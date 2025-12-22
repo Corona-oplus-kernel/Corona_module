@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Corona 控制台</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="bg-decoration"></div>
+
+    <div class="container">
+        
+        <div class="page active" id="page-home">
+            <div class="page-header">
+                <h1 class="page-title">仪表盘</h1>
+                <p class="page-subtitle">系统状态与监控</p>
+            </div>
+
+            <div class="banner-image">
+                <img src="images/001.png" alt="Banner">
+            </div>
+
+            <div class="card-row">
+                <div class="card-col-left">
+                    <div class="card card-device">
+                        <div class="card-title">设备型号</div>
+                        <div class="card-content">
+                            <div class="device-brand" id="device-brand">--</div>
+                            <div class="device-model" id="device-model">--</div>
+                        </div>
+                        <div class="device-image">
+                            <img src="images/002.png" alt="Device">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-col-right">
+                    <div class="card card-small">
+                        <div class="card-title">处理器</div>
+                        <div class="info-primary" id="cpu-info">--</div>
+                    </div>
+
+                    <div class="card card-small">
+                        <div class="card-title">运行内存</div>
+                        <div class="info-primary" id="mem-total">--</div>
+                        <div class="info-secondary"><span id="mem-used">--</span> / <span id="mem-available">--</span></div>
+                        <div class="progress-bar-mini">
+                            <div class="progress-fill" id="mem-progress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">交换分区 / ZRAM</div>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">总容量</span>
+                        <span class="info-value" id="swap-total">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">已用 / 空闲</span>
+                        <span class="info-value"><span id="swap-used">--</span> / <span id="swap-free">--</span></span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill swap" id="swap-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">储存空间</div>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">总容量</span>
+                        <span class="info-value" id="storage-total">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">已用空间</span>
+                        <span class="info-value" id="storage-used">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">可用空间</span>
+                        <span class="info-value" id="storage-available">--</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="storage-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    电池与温度
+                    <span class="refresh-indicator"></span>
+                </div>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">电池电量</span>
+                        <span class="info-value" id="battery-level">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">电池容量</span>
+                        <span class="info-value" id="battery-capacity">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">电池温度</span>
+                        <span class="info-value" id="battery-temp">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">CPU 温度</span>
+                        <span class="info-value" id="cpu-temp">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">系统信息</div>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">系统版本</span>
+                        <span class="info-value" id="system-version">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">内核版本</span>
+                        <span class="info-value" id="kernel-version">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card card-author" id="author-card">
+                <div class="author-row">
+                    <span class="author-label">模块作者</span>
+                    <span class="author-name">Frost_Bai</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="page" id="page-settings">
+            <div class="page-header">
+                <h1 class="page-title">系统配置</h1>
+                <p class="page-subtitle">修改系统配置</p>
+            </div>
+
+            <div class="card">
+                <div class="card-title">ZRAM 管理 ></div>
+                
+                <div class="switch-container">
+                    <div class="switch-info">
+                        <span class="switch-label">启用 ZRAM 设置</span>
+                        <span class="switch-desc">压缩内存块，扩展可用RAM</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="zram-switch">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                
+                <div id="zram-settings" class="sub-settings hidden">
+                    <div class="info-item">
+                        <span class="info-label">当前算法</span>
+                        <span class="info-value" id="zram-current-alg">--</span>
+                        <span class="info-label">当前大小</span>
+                        <span class="info-value" id="zram-current-size">--</span>
+                    </div>
+                    
+                    <div class="setting-section">
+                        <span class="section-label">压缩算法</span>
+                        <div class="option-grid" id="algorithm-list"></div>
+                    </div>
+                    
+                    <div class="setting-section">
+                        <span class="section-label">ZRAM 大小 (松开立即应用)</span>
+                        <div class="slider-container">
+                            <input type="range" class="range-slider" id="zram-size-slider" 
+                                   min="2" max="24" step="0.25" value="8">
+                            <div class="slider-labels">
+                                <span>2GB</span>
+                                <span class="slider-value" id="zram-size-value">8.00 GB</span>
+                                <span>24GB</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-section">
+                        <span class="section-label">Swappiness (松开立即应用)</span>
+                        <div class="slider-container">
+                            <input type="range" class="range-slider" id="swappiness-slider" 
+                                   min="0" max="200" step="1" value="100">
+                            <div class="slider-labels">
+                                <span>0</span>
+                                <span class="slider-value" id="swappiness-value">100</span>
+                                <span>200</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    IO 调度器
+                    <span class="current-badge" id="io-current">--</span>
+                </div>
+                <div class="option-list" id="io-scheduler-list"></div>
+                
+                <div class="setting-section">
+                    <span class="section-label">预读取大小 (KB)</span>
+                    <div class="option-grid cols-4" id="readahead-list"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    CPU 调频器
+                    <span class="current-badge" id="cpu-gov-current">--</span>
+                </div>
+                <div class="option-list" id="cpu-governor-list"></div>
+                
+                <div class="setting-section">
+                    <span class="section-label">核心管理 (点击切换)</span>
+                    <div class="cpu-grid" id="cpu-cores-list"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    TCP 拥塞算法
+                    <span class="current-badge" id="tcp-current">--</span>
+                </div>
+                <div class="option-list" id="tcp-list"></div>
+            </div>
+        </div>
+
+        <div class="tab-bar-container">
+            <nav class="tab-bar">
+                <div class="tab-slider" id="tab-slider"></div>
+                <div class="tab-item active" data-page="home">
+                    <span class="tab-label">主页</span>
+                </div>
+                <div class="tab-item" data-page="settings">
+                    <span class="tab-label">配置</span>
+                </div>
+            </nav>
+        </div>
+
+    <div class="toast" id="toast"></div>
+
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <span class="loading-text">处理中...</span>
+    </div>
+
+    <div class="easter-egg-overlay" id="easter-egg-overlay">
+        <div class="easter-egg-card" id="easter-egg-card">
+            <div class="easter-egg-content" id="easter-egg-content">
+                <div class="rainbow-text">感谢使用<span class="corona-c">C</span>orona模块</div>
+                <div class="rainbow-text ciallo">Ciallo~(∠・ω< )⌒★</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
