@@ -7,7 +7,7 @@ sleep 5
 
 mkdir -p "$CONFIG_DIR"
 
-sleep 10
+sleep 5
 if [ -f "$CONFIG_DIR/zram.conf" ]; then
     enabled=$(grep "^enabled=" "$CONFIG_DIR/zram.conf" | cut -d'=' -f2)
     if [ "$enabled" = "1" ]; then
@@ -25,6 +25,19 @@ if [ -f "$CONFIG_DIR/zram.conf" ]; then
         mkswap /dev/block/zram0 2>/dev/null
         swapon /dev/block/zram0 -p 32758 2>/dev/null || swapon /dev/block/zram0 2>/dev/null
         echo "${swappiness:-100}" > /proc/sys/vm/swappiness 2>/dev/null
+    fi
+fi
+
+sleep 5
+if [ -f "$CONFIG_DIR/le9ec.conf" ]; then
+    enabled=$(grep "^enabled=" "$CONFIG_DIR/le9ec.conf" | cut -d'=' -f2)
+    if [ "$enabled" = "1" ]; then
+        anon_min=$(grep "^anon_min=" "$CONFIG_DIR/le9ec.conf" | cut -d'=' -f2)
+        clean_low=$(grep "^clean_low=" "$CONFIG_DIR/le9ec.conf" | cut -d'=' -f2)
+        clean_min=$(grep "^clean_min=" "$CONFIG_DIR/le9ec.conf" | cut -d'=' -f2)
+        [ -n "$anon_min" ] && echo "$anon_min" > /proc/sys/vm/anon_min_kbytes 2>/dev/null
+        [ -n "$clean_low" ] && echo "$clean_low" > /proc/sys/vm/clean_low_kbytes 2>/dev/null
+        [ -n "$clean_min" ] && echo "$clean_min" > /proc/sys/vm/clean_min_kbytes 2>/dev/null
     fi
 fi
 

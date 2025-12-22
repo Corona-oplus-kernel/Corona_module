@@ -29,20 +29,21 @@
                             <div class="device-brand" id="device-brand">--</div>
                             <div class="device-model" id="device-model">--</div>
                         </div>
-                        <div class="device-image">
-                            <img src="images/002.png" alt="Device">
+                        <div class="device-image" id="device-image-container">
+                            <img src="images/002.png" alt="Device" id="device-image">
                         </div>
                     </div>
                 </div>
 
                 <div class="card-col-right">
-                    <div class="card card-small">
-                        <div class="card-title">处理器</div>
+                    <div class="card card-small card-clickable" id="cpu-card">
+                        <div class="card-title">处理器 ></div>
                         <div class="info-primary" id="cpu-info">--</div>
+                        <div class="info-secondary" id="cpu-cluster-info">--</div>
                     </div>
 
-                    <div class="card card-small">
-                        <div class="card-title">运行内存</div>
+                    <div class="card card-small card-clickable" id="mem-card">
+                        <div class="card-title">运行内存 ></div>
                         <div class="info-primary" id="mem-total">--</div>
                         <div class="info-secondary"><span id="mem-used">--</span> / <span id="mem-available">--</span></div>
                         <div class="progress-bar-mini">
@@ -52,8 +53,8 @@
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-title">交换分区 / ZRAM</div>
+            <div class="card card-clickable" id="swap-card">
+                <div class="card-title">交换分区 / ZRAM ></div>
                 <div class="info-list">
                     <div class="info-item">
                         <span class="info-label">总容量</span>
@@ -69,8 +70,8 @@
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-title">储存空间</div>
+            <div class="card card-clickable" id="storage-card">
+                <div class="card-title">储存空间 ></div>
                 <div class="info-list">
                     <div class="info-item">
                         <span class="info-label">总容量</span>
@@ -90,9 +91,9 @@
                 </div>
             </div>
 
-            <div class="card">
+            <div class="card card-clickable" id="battery-card">
                 <div class="card-title">
-                    电池与温度
+                    电池与温度 >
                     <span class="refresh-indicator"></span>
                 </div>
                 <div class="info-list">
@@ -143,7 +144,7 @@
                 <p class="page-subtitle">修改系统配置</p>
             </div>
 
-            <div class="card">
+            <div class="card" id="zram-card">
                 <div class="card-title">ZRAM 管理 ></div>
                 
                 <div class="switch-container">
@@ -198,6 +199,78 @@
                 </div>
             </div>
 
+            <div class="card" id="le9ec-card">
+                <div class="card-title">LE9EC 内存保护 ></div>
+                
+                <div class="switch-container">
+                    <div class="switch-info">
+                        <span class="switch-label">启用 LE9EC</span>
+                        <span class="switch-desc">保护工作集，防止内存抖动</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="le9ec-switch">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                
+                <div id="le9ec-settings" class="sub-settings hidden">
+                    <div class="info-item">
+                        <span class="info-label">匿名页保护</span>
+                        <span class="info-value" id="le9ec-anon-current">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">文件页软保护</span>
+                        <span class="info-value" id="le9ec-clean-low-current">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">文件页硬保护</span>
+                        <span class="info-value" id="le9ec-clean-min-current">--</span>
+                    </div>
+                    
+                    <div class="setting-section">
+                        <span class="section-label">vm.anon_min_kbytes (匿名页硬保护)</span>
+                        <span class="section-desc">防止匿名页过度换出到ZRAM</span>
+                        <div class="slider-container">
+                            <input type="range" class="range-slider" id="le9ec-anon-slider" 
+                                   min="0" max="4194304" step="65536" value="0">
+                            <div class="slider-labels">
+                                <span>0</span>
+                                <span class="slider-value" id="le9ec-anon-value">0 MB</span>
+                                <span>4 GB</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-section">
+                        <span class="section-label">vm.clean_low_kbytes (文件页软保护)</span>
+                        <span class="section-desc">除非OOM否则不回收低于此值的干净文件页</span>
+                        <div class="slider-container">
+                            <input type="range" class="range-slider" id="le9ec-clean-low-slider" 
+                                   min="0" max="2097152" step="32768" value="0">
+                            <div class="slider-labels">
+                                <span>0</span>
+                                <span class="slider-value" id="le9ec-clean-low-value">0 MB</span>
+                                <span>2 GB</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-section">
+                        <span class="section-label">vm.clean_min_kbytes (文件页硬保护)</span>
+                        <span class="section-desc">绝不回收低于此值的干净文件页</span>
+                        <div class="slider-container">
+                            <input type="range" class="range-slider" id="le9ec-clean-min-slider" 
+                                   min="0" max="1048576" step="16384" value="0">
+                            <div class="slider-labels">
+                                <span>0</span>
+                                <span class="slider-value" id="le9ec-clean-min-value">0 MB</span>
+                                <span>1 GB</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-title">
                     IO 调度器
@@ -211,7 +284,7 @@
                 </div>
             </div>
 
-            <div class="card">
+            <div class="card" id="cpu-governor-card">
                 <div class="card-title">
                     CPU 调频器
                     <span class="current-badge" id="cpu-gov-current">--</span>
@@ -219,7 +292,10 @@
                 <div class="option-list" id="cpu-governor-list"></div>
                 
                 <div class="setting-section">
-                    <span class="section-label">核心管理 (点击切换)</span>
+                    <div class="section-header">
+                        <span class="section-label">核心管理 (点击切换)</span>
+                        <span class="cpu-cluster-badge" id="cpu-cluster-badge">--</span>
+                    </div>
                     <div class="cpu-grid" id="cpu-cores-list"></div>
                 </div>
             </div>
@@ -230,6 +306,12 @@
                     <span class="current-badge" id="tcp-current">--</span>
                 </div>
                 <div class="option-list" id="tcp-list"></div>
+            </div>
+
+            <div class="card card-danger">
+                <div class="card-title">危险操作</div>
+                <div class="action-desc" style="margin-bottom: 14px; color: var(--text-sub);">重置所有设置并删除所有配置文件，此操作不可撤销</div>
+                <button class="action-btn action-btn-danger" id="reset-all-btn">重置所有设置</button>
             </div>
         </div>
 
@@ -255,9 +337,93 @@
     <div class="easter-egg-overlay" id="easter-egg-overlay">
         <div class="easter-egg-card" id="easter-egg-card">
             <div class="easter-egg-content" id="easter-egg-content">
-                <div class="rainbow-text">感谢使用<span class="corona-c">C</span>orona模块</div>
+                <div class="rainbow-text">感谢使用<span class="corona-c-rainbow">C</span>orona模块</div>
                 <div class="rainbow-text ciallo">Ciallo~(∠・ω< )⌒★</div>
             </div>
+        </div>
+    </div>
+
+    <div class="detail-overlay hidden" id="battery-detail-overlay">
+        <div class="detail-card">
+            <div class="detail-header">
+                <span class="detail-title">电池详情</span>
+                <span class="detail-close" id="battery-detail-close">✕</span>
+            </div>
+            <div class="detail-content" id="battery-detail-content">
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-overlay hidden" id="ufs-detail-overlay">
+        <div class="detail-card">
+            <div class="detail-header">
+                <span class="detail-title">UFS 寿命</span>
+                <span class="detail-close" id="ufs-detail-close">✕</span>
+            </div>
+            <div class="detail-content" id="ufs-detail-content">
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-overlay hidden" id="storage-detail-overlay">
+        <div class="detail-card">
+            <div class="detail-header">
+                <span class="detail-title">储存管理</span>
+                <span class="detail-close" id="storage-detail-close">✕</span>
+            </div>
+            <div class="detail-content" id="storage-detail-content">
+                <div class="action-section">
+                    <div class="action-title">垃圾回收 (GC)</div>
+                    <div class="action-desc">执行F2FS文件系统垃圾回收</div>
+                    <button class="action-btn" id="gc-btn">执行 GC</button>
+                </div>
+                <div class="action-section" id="memclean-section">
+                    <div class="action-title">内存清理</div>
+                    <div class="action-desc">释放系统缓存与后台进程内存</div>
+                    <div class="memclean-options" id="memclean-options">
+                        <div class="memclean-option" data-mode="drop-caches">
+                            <div class="memclean-name">清理缓存</div>
+                            <div class="memclean-desc">释放页面缓存</div>
+                        </div>
+                        <div class="memclean-option" data-mode="drop-all">
+                            <div class="memclean-name">深度清理</div>
+                            <div class="memclean-desc">释放所有可回收内存</div>
+                        </div>
+                        <div class="memclean-option" data-mode="compact">
+                            <div class="memclean-name">内存整理</div>
+                            <div class="memclean-desc">压缩内存碎片</div>
+                        </div>
+                        <div class="memclean-option" data-mode="kill-bg">
+                            <div class="memclean-name">清理后台</div>
+                            <div class="memclean-desc">终止后台应用</div>
+                        </div>
+                        <div class="memclean-option" data-mode="full-clean">
+                            <div class="memclean-name">完全清理</div>
+                            <div class="memclean-desc">执行所有清理操作</div>
+                        </div>
+                    </div>
+                    <div class="memclean-progress-container hidden" id="memclean-progress">
+                        <div class="memclean-progress-header">
+                            <span class="memclean-progress-title">清理进度</span>
+                            <span class="memclean-progress-percent" id="memclean-percent">0%</span>
+                        </div>
+                        <div class="memclean-progress-bar">
+                            <div class="memclean-progress-fill" id="memclean-fill" style="width: 0%"></div>
+                        </div>
+                        <div class="memclean-progress-status" id="memclean-status">准备中...</div>
+                    </div>
+                    <div class="memclean-result hidden" id="memclean-result">
+                        <div class="memclean-result-title">清理结果</div>
+                        <div class="memclean-result-content" id="memclean-result-content"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-overlay hidden" id="xinran-overlay">
+        <div class="detail-card xinran-card">
+            <img src="images/003.png" alt="Xinran" class="xinran-image">
         </div>
     </div>
 
