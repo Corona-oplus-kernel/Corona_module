@@ -302,6 +302,22 @@
                 </div>
             </div>
 
+            <div class="card" id="cpu-affinity-card">
+                <div class="card-title">
+                    CPU 亲和性
+                    <span class="current-badge" id="affinity-count">0 条规则</span>
+                </div>
+                <div class="affinity-desc">为进程指定运行的CPU核心，优化性能与功耗</div>
+                
+                <div class="affinity-rules-container" id="affinity-rules-list">
+                    <div class="affinity-empty">暂无亲和性规则</div>
+                </div>
+                
+                <button class="action-btn affinity-add-btn" id="affinity-add-btn">
+                    <span class="add-icon">+</span> 添加进程规则
+                </button>
+            </div>
+
             <div class="card">
                 <div class="card-title">
                     TCP 拥塞算法
@@ -426,6 +442,42 @@
     <div class="detail-overlay hidden" id="xinran-overlay">
         <div class="detail-card xinran-card">
             <img src="images/003.png" alt="Xinran" class="xinran-image">
+        </div>
+    </div>
+
+    <div class="detail-overlay hidden" id="affinity-process-overlay">
+        <div class="detail-card affinity-process-card">
+            <div class="detail-header">
+                <span class="detail-title">选择进程</span>
+                <span class="detail-close" id="affinity-process-close">✕</span>
+            </div>
+            <div class="affinity-search-container">
+                <input type="text" class="affinity-search" id="process-search" placeholder="搜索进程...">
+            </div>
+            <div class="affinity-process-list" id="process-list">
+                <div class="affinity-loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-overlay hidden" id="affinity-cpu-overlay">
+        <div class="detail-card affinity-cpu-card">
+            <div class="detail-header">
+                <span class="detail-title">选择CPU核心</span>
+                <span class="detail-close" id="affinity-cpu-close">✕</span>
+            </div>
+            <div class="affinity-process-info" id="selected-process-info">
+                <span class="process-name">--</span>
+            </div>
+            <div class="affinity-cpu-grid" id="affinity-cpu-grid"></div>
+            <div class="affinity-cpu-presets">
+                <div class="preset-title">快速选择</div>
+                <div class="preset-buttons" id="preset-buttons"></div>
+            </div>
+            <div class="affinity-actions">
+                <button class="action-btn affinity-cancel-btn" id="affinity-cancel-btn">取消</button>
+                <button class="action-btn affinity-save-btn" id="affinity-save-btn">保存规则</button>
+            </div>
         </div>
     </div>
 

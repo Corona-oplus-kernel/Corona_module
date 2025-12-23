@@ -41,6 +41,11 @@ class CoronaAddon {
             isDragging: false,
             currentScale: 1
         };
+        this.affinityRules = {};
+        this.affinityProcesses = [];
+        this.selectedProcess = null;
+        this.selectedCpus = [];
+        this.cpuMaxFreqs = [];
         this.init();
     }
     
@@ -57,6 +62,7 @@ class CoronaAddon {
         this.initDeviceImageInteraction();
         this.initDetailOverlays();
         this.initHomeCardClicks();
+        this.initAffinityFeature();
     }
     
     async exec(cmd) {
@@ -936,7 +942,8 @@ class CoronaAddon {
             this.loadIOConfig(),
             this.loadCpuGovernorConfig(),
             this.loadTCPConfig(),
-            this.loadCpuCores()
+            this.loadCpuCores(),
+            this.loadAffinityConfig()
         ]);
         await this.updateModuleDescription();
         this.updateClusterBadge();
@@ -1125,14 +1132,10 @@ class CoronaAddon {
     }
     async loadCpuCores() {
         this.cpuCores = [];
-        const container = document.getElementById('cpu-cores-list');
-        if (container) container.innerHTML = '';
-        
         const cpuCount = parseInt(await this.exec('ls -d /sys/devices/system/cpu/cpu[0-9]* 2>/dev/null | wc -l')) || 0;
         const totalCores = this.getTotalCoreCount();
         const maxCores = totalCores > 0 ? totalCores : cpuCount;
         const seenIds = new Set();
-        
         for (let i = 0; i < cpuCount && this.cpuCores.length < maxCores; i++) {
             if (seenIds.has(i)) continue;
             const online = await this.exec(`cat /sys/devices/system/cpu/cpu${i}/online 2>/dev/null`);
@@ -1148,7 +1151,6 @@ class CoronaAddon {
                 load: '--'
             });
         }
-        
         this.cpuCores.sort((a, b) => a.id - b.id);
         this.renderCpuCores();
         await this.updateCpuLoads();
@@ -1483,6 +1485,385 @@ class CoronaAddon {
             card.style.transform = '';
             card.style.transition = '';
         }, 400);
+    }
+
+    initAffinityFeature() {
+        document.getElementById('affinity-add-btn').addEventListener('click', () => {
+            this.showProcessSelector();
+        });
+        document.getElementById('affinity-process-close').addEventListener('click', () => {
+            this.hideOverlay('affinity-process-overlay');
+        });
+        document.getElementById('affinity-cpu-close').addEventListener('click', () => {
+            this.hideOverlay('affinity-cpu-overlay');
+        });
+        document.getElementById('affinity-cancel-btn').addEventListener('click', () => {
+            this.hideOverlay('affinity-cpu-overlay');
+        });
+        document.getElementById('affinity-save-btn').addEventListener('click', () => {
+            this.saveAffinityRule();
+        });
+        document.getElementById('process-search').addEventListener('input', (e) => {
+            this.filterProcessList(e.target.value);
+        });
+        document.getElementById('affinity-process-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'affinity-process-overlay') {
+                this.hideOverlay('affinity-process-overlay');
+            }
+        });
+        document.getElementById('affinity-cpu-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'affinity-cpu-overlay') {
+                this.hideOverlay('affinity-cpu-overlay');
+            }
+        });
+    }
+
+    async loadAffinityConfig() {
+        const config = await this.exec(`cat ${this.configDir}/cpu_affinity.conf 2>/dev/null`);
+        this.affinityRules = {};
+        if (config && config.trim()) {
+            const lines = config.trim().split('\n');
+            for (const line of lines) {
+                if (line && line.includes('=')) {
+                    const [processName, cpuMask] = line.split('=');
+                    if (processName && cpuMask) {
+                        this.affinityRules[processName.trim()] = cpuMask.trim();
+                    }
+                }
+            }
+        }
+        this.renderAffinityRules();
+        this.updateAffinityCount();
+    }
+
+    renderAffinityRules() {
+        const container = document.getElementById('affinity-rules-list');
+        const ruleNames = Object.keys(this.affinityRules);
+        if (ruleNames.length === 0) {
+            container.innerHTML = '<div class="affinity-empty">暂无亲和性规则</div>';
+            return;
+        }
+        container.innerHTML = ruleNames.map(name => `
+            <div class="affinity-rule-item" data-process="${name}">
+                <div class="affinity-rule-info">
+                    <div class="affinity-rule-name">${name}</div>
+                    <div class="affinity-rule-cpus">CPU: ${this.affinityRules[name]}</div>
+                </div>
+                <div class="affinity-rule-actions">
+                    <button class="affinity-rule-btn edit" onclick="corona.editAffinityRule('${name}')">✎</button>
+                    <button class="affinity-rule-btn delete" onclick="corona.deleteAffinityRule('${name}')">✕</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    updateAffinityCount() {
+        const count = Object.keys(this.affinityRules).length;
+        document.getElementById('affinity-count').textContent = `${count} 条规则`;
+    }
+
+    async showProcessSelector() {
+        this.showOverlay('affinity-process-overlay');
+        document.getElementById('process-search').value = '';
+        document.getElementById('process-list').innerHTML = '<div class="affinity-loading">加载中...</div>';
+        await this.loadProcessList();
+    }
+
+    async loadProcessList() {
+        const psOutput = await this.exec(`ps -A -o pid,comm 2>/dev/null | tail -n +2`);
+        const processes = [];
+        const seen = new Set();
+        if (psOutput) {
+            const lines = psOutput.split('\n');
+            for (const line of lines) {
+                const match = line.trim().match(/^\s*(\d+)\s+(.+)$/);
+                if (match) {
+                    const pid = match[1];
+                    const name = match[2].trim();
+                    if (!seen.has(name) && name && !name.startsWith('[')) {
+                        seen.add(name);
+                        processes.push({ pid, name });
+                    }
+                }
+            }
+        }
+        processes.sort((a, b) => a.name.localeCompare(b.name));
+        this.affinityProcesses = processes;
+        this.renderProcessList(processes);
+    }
+
+    renderProcessList(processes) {
+        const container = document.getElementById('process-list');
+        if (processes.length === 0) {
+            container.innerHTML = '<div class="affinity-loading">未找到进程</div>';
+            return;
+        }
+        const systemProcs = [];
+        const appProcs = [];
+        const otherProcs = [];
+        for (const proc of processes) {
+            if (proc.name.startsWith('com.') || proc.name.includes('.')) {
+                appProcs.push(proc);
+            } else if (['surfaceflinger', 'zygote', 'system_server', 'servicemanager', 'vold', 'logd', 'lmkd', 'hwservicemanager', 'android.hardware'].some(s => proc.name.includes(s))) {
+                systemProcs.push(proc);
+            } else {
+                otherProcs.push(proc);
+            }
+        }
+        let html = '';
+        if (appProcs.length > 0) {
+            html += '<div class="process-category">应用进程</div>';
+            html += appProcs.map(p => this.renderProcessItem(p)).join('');
+        }
+        if (systemProcs.length > 0) {
+            html += '<div class="process-category">系统进程</div>';
+            html += systemProcs.map(p => this.renderProcessItem(p)).join('');
+        }
+        if (otherProcs.length > 0) {
+            html += '<div class="process-category">其他进程</div>';
+            html += otherProcs.map(p => this.renderProcessItem(p)).join('');
+        }
+        container.innerHTML = html;
+        container.querySelectorAll('.affinity-process-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const name = item.dataset.name;
+                this.selectProcess(name);
+            });
+        });
+    }
+
+    renderProcessItem(proc) {
+        const initial = proc.name.charAt(0).toUpperCase();
+        return `
+            <div class="affinity-process-item" data-name="${proc.name}" data-pid="${proc.pid}">
+                <div class="process-icon">${initial}</div>
+                <div class="process-details">
+                    <div class="process-name">${proc.name}</div>
+                    <div class="process-pid">PID: ${proc.pid}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    filterProcessList(keyword) {
+        const filtered = this.affinityProcesses.filter(p => 
+            p.name.toLowerCase().includes(keyword.toLowerCase())
+        );
+        this.renderProcessList(filtered);
+    }
+
+    async selectProcess(processName) {
+        this.selectedProcess = processName;
+        this.hideOverlay('affinity-process-overlay');
+        await this.showCpuSelector();
+    }
+
+    async showCpuSelector() {
+        this.showOverlay('affinity-cpu-overlay');
+        document.getElementById('selected-process-info').innerHTML = `
+            <span class="process-name">${this.selectedProcess}</span>
+        `;
+        if (this.affinityRules[this.selectedProcess]) {
+            this.selectedCpus = this.parseCpuMask(this.affinityRules[this.selectedProcess]);
+        } else {
+            this.selectedCpus = [];
+        }
+        await this.renderCpuGrid();
+        this.renderPresetButtons();
+    }
+
+    parseCpuMask(mask) {
+        const cpus = [];
+        if (!mask) return cpus;
+        const parts = mask.split(',');
+        for (const part of parts) {
+            if (part.includes('-')) {
+                const [start, end] = part.split('-').map(Number);
+                for (let i = start; i <= end; i++) {
+                    cpus.push(i);
+                }
+            } else {
+                cpus.push(parseInt(part));
+            }
+        }
+        return [...new Set(cpus)].sort((a, b) => a - b);
+    }
+
+    formatCpuMask(cpus) {
+        if (cpus.length === 0) return '';
+        const sorted = [...cpus].sort((a, b) => a - b);
+        const ranges = [];
+        let start = sorted[0];
+        let end = sorted[0];
+        for (let i = 1; i < sorted.length; i++) {
+            if (sorted[i] === end + 1) {
+                end = sorted[i];
+            } else {
+                ranges.push(start === end ? `${start}` : `${start}-${end}`);
+                start = sorted[i];
+                end = sorted[i];
+            }
+        }
+        ranges.push(start === end ? `${start}` : `${start}-${end}`);
+        return ranges.join(',');
+    }
+
+    async renderCpuGrid() {
+        const container = document.getElementById('affinity-cpu-grid');
+        const cpuCount = this.cpuCores.length || 8;
+        if (this.cpuMaxFreqs.length === 0) {
+            for (let i = 0; i < cpuCount; i++) {
+                const freq = await this.exec(`cat /sys/devices/system/cpu/cpu${i}/cpufreq/cpuinfo_max_freq 2>/dev/null`);
+                this.cpuMaxFreqs[i] = freq ? Math.round(parseInt(freq) / 1000) : 0;
+            }
+        }
+        let html = '';
+        for (let i = 0; i < cpuCount; i++) {
+            const isSelected = this.selectedCpus.includes(i);
+            const freq = this.cpuMaxFreqs[i] ? `${this.cpuMaxFreqs[i]} MHz` : '--';
+            html += `
+                <div class="affinity-cpu-item ${isSelected ? 'selected' : ''}" data-cpu="${i}" onclick="corona.toggleAffinityCpu(${i})">
+                    <div class="cpu-item-id">CPU ${i}</div>
+                    <div class="cpu-item-freq">${freq}</div>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+    }
+
+    renderPresetButtons() {
+        const container = document.getElementById('preset-buttons');
+        const totalCpus = this.cpuCores.length || 8;
+        const presets = [
+            { name: '全部', cpus: Array.from({length: totalCpus}, (_, i) => i) },
+            { name: '小核', cpus: this.getClusterCpus('little') },
+            { name: '中核', cpus: this.getClusterCpus('mid') },
+            { name: '大核', cpus: this.getClusterCpus('big') },
+            { name: '超大核', cpus: this.getClusterCpus('prime') }
+        ].filter(p => p.cpus.length > 0);
+        container.innerHTML = presets.map(p => `
+            <button class="preset-btn" onclick="corona.applyPreset([${p.cpus.join(',')}])">${p.name} (${p.cpus.length})</button>
+        `).join('');
+    }
+
+    getClusterCpus(clusterType) {
+        const freqs = [];
+        for (let i = 0; i < this.cpuCores.length; i++) {
+            freqs.push({ cpu: i, freq: this.cpuMaxFreqs[i] || 0 });
+        }
+        freqs.sort((a, b) => a.freq - b.freq);
+        const uniqueFreqs = [...new Set(freqs.map(f => f.freq))].sort((a, b) => a - b);
+        if (uniqueFreqs.length === 1) {
+            return clusterType === 'little' ? freqs.map(f => f.cpu) : [];
+        } else if (uniqueFreqs.length === 2) {
+            if (clusterType === 'little') return freqs.filter(f => f.freq === uniqueFreqs[0]).map(f => f.cpu);
+            if (clusterType === 'big') return freqs.filter(f => f.freq === uniqueFreqs[1]).map(f => f.cpu);
+            return [];
+        } else if (uniqueFreqs.length === 3) {
+            if (clusterType === 'little') return freqs.filter(f => f.freq === uniqueFreqs[0]).map(f => f.cpu);
+            if (clusterType === 'mid') return freqs.filter(f => f.freq === uniqueFreqs[1]).map(f => f.cpu);
+            if (clusterType === 'big') return freqs.filter(f => f.freq === uniqueFreqs[2]).map(f => f.cpu);
+            return [];
+        } else if (uniqueFreqs.length >= 4) {
+            if (clusterType === 'little') return freqs.filter(f => f.freq === uniqueFreqs[0]).map(f => f.cpu);
+            if (clusterType === 'mid') return freqs.filter(f => f.freq === uniqueFreqs[1]).map(f => f.cpu);
+            if (clusterType === 'big') return freqs.filter(f => f.freq !== uniqueFreqs[0] && f.freq !== uniqueFreqs[1] && f.freq !== uniqueFreqs[uniqueFreqs.length - 1]).map(f => f.cpu);
+            if (clusterType === 'prime') return freqs.filter(f => f.freq === uniqueFreqs[uniqueFreqs.length - 1]).map(f => f.cpu);
+            return [];
+        }
+        return [];
+    }
+
+    toggleAffinityCpu(cpuId) {
+        const idx = this.selectedCpus.indexOf(cpuId);
+        if (idx >= 0) {
+            this.selectedCpus.splice(idx, 1);
+        } else {
+            this.selectedCpus.push(cpuId);
+        }
+        this.selectedCpus.sort((a, b) => a - b);
+        this.updateCpuGridSelection();
+    }
+
+    applyPreset(cpus) {
+        this.selectedCpus = [...cpus];
+        this.updateCpuGridSelection();
+    }
+
+    updateCpuGridSelection() {
+        document.querySelectorAll('.affinity-cpu-item').forEach(item => {
+            const cpuId = parseInt(item.dataset.cpu);
+            item.classList.toggle('selected', this.selectedCpus.includes(cpuId));
+        });
+    }
+
+    async saveAffinityRule() {
+        if (!this.selectedProcess) {
+            this.showToast('请先选择进程');
+            return;
+        }
+        if (this.selectedCpus.length === 0) {
+            this.showToast('请至少选择一个CPU核心');
+            return;
+        }
+        const cpuMask = this.formatCpuMask(this.selectedCpus);
+        this.affinityRules[this.selectedProcess] = cpuMask;
+        await this.saveAffinityConfig();
+        await this.applyAffinityRule(this.selectedProcess, cpuMask);
+        this.hideOverlay('affinity-cpu-overlay');
+        this.renderAffinityRules();
+        this.updateAffinityCount();
+        this.showToast(`已设置 ${this.selectedProcess} 的CPU亲和性: ${cpuMask}`);
+    }
+
+    async saveAffinityConfig() {
+        let configContent = '';
+        for (const [name, mask] of Object.entries(this.affinityRules)) {
+            configContent += `${name}=${mask}\n`;
+        }
+        await this.exec(`echo '${configContent}' > ${this.configDir}/cpu_affinity.conf`);
+    }
+
+    async applyAffinityRule(processName, cpuMask) {
+        const pids = await this.exec(`pgrep -f "${processName}" 2>/dev/null`);
+        if (pids) {
+            const pidList = pids.trim().split('\n');
+            for (const pid of pidList) {
+                if (pid && pid.trim()) {
+                    await this.exec(`taskset -p ${this.cpuMaskToHex(this.parseCpuMask(cpuMask))} ${pid.trim()} 2>/dev/null`);
+                }
+            }
+        }
+    }
+
+    cpuMaskToHex(cpus) {
+        let mask = 0;
+        for (const cpu of cpus) {
+            mask |= (1 << cpu);
+        }
+        return '0x' + mask.toString(16);
+    }
+
+    async editAffinityRule(processName) {
+        this.selectedProcess = processName;
+        await this.showCpuSelector();
+    }
+
+    async deleteAffinityRule(processName) {
+        if (!confirm(`确定要删除 ${processName} 的亲和性规则吗？`)) {
+            return;
+        }
+        delete this.affinityRules[processName];
+        await this.saveAffinityConfig();
+        this.renderAffinityRules();
+        this.updateAffinityCount();
+        this.showToast(`已删除 ${processName} 的亲和性规则`);
+    }
+
+    async applyAllAffinityRules() {
+        for (const [name, mask] of Object.entries(this.affinityRules)) {
+            await this.applyAffinityRule(name, mask);
+        }
     }
 }
 
