@@ -302,18 +302,18 @@
                 </div>
             </div>
 
-            <div class="card" id="cpu-affinity-card">
+            <div class="card" id="process-priority-card">
                 <div class="card-title">
-                    CPU 亲和性
-                    <span class="current-badge" id="affinity-count">0 条规则</span>
+                    进程优先级
+                    <span class="current-badge" id="priority-count">0 条规则</span>
                 </div>
-                <div class="affinity-desc">为进程指定运行的CPU核心，优化性能与功耗</div>
+                <div class="priority-desc">为进程设置 nice 值和 I/O 优先级</div>
                 
-                <div class="affinity-rules-container" id="affinity-rules-list">
-                    <div class="affinity-empty">暂无亲和性规则</div>
+                <div class="priority-rules-container" id="priority-rules-list">
+                    <div class="priority-empty">暂无优先级规则</div>
                 </div>
                 
-                <button class="action-btn affinity-add-btn" id="affinity-add-btn">
+                <button class="action-btn priority-add-btn" id="priority-add-btn">
                     <span class="add-icon">+</span> 添加进程规则
                 </button>
             </div>
@@ -445,38 +445,67 @@
         </div>
     </div>
 
-    <div class="detail-overlay hidden" id="affinity-process-overlay">
-        <div class="detail-card affinity-process-card">
+    <div class="detail-overlay hidden" id="priority-process-overlay">
+        <div class="detail-card priority-process-card">
             <div class="detail-header">
                 <span class="detail-title">选择进程</span>
-                <span class="detail-close" id="affinity-process-close">✕</span>
+                <span class="detail-close" id="priority-process-close">✕</span>
             </div>
-            <div class="affinity-search-container">
-                <input type="text" class="affinity-search" id="process-search" placeholder="搜索进程...">
+            <div class="priority-search-container">
+                <input type="text" class="priority-search" id="priority-process-search" placeholder="搜索进程...">
             </div>
-            <div class="affinity-process-list" id="process-list">
-                <div class="affinity-loading">加载中...</div>
+            <div class="priority-process-list" id="priority-process-list">
+                <div class="priority-loading">加载中...</div>
             </div>
         </div>
     </div>
 
-    <div class="detail-overlay hidden" id="affinity-cpu-overlay">
-        <div class="detail-card affinity-cpu-card">
+    <div class="detail-overlay hidden" id="priority-setting-overlay">
+        <div class="detail-card priority-setting-card">
             <div class="detail-header">
-                <span class="detail-title">选择CPU核心</span>
-                <span class="detail-close" id="affinity-cpu-close">✕</span>
+                <span class="detail-title">设置优先级</span>
+                <span class="detail-close" id="priority-setting-close">✕</span>
             </div>
-            <div class="affinity-process-info" id="selected-process-info">
+            <div class="priority-process-info" id="priority-selected-process">
                 <span class="process-name">--</span>
             </div>
-            <div class="affinity-cpu-grid" id="affinity-cpu-grid"></div>
-            <div class="affinity-cpu-presets">
-                <div class="preset-title">快速选择</div>
-                <div class="preset-buttons" id="preset-buttons"></div>
+            
+            <div class="priority-setting-section">
+                <div class="priority-setting-label">CPU 优先级 (nice)</div>
+                <div class="priority-nice-slider-container">
+                    <input type="range" class="range-slider priority-nice-slider" id="nice-slider" 
+                           min="-20" max="19" step="1" value="0">
+                    <div class="slider-labels">
+                        <span>-20 (最高)</span>
+                        <span class="slider-value" id="nice-slider-value">0</span>
+                        <span>19 (最低)</span>
+                    </div>
+                </div>
+                <div class="priority-setting-hint">nice 值越低优先级越高 (-20 到 19)</div>
             </div>
-            <div class="affinity-actions">
-                <button class="action-btn affinity-cancel-btn" id="affinity-cancel-btn">取消</button>
-                <button class="action-btn affinity-save-btn" id="affinity-save-btn">保存规则</button>
+            
+            <div class="priority-setting-section">
+                <div class="priority-setting-label">I/O 优先级</div>
+                <div class="priority-io-options" id="io-options">
+                    <div class="io-option" data-class="1" data-level="0">
+                        <div class="io-class">实时</div>
+                        <div class="io-desc">最高优先级</div>
+                    </div>
+                    <div class="io-option selected" data-class="2" data-level="4">
+                        <div class="io-class">尽力</div>
+                        <div class="io-desc">默认优先级</div>
+                    </div>
+                    <div class="io-option" data-class="3" data-level="7">
+                        <div class="io-class">空闲</div>
+                        <div class="io-desc">后台任务</div>
+                    </div>
+                </div>
+                <div class="priority-setting-hint">I/O调度类别：实时 > 尽力 > 空闲</div>
+            </div>
+            
+            <div class="priority-actions">
+                <button class="action-btn priority-cancel-btn" id="priority-cancel-btn">取消</button>
+                <button class="action-btn priority-save-btn" id="priority-save-btn">保存规则</button>
             </div>
         </div>
     </div>

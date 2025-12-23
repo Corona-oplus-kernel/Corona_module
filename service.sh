@@ -163,6 +163,34 @@ cpu_mask_to_hex() {
     printf "0x%x" "$result"
 }
 
+apply_process_priority_config() {
+    if [ -f "$CONFIG_DIR/process_priority.conf" ]; then
+        while IFS='=' read -r process_name values; do
+            if [ -n "$process_name" ] && [ -n "$values" ]; then
+                nice_val=$(echo "$values" | cut -d',' -f1)
+                io_class=$(echo "$values" | cut -d',' -f2)
+                io_level=$(echo "$values" | cut -d',' -f3)
+                apply_priority_to_process "$process_name" "$nice_val" "$io_class" "$io_level"
+            fi
+        done < "$CONFIG_DIR/process_priority.conf"
+    fi
+}
+
+apply_priority_to_process() {
+    process_name="$1"
+    nice_val="$2"
+    io_class="$3"
+    io_level="$4"
+    
+    pids=$(pgrep -f "$process_name" 2>/dev/null)
+    if [ -n "$pids" ]; then
+        for pid in $pids; do
+            renice -n "$nice_val" -p "$pid" 2>/dev/null
+            ionice -c "$io_class" -n "$io_level" -p "$pid" 2>/dev/null
+        done
+    fi
+}
+
 wait_until_boot_complete
 wait_until_login
 sleep 10
@@ -188,6 +216,10 @@ apply_tcp_config
 sleep 1
 
 apply_cpu_affinity_config
+sleep 1
+
+apply_process_priority_config
 
 sleep 30
 apply_cpu_affinity_config
+apply_process_priority_config

@@ -41,10 +41,6 @@ class CoronaAddon {
             isDragging: false,
             currentScale: 1
         };
-        this.affinityRules = {};
-        this.affinityProcesses = [];
-        this.selectedProcess = null;
-        this.selectedCpus = [];
         this.cpuMaxFreqs = [];
         this.init();
     }
@@ -62,7 +58,7 @@ class CoronaAddon {
         this.initDeviceImageInteraction();
         this.initDetailOverlays();
         this.initHomeCardClicks();
-        this.initAffinityFeature();
+        this.initPerformanceMode();
     }
     
     async exec(cmd) {
@@ -415,7 +411,7 @@ class CoronaAddon {
         this.exec(`su -c 'cmd notification post -S bigtext -t "${title}" corona_memclean "${message}"'`);
     }
     async resetAllSettings() {
-        if (!confirm('确定要重置所有设置吗？\n\n此操作将删除所有配置文件，恢复到默认状态，且不可撤销！')) {
+        if (!confirm('确定要重置所有设置吗？\n\n此操作将删除所有配置文件，恢复到默认状态，5分钟后自动重启，且不可撤销！')) {
             return;
         }
         this.showLoading(true);
@@ -435,6 +431,8 @@ class CoronaAddon {
             le9ecCleanMin: 0,
             dualCell: false
         };
+        this.priorityRules = {};
+        await this.savePriorityConfig();
         document.getElementById('zram-switch').checked = false;
         document.getElementById('le9ec-switch').checked = false;
         this.toggleZramSettings(false);
@@ -451,9 +449,75 @@ class CoronaAddon {
         document.getElementById('le9ec-clean-min-value').textContent = '0 MB';
         document.querySelectorAll('.option-item.selected').forEach(el => el.classList.remove('selected'));
         document.querySelectorAll('.algorithm-item.selected').forEach(el => el.classList.remove('selected'));
+        // 重置内存优化滑块
+        document.getElementById('dirty-ratio-slider').value = 20;
+        document.getElementById('dirty-ratio-value').textContent = '20%';
+        document.getElementById('dirty-bg-slider').value = 10;
+        document.getElementById('dirty-bg-value').textContent = '10%';
+        document.getElementById('vfs-pressure-slider').value = 100;
+        document.getElementById('vfs-pressure-value').textContent = '100';
+        document.getElementById('dirty-expire-slider').value = 30;
+        document.getElementById('dirty-expire-value').textContent = '30s';
+        document.getElementById('mem-tuning-status').textContent = '默认';
+        this.renderPriorityRules();
+        this.updatePriorityCount();
         this.showLoading(false);
-        this.showToast('所有设置已重置');
-        this.sendNotification('Corona', '所有设置已重置为默认值');
+        this.showToast('所有设置已重置，5分钟后自动重启');
+        this.sendNotification('Corona', '所有设置已重置，5分钟后自动重启');
+        this.startRebootCountdown(300);
+    }
+    startRebootCountdown(seconds) {
+        this.rebootCountdownSeconds = seconds;
+        this.showRebootCountdownUI();
+        this.rebootCountdownInterval = setInterval(() => {
+            this.rebootCountdownSeconds--;
+            this.updateRebootCountdownUI();
+            if (this.rebootCountdownSeconds <= 0) {
+                clearInterval(this.rebootCountdownInterval);
+                this.exec('reboot');
+            }
+        }, 1000);
+    }
+    showRebootCountdownUI() {
+        let container = document.getElementById('reboot-countdown-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'reboot-countdown-container';
+            container.className = 'reset-countdown';
+            container.innerHTML = `
+                <div class="reset-countdown-title">系统将在以下时间后重启</div>
+                <div class="reset-countdown-time" id="reboot-countdown-time">5:00</div>
+                <div class="reset-countdown-desc">重启后设置将完全生效</div>
+                <button class="reset-cancel-btn" id="cancel-reboot-btn">取消重启</button>
+            `;
+            const dangerCard = document.querySelector('.card-danger');
+            if (dangerCard) {
+                dangerCard.appendChild(container);
+            }
+            document.getElementById('cancel-reboot-btn').addEventListener('click', () => {
+                this.cancelRebootCountdown();
+            });
+        }
+        this.updateRebootCountdownUI();
+    }
+    updateRebootCountdownUI() {
+        const timeEl = document.getElementById('reboot-countdown-time');
+        if (timeEl) {
+            const mins = Math.floor(this.rebootCountdownSeconds / 60);
+            const secs = this.rebootCountdownSeconds % 60;
+            timeEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+    }
+    cancelRebootCountdown() {
+        if (this.rebootCountdownInterval) {
+            clearInterval(this.rebootCountdownInterval);
+            this.rebootCountdownInterval = null;
+        }
+        const container = document.getElementById('reboot-countdown-container');
+        if (container) {
+            container.remove();
+        }
+        this.showToast('已取消自动重启');
     }
     initDeviceImageInteraction() {
         const container = document.getElementById('device-image-container');
@@ -943,7 +1007,7 @@ class CoronaAddon {
             this.loadCpuGovernorConfig(),
             this.loadTCPConfig(),
             this.loadCpuCores(),
-            this.loadAffinityConfig()
+            this.loadPerformanceModeConfig()
         ]);
         await this.updateModuleDescription();
         this.updateClusterBadge();
@@ -1487,100 +1551,132 @@ class CoronaAddon {
         }, 400);
     }
 
-    initAffinityFeature() {
-        document.getElementById('affinity-add-btn').addEventListener('click', () => {
-            this.showProcessSelector();
+    initPerformanceMode() {
+        this.initProcessPriority();
+    }
+
+    // ========== 进程优先级功能 ==========
+    async loadPerformanceModeConfig() {
+        await this.loadPriorityConfig();
+    }
+
+    initProcessPriority() {
+        this.priorityRules = {};
+        this.priorityProcesses = [];
+        this.selectedPriorityProcess = null;
+        this.selectedNice = 0;
+        this.selectedIoClass = 2;
+        this.selectedIoLevel = 4;
+
+        document.getElementById('priority-add-btn').addEventListener('click', () => this.showPriorityProcessSelector());
+        document.getElementById('priority-process-close').addEventListener('click', () => this.hideOverlay('priority-process-overlay'));
+        document.getElementById('priority-setting-close').addEventListener('click', () => this.hideOverlay('priority-setting-overlay'));
+        document.getElementById('priority-cancel-btn').addEventListener('click', () => this.hideOverlay('priority-setting-overlay'));
+        document.getElementById('priority-save-btn').addEventListener('click', () => this.savePriorityRule());
+        
+        document.getElementById('priority-process-search').addEventListener('input', (e) => {
+            this.filterPriorityProcessList(e.target.value);
         });
-        document.getElementById('affinity-process-close').addEventListener('click', () => {
-            this.hideOverlay('affinity-process-overlay');
+
+        document.getElementById('priority-process-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'priority-process-overlay') this.hideOverlay('priority-process-overlay');
         });
-        document.getElementById('affinity-cpu-close').addEventListener('click', () => {
-            this.hideOverlay('affinity-cpu-overlay');
+        document.getElementById('priority-setting-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'priority-setting-overlay') this.hideOverlay('priority-setting-overlay');
         });
-        document.getElementById('affinity-cancel-btn').addEventListener('click', () => {
-            this.hideOverlay('affinity-cpu-overlay');
+
+        const niceSlider = document.getElementById('nice-slider');
+        const niceValue = document.getElementById('nice-slider-value');
+        niceSlider.addEventListener('input', () => {
+            this.selectedNice = parseInt(niceSlider.value);
+            niceValue.textContent = this.selectedNice;
         });
-        document.getElementById('affinity-save-btn').addEventListener('click', () => {
-            this.saveAffinityRule();
-        });
-        document.getElementById('process-search').addEventListener('input', (e) => {
-            this.filterProcessList(e.target.value);
-        });
-        document.getElementById('affinity-process-overlay').addEventListener('click', (e) => {
-            if (e.target.id === 'affinity-process-overlay') {
-                this.hideOverlay('affinity-process-overlay');
-            }
-        });
-        document.getElementById('affinity-cpu-overlay').addEventListener('click', (e) => {
-            if (e.target.id === 'affinity-cpu-overlay') {
-                this.hideOverlay('affinity-cpu-overlay');
-            }
+
+        document.querySelectorAll('.io-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+                document.querySelectorAll('.io-option').forEach(o => o.classList.remove('selected'));
+                opt.classList.add('selected');
+                this.selectedIoClass = parseInt(opt.dataset.class);
+                this.selectedIoLevel = parseInt(opt.dataset.level);
+            });
         });
     }
 
-    async loadAffinityConfig() {
-        const config = await this.exec(`cat ${this.configDir}/cpu_affinity.conf 2>/dev/null`);
-        this.affinityRules = {};
+    async loadPriorityConfig() {
+        const config = await this.exec(`cat ${this.configDir}/process_priority.conf 2>/dev/null`);
+        this.priorityRules = {};
         if (config && config.trim()) {
             const lines = config.trim().split('\n');
             for (const line of lines) {
                 if (line && line.includes('=')) {
-                    const [processName, cpuMask] = line.split('=');
-                    if (processName && cpuMask) {
-                        this.affinityRules[processName.trim()] = cpuMask.trim();
+                    const [processName, values] = line.split('=');
+                    if (processName && values) {
+                        const [nice, ioClass, ioLevel] = values.split(',').map(Number);
+                        this.priorityRules[processName.trim()] = { nice, ioClass, ioLevel };
                     }
                 }
             }
         }
-        this.renderAffinityRules();
-        this.updateAffinityCount();
+        this.renderPriorityRules();
+        this.updatePriorityCount();
     }
 
-    renderAffinityRules() {
-        const container = document.getElementById('affinity-rules-list');
-        const ruleNames = Object.keys(this.affinityRules);
+    renderPriorityRules() {
+        const container = document.getElementById('priority-rules-list');
+        const ruleNames = Object.keys(this.priorityRules);
         if (ruleNames.length === 0) {
-            container.innerHTML = '<div class="affinity-empty">暂无亲和性规则</div>';
+            container.innerHTML = '<div class="priority-empty">暂无优先级规则</div>';
             return;
         }
+
+        const ioClassNames = { 1: '实时', 2: '尽力', 3: '空闲' };
+
         container.innerHTML = ruleNames.map(name => {
-            const isApp = name.includes('.') && !name.includes('android.hardware');
+            const rule = this.priorityRules[name];
             const initial = name.charAt(0).toUpperCase();
-            const iconHtml = isApp 
-                ? `<div class="affinity-rule-icon app-icon"><img src="file:///data/data/${name}/icon.png" onerror="this.parentElement.classList.remove('app-icon');this.parentElement.innerHTML='${initial}';this.parentElement.style.background='linear-gradient(135deg, #00C853, #4CAF50)';" alt=""></div>`
-                : `<div class="affinity-rule-icon">${initial}</div>`;
             return `
-                <div class="affinity-rule-item" data-process="${name}">
-                    ${iconHtml}
-                    <div class="affinity-rule-info">
-                        <div class="affinity-rule-name">${name}</div>
-                        <div class="affinity-rule-cpus">CPU: ${this.affinityRules[name]}</div>
+                <div class="priority-rule-item" data-process="${name}">
+                    <div class="priority-rule-icon">${initial}</div>
+                    <div class="priority-rule-info">
+                        <div class="priority-rule-name">${name}</div>
+                        <div class="priority-rule-values">nice: ${rule.nice} | I/O: ${ioClassNames[rule.ioClass] || '尽力'}</div>
                     </div>
-                    <div class="affinity-rule-actions">
-                        <button class="affinity-rule-btn edit" onclick="corona.editAffinityRule('${name}')">✎</button>
-                        <button class="affinity-rule-btn delete" onclick="corona.deleteAffinityRule('${name}')">✕</button>
+                    <div class="priority-rule-actions">
+                        <button class="priority-rule-btn edit" data-action="edit" data-name="${name}">✎</button>
+                        <button class="priority-rule-btn delete" data-action="delete" data-name="${name}">✕</button>
                     </div>
                 </div>
             `;
         }).join('');
+
+        container.querySelectorAll('.priority-rule-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = btn.dataset.action;
+                const name = btn.dataset.name;
+                if (action === 'edit') this.editPriorityRule(name);
+                else if (action === 'delete') this.deletePriorityRule(name);
+            });
+        });
     }
 
-    updateAffinityCount() {
-        const count = Object.keys(this.affinityRules).length;
-        document.getElementById('affinity-count').textContent = `${count} 条规则`;
+    updatePriorityCount() {
+        const count = Object.keys(this.priorityRules).length;
+        document.getElementById('priority-count').textContent = `${count} 条规则`;
     }
 
-    async showProcessSelector() {
-        this.showOverlay('affinity-process-overlay');
-        document.getElementById('process-search').value = '';
-        document.getElementById('process-list').innerHTML = '<div class="affinity-loading">加载中...</div>';
-        await this.loadProcessList();
+    async showPriorityProcessSelector() {
+        this.showOverlay('priority-process-overlay');
+        document.getElementById('priority-process-search').value = '';
+        document.getElementById('priority-process-list').innerHTML = '<div class="priority-loading">加载中...</div>';
+        await this.loadPriorityProcessList();
     }
 
-    async loadProcessList() {
+    async loadPriorityProcessList() {
         const psOutput = await this.exec(`ps -Ao pid,args 2>/dev/null | tail -n +2`);
         const processes = [];
         const seen = new Set();
+        
         if (psOutput) {
             const lines = psOutput.split('\n');
             for (const line of lines) {
@@ -1589,10 +1685,9 @@ class CoronaAddon {
                     const pid = match[1];
                     let fullCmd = match[2].trim();
                     let name = fullCmd.split(/\s+/)[0];
-                    if (name.includes('/')) {
-                        name = name.split('/').pop();
-                    }
-                    const isApp = fullCmd.includes('com.') || fullCmd.includes('org.') || fullCmd.includes('net.') || fullCmd.includes('io.');
+                    if (name.includes('/')) name = name.split('/').pop();
+                    
+                    const isApp = fullCmd.includes('com.') || fullCmd.includes('org.') || fullCmd.includes('net.');
                     let packageName = '';
                     if (isApp) {
                         const pkgMatch = fullCmd.match(/([a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)+)/);
@@ -1601,6 +1696,7 @@ class CoronaAddon {
                             name = packageName;
                         }
                     }
+                    
                     if (!seen.has(name) && name && !name.startsWith('[')) {
                         seen.add(name);
                         processes.push({ pid, name, packageName, isApp });
@@ -1608,70 +1704,54 @@ class CoronaAddon {
                 }
             }
         }
+        
         processes.sort((a, b) => a.name.localeCompare(b.name));
-        this.affinityProcesses = processes;
-        this.renderProcessList(processes);
+        this.priorityProcesses = processes;
+        this.renderPriorityProcessList(processes);
     }
 
-    renderProcessList(processes) {
-        const container = document.getElementById('process-list');
+    renderPriorityProcessList(processes) {
+        const container = document.getElementById('priority-process-list');
         if (processes.length === 0) {
-            container.innerHTML = '<div class="affinity-loading">未找到进程</div>';
+            container.innerHTML = '<div class="priority-loading">未找到进程</div>';
             return;
         }
-        const systemProcs = [];
-        const appProcs = [];
-        const otherProcs = [];
+
+        const appProcs = [], systemProcs = [], otherProcs = [];
         for (const proc of processes) {
             if (proc.isApp || proc.name.startsWith('com.') || (proc.name.includes('.') && !proc.name.includes('android.hardware'))) {
                 appProcs.push(proc);
-            } else if (['surfaceflinger', 'zygote', 'system_server', 'servicemanager', 'vold', 'logd', 'lmkd', 'hwservicemanager', 'android.hardware'].some(s => proc.name.includes(s))) {
+            } else if (['surfaceflinger', 'zygote', 'system_server', 'servicemanager', 'vold', 'logd'].some(s => proc.name.includes(s))) {
                 systemProcs.push(proc);
             } else {
                 otherProcs.push(proc);
             }
         }
+
         let html = '';
         if (appProcs.length > 0) {
             html += '<div class="process-category">应用进程</div>';
-            html += appProcs.map(p => this.renderProcessItem(p, true)).join('');
+            html += appProcs.map(p => this.renderPriorityProcessItem(p)).join('');
         }
         if (systemProcs.length > 0) {
             html += '<div class="process-category">系统进程</div>';
-            html += systemProcs.map(p => this.renderProcessItem(p, false)).join('');
+            html += systemProcs.map(p => this.renderPriorityProcessItem(p)).join('');
         }
         if (otherProcs.length > 0) {
             html += '<div class="process-category">其他进程</div>';
-            html += otherProcs.map(p => this.renderProcessItem(p, false)).join('');
+            html += otherProcs.map(p => this.renderPriorityProcessItem(p)).join('');
         }
+
         container.innerHTML = html;
-        container.querySelectorAll('.affinity-process-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const name = item.dataset.name;
-                this.selectProcess(name);
-            });
+        container.querySelectorAll('.priority-process-item').forEach(item => {
+            item.addEventListener('click', () => this.selectPriorityProcess(item.dataset.name));
         });
     }
 
-    renderProcessItem(proc, isAppProc = false) {
+    renderPriorityProcessItem(proc) {
         const initial = proc.name.charAt(0).toUpperCase();
-        const packageName = proc.packageName || proc.name;
-        const isApp = isAppProc || proc.isApp || (proc.name.includes('.') && !proc.name.includes('android.hardware'));
-        if (isApp) {
-            return `
-                <div class="affinity-process-item is-app" data-name="${proc.name}" data-pid="${proc.pid}">
-                    <div class="process-icon app-icon">
-                        <img src="file:///data/data/${packageName}/icon.png" onerror="this.parentElement.classList.remove('app-icon');this.parentElement.innerHTML='${initial}';this.parentElement.style.background='linear-gradient(135deg, #00C853, #4CAF50)';" alt="">
-                    </div>
-                    <div class="process-details">
-                        <div class="process-name">${proc.name}</div>
-                        <div class="process-pid">PID: ${proc.pid}</div>
-                    </div>
-                </div>
-            `;
-        }
         return `
-            <div class="affinity-process-item" data-name="${proc.name}" data-pid="${proc.pid}">
+            <div class="priority-process-item" data-name="${proc.name}" data-pid="${proc.pid}">
                 <div class="process-icon">${initial}</div>
                 <div class="process-details">
                     <div class="process-name">${proc.name}</div>
@@ -1681,224 +1761,120 @@ class CoronaAddon {
         `;
     }
 
-    filterProcessList(keyword) {
-        const filtered = this.affinityProcesses.filter(p => 
+    filterPriorityProcessList(keyword) {
+        const filtered = this.priorityProcesses.filter(p => 
             p.name.toLowerCase().includes(keyword.toLowerCase())
         );
-        this.renderProcessList(filtered);
+        this.renderPriorityProcessList(filtered);
     }
 
-    async selectProcess(processName) {
-        this.selectedProcess = processName;
-        this.hideOverlay('affinity-process-overlay');
-        await this.showCpuSelector();
+    selectPriorityProcess(processName) {
+        this.selectedPriorityProcess = processName;
+        this.hideOverlay('priority-process-overlay');
+        this.showPrioritySetting();
     }
 
-    async showCpuSelector() {
-        this.showOverlay('affinity-cpu-overlay');
-        document.getElementById('selected-process-info').innerHTML = `
-            <span class="process-name">${this.selectedProcess}</span>
-        `;
-        if (this.affinityRules[this.selectedProcess]) {
-            this.selectedCpus = this.parseCpuMask(this.affinityRules[this.selectedProcess]);
+    showPrioritySetting() {
+        this.showOverlay('priority-setting-overlay');
+        document.getElementById('priority-selected-process').innerHTML = `<span class="process-name">${this.selectedPriorityProcess}</span>`;
+
+        if (this.priorityRules[this.selectedPriorityProcess]) {
+            const rule = this.priorityRules[this.selectedPriorityProcess];
+            this.selectedNice = rule.nice;
+            this.selectedIoClass = rule.ioClass;
+            this.selectedIoLevel = rule.ioLevel;
         } else {
-            this.selectedCpus = [];
+            this.selectedNice = 0;
+            this.selectedIoClass = 2;
+            this.selectedIoLevel = 4;
         }
-        await this.renderCpuGrid();
-        this.renderPresetButtons();
-    }
 
-    parseCpuMask(mask) {
-        const cpus = [];
-        if (!mask) return cpus;
-        const parts = mask.split(',');
-        for (const part of parts) {
-            if (part.includes('-')) {
-                const [start, end] = part.split('-').map(Number);
-                for (let i = start; i <= end; i++) {
-                    cpus.push(i);
-                }
-            } else {
-                cpus.push(parseInt(part));
-            }
-        }
-        return [...new Set(cpus)].sort((a, b) => a - b);
-    }
+        const niceSlider = document.getElementById('nice-slider');
+        const niceValue = document.getElementById('nice-slider-value');
+        niceSlider.value = this.selectedNice;
+        niceValue.textContent = this.selectedNice;
 
-    formatCpuMask(cpus) {
-        if (cpus.length === 0) return '';
-        const sorted = [...cpus].sort((a, b) => a - b);
-        const ranges = [];
-        let start = sorted[0];
-        let end = sorted[0];
-        for (let i = 1; i < sorted.length; i++) {
-            if (sorted[i] === end + 1) {
-                end = sorted[i];
-            } else {
-                ranges.push(start === end ? `${start}` : `${start}-${end}`);
-                start = sorted[i];
-                end = sorted[i];
-            }
-        }
-        ranges.push(start === end ? `${start}` : `${start}-${end}`);
-        return ranges.join(',');
-    }
-
-    async renderCpuGrid() {
-        const container = document.getElementById('affinity-cpu-grid');
-        const cpuCount = this.cpuCores.length || 8;
-        if (this.cpuMaxFreqs.length === 0) {
-            for (let i = 0; i < cpuCount; i++) {
-                const freq = await this.exec(`cat /sys/devices/system/cpu/cpu${i}/cpufreq/cpuinfo_max_freq 2>/dev/null`);
-                this.cpuMaxFreqs[i] = freq ? Math.round(parseInt(freq) / 1000) : 0;
-            }
-        }
-        let html = '';
-        for (let i = 0; i < cpuCount; i++) {
-            const isSelected = this.selectedCpus.includes(i);
-            const freq = this.cpuMaxFreqs[i] ? `${this.cpuMaxFreqs[i]} MHz` : '--';
-            html += `
-                <div class="affinity-cpu-item ${isSelected ? 'selected' : ''}" data-cpu="${i}" onclick="corona.toggleAffinityCpu(${i})">
-                    <div class="cpu-item-id">CPU ${i}</div>
-                    <div class="cpu-item-freq">${freq}</div>
-                </div>
-            `;
-        }
-        container.innerHTML = html;
-    }
-
-    renderPresetButtons() {
-        const container = document.getElementById('preset-buttons');
-        const totalCpus = this.cpuCores.length || 8;
-        const presets = [
-            { name: '全部', cpus: Array.from({length: totalCpus}, (_, i) => i) },
-            { name: '小核', cpus: this.getClusterCpus('little') },
-            { name: '中核', cpus: this.getClusterCpus('mid') },
-            { name: '大核', cpus: this.getClusterCpus('big') },
-            { name: '超大核', cpus: this.getClusterCpus('prime') }
-        ].filter(p => p.cpus.length > 0);
-        container.innerHTML = presets.map(p => `
-            <button class="preset-btn" onclick="corona.applyPreset([${p.cpus.join(',')}])">${p.name} (${p.cpus.length})</button>
-        `).join('');
-    }
-
-    getClusterCpus(clusterType) {
-        const freqs = [];
-        for (let i = 0; i < this.cpuCores.length; i++) {
-            freqs.push({ cpu: i, freq: this.cpuMaxFreqs[i] || 0 });
-        }
-        freqs.sort((a, b) => a.freq - b.freq);
-        const uniqueFreqs = [...new Set(freqs.map(f => f.freq))].sort((a, b) => a - b);
-        if (uniqueFreqs.length === 1) {
-            return clusterType === 'little' ? freqs.map(f => f.cpu) : [];
-        } else if (uniqueFreqs.length === 2) {
-            if (clusterType === 'little') return freqs.filter(f => f.freq === uniqueFreqs[0]).map(f => f.cpu);
-            if (clusterType === 'big') return freqs.filter(f => f.freq === uniqueFreqs[1]).map(f => f.cpu);
-            return [];
-        } else if (uniqueFreqs.length === 3) {
-            if (clusterType === 'little') return freqs.filter(f => f.freq === uniqueFreqs[0]).map(f => f.cpu);
-            if (clusterType === 'mid') return freqs.filter(f => f.freq === uniqueFreqs[1]).map(f => f.cpu);
-            if (clusterType === 'big') return freqs.filter(f => f.freq === uniqueFreqs[2]).map(f => f.cpu);
-            return [];
-        } else if (uniqueFreqs.length >= 4) {
-            if (clusterType === 'little') return freqs.filter(f => f.freq === uniqueFreqs[0]).map(f => f.cpu);
-            if (clusterType === 'mid') return freqs.filter(f => f.freq === uniqueFreqs[1]).map(f => f.cpu);
-            if (clusterType === 'big') return freqs.filter(f => f.freq !== uniqueFreqs[0] && f.freq !== uniqueFreqs[1] && f.freq !== uniqueFreqs[uniqueFreqs.length - 1]).map(f => f.cpu);
-            if (clusterType === 'prime') return freqs.filter(f => f.freq === uniqueFreqs[uniqueFreqs.length - 1]).map(f => f.cpu);
-            return [];
-        }
-        return [];
-    }
-
-    toggleAffinityCpu(cpuId) {
-        const idx = this.selectedCpus.indexOf(cpuId);
-        if (idx >= 0) {
-            this.selectedCpus.splice(idx, 1);
-        } else {
-            this.selectedCpus.push(cpuId);
-        }
-        this.selectedCpus.sort((a, b) => a - b);
-        this.updateCpuGridSelection();
-    }
-
-    applyPreset(cpus) {
-        this.selectedCpus = [...cpus];
-        this.updateCpuGridSelection();
-    }
-
-    updateCpuGridSelection() {
-        document.querySelectorAll('.affinity-cpu-item').forEach(item => {
-            const cpuId = parseInt(item.dataset.cpu);
-            item.classList.toggle('selected', this.selectedCpus.includes(cpuId));
+        document.querySelectorAll('.io-option').forEach(opt => {
+            opt.classList.toggle('selected', parseInt(opt.dataset.class) === this.selectedIoClass);
         });
     }
 
-    async saveAffinityRule() {
-        if (!this.selectedProcess) {
+    async savePriorityRule() {
+        if (!this.selectedPriorityProcess) {
             this.showToast('请先选择进程');
             return;
         }
-        if (this.selectedCpus.length === 0) {
-            this.showToast('请至少选择一个CPU核心');
-            return;
+
+        this.priorityRules[this.selectedPriorityProcess] = {
+            nice: this.selectedNice,
+            ioClass: this.selectedIoClass,
+            ioLevel: this.selectedIoLevel
+        };
+
+        await this.savePriorityConfig();
+        const appliedCount = await this.applyPriorityRule(this.selectedPriorityProcess);
+        
+        this.hideOverlay('priority-setting-overlay');
+        this.renderPriorityRules();
+        this.updatePriorityCount();
+
+        const ioClassNames = { 1: '实时', 2: '尽力', 3: '空闲' };
+        if (appliedCount > 0) {
+            this.showToast(`已设置 ${this.selectedPriorityProcess}: nice=${this.selectedNice}, I/O=${ioClassNames[this.selectedIoClass]}`);
+        } else {
+            this.showToast(`已保存规则，进程启动时生效`);
         }
-        const cpuMask = this.formatCpuMask(this.selectedCpus);
-        this.affinityRules[this.selectedProcess] = cpuMask;
-        await this.saveAffinityConfig();
-        await this.applyAffinityRule(this.selectedProcess, cpuMask);
-        this.hideOverlay('affinity-cpu-overlay');
-        this.renderAffinityRules();
-        this.updateAffinityCount();
-        this.showToast(`已设置 ${this.selectedProcess} 的CPU亲和性: ${cpuMask}`);
     }
 
-    async saveAffinityConfig() {
+    async savePriorityConfig() {
         let configContent = '';
-        for (const [name, mask] of Object.entries(this.affinityRules)) {
-            configContent += `${name}=${mask}\n`;
+        for (const [name, rule] of Object.entries(this.priorityRules)) {
+            configContent += `${name}=${rule.nice},${rule.ioClass},${rule.ioLevel}\n`;
         }
-        await this.exec(`echo '${configContent}' > ${this.configDir}/cpu_affinity.conf`);
+        await this.exec(`echo '${configContent}' > ${this.configDir}/process_priority.conf`);
     }
 
-    async applyAffinityRule(processName, cpuMask) {
+    async applyPriorityRule(processName) {
+        const rule = this.priorityRules[processName];
+        if (!rule) return 0;
+
+        let appliedCount = 0;
         const pids = await this.exec(`pgrep -f "${processName}" 2>/dev/null`);
-        if (pids) {
-            const pidList = pids.trim().split('\n');
+        
+        if (pids && pids.trim()) {
+            const pidList = pids.trim().split('\n').filter(p => p.trim());
             for (const pid of pidList) {
-                if (pid && pid.trim()) {
-                    await this.exec(`taskset -p ${this.cpuMaskToHex(this.parseCpuMask(cpuMask))} ${pid.trim()} 2>/dev/null`);
+                const trimmedPid = pid.trim();
+                if (trimmedPid) {
+                    // 设置nice值
+                    await this.exec(`renice -n ${rule.nice} -p ${trimmedPid} 2>/dev/null`);
+                    // 设置I/O优先级
+                    await this.exec(`ionice -c ${rule.ioClass} -n ${rule.ioLevel} -p ${trimmedPid} 2>/dev/null`);
+                    appliedCount++;
                 }
             }
         }
+        return appliedCount;
     }
 
-    cpuMaskToHex(cpus) {
-        let mask = 0;
-        for (const cpu of cpus) {
-            mask |= (1 << cpu);
-        }
-        return '0x' + mask.toString(16);
+    async editPriorityRule(processName) {
+        this.selectedPriorityProcess = processName;
+        this.showPrioritySetting();
     }
 
-    async editAffinityRule(processName) {
-        this.selectedProcess = processName;
-        await this.showCpuSelector();
+    async deletePriorityRule(processName) {
+        if (!confirm(`确定要删除 ${processName} 的优先级规则吗？`)) return;
+        
+        delete this.priorityRules[processName];
+        await this.savePriorityConfig();
+        this.renderPriorityRules();
+        this.updatePriorityCount();
+        this.showToast(`已删除 ${processName} 的优先级规则`);
     }
 
-    async deleteAffinityRule(processName) {
-        if (!confirm(`确定要删除 ${processName} 的亲和性规则吗？`)) {
-            return;
-        }
-        delete this.affinityRules[processName];
-        await this.saveAffinityConfig();
-        this.renderAffinityRules();
-        this.updateAffinityCount();
-        this.showToast(`已删除 ${processName} 的亲和性规则`);
-    }
-
-    async applyAllAffinityRules() {
-        for (const [name, mask] of Object.entries(this.affinityRules)) {
-            await this.applyAffinityRule(name, mask);
+    async applyAllPriorityRules() {
+        for (const name of Object.keys(this.priorityRules)) {
+            await this.applyPriorityRule(name);
         }
     }
 }
