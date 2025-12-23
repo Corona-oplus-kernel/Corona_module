@@ -484,37 +484,27 @@ class CoronaAddon {
         let longPressTimer = null;
         let startY = 0;
         let currentScale = 1;
+        this.deviceImageState.stopClickCount = 0;
+        this.deviceImageState.isFlying = false;
+        this.deviceImageState.flyAnimationId = null;
         container.addEventListener('click', (e) => {
             if (isLongPress || this.deviceImageState.isDragging) {
                 e.preventDefault();
                 return;
             }
+            if (this.deviceImageState.isFlying) {
+                return;
+            }
             if (this.deviceImageState.isInfiniteRotating) {
-                this.deviceImageState.isInfiniteRotating = false;
-                this.deviceImageState.rotateCount = 0;
-                const computedStyle = window.getComputedStyle(img);
-                const matrix = computedStyle.transform;
-                let currentAngle = 0;
-                if (matrix !== 'none') {
-                    const values = matrix.split('(')[1].split(')')[0].split(',');
-                    const a = parseFloat(values[0]);
-                    const b = parseFloat(values[1]);
-                    currentAngle = Math.round(Math.atan2(b, a) * (180 / Math.PI));
-                    if (currentAngle < 0) currentAngle += 360;
+                this.deviceImageState.stopClickCount++;
+                if (this.deviceImageState.stopClickCount >= 3) {
+                    this.deviceImageState.isInfiniteRotating = false;
+                    this.deviceImageState.rotateCount = 0;
+                    this.deviceImageState.stopClickCount = 0;
+                    img.classList.remove('infinite-rotate');
+                    img.style.animation = '';
+                    this.startFlyingAnimation(container, img);
                 }
-                img.classList.remove('infinite-rotate');
-                img.style.animation = '';
-                img.style.transition = 'none';
-                img.style.transform = `rotate(${currentAngle}deg) scale(${currentScale})`;
-                void img.offsetWidth;
-                img.style.transition = 'transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)';
-                img.style.transform = `rotate(${currentAngle + (360 - currentAngle)}deg) scale(${currentScale})`;
-                setTimeout(() => {
-                    img.style.transition = 'none';
-                    img.style.transform = `rotate(0deg) scale(${currentScale})`;
-                    this.deviceImageState.rotation = 0;
-                    this.deviceImageState.isRotating = false;
-                }, 600);
                 return;
             }
             if (this.deviceImageState.isRotating) return;
@@ -522,6 +512,7 @@ class CoronaAddon {
             if (this.deviceImageState.rotateCount >= 5) {
                 this.deviceImageState.isInfiniteRotating = true;
                 this.deviceImageState.isRotating = true;
+                this.deviceImageState.stopClickCount = 0;
                 img.style.transition = 'none';
                 img.classList.add('infinite-rotate');
                 return;
@@ -543,6 +534,7 @@ class CoronaAddon {
             }, 2000);
         });
         container.addEventListener('touchstart', (e) => {
+            if (this.deviceImageState.isFlying) return;
             touchStartTime = Date.now();
             startY = e.touches[0].clientY;
             isLongPress = false;
@@ -553,6 +545,7 @@ class CoronaAddon {
             }, 300);
         }, { passive: true });
         container.addEventListener('touchmove', (e) => {
+            if (this.deviceImageState.isFlying) return;
             if (!isLongPress) {
                 clearTimeout(longPressTimer);
                 return;
@@ -566,6 +559,7 @@ class CoronaAddon {
             img.style.transform = `rotate(${this.deviceImageState.rotation}deg) scale(${currentScale})`;
         }, { passive: false });
         container.addEventListener('touchend', () => {
+            if (this.deviceImageState.isFlying) return;
             clearTimeout(longPressTimer);
             if (isLongPress) {
                 img.style.transition = 'transform 0.3s ease-out';
@@ -576,6 +570,112 @@ class CoronaAddon {
                 isLongPress = false;
             }, 100);
         });
+    }
+    startFlyingAnimation(container, img) {
+        this.deviceImageState.isFlying = true;
+        const rect = container.getBoundingClientRect();
+        const originalLeft = rect.left;
+        const originalTop = rect.top;
+        this.deviceImageState.originalPosition = { left: originalLeft, top: originalTop };
+        this.deviceImageState.flyingContainer = container;
+        this.deviceImageState.flyingImg = img;
+        document.body.appendChild(container);
+        container.style.position = 'fixed';
+        container.style.left = rect.left + 'px';
+        container.style.top = rect.top + 'px';
+        container.style.width = '80px';
+        container.style.height = '80px';
+        container.style.zIndex = '9999';
+        container.style.margin = '0';
+        container.style.pointerEvents = 'auto';
+        container.style.cursor = 'pointer';
+        img.style.width = '80px';
+        img.style.height = '80px';
+        let x = rect.left;
+        let y = rect.top;
+        let vx = (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random() * 2);
+        let vy = (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random() * 2);
+        let rotation = 0;
+        let rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * (8 + Math.random() * 6);
+        const containerWidth = 80;
+        const containerHeight = 80;
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        this.deviceImageState.flyData = { x, y, vx, vy, rotation, rotationSpeed };
+        const animate = () => {
+            if (!this.deviceImageState.isFlying) return;
+            const data = this.deviceImageState.flyData;
+            data.x += data.vx;
+            data.y += data.vy;
+            data.rotation += data.rotationSpeed;
+            if (data.x <= 0) {
+                data.x = 0;
+                data.vx = Math.abs(data.vx) * (0.9 + Math.random() * 0.2);
+                data.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * (8 + Math.random() * 6);
+            } else if (data.x + containerWidth >= screenWidth) {
+                data.x = screenWidth - containerWidth;
+                data.vx = -Math.abs(data.vx) * (0.9 + Math.random() * 0.2);
+                data.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * (8 + Math.random() * 6);
+            }
+            if (data.y <= 0) {
+                data.y = 0;
+                data.vy = Math.abs(data.vy) * (0.9 + Math.random() * 0.2);
+                data.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * (8 + Math.random() * 6);
+            } else if (data.y + containerHeight >= screenHeight) {
+                data.y = screenHeight - containerHeight;
+                data.vy = -Math.abs(data.vy) * (0.9 + Math.random() * 0.2);
+                data.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * (8 + Math.random() * 6);
+            }
+            container.style.left = data.x + 'px';
+            container.style.top = data.y + 'px';
+            img.style.transition = 'none';
+            img.style.transform = `rotate(${data.rotation}deg)`;
+            this.deviceImageState.flyAnimationId = requestAnimationFrame(animate);
+        };
+        container.onclick = (e) => {
+            e.stopPropagation();
+            this.stopFlyingAnimation();
+        };
+        this.deviceImageState.flyAnimationId = requestAnimationFrame(animate);
+    }
+    stopFlyingAnimation() {
+        if (!this.deviceImageState.isFlying) return;
+        this.deviceImageState.isFlying = false;
+        if (this.deviceImageState.flyAnimationId) {
+            cancelAnimationFrame(this.deviceImageState.flyAnimationId);
+        }
+        const container = this.deviceImageState.flyingContainer;
+        const img = this.deviceImageState.flyingImg;
+        const pos = this.deviceImageState.originalPosition;
+        container.style.transition = 'left 0.5s ease-out, top 0.5s ease-out';
+        img.style.transition = 'transform 0.5s ease-out';
+        container.style.left = pos.left + 'px';
+        container.style.top = pos.top + 'px';
+        img.style.transform = 'rotate(0deg)';
+        setTimeout(() => {
+            const deviceCard = document.querySelector('.card-device');
+            if (deviceCard) {
+                container.style.position = '';
+                container.style.left = '';
+                container.style.top = '';
+                container.style.width = '';
+                container.style.height = '';
+                container.style.zIndex = '';
+                container.style.margin = '';
+                container.style.transition = '';
+                container.style.pointerEvents = '';
+                container.style.cursor = '';
+                img.style.width = '';
+                img.style.height = '';
+                img.style.transition = '';
+                img.style.transform = '';
+                container.onclick = null;
+                deviceCard.appendChild(container);
+            }
+            this.deviceImageState.rotation = 0;
+            this.deviceImageState.rotateCount = 0;
+            this.deviceImageState.isRotating = false;
+        }, 500);
     }
     bindAllEvents() {
         document.querySelectorAll('.tab-item').forEach(tab => {
