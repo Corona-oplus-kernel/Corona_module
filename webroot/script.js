@@ -730,6 +730,38 @@ class CoronaAddon {
         const clusterStr = this.formatClusterInfo();
         document.getElementById('cpu-info').textContent = cpuName;
         document.getElementById('cpu-cluster-info').textContent = clusterStr || '--';
+        
+        const cpuBrandBadge = document.getElementById('cpu-brand-badge');
+        const cpuNameLower = cpuName.toLowerCase();
+        const hardwareLower = (hardware || '').toLowerCase();
+        const socModelLower = (socModel || '').toLowerCase();
+        
+        const isSnapdragon = cpuNameLower.includes('sm') || 
+                            cpuNameLower.includes('sdm') || 
+                            cpuNameLower.includes('msm') ||
+                            cpuNameLower.includes('qcom') ||
+                            cpuNameLower.includes('snapdragon') ||
+                            hardwareLower.includes('qcom') ||
+                            socModelLower.includes('sm') ||
+                            socModelLower.includes('sdm') ||
+                            socModelLower.includes('msm');
+        
+        const isDimensity = cpuNameLower.includes('mt') || 
+                           cpuNameLower.includes('dimensity') ||
+                           cpuNameLower.includes('mediatek') ||
+                           hardwareLower.includes('mt') ||
+                           socModelLower.includes('mt');
+        
+        if (isSnapdragon) {
+            cpuBrandBadge.textContent = 'Snapdragon';
+            cpuBrandBadge.className = 'cpu-brand-badge snapdragon';
+        } else if (isDimensity) {
+            cpuBrandBadge.textContent = 'MediaTek';
+            cpuBrandBadge.className = 'cpu-brand-badge mediatek';
+        } else {
+            cpuBrandBadge.classList.add('hidden');
+        }
+        
         const androidVer = await this.exec('getprop ro.build.version.release');
         const sdk = await this.exec('getprop ro.build.version.sdk');
         document.getElementById('system-version').textContent = `Android ${androidVer} (API ${sdk})`;
@@ -1093,10 +1125,14 @@ class CoronaAddon {
     }
     async loadCpuCores() {
         this.cpuCores = [];
+        const container = document.getElementById('cpu-cores-list');
+        if (container) container.innerHTML = '';
+        
         const cpuCount = parseInt(await this.exec('ls -d /sys/devices/system/cpu/cpu[0-9]* 2>/dev/null | wc -l')) || 0;
         const totalCores = this.getTotalCoreCount();
         const maxCores = totalCores > 0 ? totalCores : cpuCount;
         const seenIds = new Set();
+        
         for (let i = 0; i < cpuCount && this.cpuCores.length < maxCores; i++) {
             if (seenIds.has(i)) continue;
             const online = await this.exec(`cat /sys/devices/system/cpu/cpu${i}/online 2>/dev/null`);
@@ -1112,6 +1148,7 @@ class CoronaAddon {
                 load: '--'
             });
         }
+        
         this.cpuCores.sort((a, b) => a.id - b.id);
         this.renderCpuCores();
         await this.updateCpuLoads();

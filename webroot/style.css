@@ -1348,3 +1348,50 @@ body {
     color: var(--accent);
     font-size: 16px;
 }
+
+.card-title .cpu-brand-badge {
+    margin-left: auto;
+    float: right;
+}
+
+.cpu-brand-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.cpu-brand-badge.snapdragon {
+    background: linear-gradient(135deg, #E53935 0%, #C62828 100%);
+    color: #FFFFFF;
+    box-shadow: 0 1px 4px rgba(229, 57, 53, 0.3);
+}
+
+.cpu-brand-badge.mediatek {
+    background: linear-gradient(135deg, #1E88E5 0%, #1565C0 100%);
+    color: #FFFFFF;
+    box-shadow: 0 1px 4px rgba(30, 136, 229, 0.3);
+}
+
+.cpu-brand-badge.hidden {
+    display: none;
+}
+
+.cpu-info-line {
+    display: flex;
+    align-items: baseline;
+    gap: 30px;
+}
+
+#cpu-card .info-primary {
+    margin-bottom: 0;
+}
+
+#cpu-card .info-secondary {
+    flex-shrink: 0;
+}
