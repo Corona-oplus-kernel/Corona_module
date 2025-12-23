@@ -1543,18 +1543,26 @@ class CoronaAddon {
             container.innerHTML = '<div class="affinity-empty">暂无亲和性规则</div>';
             return;
         }
-        container.innerHTML = ruleNames.map(name => `
-            <div class="affinity-rule-item" data-process="${name}">
-                <div class="affinity-rule-info">
-                    <div class="affinity-rule-name">${name}</div>
-                    <div class="affinity-rule-cpus">CPU: ${this.affinityRules[name]}</div>
+        container.innerHTML = ruleNames.map(name => {
+            const isApp = name.includes('.') && !name.includes('android.hardware');
+            const initial = name.charAt(0).toUpperCase();
+            const iconHtml = isApp 
+                ? `<div class="affinity-rule-icon app-icon"><img src="file:///data/data/${name}/icon.png" onerror="this.parentElement.classList.remove('app-icon');this.parentElement.innerHTML='${initial}';this.parentElement.style.background='linear-gradient(135deg, #00C853, #4CAF50)';" alt=""></div>`
+                : `<div class="affinity-rule-icon">${initial}</div>`;
+            return `
+                <div class="affinity-rule-item" data-process="${name}">
+                    ${iconHtml}
+                    <div class="affinity-rule-info">
+                        <div class="affinity-rule-name">${name}</div>
+                        <div class="affinity-rule-cpus">CPU: ${this.affinityRules[name]}</div>
+                    </div>
+                    <div class="affinity-rule-actions">
+                        <button class="affinity-rule-btn edit" onclick="corona.editAffinityRule('${name}')">✎</button>
+                        <button class="affinity-rule-btn delete" onclick="corona.deleteAffinityRule('${name}')">✕</button>
+                    </div>
                 </div>
-                <div class="affinity-rule-actions">
-                    <button class="affinity-rule-btn edit" onclick="corona.editAffinityRule('${name}')">✎</button>
-                    <button class="affinity-rule-btn delete" onclick="corona.deleteAffinityRule('${name}')">✕</button>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     updateAffinityCount() {
@@ -1570,7 +1578,7 @@ class CoronaAddon {
     }
 
     async loadProcessList() {
-        const psOutput = await this.exec(`ps -A -o pid,comm 2>/dev/null | tail -n +2`);
+        const psOutput = await this.exec(`ps -Ao pid,args 2>/dev/null | tail -n +2`);
         const processes = [];
         const seen = new Set();
         if (psOutput) {
@@ -1579,10 +1587,23 @@ class CoronaAddon {
                 const match = line.trim().match(/^\s*(\d+)\s+(.+)$/);
                 if (match) {
                     const pid = match[1];
-                    const name = match[2].trim();
+                    let fullCmd = match[2].trim();
+                    let name = fullCmd.split(/\s+/)[0];
+                    if (name.includes('/')) {
+                        name = name.split('/').pop();
+                    }
+                    const isApp = fullCmd.includes('com.') || fullCmd.includes('org.') || fullCmd.includes('net.') || fullCmd.includes('io.');
+                    let packageName = '';
+                    if (isApp) {
+                        const pkgMatch = fullCmd.match(/([a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)+)/);
+                        if (pkgMatch) {
+                            packageName = pkgMatch[1];
+                            name = packageName;
+                        }
+                    }
                     if (!seen.has(name) && name && !name.startsWith('[')) {
                         seen.add(name);
-                        processes.push({ pid, name });
+                        processes.push({ pid, name, packageName, isApp });
                     }
                 }
             }
@@ -1602,7 +1623,7 @@ class CoronaAddon {
         const appProcs = [];
         const otherProcs = [];
         for (const proc of processes) {
-            if (proc.name.startsWith('com.') || proc.name.includes('.')) {
+            if (proc.isApp || proc.name.startsWith('com.') || (proc.name.includes('.') && !proc.name.includes('android.hardware'))) {
                 appProcs.push(proc);
             } else if (['surfaceflinger', 'zygote', 'system_server', 'servicemanager', 'vold', 'logd', 'lmkd', 'hwservicemanager', 'android.hardware'].some(s => proc.name.includes(s))) {
                 systemProcs.push(proc);
@@ -1613,15 +1634,15 @@ class CoronaAddon {
         let html = '';
         if (appProcs.length > 0) {
             html += '<div class="process-category">应用进程</div>';
-            html += appProcs.map(p => this.renderProcessItem(p)).join('');
+            html += appProcs.map(p => this.renderProcessItem(p, true)).join('');
         }
         if (systemProcs.length > 0) {
             html += '<div class="process-category">系统进程</div>';
-            html += systemProcs.map(p => this.renderProcessItem(p)).join('');
+            html += systemProcs.map(p => this.renderProcessItem(p, false)).join('');
         }
         if (otherProcs.length > 0) {
             html += '<div class="process-category">其他进程</div>';
-            html += otherProcs.map(p => this.renderProcessItem(p)).join('');
+            html += otherProcs.map(p => this.renderProcessItem(p, false)).join('');
         }
         container.innerHTML = html;
         container.querySelectorAll('.affinity-process-item').forEach(item => {
@@ -1632,8 +1653,23 @@ class CoronaAddon {
         });
     }
 
-    renderProcessItem(proc) {
+    renderProcessItem(proc, isAppProc = false) {
         const initial = proc.name.charAt(0).toUpperCase();
+        const packageName = proc.packageName || proc.name;
+        const isApp = isAppProc || proc.isApp || (proc.name.includes('.') && !proc.name.includes('android.hardware'));
+        if (isApp) {
+            return `
+                <div class="affinity-process-item is-app" data-name="${proc.name}" data-pid="${proc.pid}">
+                    <div class="process-icon app-icon">
+                        <img src="file:///data/data/${packageName}/icon.png" onerror="this.parentElement.classList.remove('app-icon');this.parentElement.innerHTML='${initial}';this.parentElement.style.background='linear-gradient(135deg, #00C853, #4CAF50)';" alt="">
+                    </div>
+                    <div class="process-details">
+                        <div class="process-name">${proc.name}</div>
+                        <div class="process-pid">PID: ${proc.pid}</div>
+                    </div>
+                </div>
+            `;
+        }
         return `
             <div class="affinity-process-item" data-name="${proc.name}" data-pid="${proc.pid}">
                 <div class="process-icon">${initial}</div>
