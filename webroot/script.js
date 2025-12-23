@@ -39,7 +39,9 @@ class CoronaAddon {
             scale: 1,
             isRotating: false,
             isDragging: false,
-            currentScale: 1
+            currentScale: 1,
+            rotateCount: 0,
+            isInfiniteRotating: false
         };
         this.cpuMaxFreqs = [];
         this.init();
@@ -411,60 +413,14 @@ class CoronaAddon {
         this.exec(`su -c 'cmd notification post -S bigtext -t "${title}" corona_memclean "${message}"'`);
     }
     async resetAllSettings() {
-        if (!confirm('确定要重置所有设置吗？\n\n此操作将删除所有配置文件，恢复到默认状态，5分钟后自动重启，且不可撤销！')) {
+        if (!confirm('确定要重置所有设置吗？\n\n此操作将删除所有配置文件并立刻重启，且不可撤销！')) {
             return;
         }
         this.showLoading(true);
-        await this.exec(`rm -rf ${this.configDir}/*`);
-        this.state = {
-            algorithm: 'lz4',
-            zramSize: 8,
-            swappiness: 100,
-            ioScheduler: null,
-            readahead: 512,
-            tcp: null,
-            cpuGovernor: null,
-            zramEnabled: false,
-            le9ecEnabled: false,
-            le9ecAnon: 0,
-            le9ecCleanLow: 0,
-            le9ecCleanMin: 0,
-            dualCell: false
-        };
-        this.priorityRules = {};
-        await this.savePriorityConfig();
-        document.getElementById('zram-switch').checked = false;
-        document.getElementById('le9ec-switch').checked = false;
-        this.toggleZramSettings(false);
-        this.toggleLe9ecSettings(false);
-        document.getElementById('zram-size-slider').value = 8;
-        document.getElementById('zram-size-value').textContent = '8.00 GB';
-        document.getElementById('swappiness-slider').value = 100;
-        document.getElementById('swappiness-value').textContent = '100';
-        document.getElementById('le9ec-anon-slider').value = 0;
-        document.getElementById('le9ec-anon-value').textContent = '0 MB';
-        document.getElementById('le9ec-clean-low-slider').value = 0;
-        document.getElementById('le9ec-clean-low-value').textContent = '0 MB';
-        document.getElementById('le9ec-clean-min-slider').value = 0;
-        document.getElementById('le9ec-clean-min-value').textContent = '0 MB';
-        document.querySelectorAll('.option-item.selected').forEach(el => el.classList.remove('selected'));
-        document.querySelectorAll('.algorithm-item.selected').forEach(el => el.classList.remove('selected'));
-        // 重置内存优化滑块
-        document.getElementById('dirty-ratio-slider').value = 20;
-        document.getElementById('dirty-ratio-value').textContent = '20%';
-        document.getElementById('dirty-bg-slider').value = 10;
-        document.getElementById('dirty-bg-value').textContent = '10%';
-        document.getElementById('vfs-pressure-slider').value = 100;
-        document.getElementById('vfs-pressure-value').textContent = '100';
-        document.getElementById('dirty-expire-slider').value = 30;
-        document.getElementById('dirty-expire-value').textContent = '30s';
-        document.getElementById('mem-tuning-status').textContent = '默认';
-        this.renderPriorityRules();
-        this.updatePriorityCount();
-        this.showLoading(false);
-        this.showToast('所有设置已重置，5分钟后自动重启');
-        this.sendNotification('Corona', '所有设置已重置，5分钟后自动重启');
-        this.startRebootCountdown(300);
+        await this.exec(`rm -rf ${this.configDir}`);
+        this.showToast('配置已清除，正在重启...');
+        await this.sleep(500);
+        await this.exec('reboot');
     }
     startRebootCountdown(seconds) {
         this.rebootCountdownSeconds = seconds;
@@ -533,7 +489,43 @@ class CoronaAddon {
                 e.preventDefault();
                 return;
             }
+            if (this.deviceImageState.isInfiniteRotating) {
+                this.deviceImageState.isInfiniteRotating = false;
+                this.deviceImageState.rotateCount = 0;
+                const computedStyle = window.getComputedStyle(img);
+                const matrix = computedStyle.transform;
+                let currentAngle = 0;
+                if (matrix !== 'none') {
+                    const values = matrix.split('(')[1].split(')')[0].split(',');
+                    const a = parseFloat(values[0]);
+                    const b = parseFloat(values[1]);
+                    currentAngle = Math.round(Math.atan2(b, a) * (180 / Math.PI));
+                    if (currentAngle < 0) currentAngle += 360;
+                }
+                img.classList.remove('infinite-rotate');
+                img.style.animation = '';
+                img.style.transition = 'none';
+                img.style.transform = `rotate(${currentAngle}deg) scale(${currentScale})`;
+                void img.offsetWidth;
+                img.style.transition = 'transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)';
+                img.style.transform = `rotate(${currentAngle + (360 - currentAngle)}deg) scale(${currentScale})`;
+                setTimeout(() => {
+                    img.style.transition = 'none';
+                    img.style.transform = `rotate(0deg) scale(${currentScale})`;
+                    this.deviceImageState.rotation = 0;
+                    this.deviceImageState.isRotating = false;
+                }, 600);
+                return;
+            }
             if (this.deviceImageState.isRotating) return;
+            this.deviceImageState.rotateCount++;
+            if (this.deviceImageState.rotateCount >= 5) {
+                this.deviceImageState.isInfiniteRotating = true;
+                this.deviceImageState.isRotating = true;
+                img.style.transition = 'none';
+                img.classList.add('infinite-rotate');
+                return;
+            }
             this.deviceImageState.isRotating = true;
             this.deviceImageState.rotation += 360;
             img.style.transition = 'transform 0.6s ease-in-out';
@@ -541,6 +533,14 @@ class CoronaAddon {
             setTimeout(() => {
                 this.deviceImageState.isRotating = false;
             }, 600);
+            if (this.deviceImageState.rotateResetTimer) {
+                clearTimeout(this.deviceImageState.rotateResetTimer);
+            }
+            this.deviceImageState.rotateResetTimer = setTimeout(() => {
+                if (!this.deviceImageState.isInfiniteRotating) {
+                    this.deviceImageState.rotateCount = 0;
+                }
+            }, 2000);
         });
         container.addEventListener('touchstart', (e) => {
             touchStartTime = Date.now();
@@ -1507,11 +1507,11 @@ class CoronaAddon {
         this.easterEgg.isOverlayOpen = true;
         this.easterEgg.xinranClickCount = 0;
         content.innerHTML = `
-            <div class="credit-name" id="xinran-credit">致谢爱人❤️然(≧ω≦)/</div>
-            <div class="credit-name">
-            <div class="credits-title">模块制作感谢名单</div>
-                <div class="credit-name">Cloud_Yun</div>
-                <div class="credit-name">穆远星</div>
+            <div class="rainbow-text credit-name" id="xinran-credit">致谢爱人❤️然(≧ω≦)/</div>
+            <div class="credits-section">
+                <div class="rainbow-text credits-title">模块制作感谢名单</div>
+                <div class="rainbow-text credit-name">Cloud_Yun</div>
+                <div class="rainbow-text credit-name">穆远星</div>
             </div>
         `;
         overlay.classList.add('show');
@@ -1555,7 +1555,6 @@ class CoronaAddon {
         this.initProcessPriority();
     }
 
-    // ========== 进程优先级功能 ==========
     async loadPerformanceModeConfig() {
         await this.loadPriorityConfig();
     }
@@ -1846,9 +1845,7 @@ class CoronaAddon {
             for (const pid of pidList) {
                 const trimmedPid = pid.trim();
                 if (trimmedPid) {
-                    // 设置nice值
                     await this.exec(`renice -n ${rule.nice} -p ${trimmedPid} 2>/dev/null`);
-                    // 设置I/O优先级
                     await this.exec(`ionice -c ${rule.ioClass} -n ${rule.ioLevel} -p ${trimmedPid} 2>/dev/null`);
                     appliedCount++;
                 }

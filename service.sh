@@ -116,30 +116,6 @@ apply_tcp_config() {
     fi
 }
 
-apply_cpu_affinity_config() {
-    if [ -f "$CONFIG_DIR/cpu_affinity.conf" ]; then
-        while IFS='=' read -r process_name cpu_mask; do
-            if [ -n "$process_name" ] && [ -n "$cpu_mask" ]; then
-                apply_affinity_to_process "$process_name" "$cpu_mask"
-            fi
-        done < "$CONFIG_DIR/cpu_affinity.conf"
-    fi
-}
-
-apply_affinity_to_process() {
-    process_name="$1"
-    cpu_mask="$2"
-    
-    hex_mask=$(cpu_mask_to_hex "$cpu_mask")
-    
-    pids=$(pgrep -f "$process_name" 2>/dev/null)
-    if [ -n "$pids" ]; then
-        for pid in $pids; do
-            taskset -p "$hex_mask" "$pid" 2>/dev/null
-        done
-    fi
-}
-
 cpu_mask_to_hex() {
     mask_str="$1"
     result=0
@@ -163,16 +139,27 @@ cpu_mask_to_hex() {
     printf "0x%x" "$result"
 }
 
-apply_process_priority_config() {
-    if [ -f "$CONFIG_DIR/process_priority.conf" ]; then
-        while IFS='=' read -r process_name values; do
-            if [ -n "$process_name" ] && [ -n "$values" ]; then
-                nice_val=$(echo "$values" | cut -d',' -f1)
-                io_class=$(echo "$values" | cut -d',' -f2)
-                io_level=$(echo "$values" | cut -d',' -f3)
-                apply_priority_to_process "$process_name" "$nice_val" "$io_class" "$io_level"
+apply_affinity_to_process() {
+    process_name="$1"
+    cpu_mask="$2"
+    
+    hex_mask=$(cpu_mask_to_hex "$cpu_mask")
+    
+    pids=$(pgrep -f "$process_name" 2>/dev/null)
+    if [ -n "$pids" ]; then
+        for pid in $pids; do
+            taskset -p "$hex_mask" "$pid" 2>/dev/null
+        done
+    fi
+}
+
+apply_cpu_affinity_config() {
+    if [ -f "$CONFIG_DIR/cpu_affinity.conf" ]; then
+        while IFS='=' read -r process_name cpu_mask; do
+            if [ -n "$process_name" ] && [ -n "$cpu_mask" ]; then
+                apply_affinity_to_process "$process_name" "$cpu_mask"
             fi
-        done < "$CONFIG_DIR/process_priority.conf"
+        done < "$CONFIG_DIR/cpu_affinity.conf"
     fi
 }
 
@@ -188,6 +175,19 @@ apply_priority_to_process() {
             renice -n "$nice_val" -p "$pid" 2>/dev/null
             ionice -c "$io_class" -n "$io_level" -p "$pid" 2>/dev/null
         done
+    fi
+}
+
+apply_process_priority_config() {
+    if [ -f "$CONFIG_DIR/process_priority.conf" ]; then
+        while IFS='=' read -r process_name values; do
+            if [ -n "$process_name" ] && [ -n "$values" ]; then
+                nice_val=$(echo "$values" | cut -d',' -f1)
+                io_class=$(echo "$values" | cut -d',' -f2)
+                io_level=$(echo "$values" | cut -d',' -f3)
+                apply_priority_to_process "$process_name" "$nice_val" "$io_class" "$io_level"
+            fi
+        done < "$CONFIG_DIR/process_priority.conf"
     fi
 }
 
