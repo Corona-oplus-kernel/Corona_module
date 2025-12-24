@@ -198,25 +198,25 @@ sleep 10
 mkdir -p "$CONFIG_DIR"
 
 apply_zram_config
-sleep 1
+sleep 10
 
 apply_le9ec_config
-sleep 1
+sleep 5
 
 apply_io_config
-sleep 1
+sleep 5
 
 apply_cpu_governor_config
-sleep 1
+sleep 5
 
 apply_cpu_hotplug_config
-sleep 1
+sleep 5
 
 apply_tcp_config
-sleep 1
+sleep 5
 
 apply_cpu_affinity_config
-sleep 1
+sleep 5
 
 apply_process_priority_config
 
