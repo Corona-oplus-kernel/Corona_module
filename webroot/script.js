@@ -495,7 +495,7 @@ class CoronaAddon {
         return { total, available, free, buffers, cached };
     }
     sendNotification(title, message) { this.exec(`su -c 'cmd notification post -S bigtext -t "${title}" corona_memclean "${message}"'`); }
-    async resetAllSettings() { const confirmed = await this.showConfirm('确定要重置所有设置吗？\n\n此操作将删除所有配置文件并立刻重启，且不可撤销！', '重置所有设置'); if (!confirmed) return; this.showLoading(true); await this.exec(`rm -rf ${this.configDir}`); this.showToast('配置已清除，正在重启...'); await this.sleep(500); await this.exec('reboot'); }
+    async resetAllSettings() { const confirmed = await this.showConfirm('确定要重置所有设置吗？\n\n此操作将删除所有配置文件并立刻重启，且不可撤销！', '重置所有设置'); if (!confirmed) return; this.showLoading(true); await this.exec(`rm -rf ${this.configDir}`); await this.exec(`sed -i 's/^description=.*/description=等待首次设置……/' '${this.modDir}/module.prop' 2>/dev/null`); this.showToast('配置已清除，正在重启...'); await this.sleep(500); await this.exec('reboot'); }
     initDeviceImageInteraction() {
         const container = document.getElementById('device-image-container');
         const img = document.getElementById('device-image');
