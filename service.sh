@@ -254,5 +254,7 @@ apply_freq_lock_config
 
 sleep 30
 apply_cpu_affinity_config
+sleep 2
 apply_process_priority_config
+sleep 2
 apply_freq_lock_config
