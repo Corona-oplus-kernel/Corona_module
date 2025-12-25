@@ -370,14 +370,13 @@ class CoronaAddon {
         this.showOverlay('ufs-detail-overlay');
         const content = document.getElementById('ufs-detail-content');
         content.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-sub)">加载中...</div>';
-        const [lifeA, lifeB, lifeC] = await Promise.all([
+        const [lifeA, lifeB] = await Promise.all([
             this.exec('cat /sys/devices/platform/soc/*/health_descriptor/life_time_estimation_a 2>/dev/null || cat /sys/block/sda/device/life_time_estimation_a 2>/dev/null'),
-            this.exec('cat /sys/devices/platform/soc/*/health_descriptor/life_time_estimation_b 2>/dev/null || cat /sys/block/sda/device/life_time_estimation_b 2>/dev/null'),
-            this.exec('cat /sys/devices/platform/soc/*/health_descriptor/life_time_estimation_c 2>/dev/null || cat /sys/block/sda/device/life_time_estimation_c 2>/dev/null')
+            this.exec('cat /sys/devices/platform/soc/*/health_descriptor/life_time_estimation_b 2>/dev/null || cat /sys/block/sda/device/life_time_estimation_b 2>/dev/null')
         ]);
         const lifeMap = { '0x00': '未使用', '0x01': '0-10%', '0x02': '10-20%', '0x03': '20-30%', '0x04': '30-40%', '0x05': '40-50%', '0x06': '50-60%', '0x07': '60-70%', '0x08': '70-80%', '0x09': '80-90%', '0x0A': '90-100%', '0x0B': '超过寿命' };
         const formatLife = (val) => lifeMap[val] || val || '--';
-        content.innerHTML = `<div class="info-item"><span class="info-label">寿命估计 A</span><span class="info-value">${formatLife(lifeA)}</span></div><div class="info-item"><span class="info-label">寿命估计 B</span><span class="info-value">${formatLife(lifeB)}</span></div><div class="info-item"><span class="info-label">预留空间消耗</span><span class="info-value">${formatLife(lifeC)}</span></div>`;
+        content.innerHTML = `<div class="info-item"><span class="info-label">寿命估计 A</span><span class="info-value">${formatLife(lifeA)}</span></div><div class="info-item"><span class="info-label">寿命估计 B</span><span class="info-value">${formatLife(lifeB)}</span></div>`;
     }
     showStorageDetail() { this.showOverlay('storage-detail-overlay'); }
     async runGC() { this.showLoading(true); await this.exec('sync && echo 1 > /sys/fs/f2fs/*/gc_urgent'); await this.sleep(2000); await this.exec('echo 0 > /sys/fs/f2fs/*/gc_urgent'); this.showLoading(false); this.showToast('GC 执行完成'); }
