@@ -64,6 +64,30 @@ class CoronaAddon {
             try { ksu.exec(cmd, '{}', callbackId); } catch (e) { clearTimeout(timeout); delete window[callbackId]; resolve(''); }
         });
     }
+    showConfirm(message, title = '确认') {
+        return new Promise((resolve) => {
+            const overlay = document.getElementById('confirm-dialog-overlay');
+            const titleEl = document.getElementById('confirm-dialog-title');
+            const messageEl = document.getElementById('confirm-dialog-message');
+            const cancelBtn = document.getElementById('confirm-dialog-cancel');
+            const okBtn = document.getElementById('confirm-dialog-ok');
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+            const cleanup = () => {
+                this.hideOverlay('confirm-dialog-overlay');
+                cancelBtn.removeEventListener('click', onCancel);
+                okBtn.removeEventListener('click', onOk);
+                overlay.removeEventListener('click', onOverlayClick);
+            };
+            const onCancel = () => { cleanup(); resolve(false); };
+            const onOk = () => { cleanup(); resolve(true); };
+            const onOverlayClick = (e) => { if (e.target === overlay) { cleanup(); resolve(false); } };
+            cancelBtn.addEventListener('click', onCancel);
+            okBtn.addEventListener('click', onOk);
+            overlay.addEventListener('click', onOverlayClick);
+            this.showOverlay('confirm-dialog-overlay');
+        });
+    }
     async ensureConfigDir() { await this.exec(`mkdir -p ${this.configDir}`); }
     initTheme() {
         const savedTheme = localStorage.getItem('corona_theme') || 'auto';
@@ -471,7 +495,7 @@ class CoronaAddon {
         return { total, available, free, buffers, cached };
     }
     sendNotification(title, message) { this.exec(`su -c 'cmd notification post -S bigtext -t "${title}" corona_memclean "${message}"'`); }
-    async resetAllSettings() { if (!confirm('确定要重置所有设置吗？\n\n此操作将删除所有配置文件并立刻重启，且不可撤销！')) return; this.showLoading(true); await this.exec(`rm -rf ${this.configDir}`); this.showToast('配置已清除，正在重启...'); await this.sleep(500); await this.exec('reboot'); }
+    async resetAllSettings() { const confirmed = await this.showConfirm('确定要重置所有设置吗？\n\n此操作将删除所有配置文件并立刻重启，且不可撤销！', '重置所有设置'); if (!confirmed) return; this.showLoading(true); await this.exec(`rm -rf ${this.configDir}`); this.showToast('配置已清除，正在重启...'); await this.sleep(500); await this.exec('reboot'); }
     initDeviceImageInteraction() {
         const container = document.getElementById('device-image-container');
         const img = document.getElementById('device-image');
@@ -1204,7 +1228,7 @@ class CoronaAddon {
         return appliedCount;
     }
     async editPriorityRule(processName) { this.selectedPriorityProcess = processName; this.showPrioritySetting(); }
-    async deletePriorityRule(processName) { if (!confirm(`确定要删除 ${processName} 的优先级规则吗？`)) return; delete this.priorityRules[processName]; await this.savePriorityConfig(); this.renderPriorityRules(); this.updatePriorityCount(); this.showToast(`已删除 ${processName} 的优先级规则`); }
+    async deletePriorityRule(processName) { const confirmed = await this.showConfirm(`确定要删除 ${processName} 的优先级规则吗？`, '删除规则'); if (!confirmed) return; delete this.priorityRules[processName]; await this.savePriorityConfig(); this.renderPriorityRules(); this.updatePriorityCount(); this.showToast(`已删除 ${processName} 的优先级规则`); }
     async applyAllPriorityRules() { const promises = Object.keys(this.priorityRules).map(name => this.applyPriorityRule(name)); await Promise.all(promises); }
 }
 document.addEventListener('DOMContentLoaded', () => { window.corona = new CoronaAddon(); });

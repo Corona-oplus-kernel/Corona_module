@@ -2540,3 +2540,27 @@ body.theme-dark .range-slider::-webkit-slider-thumb {
 .danger-section .section-label {
     color: var(--danger);
 }
+
+.confirm-dialog {
+    max-width: 320px;
+    width: 90%;
+    text-align: center;
+}
+.confirm-dialog-body {
+    padding: 20px 16px;
+}
+.confirm-dialog-body p {
+    font-size: 14px;
+    color: var(--text-main);
+    line-height: 1.6;
+    white-space: pre-line;
+}
+.confirm-dialog-actions {
+    display: flex;
+    gap: 12px;
+    padding: 0 16px 16px;
+}
+.confirm-dialog-actions .action-btn {
+    flex: 1;
+}
+
