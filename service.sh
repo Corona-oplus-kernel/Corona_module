@@ -191,6 +191,35 @@ apply_process_priority_config() {
     fi
 }
 
+apply_freq_lock_config() {
+    if [ -f "$CONFIG_DIR/freq_lock.conf" ]; then
+        mode=$(grep "^mode=" "$CONFIG_DIR/freq_lock.conf" | cut -d'=' -f2)
+        
+        if [ "$mode" = "global" ]; then
+            min_freq=$(grep "^global_min=" "$CONFIG_DIR/freq_lock.conf" | cut -d'=' -f2)
+            max_freq=$(grep "^global_max=" "$CONFIG_DIR/freq_lock.conf" | cut -d'=' -f2)
+            if [ -n "$min_freq" ] && [ -n "$max_freq" ]; then
+                for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_min_freq; do
+                    echo "$min_freq" > "$f" 2>/dev/null
+                done
+                for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq; do
+                    echo "$max_freq" > "$f" 2>/dev/null
+                done
+            fi
+        elif [ "$mode" = "per-core" ]; then
+            grep "^core" "$CONFIG_DIR/freq_lock.conf" | while IFS='=' read -r key values; do
+                core_num=$(echo "$key" | sed 's/core//')
+                min_freq=$(echo "$values" | cut -d',' -f1)
+                max_freq=$(echo "$values" | cut -d',' -f2)
+                if [ -n "$min_freq" ] && [ -n "$max_freq" ]; then
+                    echo "$min_freq" > "/sys/devices/system/cpu/cpu${core_num}/cpufreq/scaling_min_freq" 2>/dev/null
+                    echo "$max_freq" > "/sys/devices/system/cpu/cpu${core_num}/cpufreq/scaling_max_freq" 2>/dev/null
+                fi
+            done
+        fi
+    fi
+}
+
 wait_until_boot_complete
 wait_until_login
 sleep 10
@@ -219,7 +248,11 @@ apply_cpu_affinity_config
 sleep 5
 
 apply_process_priority_config
+sleep 5
+
+apply_freq_lock_config
 
 sleep 30
 apply_cpu_affinity_config
 apply_process_priority_config
+apply_freq_lock_config
