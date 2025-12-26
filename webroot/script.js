@@ -27,7 +27,7 @@ class CoronaAddon {
         this.cpuStats = {};
         this.memCleanRunning = false;
         this.easterEgg = { clickCount: 0, clickTimer: null, authorClickCount: 0, authorClickTimer: null, xinranClickCount: 0, xinranClickTimer: null, currentCard: 'thanks', isOverlayOpen: false };
-        this.deviceImageState = { rotation: 0, scale: 1, isRotating: false, isDragging: false, currentScale: 1, rotateCount: 0, isInfiniteRotating: false };
+        this.deviceImageState = { rotation: 0, scale: 1, isRotating: false, isDragging: false, currentScale: 1, rotateCount: 0, isInfiniteRotating: false, spinClickCount: 0, noDeceleration: false };
         this.cpuMaxFreqs = [];
         this.cpuFreqsPerCore = {};
         this.historyData = { cpu: [], mem: [], cpuTemp: [], batteryTemp: [] };
@@ -95,11 +95,12 @@ class CoronaAddon {
         this.applyTheme(savedTheme);
     }
     applyTheme(theme) {
-        document.body.classList.remove('theme-light', 'theme-dark');
-        if (theme === 'auto') {
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            document.body.classList.add(prefersDark ? 'theme-dark' : 'theme-light');
-        } else { document.body.classList.add(`theme-${theme}`); }
+        const body = document.body;
+        const newThemeClass = theme === 'auto' 
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'theme-dark' : 'theme-light')
+            : `theme-${theme}`;
+        body.classList.remove('theme-light', 'theme-dark');
+        body.classList.add(newThemeClass);
     }
     initThemeSelector() {
         const themeOptions = document.querySelectorAll('.theme-option');
@@ -517,37 +518,39 @@ class CoronaAddon {
                 return;
             }
             if (this.deviceImageState.isInfiniteRotating) {
-                this.deviceImageState.isInfiniteRotating = false;
-                this.deviceImageState.isReturning = true;
-                this.deviceImageState.clickCount = 0;
-                this.deviceImageState.isRotating = false;
-                const elapsed = Date.now() - this.deviceImageState.spinStartTime;
-                const currentAngle = (elapsed / spinDuration * 360) % 360;
-                const remainingAngle = 360 - currentAngle;
-                const animDuration = (remainingAngle / 360) * 0.6 + 0.2;
-                img.style.animation = '';
-                img.style.transition = 'none';
-                img.style.transform = `rotate(${currentAngle}deg)`;
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        img.style.transition = `transform ${animDuration}s cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
-                        img.style.transform = 'rotate(360deg)';
-                        setTimeout(() => {
-                            img.style.transition = '';
-                            img.style.transform = '';
-                            this.deviceImageState.rotation = 0;
-                            this.deviceImageState.isReturning = false;
-                        }, animDuration * 1000);
-                    });
-                });
+                this.deviceImageState.spinClickCount = (this.deviceImageState.spinClickCount || 0) + 1;
+                if (this.deviceImageState.spinClickCount >= 2) {
+                    this.deviceImageState.isInfiniteRotating = false;
+                    this.deviceImageState.spinClickCount = 0;
+                    this.deviceImageState.clickCount = 0;
+                    this.deviceImageState.noDeceleration = true;
+                    const elapsed = Date.now() - this.deviceImageState.spinStartTime;
+                    const currentAngle = (elapsed / spinDuration * 360) % 360;
+                    img.style.animation = '';
+                    img.style.transition = 'none';
+                    img.style.transform = `rotate(${currentAngle}deg)`;
+                    this.deviceImageState.rotation = currentAngle;
+                    originalRect = container.getBoundingClientRect();
+                    createClone(originalRect);
+                    const randomAngle = Math.random() * Math.PI * 2;
+                    const flySpeed = 30;
+                    const vx = Math.cos(randomAngle);
+                    const vy = Math.sin(randomAngle);
+                    this.startFlyingAnimation(container, img, cloneEl, cloneImgEl, vx, vy, originalRect, flySpeed);
+                    cloneEl = null;
+                    cloneImgEl = null;
+                    return;
+                }
                 return;
             }
+            this.deviceImageState.spinClickCount = 0;
             if (this.deviceImageState.isRotating) return;
             this.deviceImageState.isRotating = true;
             this.deviceImageState.clickCount++;
             this.deviceImageState.rotation += 360;
             if (this.deviceImageState.clickCount >= 3) {
                 this.deviceImageState.isInfiniteRotating = true;
+                this.deviceImageState.spinClickCount = 0;
                 this.deviceImageState.spinStartTime = Date.now();
                 img.style.transition = 'none';
                 img.style.transform = '';
@@ -563,10 +566,10 @@ class CoronaAddon {
         };
         const createClone = (rect) => {
             cloneEl = document.createElement('div');
-            cloneEl.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:80px;height:80px;z-index:9999;border-radius:12px;overflow:hidden;pointer-events:none;`;
+            cloneEl.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:80px;height:80px;z-index:9999;pointer-events:none;`;
             cloneImgEl = document.createElement('img');
             cloneImgEl.src = img.src;
-            cloneImgEl.style.cssText = `width:100%;height:100%;object-fit:cover;transform:scale(1.15);transition:transform 0.1s ease-out;`;
+            cloneImgEl.style.cssText = `width:100%;height:100%;object-fit:cover;border-radius:12px;transform:scale(1.15);transition:transform 0.1s ease-out;`;
             cloneEl.appendChild(cloneImgEl);
             document.body.appendChild(cloneEl);
             container.style.visibility = 'hidden';
@@ -584,10 +587,13 @@ class CoronaAddon {
             longPressTriggered = false;
             longPressTimer = setTimeout(() => {
                 longPressTriggered = true;
+                document.body.style.overflow = 'hidden';
+                document.body.style.touchAction = 'none';
                 if (this.deviceImageState.isInfiniteRotating) {
                     this.deviceImageState.isInfiniteRotating = false;
                     this.deviceImageState.isReturning = true;
                     this.deviceImageState.clickCount = 0;
+                    this.deviceImageState.spinClickCount = 0;
                     this.deviceImageState.isRotating = false;
                     const elapsed = Date.now() - this.deviceImageState.spinStartTime;
                     const currentAngle = (elapsed / spinDuration * 360) % 360;
@@ -654,10 +660,13 @@ class CoronaAddon {
         const handleTouchEnd = () => {
             clearTimeout(longPressTimer);
             isTouching = false;
+            document.body.style.overflow = '';
+            document.body.style.touchAction = '';
             if (this.deviceImageState.isFlying) return;
             if (longPressTriggered && cloneEl) {
                 const distance = Math.sqrt(dragOffsetX * dragOffsetX + dragOffsetY * dragOffsetY);
                 if (distance > 20) {
+                    this.deviceImageState.noDeceleration = false;
                     const speedMultiplier = Math.min(distance / maxDragDistance, 1) * 12 + 3;
                     this.startFlyingAnimation(container, img, cloneEl, cloneImgEl, -dragOffsetX, -dragOffsetY, originalRect, speedMultiplier);
                 } else {
@@ -699,14 +708,15 @@ class CoronaAddon {
         cloneEl.style.cursor = 'pointer';
         const rect = cloneEl.getBoundingClientRect();
         const speed = Math.sqrt(vx * vx + vy * vy);
-        const normalizedVx = (vx / speed) * speedMultiplier;
-        const normalizedVy = (vy / speed) * speedMultiplier;
+        const normalizedVx = speed > 0 ? (vx / speed) * speedMultiplier : vx;
+        const normalizedVy = speed > 0 ? (vy / speed) * speedMultiplier : vy;
         let x = rect.left, y = rect.top;
         let velX = normalizedVx, velY = normalizedVy;
         let rotation = this.deviceImageState.rotation;
         let rotationSpeed = (vx > 0 ? 1 : -1) * (speedMultiplier + Math.random() * 5);
         const containerWidth = 80, containerHeight = 80;
         const screenWidth = window.innerWidth, screenHeight = window.innerHeight;
+        const noDecel = this.deviceImageState.noDeceleration;
         this.deviceImageState.flyData = { x, y, velX, velY, rotation, rotationSpeed };
         const animate = () => {
             if (!this.deviceImageState.isFlying) return;
@@ -732,9 +742,11 @@ class CoronaAddon {
                 data.velY = -Math.abs(data.velY) * 0.8;
                 data.rotationSpeed *= 0.85;
             }
-            data.velX *= 0.994;
-            data.velY *= 0.994;
-            data.rotationSpeed *= 0.997;
+            if (!noDecel) {
+                data.velX *= 0.994;
+                data.velY *= 0.994;
+                data.rotationSpeed *= 0.997;
+            }
             cloneEl.style.left = data.x + 'px';
             cloneEl.style.top = data.y + 'px';
             cloneImgEl.style.transform = `rotate(${data.rotation}deg)`;
@@ -746,14 +758,15 @@ class CoronaAddon {
     stopFlyingAnimation() {
         if (!this.deviceImageState.isFlying) return;
         this.deviceImageState.isFlying = false;
+        this.deviceImageState.noDeceleration = false;
         if (this.deviceImageState.flyAnimationId) cancelAnimationFrame(this.deviceImageState.flyAnimationId);
         const container = this.deviceImageState.originalContainer;
         const img = this.deviceImageState.originalImg;
-        const originalRect = this.deviceImageState.originalRect;
         const cloneEl = this.deviceImageState.flyingClone;
         const cloneImgEl = this.deviceImageState.flyingCloneImg;
         this.deviceImageState.rotation = 0;
         this.deviceImageState.clickCount = 0;
+        this.deviceImageState.spinClickCount = 0;
         this.deviceImageState.isRotating = false;
         this.deviceImageState.isReturning = false;
         const finishReturn = () => {
@@ -763,39 +776,50 @@ class CoronaAddon {
             img.style.transform = '';
             img.style.animation = '';
         };
+        const getTargetRect = () => {
+            const deviceCard = document.querySelector('.card-device');
+            if (deviceCard) {
+                const cardRect = deviceCard.getBoundingClientRect();
+                return { left: cardRect.right - 12 - 80, top: cardRect.bottom - 12 - 80 };
+            }
+            return null;
+        };
         const animateToTarget = () => {
             const homePage = document.getElementById('page-home');
             if (homePage) homePage.scrollTop = 0;
             setTimeout(() => {
-                const deviceCard = document.querySelector('.card-device');
-                let targetX, targetY;
-                if (deviceCard) {
-                    const cardRect = deviceCard.getBoundingClientRect();
-                    targetX = cardRect.right - 12 - 80;
-                    targetY = cardRect.bottom - 12 - 80;
-                } else if (originalRect) {
-                    targetX = originalRect.left;
-                    targetY = originalRect.top;
-                } else {
-                    finishReturn();
-                    return;
-                }
-                cloneEl.style.transition = 'left 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
-                cloneImgEl.style.transition = 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
-                cloneEl.style.left = targetX + 'px';
-                cloneEl.style.top = targetY + 'px';
-                cloneImgEl.style.transform = 'rotate(0deg) scale(1)';
-                setTimeout(() => {
-                    cloneImgEl.style.transition = 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)';
-                    cloneImgEl.style.transform = 'scale(1.15)';
-                    setTimeout(() => {
-                        cloneImgEl.style.transform = 'scale(0.95)';
+                const startX = parseFloat(cloneEl.style.left);
+                const startY = parseFloat(cloneEl.style.top);
+                const startRotation = this.deviceImageState.flyData ? this.deviceImageState.flyData.rotation : 0;
+                const startTime = Date.now();
+                const duration = 600;
+                const animateFrame = () => {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    const target = getTargetRect();
+                    if (!target) { finishReturn(); return; }
+                    const currentX = startX + (target.left - startX) * eased;
+                    const currentY = startY + (target.top - startY) * eased;
+                    const currentRotation = startRotation * (1 - eased);
+                    cloneEl.style.left = currentX + 'px';
+                    cloneEl.style.top = currentY + 'px';
+                    cloneImgEl.style.transform = `rotate(${currentRotation}deg) scale(1)`;
+                    if (progress < 1) {
+                        requestAnimationFrame(animateFrame);
+                    } else {
+                        cloneImgEl.style.transition = 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                        cloneImgEl.style.transform = 'scale(1.15)';
                         setTimeout(() => {
-                            cloneImgEl.style.transform = 'scale(1)';
-                            setTimeout(finishReturn, 200);
+                            cloneImgEl.style.transform = 'scale(0.95)';
+                            setTimeout(() => {
+                                cloneImgEl.style.transform = 'scale(1)';
+                                setTimeout(finishReturn, 200);
+                            }, 100);
                         }, 100);
-                    }, 100);
-                }, 600);
+                    }
+                };
+                requestAnimationFrame(animateFrame);
             }, 50);
         };
         const homePage = document.getElementById('page-home');
