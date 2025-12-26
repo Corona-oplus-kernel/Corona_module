@@ -2564,3 +2564,7 @@ body.theme-dark .range-slider::-webkit-slider-thumb {
     flex: 1;
 }
 
+@keyframes infiniteSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

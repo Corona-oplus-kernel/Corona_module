@@ -499,91 +499,309 @@ class CoronaAddon {
         const container = document.getElementById('device-image-container');
         const img = document.getElementById('device-image');
         if (!container || !img) return;
-        let touchStartTime = 0, isLongPress = false, longPressTimer = null, startY = 0, currentScale = 1;
-        this.deviceImageState.stopClickCount = 0; this.deviceImageState.isFlying = false; this.deviceImageState.flyAnimationId = null;
-        container.addEventListener('click', (e) => {
-            if (isLongPress || this.deviceImageState.isDragging) { e.preventDefault(); return; }
-            if (this.deviceImageState.isFlying) return;
-            if (this.deviceImageState.isInfiniteRotating) { this.deviceImageState.stopClickCount++; if (this.deviceImageState.stopClickCount >= 3) { this.deviceImageState.isInfiniteRotating = false; this.deviceImageState.rotateCount = 0; this.deviceImageState.stopClickCount = 0; img.classList.remove('infinite-rotate'); img.style.animation = ''; this.startFlyingAnimation(container, img); } return; }
+        this.deviceImageState.clickCount = 0;
+        this.deviceImageState.isFlying = false;
+        this.deviceImageState.flyAnimationId = null;
+        this.deviceImageState.rotation = 0;
+        this.deviceImageState.isInfiniteRotating = false;
+        this.deviceImageState.isRotating = false;
+        this.deviceImageState.isReturning = false;
+        let longPressTimer = null, isDragging = false, isTouching = false;
+        let startX = 0, startY = 0, dragOffsetX = 0, dragOffsetY = 0;
+        let originalRect = null, longPressTriggered = false;
+        let cloneEl = null, cloneImgEl = null;
+        const maxDragDistance = 120;
+        const spinDuration = 150;
+        const handleClick = () => {
+            if (this.deviceImageState.isFlying || longPressTriggered || isDragging || this.deviceImageState.isReturning) {
+                return;
+            }
+            if (this.deviceImageState.isInfiniteRotating) {
+                this.deviceImageState.isInfiniteRotating = false;
+                this.deviceImageState.isReturning = true;
+                this.deviceImageState.clickCount = 0;
+                this.deviceImageState.isRotating = false;
+                const elapsed = Date.now() - this.deviceImageState.spinStartTime;
+                const currentAngle = (elapsed / spinDuration * 360) % 360;
+                const remainingAngle = 360 - currentAngle;
+                const animDuration = (remainingAngle / 360) * 0.6 + 0.2;
+                img.style.animation = '';
+                img.style.transition = 'none';
+                img.style.transform = `rotate(${currentAngle}deg)`;
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        img.style.transition = `transform ${animDuration}s cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+                        img.style.transform = 'rotate(360deg)';
+                        setTimeout(() => {
+                            img.style.transition = '';
+                            img.style.transform = '';
+                            this.deviceImageState.rotation = 0;
+                            this.deviceImageState.isReturning = false;
+                        }, animDuration * 1000);
+                    });
+                });
+                return;
+            }
             if (this.deviceImageState.isRotating) return;
-            this.deviceImageState.rotateCount++;
-            if (this.deviceImageState.rotateCount >= 5) { this.deviceImageState.isInfiniteRotating = true; this.deviceImageState.isRotating = true; this.deviceImageState.stopClickCount = 0; img.style.transition = 'none'; img.classList.add('infinite-rotate'); return; }
-            this.deviceImageState.isRotating = true; this.deviceImageState.rotation += 360;
-            img.style.transition = 'transform 0.6s ease-in-out'; img.style.transform = `rotate(${this.deviceImageState.rotation}deg) scale(${currentScale})`;
-            setTimeout(() => { this.deviceImageState.isRotating = false; }, 600);
-            if (this.deviceImageState.rotateResetTimer) clearTimeout(this.deviceImageState.rotateResetTimer);
-            this.deviceImageState.rotateResetTimer = setTimeout(() => { if (!this.deviceImageState.isInfiniteRotating) this.deviceImageState.rotateCount = 0; }, 2000);
-        });
-        container.addEventListener('touchstart', (e) => { if (this.deviceImageState.isFlying) return; touchStartTime = Date.now(); startY = e.touches[0].clientY; isLongPress = false; longPressTimer = setTimeout(() => { isLongPress = true; this.deviceImageState.isDragging = true; container.style.zIndex = '100'; }, 300); }, { passive: true });
-        container.addEventListener('touchmove', (e) => { if (this.deviceImageState.isFlying) return; if (!isLongPress) { clearTimeout(longPressTimer); return; } e.preventDefault(); const currentY = e.touches[0].clientY; const deltaY = startY - currentY; currentScale = Math.max(0.5, Math.min(3, 1 + deltaY / 100)); this.deviceImageState.currentScale = currentScale; img.style.transition = 'none'; img.style.transform = `rotate(${this.deviceImageState.rotation}deg) scale(${currentScale})`; }, { passive: false });
-        container.addEventListener('touchend', () => { if (this.deviceImageState.isFlying) return; clearTimeout(longPressTimer); if (isLongPress) { img.style.transition = 'transform 0.3s ease-out'; container.style.zIndex = ''; } setTimeout(() => { this.deviceImageState.isDragging = false; isLongPress = false; }, 100); });
+            this.deviceImageState.isRotating = true;
+            this.deviceImageState.clickCount++;
+            this.deviceImageState.rotation += 360;
+            if (this.deviceImageState.clickCount >= 3) {
+                this.deviceImageState.isInfiniteRotating = true;
+                this.deviceImageState.spinStartTime = Date.now();
+                img.style.transition = 'none';
+                img.style.transform = '';
+                img.style.animation = `infiniteSpin ${spinDuration}ms linear infinite`;
+                this.deviceImageState.isRotating = false;
+            } else {
+                img.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                img.style.transform = `rotate(${this.deviceImageState.rotation}deg)`;
+                setTimeout(() => {
+                    this.deviceImageState.isRotating = false;
+                }, 400);
+            }
+        };
+        const createClone = (rect) => {
+            cloneEl = document.createElement('div');
+            cloneEl.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:80px;height:80px;z-index:9999;border-radius:12px;overflow:hidden;pointer-events:none;`;
+            cloneImgEl = document.createElement('img');
+            cloneImgEl.src = img.src;
+            cloneImgEl.style.cssText = `width:100%;height:100%;object-fit:cover;transform:scale(1.15);transition:transform 0.1s ease-out;`;
+            cloneEl.appendChild(cloneImgEl);
+            document.body.appendChild(cloneEl);
+            container.style.visibility = 'hidden';
+        };
+        const handleTouchStart = (e) => {
+            if (this.deviceImageState.isFlying || this.deviceImageState.isReturning) return;
+            isTouching = true;
+            const touch = e.touches ? e.touches[0] : e;
+            startX = touch.clientX;
+            startY = touch.clientY;
+            originalRect = container.getBoundingClientRect();
+            dragOffsetX = 0;
+            dragOffsetY = 0;
+            isDragging = false;
+            longPressTriggered = false;
+            longPressTimer = setTimeout(() => {
+                longPressTriggered = true;
+                if (this.deviceImageState.isInfiniteRotating) {
+                    this.deviceImageState.isInfiniteRotating = false;
+                    this.deviceImageState.isReturning = true;
+                    this.deviceImageState.clickCount = 0;
+                    this.deviceImageState.isRotating = false;
+                    const elapsed = Date.now() - this.deviceImageState.spinStartTime;
+                    const currentAngle = (elapsed / spinDuration * 360) % 360;
+                    const remainingAngle = 360 - currentAngle;
+                    const animDuration = (remainingAngle / 360) * 0.6 + 0.2;
+                    img.style.animation = '';
+                    img.style.transition = 'none';
+                    img.style.transform = `rotate(${currentAngle}deg)`;
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            img.style.transition = `transform ${animDuration}s cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+                            img.style.transform = 'rotate(360deg)';
+                            setTimeout(() => {
+                                img.style.transition = '';
+                                img.style.transform = '';
+                                this.deviceImageState.rotation = 0;
+                                this.deviceImageState.isReturning = false;
+                                if (isTouching) {
+                                    originalRect = container.getBoundingClientRect();
+                                    createClone(originalRect);
+                                }
+                            }, animDuration * 1000);
+                        });
+                    });
+                } else {
+                    createClone(originalRect);
+                }
+            }, 200);
+        };
+        const handleTouchMove = (e) => {
+            if (this.deviceImageState.isFlying) return;
+            const touch = e.touches ? e.touches[0] : e;
+            const moveX = touch.clientX - startX;
+            const moveY = touch.clientY - startY;
+            if (!longPressTriggered && (Math.abs(moveX) > 5 || Math.abs(moveY) > 5)) {
+                clearTimeout(longPressTimer);
+                return;
+            }
+            if (!longPressTriggered || !cloneEl) return;
+            e.preventDefault && e.preventDefault();
+            isDragging = true;
+            let rawOffsetX = moveX;
+            let rawOffsetY = moveY;
+            const rawDistance = Math.sqrt(rawOffsetX * rawOffsetX + rawOffsetY * rawOffsetY);
+            if (rawDistance > maxDragDistance) {
+                const ratio = maxDragDistance / rawDistance;
+                rawOffsetX *= ratio;
+                rawOffsetY *= ratio;
+            }
+            dragOffsetX = rawOffsetX;
+            dragOffsetY = rawOffsetY;
+            const newX = originalRect.left + dragOffsetX;
+            const newY = originalRect.top + dragOffsetY;
+            cloneEl.style.left = newX + 'px';
+            cloneEl.style.top = newY + 'px';
+            const distance = Math.sqrt(dragOffsetX * dragOffsetX + dragOffsetY * dragOffsetY);
+            const distanceRatio = distance / maxDragDistance;
+            const scale = Math.max(0.7, 1.15 - distanceRatio * 0.45);
+            const skewX = Math.max(-20, Math.min(20, dragOffsetX / 8));
+            const skewY = Math.max(-20, Math.min(20, dragOffsetY / 8));
+            cloneImgEl.style.transition = 'none';
+            cloneImgEl.style.transform = `rotate(${this.deviceImageState.rotation}deg) scale(${scale}) skew(${-skewX}deg, ${-skewY}deg)`;
+        };
+        const handleTouchEnd = () => {
+            clearTimeout(longPressTimer);
+            isTouching = false;
+            if (this.deviceImageState.isFlying) return;
+            if (longPressTriggered && cloneEl) {
+                const distance = Math.sqrt(dragOffsetX * dragOffsetX + dragOffsetY * dragOffsetY);
+                if (distance > 20) {
+                    const speedMultiplier = Math.min(distance / maxDragDistance, 1) * 12 + 3;
+                    this.startFlyingAnimation(container, img, cloneEl, cloneImgEl, -dragOffsetX, -dragOffsetY, originalRect, speedMultiplier);
+                } else {
+                    this.jellyResetClone(container, cloneEl, cloneImgEl, originalRect);
+                }
+                cloneEl = null;
+                cloneImgEl = null;
+            }
+            setTimeout(() => { isDragging = false; longPressTriggered = false; }, 30);
+        };
+        container.addEventListener('click', handleClick);
+        container.addEventListener('touchstart', handleTouchStart, { passive: true });
+        container.addEventListener('touchmove', handleTouchMove, { passive: false });
+        container.addEventListener('touchend', handleTouchEnd);
+        container.addEventListener('touchcancel', handleTouchEnd);
+        container.addEventListener('mousedown', handleTouchStart);
+        document.addEventListener('mousemove', handleTouchMove);
+        document.addEventListener('mouseup', handleTouchEnd);
     }
-    startFlyingAnimation(container, img) {
+    jellyResetClone(container, cloneEl, cloneImgEl, originalRect) {
+        cloneEl.style.transition = 'left 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        cloneImgEl.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        cloneEl.style.left = originalRect.left + 'px';
+        cloneEl.style.top = originalRect.top + 'px';
+        cloneImgEl.style.transform = `rotate(${this.deviceImageState.rotation}deg) scale(1)`;
+        setTimeout(() => {
+            if (cloneEl && cloneEl.parentNode) cloneEl.parentNode.removeChild(cloneEl);
+            container.style.visibility = '';
+        }, 500);
+    }
+    startFlyingAnimation(container, img, cloneEl, cloneImgEl, vx, vy, originalRect, speedMultiplier) {
         this.deviceImageState.isFlying = true;
-        const rect = container.getBoundingClientRect();
-        this.deviceImageState.originalPosition = { left: rect.left, top: rect.top };
-        this.deviceImageState.flyingContainer = container; this.deviceImageState.flyingImg = img;
-        document.body.appendChild(container);
-        container.style.position = 'fixed'; container.style.left = rect.left + 'px'; container.style.top = rect.top + 'px';
-        container.style.width = '80px'; container.style.height = '80px'; container.style.zIndex = '9999';
-        container.style.margin = '0'; container.style.pointerEvents = 'auto'; container.style.cursor = 'pointer';
-        img.style.width = '80px'; img.style.height = '80px';
+        this.deviceImageState.originalContainer = container;
+        this.deviceImageState.originalImg = img;
+        this.deviceImageState.originalRect = originalRect;
+        this.deviceImageState.flyingClone = cloneEl;
+        this.deviceImageState.flyingCloneImg = cloneImgEl;
+        cloneEl.style.pointerEvents = 'auto';
+        cloneEl.style.cursor = 'pointer';
+        const rect = cloneEl.getBoundingClientRect();
+        const speed = Math.sqrt(vx * vx + vy * vy);
+        const normalizedVx = (vx / speed) * speedMultiplier;
+        const normalizedVy = (vy / speed) * speedMultiplier;
         let x = rect.left, y = rect.top;
-        let vx = (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random() * 2);
-        let vy = (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random() * 2);
-        let rotation = 0, rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * (8 + Math.random() * 6);
-        const containerWidth = 80, containerHeight = 80, screenWidth = window.innerWidth, screenHeight = window.innerHeight;
-        this.deviceImageState.flyData = { x, y, vx, vy, rotation, rotationSpeed };
+        let velX = normalizedVx, velY = normalizedVy;
+        let rotation = this.deviceImageState.rotation;
+        let rotationSpeed = (vx > 0 ? 1 : -1) * (speedMultiplier + Math.random() * 5);
+        const containerWidth = 80, containerHeight = 80;
+        const screenWidth = window.innerWidth, screenHeight = window.innerHeight;
+        this.deviceImageState.flyData = { x, y, velX, velY, rotation, rotationSpeed };
         const animate = () => {
             if (!this.deviceImageState.isFlying) return;
             const data = this.deviceImageState.flyData;
-            data.x += data.vx; data.y += data.vy; data.rotation += data.rotationSpeed;
-            if (data.x <= 0) { data.x = 0; data.vx = Math.abs(data.vx) * (0.9 + Math.random() * 0.2); data.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * (8 + Math.random() * 6); }
-            else if (data.x + containerWidth >= screenWidth) { data.x = screenWidth - containerWidth; data.vx = -Math.abs(data.vx) * (0.9 + Math.random() * 0.2); data.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * (8 + Math.random() * 6); }
-            if (data.y <= 0) { data.y = 0; data.vy = Math.abs(data.vy) * (0.9 + Math.random() * 0.2); data.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * (8 + Math.random() * 6); }
-            else if (data.y + containerHeight >= screenHeight) { data.y = screenHeight - containerHeight; data.vy = -Math.abs(data.vy) * (0.9 + Math.random() * 0.2); data.rotationSpeed = (Math.random() > 0.5 ? 1 : -1) * (8 + Math.random() * 6); }
-            container.style.left = data.x + 'px'; container.style.top = data.y + 'px';
-            img.style.transition = 'none'; img.style.transform = `rotate(${data.rotation}deg)`;
+            data.x += data.velX;
+            data.y += data.velY;
+            data.rotation += data.rotationSpeed;
+            if (data.x <= 0) {
+                data.x = 0;
+                data.velX = Math.abs(data.velX) * 0.8;
+                data.rotationSpeed = -data.rotationSpeed * 0.85;
+            } else if (data.x + containerWidth >= screenWidth) {
+                data.x = screenWidth - containerWidth;
+                data.velX = -Math.abs(data.velX) * 0.8;
+                data.rotationSpeed = -data.rotationSpeed * 0.85;
+            }
+            if (data.y <= 0) {
+                data.y = 0;
+                data.velY = Math.abs(data.velY) * 0.8;
+                data.rotationSpeed *= 0.85;
+            } else if (data.y + containerHeight >= screenHeight) {
+                data.y = screenHeight - containerHeight;
+                data.velY = -Math.abs(data.velY) * 0.8;
+                data.rotationSpeed *= 0.85;
+            }
+            data.velX *= 0.994;
+            data.velY *= 0.994;
+            data.rotationSpeed *= 0.997;
+            cloneEl.style.left = data.x + 'px';
+            cloneEl.style.top = data.y + 'px';
+            cloneImgEl.style.transform = `rotate(${data.rotation}deg)`;
             this.deviceImageState.flyAnimationId = requestAnimationFrame(animate);
         };
-        container.onclick = (e) => { e.stopPropagation(); this.stopFlyingAnimation(); };
+        cloneEl.onclick = (e) => { e.stopPropagation(); this.stopFlyingAnimation(); };
         this.deviceImageState.flyAnimationId = requestAnimationFrame(animate);
     }
     stopFlyingAnimation() {
         if (!this.deviceImageState.isFlying) return;
         this.deviceImageState.isFlying = false;
         if (this.deviceImageState.flyAnimationId) cancelAnimationFrame(this.deviceImageState.flyAnimationId);
-        const container = this.deviceImageState.flyingContainer;
-        const img = this.deviceImageState.flyingImg;
-        const deviceCard = document.querySelector('.card-device');
+        const container = this.deviceImageState.originalContainer;
+        const img = this.deviceImageState.originalImg;
+        const originalRect = this.deviceImageState.originalRect;
+        const cloneEl = this.deviceImageState.flyingClone;
+        const cloneImgEl = this.deviceImageState.flyingCloneImg;
+        this.deviceImageState.rotation = 0;
+        this.deviceImageState.clickCount = 0;
+        this.deviceImageState.isRotating = false;
+        this.deviceImageState.isReturning = false;
         const finishReturn = () => {
-            container.style.position = ''; container.style.left = ''; container.style.top = '';
-            container.style.width = ''; container.style.height = ''; container.style.zIndex = '';
-            container.style.margin = ''; container.style.transition = ''; container.style.pointerEvents = '';
-            container.style.cursor = ''; img.style.width = ''; img.style.height = '';
-            img.style.transition = ''; img.style.transform = ''; container.onclick = null;
-            if (deviceCard) deviceCard.appendChild(container);
-            this.deviceImageState.rotation = 0; this.deviceImageState.rotateCount = 0; this.deviceImageState.isRotating = false;
+            if (cloneEl && cloneEl.parentNode) cloneEl.parentNode.removeChild(cloneEl);
+            container.style.visibility = '';
+            img.style.transition = '';
+            img.style.transform = '';
+            img.style.animation = '';
         };
         const animateToTarget = () => {
             const homePage = document.getElementById('page-home');
             if (homePage) homePage.scrollTop = 0;
             setTimeout(() => {
-                const targetRect = deviceCard.getBoundingClientRect();
-                const targetLeft = targetRect.left + (targetRect.width - 80) / 2;
-                const targetTop = targetRect.top + 40;
-                container.style.transition = 'left 0.5s ease-out, top 0.5s ease-out';
-                img.style.transition = 'transform 0.5s ease-out';
-                container.style.left = targetLeft + 'px'; container.style.top = targetTop + 'px';
-                img.style.transform = 'rotate(0deg)';
-                setTimeout(finishReturn, 500);
+                const deviceCard = document.querySelector('.card-device');
+                let targetX, targetY;
+                if (deviceCard) {
+                    const cardRect = deviceCard.getBoundingClientRect();
+                    targetX = cardRect.right - 12 - 80;
+                    targetY = cardRect.bottom - 12 - 80;
+                } else if (originalRect) {
+                    targetX = originalRect.left;
+                    targetY = originalRect.top;
+                } else {
+                    finishReturn();
+                    return;
+                }
+                cloneEl.style.transition = 'left 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                cloneImgEl.style.transition = 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                cloneEl.style.left = targetX + 'px';
+                cloneEl.style.top = targetY + 'px';
+                cloneImgEl.style.transform = 'rotate(0deg) scale(1)';
+                setTimeout(() => {
+                    cloneImgEl.style.transition = 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                    cloneImgEl.style.transform = 'scale(1.15)';
+                    setTimeout(() => {
+                        cloneImgEl.style.transform = 'scale(0.95)';
+                        setTimeout(() => {
+                            cloneImgEl.style.transform = 'scale(1)';
+                            setTimeout(finishReturn, 200);
+                        }, 100);
+                    }, 100);
+                }, 600);
             }, 50);
         };
-        if (deviceCard) {
-            const homePage = document.getElementById('page-home');
-            const isHomeVisible = homePage && homePage.classList.contains('active');
-            if (isHomeVisible) animateToTarget(); else { this.switchPage('home'); setTimeout(animateToTarget, 150); }
-        } else finishReturn();
+        const homePage = document.getElementById('page-home');
+        const isHomeVisible = homePage && homePage.classList.contains('active');
+        if (isHomeVisible) animateToTarget();
+        else { this.switchPage('home'); setTimeout(animateToTarget, 150); }
     }
     bindAllEvents() {
         document.querySelectorAll('.tab-item').forEach(tab => { tab.addEventListener('click', (e) => this.switchPage(e.currentTarget.dataset.page)); });
