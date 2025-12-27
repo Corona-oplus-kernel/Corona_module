@@ -21,9 +21,24 @@ apply_zram_config() {
             algorithm=$(grep "^algorithm=" "$CONFIG_DIR/zram.conf" | cut -d'=' -f2)
             size=$(grep "^size=" "$CONFIG_DIR/zram.conf" | cut -d'=' -f2)
             swappiness=$(grep "^swappiness=" "$CONFIG_DIR/zram.conf" | cut -d'=' -f2)
+            zram_writeback=$(grep "^zram_writeback=" "$CONFIG_DIR/zram.conf" | cut -d'=' -f2)
             
             swapoff /dev/block/zram0 2>/dev/null
             echo 1 > /sys/block/zram0/reset 2>/dev/null
+            
+            bd_path=/sys/block/zram0/backing_dev
+            if [ -f /sys/block/zram0/hybridswap_loop_device ]; then
+                bd_path=/sys/block/zram0/hybridswap_loop_device
+            fi
+            if [ -f "$bd_path" ]; then
+                if [ "$zram_writeback" = "true" ]; then
+                    echo 0 > /sys/block/zram0/writeback_limit_enable 2>/dev/null
+                elif [ "$zram_writeback" = "false" ]; then
+                    echo none > "$bd_path" 2>/dev/null
+                    echo 1 > /sys/block/zram0/writeback_limit_enable 2>/dev/null
+                    echo 0 > /sys/block/zram0/writeback_limit 2>/dev/null
+                fi
+            fi
             
             if [ -n "$algorithm" ]; then
                 echo "$algorithm" > /sys/block/zram0/comp_algorithm 2>/dev/null
@@ -43,6 +58,85 @@ apply_zram_config() {
     fi
 }
 
+apply_swap_config() {
+    if [ -f "$CONFIG_DIR/swap.conf" ]; then
+        enabled=$(grep "^enabled=" "$CONFIG_DIR/swap.conf" | cut -d'=' -f2)
+        size=$(grep "^size=" "$CONFIG_DIR/swap.conf" | cut -d'=' -f2)
+        priority=$(grep "^priority=" "$CONFIG_DIR/swap.conf" | cut -d'=' -f2)
+        swapfile="/data/swapfile"
+        if [ "$enabled" = "1" ] && [ -n "$size" ]; then
+            if [ -f "$swapfile" ]; then
+                current_size=$(($(stat -c %s "$swapfile" 2>/dev/null || echo 0) / 1024 / 1024))
+                if [ "$current_size" != "$size" ]; then
+                    swapoff "$swapfile" 2>/dev/null
+                    rm -f "$swapfile"
+                fi
+            fi
+            if [ ! -f "$swapfile" ]; then
+                dd if=/dev/zero of="$swapfile" bs=1M count="$size" 2>/dev/null
+                chmod 600 "$swapfile"
+            fi
+            mkswap "$swapfile" 2>/dev/null
+            if [ -n "$priority" ] && [ "$priority" != "0" ]; then
+                swapon "$swapfile" -p "$priority" 2>/dev/null
+            else
+                swapon "$swapfile" 2>/dev/null
+            fi
+        else
+            swapoff "$swapfile" 2>/dev/null
+        fi
+    fi
+}
+
+apply_vm_config() {
+    if [ -f "$CONFIG_DIR/vm.conf" ]; then
+        watermark=$(grep "^watermark_scale_factor=" "$CONFIG_DIR/vm.conf" | cut -d'=' -f2)
+        extra_free=$(grep "^extra_free_kbytes=" "$CONFIG_DIR/vm.conf" | cut -d'=' -f2)
+        dirty_ratio=$(grep "^dirty_ratio=" "$CONFIG_DIR/vm.conf" | cut -d'=' -f2)
+        dirty_bg=$(grep "^dirty_background_ratio=" "$CONFIG_DIR/vm.conf" | cut -d'=' -f2)
+        vfs_pressure=$(grep "^vfs_cache_pressure=" "$CONFIG_DIR/vm.conf" | cut -d'=' -f2)
+        
+        [ -n "$watermark" ] && echo "$watermark" > /proc/sys/vm/watermark_scale_factor 2>/dev/null
+        [ -n "$extra_free" ] && echo "$extra_free" > /proc/sys/vm/extra_free_kbytes 2>/dev/null
+        [ -n "$dirty_ratio" ] && echo "$dirty_ratio" > /proc/sys/vm/dirty_ratio 2>/dev/null
+        [ -n "$dirty_bg" ] && echo "$dirty_bg" > /proc/sys/vm/dirty_background_ratio 2>/dev/null
+        [ -n "$vfs_pressure" ] && echo "$vfs_pressure" > /proc/sys/vm/vfs_cache_pressure 2>/dev/null
+    fi
+}
+
+apply_kernel_features_config() {
+    if [ -f "$CONFIG_DIR/kernel.conf" ]; then
+        lru_gen=$(grep "^lru_gen=" "$CONFIG_DIR/kernel.conf" | cut -d'=' -f2)
+        thp=$(grep "^thp=" "$CONFIG_DIR/kernel.conf" | cut -d'=' -f2)
+        ksm=$(grep "^ksm=" "$CONFIG_DIR/kernel.conf" | cut -d'=' -f2)
+        compaction=$(grep "^compaction=" "$CONFIG_DIR/kernel.conf" | cut -d'=' -f2)
+        
+        if [ -f /sys/kernel/mm/lru_gen/enabled ] && [ -n "$lru_gen" ]; then
+            if [ "$lru_gen" = "1" ]; then
+                echo Y > /sys/kernel/mm/lru_gen/enabled 2>/dev/null
+            else
+                echo N > /sys/kernel/mm/lru_gen/enabled 2>/dev/null
+            fi
+        fi
+        
+        if [ -f /sys/kernel/mm/transparent_hugepage/enabled ] && [ -n "$thp" ]; then
+            echo "$thp" > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
+        fi
+        
+        if [ -f /sys/kernel/mm/ksm/run ] && [ -n "$ksm" ]; then
+            echo "$ksm" > /sys/kernel/mm/ksm/run 2>/dev/null
+        fi
+        
+        if [ -f /proc/sys/vm/compaction_proactiveness ] && [ -n "$compaction" ]; then
+            if [ "$compaction" = "1" ]; then
+                echo 20 > /proc/sys/vm/compaction_proactiveness 2>/dev/null
+            else
+                echo 0 > /proc/sys/vm/compaction_proactiveness 2>/dev/null
+            fi
+        fi
+    fi
+}
+
 apply_le9ec_config() {
     if [ -f "$CONFIG_DIR/le9ec.conf" ]; then
         enabled=$(grep "^enabled=" "$CONFIG_DIR/le9ec.conf" | cut -d'=' -f2)
@@ -51,15 +145,9 @@ apply_le9ec_config() {
             clean_low=$(grep "^clean_low=" "$CONFIG_DIR/le9ec.conf" | cut -d'=' -f2)
             clean_min=$(grep "^clean_min=" "$CONFIG_DIR/le9ec.conf" | cut -d'=' -f2)
             
-            if [ -n "$anon_min" ]; then
-                echo "$anon_min" > /proc/sys/vm/anon_min_kbytes 2>/dev/null
-            fi
-            if [ -n "$clean_low" ]; then
-                echo "$clean_low" > /proc/sys/vm/clean_low_kbytes 2>/dev/null
-            fi
-            if [ -n "$clean_min" ]; then
-                echo "$clean_min" > /proc/sys/vm/clean_min_kbytes 2>/dev/null
-            fi
+            [ -n "$anon_min" ] && echo "$anon_min" > /proc/sys/vm/anon_min_kbytes 2>/dev/null
+            [ -n "$clean_low" ] && echo "$clean_low" > /proc/sys/vm/clean_low_kbytes 2>/dev/null
+            [ -n "$clean_min" ] && echo "$clean_min" > /proc/sys/vm/clean_min_kbytes 2>/dev/null
         fi
     fi
 }
@@ -220,6 +308,14 @@ apply_freq_lock_config() {
     fi
 }
 
+apply_user_scripts() {
+    if [ -f "$CONFIG_DIR/user_scripts.sh" ]; then
+        chmod 755 "$CONFIG_DIR/user_scripts.sh"
+        sh "$CONFIG_DIR/user_scripts.sh" 2>/dev/null &
+    fi
+}
+
+
 wait_until_boot_complete
 wait_until_login
 sleep 10
@@ -227,7 +323,16 @@ sleep 10
 mkdir -p "$CONFIG_DIR"
 
 apply_zram_config
-sleep 10
+sleep 5
+
+apply_swap_config
+sleep 5
+
+apply_vm_config
+sleep 3
+
+apply_kernel_features_config
+sleep 3
 
 apply_le9ec_config
 sleep 5
@@ -252,9 +357,29 @@ sleep 5
 
 apply_freq_lock_config
 
+sleep 5
+
+apply_user_scripts
+
 sleep 30
 apply_cpu_affinity_config
 sleep 2
 apply_process_priority_config
 sleep 2
 apply_freq_lock_config
+
+start_auto_clean() {
+    while true; do
+        sleep 3600
+        if [ -f "$CONFIG_DIR/autoclean.conf" ]; then
+            enabled=$(grep "^enabled=" "$CONFIG_DIR/autoclean.conf" | cut -d'=' -f2)
+            if [ "$enabled" = "1" ]; then
+                sync
+                echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+                sed -i "s/last_clean=.*/last_clean=$(date +%s)000/" "$CONFIG_DIR/autoclean.conf"
+            fi
+        fi
+    done
+}
+
+start_auto_clean &

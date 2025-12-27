@@ -143,55 +143,239 @@
                 <h1 class="page-title">系统配置</h1>
                 <p class="page-subtitle">修改系统配置</p>
             </div>
-            <div class="card" id="zram-card">
-                <div class="card-title card-title-expandable" id="zram-toggle">ZRAM 管理<span class="expand-icon">❯</span></div>
-                <div id="zram-content" class="expandable-content hidden">
-                    <div class="info-item">
-                        <span class="info-label">当前算法</span>
-                        <span class="info-value" id="zram-current-alg">--</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">当前大小</span>
-                        <span class="info-value" id="zram-current-size">--</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">当前Swappiness</span>
-                        <span class="info-value" id="zram-current-swappiness">--</span>
-                    </div>
-                    <div class="switch-container">
-                        <div class="switch-info">
-                            <span class="switch-label">启用 ZRAM 设置</span>
-                            <span class="switch-desc">压缩内存块，扩展可用RAM</span>
+            <div class="card" id="memory-compression-card">
+                <div class="card-title card-title-expandable" id="memory-compression-toggle">内存压缩<span class="expand-icon">❯</span></div>
+                <div id="memory-compression-content" class="expandable-content hidden">
+                    <div class="sub-card" id="zram-sub">
+                        <div class="sub-card-header" id="zram-toggle">
+                            <span class="sub-card-title">ZRAM 管理</span>
+                            <span class="current-badge" id="zram-status">--</span>
+                            <span class="expand-icon">❯</span>
                         </div>
-                        <label class="switch">
-                            <input type="checkbox" id="zram-switch">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <div id="zram-settings" class="sub-settings hidden">
-                        <div class="setting-section">
-                            <span class="section-label">压缩算法</span>
-                            <div class="option-grid" id="algorithm-list"></div>
-                        </div>
-                        <div class="setting-section">
-                            <span class="section-label">ZRAM 大小 (松开立即应用)</span>
-                            <div class="slider-container">
-                                <input type="range" class="range-slider" id="zram-size-slider" min="2" max="24" step="0.25" value="8">
-                                <div class="slider-labels">
-                                    <span>2GB</span>
-                                    <span class="slider-value" id="zram-size-value">8.00 GB</span>
-                                    <span>24GB</span>
+                        <div id="zram-content" class="sub-expandable-content">
+                            <div class="info-row">
+                                <div class="info-item">
+                                    <span class="info-label">当前算法</span>
+                                    <span class="info-value" id="zram-current-alg">--</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">当前大小</span>
+                                    <span class="info-value" id="zram-current-size">--</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Swappiness</span>
+                                    <span class="info-value" id="zram-current-swappiness">--</span>
+                                </div>
+                            </div>
+                            <div class="switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">启用 ZRAM</span>
+                                    <span class="switch-desc">压缩内存块，扩展可用RAM</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="zram-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div id="zram-settings" class="sub-settings hidden">
+                                <div class="setting-section">
+                                    <span class="section-label">压缩算法</span>
+                                    <div class="option-grid" id="algorithm-list"></div>
+                                </div>
+                                <div class="setting-section">
+                                    <span class="section-label">ZRAM 大小</span>
+                                    <div class="slider-container">
+                                        <input type="range" class="range-slider" id="zram-size-slider" min="2" max="24" step="0.25" value="8">
+                                        <div class="slider-labels">
+                                            <span>2GB</span>
+                                            <span class="slider-value" id="zram-size-value">8.00 GB</span>
+                                            <span>24GB</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="setting-section">
+                                    <span class="section-label">Swappiness</span>
+                                    <div class="slider-container">
+                                        <input type="range" class="range-slider" id="swappiness-slider" min="0" max="200" step="1" value="100">
+                                        <div class="slider-labels">
+                                            <span>0</span>
+                                            <span class="slider-value" id="swappiness-value">100</span>
+                                            <span>200</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="setting-section">
+                                    <span class="section-label">ZRAM 回写</span>
+                                    <div class="option-grid" id="zram-writeback-list">
+                                        <div class="option-item selected" data-value="default">默认</div>
+                                        <div class="option-item" data-value="true">启用</div>
+                                        <div class="option-item" data-value="false">禁用</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="setting-section">
-                            <span class="section-label">Swappiness (松开立即应用)</span>
-                            <div class="slider-container">
-                                <input type="range" class="range-slider" id="swappiness-slider" min="0" max="200" step="1" value="100">
-                                <div class="slider-labels">
-                                    <span>0</span>
-                                    <span class="slider-value" id="swappiness-value">100</span>
-                                    <span>200</span>
+                    </div>
+                    <div class="sub-card" id="swap-sub">
+                        <div class="sub-card-header" id="swap-toggle">
+                            <span class="sub-card-title">Swap 文件</span>
+                            <span class="current-badge" id="swap-status">未启用</span>
+                            <span class="expand-icon">❯</span>
+                        </div>
+                        <div id="swap-content" class="sub-expandable-content">
+                            <div class="info-row">
+                                <div class="info-item">
+                                    <span class="info-label">当前状态</span>
+                                    <span class="info-value" id="swap-current-status">--</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">当前大小</span>
+                                    <span class="info-value" id="swap-current-size">--</span>
+                                </div>
+                            </div>
+                            <div class="switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">启用 Swap</span>
+                                    <span class="switch-desc">使用文件作为交换空间</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="swap-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div id="swap-settings" class="sub-settings hidden">
+                                <div class="setting-section">
+                                    <span class="section-label">Swap 大小</span>
+                                    <div class="slider-container">
+                                        <input type="range" class="range-slider" id="swap-size-slider" min="512" max="16384" step="512" value="2048">
+                                        <div class="slider-labels">
+                                            <span>512MB</span>
+                                            <span class="slider-value" id="swap-size-value">2048 MB</span>
+                                            <span>16GB</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="setting-section">
+                                    <span class="section-label">Swap 优先级</span>
+                                    <div class="option-grid" id="swap-priority-list">
+                                        <div class="option-item" data-value="-2">低 (-2)</div>
+                                        <div class="option-item selected" data-value="0">默认 (0)</div>
+                                        <div class="option-item" data-value="5">高 (5)</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sub-card" id="lru-sub">
+                        <div class="sub-card-header" id="lru-toggle">
+                            <span class="sub-card-title">LRU 相关</span>
+                            <span class="current-badge" id="lru-status">--</span>
+                            <span class="expand-icon">❯</span>
+                        </div>
+                        <div id="lru-content" class="sub-expandable-content">
+                            <div class="lru-switch" id="lru-gen-container" style="display:none;">
+                                <div class="switch-info">
+                                    <span class="switch-label">多代 LRU (MGLRU)</span>
+                                    <span class="switch-desc">改进的页面回收算法，提升性能</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="lru-gen-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="lru-setting" id="thp-container" style="display:none;">
+                                <span class="section-label">透明大页 (THP)</span>
+                                <span class="section-desc">自动使用大页面提升内存访问效率</span>
+                                <div class="option-grid" id="thp-list">
+                                    <div class="option-item" data-value="always">始终</div>
+                                    <div class="option-item" data-value="madvise">按需</div>
+                                    <div class="option-item selected" data-value="never">禁用</div>
+                                </div>
+                            </div>
+                            <div class="lru-switch" id="ksm-container" style="display:none;">
+                                <div class="switch-info">
+                                    <span class="switch-label">内存页合并 (KSM)</span>
+                                    <span class="switch-desc">合并相同内存页节省内存</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="ksm-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="lru-switch" id="compaction-container" style="display:none;">
+                                <div class="switch-info">
+                                    <span class="switch-label">主动内存压缩</span>
+                                    <span class="switch-desc">后台压缩内存碎片</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="compaction-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="kernel-features-empty" id="kernel-features-empty">
+                                <span>未检测到可配置的 LRU 特性</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sub-card" id="vm-sub">
+                        <div class="sub-card-header" id="vm-toggle">
+                            <span class="sub-card-title">虚拟内存参数</span>
+                            <span class="current-badge" id="vm-status">默认</span>
+                            <span class="expand-icon">❯</span>
+                        </div>
+                        <div id="vm-content" class="sub-expandable-content">
+                            <div class="setting-section">
+                                <span class="section-label">内存回收水位线 (watermark_scale_factor)</span>
+                                <div class="slider-container">
+                                    <input type="range" class="range-slider" id="watermark-slider" min="1" max="1000" step="1" value="100">
+                                    <div class="slider-labels">
+                                        <span>1</span>
+                                        <span class="slider-value" id="watermark-value">100</span>
+                                        <span>1000</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="setting-section">
+                                <span class="section-label">额外空闲内存 (extra_free_kbytes)</span>
+                                <div class="slider-container">
+                                    <input type="range" class="range-slider" id="extra-free-slider" min="0" max="262144" step="4096" value="0">
+                                    <div class="slider-labels">
+                                        <span>0</span>
+                                        <span class="slider-value" id="extra-free-value">0 KB</span>
+                                        <span>256MB</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="setting-section">
+                                <span class="section-label">脏页比例 (dirty_ratio)</span>
+                                <div class="slider-container">
+                                    <input type="range" class="range-slider" id="dirty-ratio-slider" min="5" max="90" step="1" value="20">
+                                    <div class="slider-labels">
+                                        <span>5%</span>
+                                        <span class="slider-value" id="dirty-ratio-value">20%</span>
+                                        <span>90%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="setting-section">
+                                <span class="section-label">后台脏页比例 (dirty_background_ratio)</span>
+                                <div class="slider-container">
+                                    <input type="range" class="range-slider" id="dirty-bg-slider" min="1" max="50" step="1" value="10">
+                                    <div class="slider-labels">
+                                        <span>1%</span>
+                                        <span class="slider-value" id="dirty-bg-value">10%</span>
+                                        <span>50%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="setting-section">
+                                <span class="section-label">VFS缓存压力 (vfs_cache_pressure)</span>
+                                <div class="slider-container">
+                                    <input type="range" class="range-slider" id="vfs-pressure-slider" min="0" max="500" step="10" value="100">
+                                    <div class="slider-labels">
+                                        <span>0</span>
+                                        <span class="slider-value" id="vfs-pressure-value">100</span>
+                                        <span>500</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -309,11 +493,9 @@
                                 <span class="section-label">最大频率</span>
                                 <select class="freq-select" id="global-max-freq"></select>
                             </div>
-                            <button class="action-btn" id="apply-global-freq-btn">应用全局频率</button>
                         </div>
                         <div id="freq-per-core-settings" class="sub-settings hidden">
                             <div id="per-core-freq-list"></div>
-                            <button class="action-btn" id="apply-per-core-freq-btn">应用核心频率</button>
                         </div>
                     </div>
                 </div>
@@ -332,6 +514,16 @@
                 <div class="card-title card-title-expandable" id="tcp-toggle">TCP 拥塞算法<span class="current-badge" id="tcp-current">--</span><span class="expand-icon">❯</span></div>
                 <div id="tcp-content" class="expandable-content hidden">
                     <div class="option-list" id="tcp-list"></div>
+                </div>
+            </div>
+            <div class="card" id="custom-scripts-card">
+                <div class="card-title card-title-expandable" id="custom-scripts-toggle">自定义脚本<span class="current-badge" id="scripts-count">0 个</span><span class="expand-icon">❯</span></div>
+                <div id="custom-scripts-content" class="expandable-content hidden">
+                    <div class="scripts-desc">添加自定义Shell脚本，开机时自动执行</div>
+                    <div class="scripts-list-container" id="scripts-list">
+                        <div class="scripts-empty">暂无自定义脚本</div>
+                    </div>
+                    <button class="action-btn scripts-add-btn" id="scripts-add-btn"><span class="add-icon">+</span> 添加脚本</button>
                 </div>
             </div>
             <div class="card" id="app-settings-card">
@@ -354,10 +546,24 @@
                             </div>
                         </div>
                     </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">自动清理缓存</span>
+                            <span class="switch-desc">每小时自动清理系统缓存</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="auto-clean-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="auto-clean-status" id="auto-clean-status">
+                        <span class="status-label">上次清理</span>
+                        <span class="status-value" id="last-clean-time">--</span>
+                    </div>
                     <div class="setting-section danger-section">
                         <span class="section-label">危险操作</span>
-                        <div class="action-desc">重置所有设置并删除所有配置文件，此操作不可撤销</div>
-                        <button class="action-btn action-btn-danger" id="reset-all-btn">重置所有设置</button>
+                        <div class="action-desc">点击清除所有设置，长按可选择性清除</div>
+                        <button class="action-btn action-btn-danger" id="reset-all-btn">清除所有设置</button>
                     </div>
                 </div>
             </div>
@@ -534,6 +740,66 @@
             <div class="confirm-dialog-actions">
                 <button class="action-btn" id="confirm-dialog-cancel">取消</button>
                 <button class="action-btn action-btn-danger" id="confirm-dialog-ok">确定</button>
+            </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden" id="reset-settings-overlay">
+        <div class="detail-card reset-settings-card">
+            <div class="detail-header">
+                <span class="detail-title">清除设置</span>
+                <span class="detail-close" id="reset-settings-close">✕</span>
+            </div>
+            <div class="reset-settings-content">
+                <div class="reset-settings-desc">选择要清除的配置项</div>
+                <div class="reset-settings-list" id="reset-settings-list"></div>
+                <div class="reset-settings-actions">
+                    <button class="action-btn" id="reset-select-all-btn">全选</button>
+                    <button class="action-btn action-btn-danger" id="reset-confirm-btn">清除选中项</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden" id="script-edit-overlay">
+        <div class="detail-card script-edit-card">
+            <div class="detail-header">
+                <span class="detail-title" id="script-edit-title">添加脚本</span>
+                <span class="detail-close" id="script-edit-close">✕</span>
+            </div>
+            <div class="script-edit-content">
+                <div class="script-edit-section">
+                    <span class="script-edit-label">脚本名称</span>
+                    <input type="text" class="script-name-input" id="script-name-input" placeholder="例如: 性能优化">
+                </div>
+                <div class="script-edit-section">
+                    <span class="script-edit-label">分类标签</span>
+                    <div class="script-tags" id="script-tags">
+                        <div class="script-tag selected" data-tag="性能">性能</div>
+                        <div class="script-tag" data-tag="省电">省电</div>
+                        <div class="script-tag" data-tag="网络">网络</div>
+                        <div class="script-tag" data-tag="内存">内存</div>
+                        <div class="script-tag" data-tag="其他">其他</div>
+                    </div>
+                </div>
+                <div class="script-edit-section">
+                    <span class="script-edit-label">脚本内容</span>
+                    <textarea class="script-code-input" id="script-code-input" placeholder="#!/system/bin/sh&#10;# 在此输入Shell脚本代码&#10;echo 'Hello Corona'"></textarea>
+                </div>
+                <div class="script-edit-section">
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">启用此脚本</span>
+                            <span class="switch-desc">关闭后开机不会执行</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="script-enabled-switch" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="script-edit-actions">
+                    <button class="action-btn" id="script-cancel-btn">取消</button>
+                    <button class="action-btn script-save-btn" id="script-save-btn">保存脚本</button>
+                </div>
             </div>
         </div>
     </div>
