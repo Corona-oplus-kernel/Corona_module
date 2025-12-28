@@ -7,12 +7,14 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="floating-header" id="floating-header">
+        <span class="floating-header-title">Corona</span>
+    </div>
     <div class="bg-decoration"></div>
     <div class="container">
         <div class="page active" id="page-home">
-            <div class="page-header">
-                <h1 class="page-title">仪表盘</h1>
-                <p class="page-subtitle">系统状态与监控</p>
+            <div class="corona-title-container">
+                <h1 class="corona-title" id="corona-title">Corona</h1>
             </div>
             <div class="banner-image">
                 <img src="images/001.png" alt="Banner">
@@ -139,9 +141,8 @@
             </div>
         </div>
         <div class="page" id="page-settings">
-            <div class="page-header">
-                <h1 class="page-title">系统配置</h1>
-                <p class="page-subtitle">修改系统配置</p>
+            <div class="corona-title-container">
+                <h1 class="corona-title" id="corona-title-settings">Corona</h1>
             </div>
             <div class="module-card" id="memory-compression-card" data-card-key="memory-compression">
                 <div class="module-card-header">
@@ -815,29 +816,26 @@
             </div>
         </div>
     </div>
-    <div class="detail-overlay hidden" id="battery-detail-overlay">
+    <div class="detail-overlay hidden no-close-btn" id="battery-detail-overlay">
         <div class="detail-card">
             <div class="detail-header">
                 <span class="detail-title">电池详情</span>
-                <span class="detail-close" id="battery-detail-close">✕</span>
             </div>
             <div class="detail-content" id="battery-detail-content"></div>
         </div>
     </div>
-    <div class="detail-overlay hidden" id="ufs-detail-overlay">
+    <div class="detail-overlay hidden no-close-btn" id="ufs-detail-overlay">
         <div class="detail-card">
             <div class="detail-header">
                 <span class="detail-title">UFS 寿命</span>
-                <span class="detail-close" id="ufs-detail-close">✕</span>
             </div>
             <div class="detail-content" id="ufs-detail-content"></div>
         </div>
     </div>
-    <div class="detail-overlay hidden" id="storage-detail-overlay">
+    <div class="detail-overlay hidden no-close-btn" id="storage-detail-overlay">
         <div class="detail-card">
             <div class="detail-header">
                 <span class="detail-title">储存管理</span>
-                <span class="detail-close" id="storage-detail-close">✕</span>
             </div>
             <div class="detail-content" id="storage-detail-content">
                 <div class="action-section">
@@ -888,16 +886,15 @@
             </div>
         </div>
     </div>
-    <div class="detail-overlay hidden" id="xinran-overlay">
+    <div class="detail-overlay hidden no-close-btn" id="xinran-overlay">
         <div class="detail-card xinran-card">
             <img src="images/003.png" alt="Xinran" class="xinran-image">
         </div>
     </div>
-    <div class="detail-overlay hidden" id="priority-process-overlay">
+    <div class="detail-overlay hidden no-close-btn" id="priority-process-overlay">
         <div class="detail-card priority-process-card">
             <div class="detail-header">
                 <span class="detail-title">选择进程</span>
-                <span class="detail-close" id="priority-process-close">✕</span>
             </div>
             <div class="priority-search-container">
                 <input type="text" class="priority-search" id="priority-process-search" placeholder="搜索进程...">
@@ -907,11 +904,10 @@
             </div>
         </div>
     </div>
-    <div class="detail-overlay hidden" id="priority-setting-overlay">
+    <div class="detail-overlay hidden no-close-btn" id="priority-setting-overlay">
         <div class="detail-card priority-setting-card">
             <div class="detail-header">
                 <span class="detail-title">设置优先级</span>
-                <span class="detail-close" id="priority-setting-close">✕</span>
             </div>
             <div class="priority-process-info" id="priority-selected-process">
                 <span class="process-name">--</span>
@@ -966,11 +962,10 @@
             </div>
         </div>
     </div>
-    <div class="detail-overlay hidden" id="script-edit-overlay">
+    <div class="detail-overlay hidden no-close-btn" id="script-edit-overlay">
         <div class="detail-card script-edit-card">
             <div class="detail-header">
                 <span class="detail-title" id="script-edit-title">添加脚本</span>
-                <span class="detail-close" id="script-edit-close">✕</span>
             </div>
             <div class="script-edit-content">
                 <div class="script-edit-section">

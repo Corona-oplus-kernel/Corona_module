@@ -101,6 +101,7 @@ class CoronaAddon {
         this.initAutoClean();
         this.initCustomScripts();
         this.initSystemOpt();
+        this.initScrollEffect();
         Promise.all([this.loadZramStatus(), this.loadLe9ecStatus()]);
     }
     updateSliderProgress(slider) {
@@ -456,12 +457,26 @@ class CoronaAddon {
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => overlay.classList.add('show'));
             });
+            // 如果是无关闭按钮的卡片，隐藏浮动标题栏
+            if (overlay.classList.contains('no-close-btn')) {
+                const floatingHeader = document.getElementById('floating-header');
+                if (floatingHeader) {
+                    floatingHeader.classList.add('overlay-hidden');
+                }
+            }
         }
     }
     hideOverlay(id) {
         const overlay = document.getElementById(id);
         if (overlay) {
             overlay.classList.remove('show');
+            // 如果是无关闭按钮的卡片，恢复浮动标题栏
+            if (overlay.classList.contains('no-close-btn')) {
+                const floatingHeader = document.getElementById('floating-header');
+                if (floatingHeader) {
+                    floatingHeader.classList.remove('overlay-hidden');
+                }
+            }
             const onTransitionEnd = () => {
                 overlay.classList.add('hidden');
                 overlay.removeEventListener('transitionend', onTransitionEnd);
@@ -1592,8 +1607,6 @@ class CoronaAddon {
     initProcessPriority() {
         this.priorityRules = {}; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4;
         document.getElementById('priority-add-btn').addEventListener('click', () => this.showPriorityProcessSelector());
-        document.getElementById('priority-process-close').addEventListener('click', () => this.hideOverlay('priority-process-overlay'));
-        document.getElementById('priority-setting-close').addEventListener('click', () => this.hideOverlay('priority-setting-overlay'));
         document.getElementById('priority-cancel-btn').addEventListener('click', () => this.hideOverlay('priority-setting-overlay'));
         document.getElementById('priority-save-btn').addEventListener('click', () => this.savePriorityRule());
         document.getElementById('priority-process-search').addEventListener('input', (e) => { this.filterPriorityProcessList(e.target.value); });
@@ -2101,7 +2114,6 @@ class CoronaAddon {
         this.customScripts = {};
         this.editingScriptId = null;
         document.getElementById('scripts-add-btn').addEventListener('click', () => this.showScriptEditor());
-        document.getElementById('script-edit-close').addEventListener('click', () => this.hideOverlay('script-edit-overlay'));
         document.getElementById('script-cancel-btn').addEventListener('click', () => this.hideOverlay('script-edit-overlay'));
         document.getElementById('script-save-btn').addEventListener('click', () => this.saveScript());
         document.getElementById('script-edit-overlay').addEventListener('click', (e) => {
@@ -2384,6 +2396,45 @@ class CoronaAddon {
         } else if (name === 'fstrim') {
             await this.exec('sm fstrim 2>/dev/null');
         }
+    }
+    initScrollEffect() {
+        const floatingHeader = document.getElementById('floating-header');
+        const coronaTitle = document.getElementById('corona-title');
+        const coronaTitleSettings = document.getElementById('corona-title-settings');
+        let headerShown = false;
+        let lastScrollY = 0;
+        const handleScroll = () => {
+            const scrollY = window.scrollY;
+            const activePage = document.querySelector('.page.active');
+            let currentTitle = coronaTitle;
+            if (activePage && activePage.id === 'page-settings') {
+                currentTitle = coronaTitleSettings;
+            }
+            if (!currentTitle) return;
+            const titleRect = currentTitle.getBoundingClientRect();
+            const titleBottom = titleRect.bottom;
+            const triggerPoint = 20;
+            const fadeStart = 60;
+            const fadeEnd = triggerPoint + 5;
+            if (titleBottom > fadeStart) {
+                currentTitle.style.opacity = '1';
+            } else if (titleBottom > fadeEnd) {
+                const progress = (titleBottom - fadeEnd) / (fadeStart - fadeEnd);
+                currentTitle.style.opacity = String(progress);
+            } else {
+                currentTitle.style.opacity = '0';
+            }
+            if (titleBottom <= triggerPoint && !headerShown) {
+                headerShown = true;
+                floatingHeader.classList.add('visible');
+            } else if (titleBottom > triggerPoint && headerShown) {
+                headerShown = false;
+                floatingHeader.classList.remove('visible');
+            }
+            lastScrollY = scrollY;
+        };
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        handleScroll();
     }
 }
 document.addEventListener('DOMContentLoaded', () => { window.corona = new CoronaAddon(); });
