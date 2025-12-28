@@ -96,6 +96,7 @@ class CoronaAddon {
         this.initZramWriteback();
         this.initAutoClean();
         this.initCustomScripts();
+        this.initSystemOpt();
         this.loadZramStatus();
         this.loadLe9ecStatus();
     }
@@ -299,6 +300,7 @@ class CoronaAddon {
             { toggle: 'process-priority-toggle', content: 'process-priority-content', onExpand: null },
             { toggle: 'tcp-toggle', content: 'tcp-content', onExpand: null },
             { toggle: 'custom-scripts-toggle', content: 'custom-scripts-content', onExpand: null },
+            { toggle: 'system-opt-toggle', content: 'system-opt-content', onExpand: () => this.loadSystemOptConfig() },
             { toggle: 'app-settings-toggle', content: 'app-settings-content', onExpand: null }
         ];
         cards.forEach(card => {
@@ -1536,7 +1538,7 @@ class CoronaAddon {
         this.easterEgg.currentCard = 'credits';
         this.easterEgg.isOverlayOpen = true;
         this.easterEgg.xinranClickCount = 0;
-        content.innerHTML = `<div class="rainbow-text credit-name" id="xinran-credit">致谢爱人❤️然(≧ω≦)/</div><div class="credits-section"><div class="rainbow-text credits-title">模块制作感谢名单</div><div class="rainbow-text credit-name">Cloud_Yun</div><div class="rainbow-text credit-name">穆远星</div></div>`;
+        content.innerHTML = `<div class="rainbow-text credit-name" id="xinran-credit">致谢爱人❤️然(≧ω≦)/</div><div class="credits-section"><div class="rainbow-text credits-title">模块制作感谢名单</div><div class="rainbow-text credit-name">Cloud_Yun</div><div class="rainbow-text credit-name">穆远星</div><div class="rainbow-text credit-name">scene附加模块2（嘟嘟Ski）</div></div>`;
         overlay.classList.add('show');
         const xinranEl = document.getElementById('xinran-credit');
         if (xinranEl) {
@@ -2223,6 +2225,119 @@ class CoronaAddon {
         this.renderScriptsList();
         this.updateScriptsCount();
         this.showToast('脚本已删除');
+    }
+    initSystemOpt() {
+        const switches = ['lmk', 'device-config', 'reclaim', 'kswapd', 'protect', 'fstrim'];
+        switches.forEach(name => {
+            const sw = document.getElementById(`${name}-switch`);
+            if (sw) sw.addEventListener('change', () => this.saveAndApplySystemOpt(name));
+        });
+        this.loadSystemOptConfig();
+    }
+    async loadSystemOptConfig() {
+        const configs = {
+            lmk: { file: 'lmk.conf', switch: 'lmk-switch' },
+            device: { file: 'device.conf', switch: 'device-config-switch' },
+            reclaim: { file: 'reclaim.conf', switch: 'reclaim-switch' },
+            kswapd: { file: 'kswapd.conf', switch: 'kswapd-switch' },
+            protect: { file: 'protect.conf', switch: 'protect-switch' },
+            fstrim: { file: 'fstrim.conf', switch: 'fstrim-switch' }
+        };
+        let enabledCount = 0;
+        for (const [key, cfg] of Object.entries(configs)) {
+            const content = await this.exec(`cat ${this.configDir}/${cfg.file} 2>/dev/null`);
+            const sw = document.getElementById(cfg.switch);
+            if (sw) {
+                const enabled = content.includes('enabled=1');
+                sw.checked = enabled;
+                if (enabled) enabledCount++;
+            }
+        }
+        const badge = document.getElementById('system-opt-badge');
+        if (badge) badge.textContent = enabledCount > 0 ? `${enabledCount}项已启用` : '未配置';
+    }
+    async saveAndApplySystemOpt(name) {
+        const switchMap = {
+            'lmk': 'lmk-switch',
+            'device-config': 'device-config-switch',
+            'reclaim': 'reclaim-switch',
+            'kswapd': 'kswapd-switch',
+            'protect': 'protect-switch',
+            'fstrim': 'fstrim-switch'
+        };
+        const fileMap = {
+            'lmk': 'lmk.conf',
+            'device-config': 'device.conf',
+            'reclaim': 'reclaim.conf',
+            'kswapd': 'kswapd.conf',
+            'protect': 'protect.conf',
+            'fstrim': 'fstrim.conf'
+        };
+        const sw = document.getElementById(switchMap[name]);
+        if (!sw) return;
+        const enabled = sw.checked ? '1' : '0';
+        await this.exec(`echo "enabled=${enabled}" > ${this.configDir}/${fileMap[name]}`);
+        if (sw.checked) {
+            this.showLoading(true);
+            await this.applySystemOptNow(name);
+            this.showLoading(false);
+        }
+        this.loadSystemOptConfig();
+        this.showToast(sw.checked ? '已启用并应用' : '已禁用');
+    }
+    async applySystemOptNow(name) {
+        const memInfo = await this.exec('cat /proc/meminfo | grep MemTotal');
+        const memKb = parseInt(memInfo.replace(/[^0-9]/g, '')) || 8000000;
+        const sdkVersion = parseInt(await this.exec('getprop ro.build.version.sdk')) || 30;
+        const isXiaomi = (await this.exec('getprop ro.miui.ui.version.name')).trim() !== '';
+        const isOplus = (await this.exec('find /proc -maxdepth 1 -name "oplus*" 2>/dev/null | head -1')).trim() !== '';
+        if (name === 'lmk') {
+            if (isXiaomi) {
+                await this.exec('resetprop persist.sys.minfree_6g "16384,20480,32768,131072,262144,384000"');
+                await this.exec('resetprop persist.sys.minfree_8g "16384,20480,32768,131072,384000,524288"');
+                await this.exec('resetprop persist.sys.minfree_12g "16384,20480,131072,384000,524288,819200"');
+            }
+            if (sdkVersion > 28) {
+                let levels = '4096:0,5120:100,8192:200,32768:250,65536:900,96000:950';
+                if (memKb > 8388608) levels = '4096:0,5120:100,32768:200,96000:250,131072:900,204800:950';
+                else if (memKb > 6291456) levels = '4096:0,5120:100,8192:200,32768:250,96000:900,131072:950';
+                await this.exec(`resetprop sys.lmk.minfree_levels "${levels}"`);
+            }
+        } else if (name === 'device-config') {
+            await this.exec('device_config set_sync_disabled_for_tests until_reboot');
+            await this.exec('device_config put activity_manager max_cached_processes 32768');
+            await this.exec('device_config put activity_manager max_phantom_processes 32768');
+            await this.exec('device_config put activity_manager use_compaction false');
+            await this.exec('settings put global settings_enable_monitor_phantom_procs false');
+        } else if (name === 'reclaim') {
+            await this.exec('echo off > /sys/kernel/mm/damon/admin/kdamonds/0/state 2>/dev/null');
+            await this.exec('echo 0 > /sys/module/process_reclaim/parameters/enable_process_reclaim 2>/dev/null');
+            await this.exec('echo 0 > /sys/kernel/mi_reclaim/enable 2>/dev/null');
+            if (isOplus) {
+                await this.exec('echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null');
+                await this.exec('dumpsys osensemanager proc debug feature 0 2>/dev/null');
+            }
+        } else if (name === 'kswapd') {
+            const kswapd = await this.exec('pgrep kswapd');
+            if (kswapd) {
+                await this.exec(`echo ${kswapd.trim()} > /dev/cpuset/foreground/cgroup.procs 2>/dev/null`);
+                await this.exec('mkdir -p /dev/cpuctl/kswapd');
+                await this.exec(`echo ${kswapd.trim()} > /dev/cpuctl/kswapd/cgroup.procs 2>/dev/null`);
+                await this.exec('echo 1 > /dev/cpuctl/kswapd/cpu.uclamp.latency_sensitive 2>/dev/null');
+            }
+        } else if (name === 'protect') {
+            if (memKb > 8388608) {
+                await this.exec('mkdir -p /dev/memcg/system/active_fg');
+                await this.exec('echo 0 > /dev/memcg/system/active_fg/memory.swappiness 2>/dev/null');
+                const apps = ['com.android.systemui', 'com.miui.home', 'com.android.launcher', 'surfaceflinger', 'system_server'];
+                for (const app of apps) {
+                    const pid = await this.exec(`pidof ${app} 2>/dev/null | head -n1`);
+                    if (pid.trim()) await this.exec(`echo ${pid.trim()} > /dev/memcg/system/active_fg/cgroup.procs 2>/dev/null`);
+                }
+            }
+        } else if (name === 'fstrim') {
+            await this.exec('sm fstrim 2>/dev/null');
+        }
     }
 }
 document.addEventListener('DOMContentLoaded', () => { window.corona = new CoronaAddon(); });

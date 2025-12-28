@@ -603,6 +603,82 @@
                     <button class="action-btn scripts-add-btn" id="scripts-add-btn"><span class="add-icon">+</span> 添加脚本</button>
                 </div>
             </div>
+            <div class="module-card" id="system-opt-card" data-card-key="system-opt">
+                <div class="module-card-header">
+                    <div class="module-card-info">
+                        <div class="module-card-title">系统优化</div>
+                        <div class="module-card-desc">LMK / 回收控制 / 进程保护</div>
+                        <span class="module-card-badge" id="system-opt-badge">--</span>
+                    </div>
+                    <div class="module-card-actions">
+                        <div class="module-card-expand" id="system-opt-toggle">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="system-opt-content" class="module-card-content hidden">
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">LMK 优化</span>
+                            <span class="switch-desc">根据内存大小自动配置 minfree_levels</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="lmk-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">解锁后台限制</span>
+                            <span class="switch-desc">max_cached_processes 设为 32768</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="device-config-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">禁用激进回收</span>
+                            <span class="switch-desc">禁用 DAMON/process_reclaim/mi_reclaim</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="reclaim-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">kswapd 优化</span>
+                            <span class="switch-desc">将 kswapd 放入前台 cpuset</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="kswapd-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">关键进程保护</span>
+                            <span class="switch-desc">保护 SystemUI/Launcher 等进程</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="protect-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">开机 fstrim</span>
+                            <span class="switch-desc">开机时自动执行 fstrim</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="fstrim-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
             <div class="module-card" id="app-settings-card" data-card-key="app-settings">
                 <div class="module-card-header">
                     <div class="module-card-info">
@@ -691,6 +767,13 @@
                                 <span class="card-visibility-name">自定义脚本</span>
                                 <label class="switch">
                                     <input type="checkbox" class="card-visibility-switch" data-card="custom-scripts" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="card-visibility-item" data-card="system-opt">
+                                <span class="card-visibility-name">系统优化</span>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="system-opt" checked>
                                     <span class="slider"></span>
                                 </label>
                             </div>
