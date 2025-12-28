@@ -73,12 +73,16 @@ class CoronaAddon {
         await this.ensureConfigDir();
         this.initTheme();
         this.bindAllEvents();
-        await this.loadDeviceInfo();
+        const [,] = await Promise.all([
+            this.loadDeviceInfo(),
+            this.loadAllConfigs()
+        ]);
         this.renderStaticOptions();
         this.startRealtimeMonitor();
-        await this.loadAllConfigs();
-        await this.loadDualCellConfig();
-        await this.detectKernelFeatures();
+        await Promise.all([
+            this.loadDualCellConfig(),
+            this.detectKernelFeatures()
+        ]);
         this.initBannerDrag();
         this.initEasterEgg();
         this.initDeviceImageInteraction();
@@ -97,8 +101,7 @@ class CoronaAddon {
         this.initAutoClean();
         this.initCustomScripts();
         this.initSystemOpt();
-        this.loadZramStatus();
-        this.loadLe9ecStatus();
+        Promise.all([this.loadZramStatus(), this.loadLe9ecStatus()]);
     }
     updateSliderProgress(slider) {
         const min = parseFloat(slider.min) || 0;
@@ -313,11 +316,22 @@ class CoronaAddon {
                 toggle.addEventListener('click', () => {
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
+                        content.style.maxHeight = content.scrollHeight + 'px';
+                        content.offsetHeight;
                         content.classList.remove('expanded');
                         toggle.classList.remove('expanded');
+                        requestAnimationFrame(() => {
+                            content.style.maxHeight = '';
+                        });
                     } else {
                         content.classList.add('expanded');
                         toggle.classList.add('expanded');
+                        content.style.maxHeight = content.scrollHeight + 'px';
+                        const onTransitionEnd = () => {
+                            content.style.maxHeight = '';
+                            content.removeEventListener('transitionend', onTransitionEnd);
+                        };
+                        content.addEventListener('transitionend', onTransitionEnd);
                         if (card.onExpand) card.onExpand();
                     }
                 });
@@ -331,46 +345,24 @@ class CoronaAddon {
         const list = document.getElementById('card-visibility-list');
         if (toggle && list) {
             toggle.addEventListener('click', () => {
-                const isExpanded = !list.classList.contains('hidden');
-                if (isExpanded) {
-                    list.classList.add('hidden');
-                    toggle.classList.remove('expanded');
-                } else {
-                    list.classList.remove('hidden');
-                    toggle.classList.add('expanded');
-                }
+                const isExpanded = list.classList.contains('expanded');
+                list.classList.toggle('expanded', !isExpanded);
+                toggle.classList.toggle('expanded', !isExpanded);
             });
         }
         const savedVisibility = localStorage.getItem('corona_card_visibility');
-        let visibility = {};
-        if (savedVisibility) {
-            try {
-                visibility = JSON.parse(savedVisibility);
-            } catch (e) {
-                visibility = {};
-            }
-        }
-        document.querySelectorAll('.card-visibility-switch').forEach(sw => {
+        let visibility = savedVisibility ? (() => { try { return JSON.parse(savedVisibility); } catch (e) { return {}; } })() : {};
+        const switches = document.querySelectorAll('.card-visibility-switch');
+        switches.forEach(sw => {
             const cardKey = sw.dataset.card;
             const card = document.querySelector(`.module-card[data-card-key="${cardKey}"]`);
-            if (visibility[cardKey] === false) {
-                sw.checked = false;
-                if (card) card.classList.add('card-hidden');
-            } else {
-                sw.checked = true;
-                if (card) card.classList.remove('card-hidden');
-            }
+            const isVisible = visibility[cardKey] !== false;
+            sw.checked = isVisible;
+            if (card) card.classList.toggle('card-hidden', !isVisible);
             sw.addEventListener('change', () => {
-                const isVisible = sw.checked;
-                visibility[cardKey] = isVisible;
+                visibility[cardKey] = sw.checked;
                 localStorage.setItem('corona_card_visibility', JSON.stringify(visibility));
-                if (card) {
-                    if (isVisible) {
-                        card.classList.remove('card-hidden');
-                    } else {
-                        card.classList.add('card-hidden');
-                    }
-                }
+                if (card) card.classList.toggle('card-hidden', !sw.checked);
             });
         });
     }
@@ -824,7 +816,7 @@ class CoronaAddon {
                 const distance = Math.sqrt(dragOffsetX * dragOffsetX + dragOffsetY * dragOffsetY);
                 if (distance > 20) {
                     this.deviceImageState.noDeceleration = false;
-                    const speedMultiplier = Math.min(distance / maxDragDistance, 1) * 12 + 3;
+                    const speedMultiplier = Math.min(distance / maxDragDistance, 1) * 25 + 8;
                     this.startFlyingAnimation(container, img, cloneEl, cloneImgEl, -dragOffsetX, -dragOffsetY, originalRect, speedMultiplier);
                 } else {
                     this.jellyResetClone(container, cloneEl, cloneImgEl, originalRect);
@@ -873,13 +865,51 @@ class CoronaAddon {
         let rotationSpeed = (vx > 0 ? 1 : -1) * (speedMultiplier + Math.random() * 5);
         const containerWidth = 80, containerHeight = 80;
         const screenWidth = window.innerWidth, screenHeight = window.innerHeight;
+        const gravity = 0.4;
+        let accelX = 0, accelY = 0, accelZ = 0;
+        const noDecel = this.deviceImageState.noDeceleration;
+        let hasLanded = false;
+        let groundSettleFrames = 0;
+        const settleThreshold = 10;
+        const handleMotion = (e) => {
+            if (!this.deviceImageState.isFlying || noDecel || !hasLanded) return;
+            const acc = e.accelerationIncludingGravity || e.acceleration;
+            if (acc) {
+                accelX = -(acc.x || 0) * 0.3;
+                accelY = (acc.y || 0) * 0.3;
+                accelZ = (acc.z || 0) * 0.5;
+            }
+        };
+        if (!noDecel && window.DeviceMotionEvent) {
+            window.addEventListener('devicemotion', handleMotion);
+        }
         this.deviceImageState.flyData = { x, y, velX, velY, rotation, rotationSpeed };
+        this.deviceImageState.motionHandler = handleMotion;
         const animate = () => {
             if (!this.deviceImageState.isFlying) return;
             const data = this.deviceImageState.flyData;
-            const noDecel = this.deviceImageState.noDeceleration;
-            const bounceDecay = noDecel ? 1 : 0.8;
+            const bounceDecay = noDecel ? 1 : 0.75;
             const rotateDecay = noDecel ? 1 : 0.85;
+            const isOnGround = data.y + containerHeight >= screenHeight - 1;
+            const isSettled = isOnGround && Math.abs(data.velY) < 0.5 && Math.abs(data.velX) < 0.5;
+            if (isSettled) {
+                groundSettleFrames++;
+                if (groundSettleFrames >= settleThreshold && !hasLanded) {
+                    hasLanded = true;
+                }
+            } else {
+                groundSettleFrames = 0;
+            }
+            if (hasLanded && !noDecel) {
+                data.velX += accelX;
+                data.velY += accelY;
+                data.rotationSpeed += accelZ * 0.3;
+                if (!isOnGround) {
+                    data.velY += gravity;
+                }
+            } else if (!noDecel) {
+                data.velY += gravity;
+            }
             data.x += data.velX;
             data.y += data.velY;
             data.rotation += data.rotationSpeed;
@@ -902,8 +932,8 @@ class CoronaAddon {
                 data.rotationSpeed *= rotateDecay;
             }
             if (!noDecel) {
-                data.velX *= 0.994;
-                data.velY *= 0.994;
+                data.velX *= 0.992;
+                data.velY *= 0.992;
                 data.rotationSpeed *= 0.997;
             }
             cloneEl.style.left = data.x + 'px';
@@ -919,6 +949,10 @@ class CoronaAddon {
         this.deviceImageState.isFlying = false;
         this.deviceImageState.noDeceleration = false;
         if (this.deviceImageState.flyAnimationId) cancelAnimationFrame(this.deviceImageState.flyAnimationId);
+        if (this.deviceImageState.motionHandler) {
+            window.removeEventListener('devicemotion', this.deviceImageState.motionHandler);
+            this.deviceImageState.motionHandler = null;
+        }
         const container = this.deviceImageState.originalContainer;
         const img = this.deviceImageState.originalImg;
         const cloneEl = this.deviceImageState.flyingClone;
@@ -1256,9 +1290,9 @@ class CoronaAddon {
         document.getElementById('zram-current-size').textContent = `${sizeGB} GB`;
         document.getElementById('zram-current-swappiness').textContent = swappiness.trim() || '--';
         const statusEl = document.getElementById('zram-status');
-        if (statusEl) statusEl.textContent = parseInt(disksize) > 0 ? `${sizeGB}GB` : '未启用';
+        if (statusEl) statusEl.textContent = parseInt(disksize) > 0 ? currentAlg.toUpperCase() : '未启用';
         const memBadge = document.getElementById('memory-compression-badge');
-        if (memBadge) memBadge.textContent = parseInt(disksize) > 0 ? `ZRAM: ${sizeGB}GB` : '未配置';
+        if (memBadge) memBadge.textContent = parseInt(disksize) > 0 ? `ZRAM: ${currentAlg.toUpperCase()}` : '未配置';
     }
     async saveZramConfig() {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
@@ -1992,23 +2026,28 @@ class CoronaAddon {
     }
     initAutoClean() {
         const sw = this.$('auto-clean-switch');
+        const container = document.getElementById('last-clean-container');
         if (sw) {
             sw.addEventListener('change', (e) => {
                 this.state.autoCleanEnabled = e.target.checked;
                 this.saveAutoCleanConfig();
                 if (e.target.checked) {
                     this.startAutoClean();
+                    if (container) container.classList.remove('hidden');
                     this.showToast('已开启自动清理');
                 } else {
                     this.stopAutoClean();
+                    if (container) container.classList.add('hidden');
                     this.showToast('已关闭自动清理');
                 }
             });
         }
+        if (container) container.classList.add('hidden');
         this.loadAutoCleanConfig();
     }
     async loadAutoCleanConfig() {
         const config = await this.exec(`cat ${this.configDir}/autoclean.conf 2>/dev/null`);
+        const container = document.getElementById('last-clean-container');
         if (config) {
             const enabledMatch = config.match(/enabled=(\d)/);
             const lastCleanMatch = config.match(/last_clean=(\d+)/);
@@ -2016,9 +2055,12 @@ class CoronaAddon {
                 this.state.autoCleanEnabled = enabledMatch[1] === '1';
                 const sw = this.$('auto-clean-switch');
                 if (sw) sw.checked = this.state.autoCleanEnabled;
-                if (this.state.autoCleanEnabled) this.startAutoClean();
+                if (this.state.autoCleanEnabled) {
+                    this.startAutoClean();
+                    if (container) container.classList.remove('hidden');
+                }
             }
-            if (lastCleanMatch) {
+            if (lastCleanMatch && this.state.autoCleanEnabled) {
                 const lastTime = parseInt(lastCleanMatch[1]);
                 this.updateLastCleanTime(lastTime);
             }
@@ -2048,7 +2090,11 @@ class CoronaAddon {
         const el = this.$('last-clean-time');
         if (el && timestamp) {
             const date = new Date(timestamp);
-            el.textContent = `${date.getMonth()+1}/${date.getDate()} ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            const hours = date.getHours().toString().padStart(2, '0');
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            el.textContent = `${month}月${day}日 ${hours}:${minutes}`;
         }
     }
     initCustomScripts() {
