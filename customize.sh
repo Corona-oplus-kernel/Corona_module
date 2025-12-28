@@ -3,8 +3,10 @@ SKIPMOUNT=false
 PROPFILE=false
 POSTFSDATA=false
 LATESTARTSERVICE=true
+MODULE_NAME=$(grep -E '^name=' "${MODPATH}/module.prop" | cut -d'=' -f2-)
+MODULE_VERSION=$(grep -E '^version=' "${MODPATH}/module.prop" | cut -d'=' -f2-)
 ui_print "================================================"
-ui_print "  Corona v3.4.0"
+ui_print " ${MODULE_NAME} ${MODULE_VERSION}"
 ui_print "================================================"
 set_perm_recursive $MODPATH 0 0 0755 0644
 mem_total_str=$(cat /proc/meminfo | grep MemTotal)
