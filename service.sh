@@ -152,12 +152,19 @@ apply_le9ec_config() {
     fi
 }
 
+is_corona_kernel() {
+    uname -r | grep -qi "corona"
+}
+
 apply_io_config() {
     if [ -f "$CONFIG_DIR/io_scheduler.conf" ]; then
         scheduler=$(grep "^scheduler=" "$CONFIG_DIR/io_scheduler.conf" | cut -d'=' -f2)
         readahead=$(grep "^readahead=" "$CONFIG_DIR/io_scheduler.conf" | cut -d'=' -f2)
         
         if [ -n "$scheduler" ]; then
+            if is_corona_kernel; then
+                scheduler="kernel:$scheduler"
+            fi
             for f in /sys/block/*/queue/scheduler; do
                 echo "$scheduler" > "$f" 2>/dev/null
             done

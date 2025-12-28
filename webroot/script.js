@@ -96,6 +96,8 @@ class CoronaAddon {
         this.initZramWriteback();
         this.initAutoClean();
         this.initCustomScripts();
+        this.loadZramStatus();
+        this.loadLe9ecStatus();
     }
     updateSliderProgress(slider) {
         const min = parseFloat(slider.min) || 0;
@@ -290,47 +292,85 @@ class CoronaAddon {
     }
     initExpandableCards() {
         const cards = [
-            { toggle: 'memory-compression-toggle', content: 'memory-compression-content', onExpand: null, defaultExpanded: true },
-            { toggle: 'le9ec-toggle', content: 'le9ec-content', onExpand: () => this.loadLe9ecStatus(), defaultExpanded: true },
-            { toggle: 'io-scheduler-toggle', content: 'io-scheduler-content', onExpand: null, defaultExpanded: true },
-            { toggle: 'cpu-governor-toggle', content: 'cpu-governor-content', onExpand: null, defaultExpanded: true },
-            { toggle: 'process-priority-toggle', content: 'process-priority-content', onExpand: null, defaultExpanded: true },
-            { toggle: 'tcp-toggle', content: 'tcp-content', onExpand: null, defaultExpanded: true },
-            { toggle: 'custom-scripts-toggle', content: 'custom-scripts-content', onExpand: null, defaultExpanded: true },
-            { toggle: 'app-settings-toggle', content: 'app-settings-content', onExpand: null, defaultExpanded: false }
+            { toggle: 'memory-compression-toggle', content: 'memory-compression-content', onExpand: null },
+            { toggle: 'le9ec-toggle', content: 'le9ec-content', onExpand: () => this.loadLe9ecStatus() },
+            { toggle: 'io-scheduler-toggle', content: 'io-scheduler-content', onExpand: null },
+            { toggle: 'cpu-governor-toggle', content: 'cpu-governor-content', onExpand: null },
+            { toggle: 'process-priority-toggle', content: 'process-priority-content', onExpand: null },
+            { toggle: 'tcp-toggle', content: 'tcp-content', onExpand: null },
+            { toggle: 'custom-scripts-toggle', content: 'custom-scripts-content', onExpand: null },
+            { toggle: 'app-settings-toggle', content: 'app-settings-content', onExpand: null }
         ];
         cards.forEach(card => {
             const toggle = document.getElementById(card.toggle);
             const content = document.getElementById(card.content);
             if (toggle && content) {
-                const icon = toggle.querySelector('.expand-icon');
                 content.classList.remove('hidden');
-                if (card.defaultExpanded) {
-                    content.classList.add('expanded');
-                    toggle.classList.add('expanded');
-                    if (icon) icon.classList.add('expanded');
-                    if (card.onExpand) card.onExpand();
-                } else {
-                    content.classList.remove('expanded');
-                    toggle.classList.remove('expanded');
-                    if (icon) icon.classList.remove('expanded');
-                }
+                content.classList.remove('expanded');
+                toggle.classList.remove('expanded');
                 toggle.addEventListener('click', () => {
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
                         content.classList.remove('expanded');
                         toggle.classList.remove('expanded');
-                        if (icon) icon.classList.remove('expanded');
                     } else {
                         content.classList.add('expanded');
                         toggle.classList.add('expanded');
-                        if (icon) icon.classList.add('expanded');
                         if (card.onExpand) card.onExpand();
                     }
                 });
             }
         });
         this.initSubCards();
+        this.initCardVisibility();
+    }
+    initCardVisibility() {
+        const toggle = document.getElementById('card-visibility-toggle');
+        const list = document.getElementById('card-visibility-list');
+        if (toggle && list) {
+            toggle.addEventListener('click', () => {
+                const isExpanded = !list.classList.contains('hidden');
+                if (isExpanded) {
+                    list.classList.add('hidden');
+                    toggle.classList.remove('expanded');
+                } else {
+                    list.classList.remove('hidden');
+                    toggle.classList.add('expanded');
+                }
+            });
+        }
+        const savedVisibility = localStorage.getItem('corona_card_visibility');
+        let visibility = {};
+        if (savedVisibility) {
+            try {
+                visibility = JSON.parse(savedVisibility);
+            } catch (e) {
+                visibility = {};
+            }
+        }
+        document.querySelectorAll('.card-visibility-switch').forEach(sw => {
+            const cardKey = sw.dataset.card;
+            const card = document.querySelector(`.module-card[data-card-key="${cardKey}"]`);
+            if (visibility[cardKey] === false) {
+                sw.checked = false;
+                if (card) card.classList.add('card-hidden');
+            } else {
+                sw.checked = true;
+                if (card) card.classList.remove('card-hidden');
+            }
+            sw.addEventListener('change', () => {
+                const isVisible = sw.checked;
+                visibility[cardKey] = isVisible;
+                localStorage.setItem('corona_card_visibility', JSON.stringify(visibility));
+                if (card) {
+                    if (isVisible) {
+                        card.classList.remove('card-hidden');
+                    } else {
+                        card.classList.add('card-hidden');
+                    }
+                }
+            });
+        });
     }
     initSubCards() {
         const subCards = [
@@ -599,121 +639,15 @@ class CoronaAddon {
     initResetAllBtn() {
         const btn = document.getElementById('reset-all-btn');
         if (!btn) return;
-        let pressTimer = null;
-        let isLongPress = false;
-        const startPress = (e) => {
-            isLongPress = false;
-            pressTimer = setTimeout(() => {
-                isLongPress = true;
-                this.showResetSettingsOverlay();
-            }, 800);
-        };
-        const endPress = (e) => {
-            if (pressTimer) {
-                clearTimeout(pressTimer);
-                pressTimer = null;
-            }
-            if (!isLongPress) {
-                this.resetAllSettings();
-            }
-        };
-        const cancelPress = () => {
-            if (pressTimer) {
-                clearTimeout(pressTimer);
-                pressTimer = null;
-            }
-        };
-        btn.addEventListener('mousedown', startPress);
-        btn.addEventListener('mouseup', endPress);
-        btn.addEventListener('mouseleave', cancelPress);
-        btn.addEventListener('touchstart', startPress, { passive: true });
-        btn.addEventListener('touchend', endPress, { passive: true });
-        btn.addEventListener('touchcancel', cancelPress, { passive: true });
-        document.getElementById('reset-settings-close').addEventListener('click', () => this.hideOverlay('reset-settings-overlay'));
-        document.getElementById('reset-settings-overlay').addEventListener('click', (e) => {
-            if (e.target.id === 'reset-settings-overlay') this.hideOverlay('reset-settings-overlay');
-        });
-        document.getElementById('reset-select-all-btn').addEventListener('click', () => this.toggleSelectAllResetSettings());
-        document.getElementById('reset-confirm-btn').addEventListener('click', () => this.confirmResetSettings());
+        btn.addEventListener('click', () => this.resetAllSettings());
     }
     async resetAllSettings() {
-        const confirmed = await this.showConfirm('确定要清除所有设置吗？\n\n此操作将删除所有配置文件并立刻重启，且不可撤销！', '清除所有设置');
+        const confirmed = await this.showConfirm('确定要重置所有设置吗？\n\n此操作将删除所有配置文件并立刻重启，且不可撤销！', '一键重置');
         if (!confirmed) return;
         this.showLoading(true);
         await this.exec(`rm -rf ${this.configDir}`);
         await this.exec(`sed -i 's/^description=.*/description=等待首次设置……/' '${this.modDir}/module.prop' 2>/dev/null`);
-        this.showToast('配置已清除，正在重启...');
-        await this.sleep(500);
-        await this.exec('reboot');
-    }
-    showResetSettingsOverlay() {
-        const configItems = [
-            { name: 'ZRAM 配置', file: 'zram.conf' },
-            { name: 'Swap 配置', file: 'swap.conf' },
-            { name: '虚拟内存参数', file: 'vm.conf' },
-            { name: 'LE9EC 配置', file: 'le9ec.conf' },
-            { name: 'LRU/内核特性', file: 'kernel.conf' },
-            { name: 'IO 调度器', file: 'io_scheduler.conf' },
-            { name: 'CPU 调频器', file: 'cpu_governor.conf' },
-            { name: 'CPU 核心热插拔', file: 'cpu_hotplug.conf' },
-            { name: '频率锁定', file: 'freq_lock.conf' },
-            { name: '进程优先级规则', file: 'process_priority.conf' },
-            { name: 'TCP 拥塞算法', file: 'tcp.conf' },
-            { name: '自定义脚本', file: 'custom_scripts.b64' },
-            { name: '自动清理设置', file: 'autoclean.conf' },
-            { name: '双电芯配置', file: 'dual_cell.conf' }
-        ];
-        const list = document.getElementById('reset-settings-list');
-        list.innerHTML = configItems.map(item => `<div class="reset-setting-item" data-file="${item.file}"><div class="reset-setting-checkbox"></div><div class="reset-setting-info"><div class="reset-setting-name">${item.name}</div><div class="reset-setting-file">${item.file}</div></div></div>`).join('');
-        list.querySelectorAll('.reset-setting-item').forEach(item => {
-            item.addEventListener('click', () => {
-                item.classList.toggle('selected');
-                this.updateSelectAllBtnText();
-            });
-        });
-        this.updateSelectAllBtnText();
-        this.showOverlay('reset-settings-overlay');
-    }
-    toggleSelectAllResetSettings() {
-        const items = document.querySelectorAll('.reset-setting-item');
-        const allSelected = Array.from(items).every(item => item.classList.contains('selected'));
-        items.forEach(item => {
-            if (allSelected) {
-                item.classList.remove('selected');
-            } else {
-                item.classList.add('selected');
-            }
-        });
-        this.updateSelectAllBtnText();
-    }
-    updateSelectAllBtnText() {
-        const items = document.querySelectorAll('.reset-setting-item');
-        const allSelected = Array.from(items).every(item => item.classList.contains('selected'));
-        document.getElementById('reset-select-all-btn').textContent = allSelected ? '取消全选' : '全选';
-    }
-    async confirmResetSettings() {
-        const selectedItems = document.querySelectorAll('.reset-setting-item.selected');
-        if (selectedItems.length === 0) {
-            this.showToast('请至少选择一项配置');
-            return;
-        }
-        const files = Array.from(selectedItems).map(item => item.dataset.file);
-        const names = Array.from(selectedItems).map(item => item.querySelector('.reset-setting-name').textContent);
-        const isAll = files.length === 13;
-        const message = isAll ? '确定要清除所有设置吗？\n\n此操作将立刻重启，且不可撤销！' : `确定要清除以下设置吗？\n\n${names.map(n => '• ' + n).join('\n')}\n\n此操作将立刻重启，且不可撤销！`;
-        const confirmed = await this.showConfirm(message, '确认清除');
-        if (!confirmed) return;
-        this.hideOverlay('reset-settings-overlay');
-        this.showLoading(true);
-        if (isAll) {
-            await this.exec(`rm -rf ${this.configDir}`);
-        } else {
-            for (const file of files) {
-                await this.exec(`rm -f ${this.configDir}/${file}`);
-            }
-        }
-        await this.exec(`sed -i 's/^description=.*/description=等待首次设置……/' '${this.modDir}/module.prop' 2>/dev/null`);
-        this.showToast('配置已清除，正在重启...');
+        this.showToast('配置已重置，正在重启...');
         await this.sleep(500);
         await this.exec('reboot');
     }
@@ -1092,6 +1026,9 @@ class CoronaAddon {
         document.getElementById('le9ec-anon-current').textContent = anon ? `${(parseInt(anon) / 1024).toFixed(0)} MB` : '--';
         document.getElementById('le9ec-clean-low-current').textContent = cleanLow ? `${(parseInt(cleanLow) / 1024).toFixed(0)} MB` : '--';
         document.getElementById('le9ec-clean-min-current').textContent = cleanMin ? `${(parseInt(cleanMin) / 1024).toFixed(0)} MB` : '--';
+        const le9ecBadge = document.getElementById('le9ec-badge');
+        const hasConfig = (anon && parseInt(anon) > 0) || (cleanLow && parseInt(cleanLow) > 0) || (cleanMin && parseInt(cleanMin) > 0);
+        if (le9ecBadge) le9ecBadge.textContent = hasConfig ? '已启用' : '未启用';
     }
     async saveLe9ecConfig() {
         const config = `enabled=${this.state.le9ecEnabled ? '1' : '0'}\nanon_min=${this.state.le9ecAnon}\nclean_low=${this.state.le9ecCleanLow}\nclean_min=${this.state.le9ecCleanMin}`;
@@ -1318,6 +1255,8 @@ class CoronaAddon {
         document.getElementById('zram-current-swappiness').textContent = swappiness.trim() || '--';
         const statusEl = document.getElementById('zram-status');
         if (statusEl) statusEl.textContent = parseInt(disksize) > 0 ? `${sizeGB}GB` : '未启用';
+        const memBadge = document.getElementById('memory-compression-badge');
+        if (memBadge) memBadge.textContent = parseInt(disksize) > 0 ? `ZRAM: ${sizeGB}GB` : '未配置';
     }
     async saveZramConfig() {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
@@ -1385,7 +1324,10 @@ class CoronaAddon {
         this.renderReadaheadOptions();
     }
     async applyIOSchedulerImmediate() {
-        await this.exec(`for f in /sys/block/*/queue/scheduler; do echo "${this.state.ioScheduler}" > "$f" 2>/dev/null; done`);
+        const kernelVersion = await this.exec('uname -r');
+        const isCorona = kernelVersion.toLowerCase().includes('corona');
+        const schedCmd = isCorona ? `kernel:${this.state.ioScheduler}` : this.state.ioScheduler;
+        await this.exec(`for f in /sys/block/*/queue/scheduler; do echo "${schedCmd}" > "$f" 2>/dev/null; done`);
         const config = `scheduler=${this.state.ioScheduler}\nreadahead=${this.state.readahead}`;
         await this.exec(`echo '${config}' > ${this.configDir}/io_scheduler.conf`);
         await this.updateModuleDescription();
@@ -1644,7 +1586,7 @@ class CoronaAddon {
         container.innerHTML = ruleNames.map(name => { const rule = this.priorityRules[name]; const initial = name.charAt(0).toUpperCase(); return `<div class="priority-rule-item" data-process="${name}"><div class="priority-rule-icon">${initial}</div><div class="priority-rule-info"><div class="priority-rule-name">${name}</div><div class="priority-rule-values">nice: ${rule.nice} | I/O: ${ioClassNames[rule.ioClass] || '尽力'}</div></div><div class="priority-rule-actions"><button class="priority-rule-btn edit" data-action="edit" data-name="${name}">✎</button><button class="priority-rule-btn delete" data-action="delete" data-name="${name}">✕</button></div></div>`; }).join('');
         container.querySelectorAll('.priority-rule-btn').forEach(btn => { btn.addEventListener('click', (e) => { e.stopPropagation(); const action = btn.dataset.action; const name = btn.dataset.name; if (action === 'edit') this.editPriorityRule(name); else if (action === 'delete') this.deletePriorityRule(name); }); });
     }
-    updatePriorityCount() { document.getElementById('priority-count').textContent = `${Object.keys(this.priorityRules).length} 条规则`; }
+    updatePriorityCount() { document.getElementById('priority-count').textContent = `${Object.keys(this.priorityRules).length} 条`; }
     async showPriorityProcessSelector() { this.showOverlay('priority-process-overlay'); document.getElementById('priority-process-search').value = ''; document.getElementById('priority-process-list').innerHTML = '<div class="priority-loading">加载中...</div>'; await this.loadPriorityProcessList(); }
     async loadPriorityProcessList() {
         const psOutput = await this.exec(`ps -Ao pid,args 2>/dev/null | tail -n +2`);
