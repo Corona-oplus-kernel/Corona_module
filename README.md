@@ -57,11 +57,15 @@ Corona/
 │   └── images/                 # 图片资源
 ├── module.prop                  # 模块信息
 ├── service.sh                   # 开机服务脚本
-├── zram.ko                      # ZRAM 内核模块
-└── zsmalloc.ko                  # zsmalloc 内核模块
+├── zakom.ko                      # ZRAM 内核模块
+└── zksmalloc.ko                  # zsmalloc 内核模块
 ```
 
 ## 更新日志
+
+### v3.4.2
+- 支持自定义 ZRAM 设备路径
+- 内核模块支持设备更多
 
 ### v3.4.2
 - 优化ui

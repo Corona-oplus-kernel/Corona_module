@@ -179,6 +179,12 @@
                                     <span class="info-value" id="zram-current-swappiness">--</span>
                                 </div>
                             </div>
+                            <div class="info-row info-row-single">
+                                <div class="info-item info-item-full">
+                                    <span class="info-label">设备路径</span>
+                                    <span class="info-value" id="zram-current-path">/dev/block/zram0</span>
+                                </div>
+                            </div>
                             <div class="switch-container">
                                 <div class="switch-info">
                                     <span class="switch-label">启用 ZRAM</span>
@@ -197,9 +203,9 @@
                                 <div class="setting-section">
                                     <span class="section-label">ZRAM 大小</span>
                                     <div class="slider-container">
-                                        <input type="range" class="range-slider" id="zram-size-slider" min="2" max="24" step="0.25" value="8">
+                                        <input type="range" class="range-slider" id="zram-size-slider" min="0" max="24" step="0.25" value="8">
                                         <div class="slider-labels">
-                                            <span>2GB</span>
+                                            <span>0GB</span>
                                             <span class="slider-value" id="zram-size-value">8.00 GB</span>
                                             <span>24GB</span>
                                         </div>
@@ -223,6 +229,17 @@
                                         <div class="option-item" data-value="true">启用</div>
                                         <div class="option-item" data-value="false">禁用</div>
                                     </div>
+                                </div>
+                                <div class="setting-section">
+                                    <span class="section-label">ZRAM 设备路径</span>
+                                    <div class="zram-path-container">
+                                        <input type="text" class="text-input" id="zram-path-input" placeholder="/dev/block/zram0" value="/dev/block/zram0">
+                                        <div class="zram-path-buttons">
+                                            <button class="btn-small" id="zram-path-detect">检测</button>
+                                            <button class="btn-small btn-primary" id="zram-path-save">保存</button>
+                                        </div>
+                                    </div>
+                                    <span class="setting-hint">自定义 ZRAM 设备路径，适用于多 ZRAM 设备或非标准路径</span>
                                 </div>
                             </div>
                         </div>

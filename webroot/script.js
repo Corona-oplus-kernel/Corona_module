@@ -9,6 +9,7 @@ class CoronaAddon {
             zramSize: 8,
             swappiness: 100,
             zramWriteback: 'default',
+            zramPath: '/dev/block/zram0',
             ioScheduler: null,
             readahead: 512,
             tcp: null,
@@ -98,6 +99,7 @@ class CoronaAddon {
         this.initVmSettings();
         this.initKernelFeatures();
         this.initZramWriteback();
+        this.initZramPath();
         this.initAutoClean();
         this.initCustomScripts();
         this.initSystemOpt();
@@ -457,7 +459,6 @@ class CoronaAddon {
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => overlay.classList.add('show'));
             });
-            // 如果是无关闭按钮的卡片，隐藏浮动标题栏
             if (overlay.classList.contains('no-close-btn')) {
                 const floatingHeader = document.getElementById('floating-header');
                 if (floatingHeader) {
@@ -470,7 +471,6 @@ class CoronaAddon {
         const overlay = document.getElementById(id);
         if (overlay) {
             overlay.classList.remove('show');
-            // 如果是无关闭按钮的卡片，恢复浮动标题栏
             if (overlay.classList.contains('no-close-btn')) {
                 const floatingHeader = document.getElementById('floating-header');
                 if (floatingHeader) {
@@ -1281,6 +1281,7 @@ class CoronaAddon {
             const swapMatch = config.match(/swappiness=(\d+)/);
             const enabledMatch = config.match(/enabled=(\d)/);
             const writebackMatch = config.match(/zram_writeback=(\S+)/);
+            const pathMatch = config.match(/zram_path=(\S+)/);
             if (algMatch) { this.state.algorithm = algMatch[1]; this.renderAlgorithmOptions(); }
             if (sizeMatch) { this.state.zramSize = parseInt(sizeMatch[1]) / 1024 / 1024 / 1024; document.getElementById('zram-size-slider').value = this.state.zramSize; document.getElementById('zram-size-value').textContent = `${this.state.zramSize.toFixed(2)} GB`; }
             if (swapMatch) { this.state.swappiness = parseInt(swapMatch[1]); document.getElementById('swappiness-slider').value = this.state.swappiness; document.getElementById('swappiness-value').textContent = this.state.swappiness; }
@@ -1290,13 +1291,19 @@ class CoronaAddon {
                 const list = document.getElementById('zram-writeback-list');
                 if (list) list.querySelectorAll('.option-item').forEach(i => i.classList.toggle('selected', i.dataset.value === this.state.zramWriteback));
             }
+            if (pathMatch) {
+                this.state.zramPath = pathMatch[1];
+                const pathInput = document.getElementById('zram-path-input');
+                if (pathInput) pathInput.value = this.state.zramPath;
+            }
         }
         await this.loadZramStatus();
     }
     async loadZramStatus() {
+        const zramBlock = this.state.zramPath.replace('/dev/block/', '').replace('/dev/', '');
         const [algRaw, disksize, swappiness] = await Promise.all([
-            this.exec('cat /sys/block/zram0/comp_algorithm 2>/dev/null'),
-            this.exec('cat /sys/block/zram0/disksize 2>/dev/null'),
+            this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`),
+            this.exec(`cat /sys/block/${zramBlock}/disksize 2>/dev/null`),
             this.exec('cat /proc/sys/vm/swappiness 2>/dev/null')
         ]);
         const currentAlg = algRaw.match(/\[([^\]]+)\]/)?.[1] || algRaw.split(' ')[0] || '--';
@@ -1308,28 +1315,32 @@ class CoronaAddon {
         if (statusEl) statusEl.textContent = parseInt(disksize) > 0 ? currentAlg.toUpperCase() : '未启用';
         const memBadge = document.getElementById('memory-compression-badge');
         if (memBadge) memBadge.textContent = parseInt(disksize) > 0 ? `ZRAM: ${currentAlg.toUpperCase()}` : '未配置';
+        const pathDisplay = document.getElementById('zram-current-path');
+        if (pathDisplay) pathDisplay.textContent = this.state.zramPath;
     }
     async saveZramConfig() {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
-        const config = `enabled=${this.state.zramEnabled ? '1' : '0'}\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}`;
+        const config = `enabled=${this.state.zramEnabled ? '1' : '0'}\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
         await this.exec(`echo '${config}' > ${this.configDir}/zram.conf`);
         if (this.state.zramEnabled) { this.showLoading(true); await this.applyZramImmediate(); this.showLoading(false); }
         else { this.showToast('ZRAM 配置已保存（禁用状态）'); await this.updateModuleDescription(); }
     }
     async applyZramImmediate() {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
+        const zramDev = this.state.zramPath;
+        const zramBlock = zramDev.replace('/dev/block/', '').replace('/dev/', '');
         this.showLoading(true);
-        await this.exec('swapoff /dev/block/zram0 2>/dev/null');
-        await this.exec('echo 1 > /sys/block/zram0/reset 2>/dev/null');
-        await this.exec(`echo "${this.state.algorithm}" > /sys/block/zram0/comp_algorithm`);
+        await this.exec(`swapoff ${zramDev} 2>/dev/null`);
+        await this.exec(`echo 1 > /sys/block/${zramBlock}/reset 2>/dev/null`);
+        await this.exec(`echo "${this.state.algorithm}" > /sys/block/${zramBlock}/comp_algorithm`);
         if (this.state.zramWriteback === 'false') {
-            await this.exec('echo none > /sys/block/zram0/backing_dev 2>/dev/null');
+            await this.exec(`echo none > /sys/block/${zramBlock}/backing_dev 2>/dev/null`);
         }
-        await this.exec(`echo "${sizeBytes}" > /sys/block/zram0/disksize`);
-        await this.exec('mkswap /dev/block/zram0');
-        await this.exec('swapon /dev/block/zram0 -p 32758 2>/dev/null || swapon /dev/block/zram0');
+        await this.exec(`echo "${sizeBytes}" > /sys/block/${zramBlock}/disksize`);
+        await this.exec(`mkswap ${zramDev}`);
+        await this.exec(`swapon ${zramDev} -p 32758 2>/dev/null || swapon ${zramDev}`);
         await this.exec(`echo "${this.state.swappiness}" > /proc/sys/vm/swappiness`);
-        const config = `enabled=1\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}`;
+        const config = `enabled=1\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
         await this.exec(`echo '${config}' > ${this.configDir}/zram.conf`);
         await this.updateModuleDescription();
         this.showLoading(false);
@@ -1339,7 +1350,7 @@ class CoronaAddon {
     async applySwappinessImmediate() {
         await this.exec(`echo "${this.state.swappiness}" > /proc/sys/vm/swappiness`);
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
-        const config = `enabled=${this.state.zramEnabled ? '1' : '0'}\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}`;
+        const config = `enabled=${this.state.zramEnabled ? '1' : '0'}\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
         await this.exec(`echo '${config}' > ${this.configDir}/zram.conf`);
         await this.updateModuleDescription();
         this.showToast(`Swappiness: ${this.state.swappiness}`);
@@ -1737,6 +1748,85 @@ class CoronaAddon {
                 this.state.zramWriteback = item.dataset.value;
                 await this.saveZramConfig();
             });
+        });
+    }
+    initZramPath() {
+        const pathInput = document.getElementById('zram-path-input');
+        const detectBtn = document.getElementById('zram-path-detect');
+        const saveBtn = document.getElementById('zram-path-save');
+        if (pathInput) {
+            pathInput.value = this.state.zramPath;
+        }
+        if (detectBtn) {
+            detectBtn.addEventListener('click', async () => {
+                this.showLoading(true);
+                const zramDevices = await this.exec('ls /dev/block/zram* 2>/dev/null || ls /dev/zram* 2>/dev/null');
+                this.showLoading(false);
+                if (zramDevices.trim()) {
+                    const devices = zramDevices.trim().split('\n').filter(d => d);
+                    if (devices.length === 1) {
+                        pathInput.value = devices[0];
+                        this.state.zramPath = devices[0];
+                        this.showToast(`检测到: ${devices[0]}`);
+                    } else if (devices.length > 1) {
+                        this.showZramDeviceSelector(devices, pathInput);
+                    }
+                } else {
+                    this.showToast('未检测到 ZRAM 设备');
+                }
+            });
+        }
+        if (saveBtn) {
+            saveBtn.addEventListener('click', async () => {
+                const newPath = pathInput.value.trim();
+                if (!newPath) {
+                    this.showToast('路径不能为空');
+                    return;
+                }
+                if (!newPath.startsWith('/dev/')) {
+                    this.showToast('路径必须以 /dev/ 开头');
+                    return;
+                }
+                this.state.zramPath = newPath;
+                await this.saveZramConfig();
+                await this.loadZramStatus();
+                this.showToast('ZRAM 路径已保存');
+            });
+        }
+    }
+    showZramDeviceSelector(devices, pathInput) {
+        const overlay = document.createElement('div');
+        overlay.className = 'detail-overlay show';
+        overlay.innerHTML = `
+            <div class="detail-container">
+                <div class="detail-header">
+                    <span class="detail-title">选择 ZRAM 设备</span>
+                    <button class="detail-close" id="zram-selector-close">✕</button>
+                </div>
+                <div class="detail-content" style="padding: 16px;">
+                    ${devices.map(d => `<div class="option-item zram-device-option" data-path="${d}" style="margin-bottom: 8px; padding: 12px;">${d}</div>`).join('')}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#zram-selector-close').addEventListener('click', () => {
+            overlay.classList.remove('show');
+            setTimeout(() => overlay.remove(), 300);
+        });
+        overlay.querySelectorAll('.zram-device-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+                pathInput.value = opt.dataset.path;
+                this.state.zramPath = opt.dataset.path;
+                overlay.classList.remove('show');
+                setTimeout(() => overlay.remove(), 300);
+                this.showToast(`已选择: ${opt.dataset.path}`);
+            });
+        });
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.classList.remove('show');
+                setTimeout(() => overlay.remove(), 300);
+            }
         });
     }
     initSwapSettings() {

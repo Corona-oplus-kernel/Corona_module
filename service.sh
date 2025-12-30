@@ -8,6 +8,11 @@ lock_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/
 wait_until_boot_complete() { until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 5; done; }
 wait_until_login() { until [ -d "/data/data/android" ]; do sleep 5; done; }
 
+load_kernel_modules() {
+    [ -f "$MODDIR/zksmalloc.ko" ] && insmod "$MODDIR/zksmalloc.ko" 2>/dev/null
+    [ -f "$MODDIR/zakom.ko" ] && insmod "$MODDIR/zakom.ko" 2>/dev/null
+}
+
 get_system_info() {
     mem_total_str=$(cat /proc/meminfo | grep MemTotal)
     mem_total_kb=${mem_total_str:16:8}
@@ -26,24 +31,27 @@ apply_zram_config() {
     size=$(grep "^size=" "$CONFIG_DIR/zram.conf" | cut -d'=' -f2)
     swappiness=$(grep "^swappiness=" "$CONFIG_DIR/zram.conf" | cut -d'=' -f2)
     zram_writeback=$(grep "^zram_writeback=" "$CONFIG_DIR/zram.conf" | cut -d'=' -f2)
-    swapoff /dev/block/zram0 2>/dev/null
-    echo 1 > /sys/block/zram0/reset 2>/dev/null
-    bd_path=/sys/block/zram0/backing_dev
-    [ -f /sys/block/zram0/hybridswap_loop_device ] && bd_path=/sys/block/zram0/hybridswap_loop_device
+    zram_path=$(grep "^zram_path=" "$CONFIG_DIR/zram.conf" | cut -d'=' -f2)
+    [ -z "$zram_path" ] && zram_path="/dev/block/zram0"
+    zram_block=$(echo "$zram_path" | sed 's|/dev/block/||' | sed 's|/dev/||')
+    swapoff "$zram_path" 2>/dev/null
+    echo 1 > /sys/block/$zram_block/reset 2>/dev/null
+    bd_path=/sys/block/$zram_block/backing_dev
+    [ -f /sys/block/$zram_block/hybridswap_loop_device ] && bd_path=/sys/block/$zram_block/hybridswap_loop_device
     if [ -f "$bd_path" ]; then
         if [ "$zram_writeback" = "true" ]; then
-            set_value 0 /sys/block/zram0/writeback_limit_enable
+            set_value 0 /sys/block/$zram_block/writeback_limit_enable
         elif [ "$zram_writeback" = "false" ]; then
             set_value none "$bd_path"
-            set_value 1 /sys/block/zram0/writeback_limit_enable
-            set_value 0 /sys/block/zram0/writeback_limit
+            set_value 1 /sys/block/$zram_block/writeback_limit_enable
+            set_value 0 /sys/block/$zram_block/writeback_limit
         fi
     fi
-    set_value 4 /sys/block/zram0/max_comp_streams
-    [ -n "$algorithm" ] && grep -q "$algorithm" /sys/block/zram0/comp_algorithm && echo "$algorithm" > /sys/block/zram0/comp_algorithm 2>/dev/null
-    [ -n "$size" ] && echo "$size" > /sys/block/zram0/disksize 2>/dev/null
-    mkswap /dev/block/zram0 2>/dev/null
-    swapon /dev/block/zram0 -p 32758 2>/dev/null || swapon /dev/block/zram0 2>/dev/null
+    set_value 4 /sys/block/$zram_block/max_comp_streams
+    [ -n "$algorithm" ] && grep -q "$algorithm" /sys/block/$zram_block/comp_algorithm && echo "$algorithm" > /sys/block/$zram_block/comp_algorithm 2>/dev/null
+    [ -n "$size" ] && echo "$size" > /sys/block/$zram_block/disksize 2>/dev/null
+    mkswap "$zram_path" 2>/dev/null
+    swapon "$zram_path" -p 32758 2>/dev/null || swapon "$zram_path" 2>/dev/null
     [ -n "$swappiness" ] && {
         lock_value "$swappiness" /proc/sys/vm/swappiness
         lock_value "$swappiness" /dev/memcg/memory.swappiness
@@ -323,6 +331,7 @@ start_auto_clean() {
 }
 
 wait_until_boot_complete
+load_kernel_modules
 wait_until_login
 sleep 10
 get_system_info
