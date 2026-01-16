@@ -1,49 +1,28 @@
 # Corona
 
-Corona 是一款提供直观 WebUI 控制台的 Magisk/KernelSU 模块，让用户能够轻松管理 ZRAM、Swap、虚拟内存、IO 调度器、CPU 调频器、TCP 拥塞控制等核心系统参数，优化设备性能与响应速度。
-
-- **Magisk 用户**：需要借助支持 WebUI 的第三方管理器
-
-## 配置文件
+Corona 提供直观WebUI模块，让用户能够轻松管理 ZRAM、Swap、虚拟内存、IO 调度器、CPU 调频器、TCP 拥塞控制等核心系统参数
 
 所有配置会自动保存至 `/data/adb/modules/Corona/config/` 目录：
 
-配置文件说明
+- **ZRAM 配置** - 自定义 ZRAM 大小、压缩算法、Swappiness
+- **Swap 文件** - 在存储设备上创建额外交换空间
+- **LE9UO 内存保护** - 保护工作集内存不被过度回收（需内核支持）
+- **VM 参数调优** - 水位线、脏页比例、VFS 缓存压力等
+- **CPU 调频器** - 选择合适的 CPU 调频策略
+- **IO 调度器** - 配置磁盘调度算法和预读大小
+- **进程优先级** - 为重要应用设置 CPU/IO 优先级
+- **TCP 拥塞算法** - 优化网络传输性能
+- **LMK 优化** - 调整低内存杀手参数
+- **后台保护** - 增加缓存进程限制，保留更多后台
+- **回收抑制** - 禁用厂商激进的内存回收机制
+- **Kswapd 优化** - 提升内核交换守护进程优先级
+- **定时 TRIM** - 保持存储设备性能
+- **自定义脚本** - 添加开机自动执行的 Shell 脚本
+- **一键清理** - 快速释放内存缓存
+- **实时监控** - CPU、内存、温度实时图表
+- **主题切换** - 支持浅色/深色主题
 
-配置文件 用途
-zram.conf ZRAM 相关配置
-swap.conf Swap 文件配置
-vm.conf 虚拟内存参数
-kernel.conf 内核特性配置（LRU/THP/KSM等）
-le9ec.conf LE9EC 内存保护配置
-io_scheduler.conf IO 调度器配置
-cpu_governor.conf CPU 调频器配置
-cpu_hotplug.conf CPU 核心开关配置
-freq_lock.conf CPU 频率锁定配置
-process_priority.conf 进程优先级规则
-tcp.conf TCP 拥塞控制配置
-custom_scripts.b64 自定义脚本配置
-user_scripts.sh 合并后的用户脚本
-autoclean.conf 自动清理设置
-lmk.conf LMK (Low Memory Killer) 优化开关
-device.conf 后台限制开关
-reclaim.conf 禁用激进回收开关
-kswapd.conf kswapd 优化开关
-protect.conf 关键进程保护开关
-fstrim.conf 开机 fstrim 开关
-
-说明：所有配置会在每次开机后自动应用。
-
-### 「系统优化」配置卡片说明（逻辑来自scene附加模块2）
-
-| 功能 | 说明 |
-|------|------|
-| LMK 优化 | 根据RAM大小自动配置 minfree_levels，小米设备额外配置 persist.sys.minfree_* |
-| 解锁后台限制 | max_cached_processes=32768，禁用幽灵进程监控 |
-| 禁用激进回收 | 禁用 DAMON/process_reclaim/mi_reclaim，OPLUS设备禁用THP |
-| kswapd 优化 | 将 kswapd 移至前台 cpuset，设置 uclamp.latency_sensitive |
-| 关键进程保护 | 为 SystemUI/Launcher/surfaceflinger 创建 swappiness=0 的 memcg 组 |
-| 开机 fstrim | 开机时执行 fstrim |
+### （部分逻辑来自scene附加模块2）
 
 ## 目录结构
 
@@ -62,6 +41,11 @@ Corona/
 ```
 
 ## 更新日志
+
+### v3.5.0
+- 将 LE9EC 更新为 LE9UO，使用 ratio 百分比参数
+- 新增模块功能介绍
+- 优化界面交互体验
 
 ### v3.4.2
 - 支持自定义 ZRAM 设备路径
@@ -161,3 +145,7 @@ Corona/
 ## 作者
 
 Frost_Bai
+
+## 开源协议
+
+本项目采用 [GPL-3.0](LICENSE) 协议开源。

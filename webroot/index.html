@@ -147,7 +147,7 @@
             <div class="module-card" id="memory-compression-card" data-card-key="memory-compression">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title">内存压缩</div>
+                        <div class="module-card-title" data-module="memory-compression">内存压缩</div>
                         <div class="module-card-desc">ZRAM / Swap / LRU / VM参数</div>
                         <span class="module-card-badge" id="memory-compression-badge">--</span>
                     </div>
@@ -411,76 +411,76 @@
                     </div>
                 </div>
             </div>
-            <div class="module-card" id="le9ec-card" data-card-key="le9ec">
+            <div class="module-card" id="le9uo-card" data-card-key="le9uo">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title">LE9EC 内存保护</div>
+                        <div class="module-card-title" data-module="le9uo">LE9UO 内存保护</div>
                         <div class="module-card-desc">防止工作集被过度回收</div>
-                        <span class="module-card-badge" id="le9ec-badge">--</span>
+                        <span class="module-card-badge" id="le9uo-badge">--</span>
                     </div>
                     <div class="module-card-actions">
-                        <div class="module-card-expand" id="le9ec-toggle">
+                        <div class="module-card-expand" id="le9uo-toggle">
                             <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
                         </div>
                     </div>
                 </div>
-                <div id="le9ec-content" class="module-card-content hidden">
+                <div id="le9uo-content" class="module-card-content hidden">
                     <div class="info-item">
                         <span class="info-label">匿名页保护</span>
-                        <span class="info-value" id="le9ec-anon-current">--</span>
+                        <span class="info-value" id="le9uo-anon-current">--</span>
                     </div>
                     <div class="info-item">
                         <span class="info-label">文件页软保护</span>
-                        <span class="info-value" id="le9ec-clean-low-current">--</span>
+                        <span class="info-value" id="le9uo-clean-low-current">--</span>
                     </div>
                     <div class="info-item">
                         <span class="info-label">文件页硬保护</span>
-                        <span class="info-value" id="le9ec-clean-min-current">--</span>
+                        <span class="info-value" id="le9uo-clean-min-current">--</span>
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">启用 LE9EC</span>
+                            <span class="switch-label">启用 LE9UO</span>
                             <span class="switch-desc">保护工作集，防止内存抖动</span>
                         </div>
                         <label class="switch">
-                            <input type="checkbox" id="le9ec-switch">
+                            <input type="checkbox" id="le9uo-switch">
                             <span class="slider"></span>
                         </label>
                     </div>
-                    <div id="le9ec-settings" class="sub-settings hidden">
+                    <div id="le9uo-settings" class="sub-settings hidden">
                         <div class="setting-section">
-                            <span class="section-label">vm.anon_min_kbytes (匿名页硬保护)</span>
+                            <span class="section-label">vm.anon_min_ratio (匿名页硬保护)</span>
                             <span class="section-desc">防止匿名页过度换出到ZRAM</span>
                             <div class="slider-container">
-                                <input type="range" class="range-slider" id="le9ec-anon-slider" min="0" max="4194304" step="65536" value="0">
+                                <input type="range" class="range-slider" id="le9uo-anon-slider" min="0" max="100" step="1" value="15">
                                 <div class="slider-labels">
-                                    <span>0</span>
-                                    <span class="slider-value" id="le9ec-anon-value">0 MB</span>
-                                    <span>4 GB</span>
+                                    <span>0%</span>
+                                    <span class="slider-value" id="le9uo-anon-value">15%</span>
+                                    <span>100%</span>
                                 </div>
                             </div>
                         </div>
                         <div class="setting-section">
-                            <span class="section-label">vm.clean_low_kbytes (文件页软保护)</span>
+                            <span class="section-label">vm.clean_low_ratio (文件页软保护)</span>
                             <span class="section-desc">除非OOM否则不回收低于此值的干净文件页</span>
                             <div class="slider-container">
-                                <input type="range" class="range-slider" id="le9ec-clean-low-slider" min="0" max="2097152" step="32768" value="0">
+                                <input type="range" class="range-slider" id="le9uo-clean-low-slider" min="0" max="100" step="1" value="0">
                                 <div class="slider-labels">
-                                    <span>0</span>
-                                    <span class="slider-value" id="le9ec-clean-low-value">0 MB</span>
-                                    <span>2 GB</span>
+                                    <span>0%</span>
+                                    <span class="slider-value" id="le9uo-clean-low-value">0%</span>
+                                    <span>100%</span>
                                 </div>
                             </div>
                         </div>
                         <div class="setting-section">
-                            <span class="section-label">vm.clean_min_kbytes (文件页硬保护)</span>
+                            <span class="section-label">vm.clean_min_ratio (文件页硬保护)</span>
                             <span class="section-desc">绝不回收低于此值的干净文件页</span>
                             <div class="slider-container">
-                                <input type="range" class="range-slider" id="le9ec-clean-min-slider" min="0" max="1048576" step="16384" value="0">
+                                <input type="range" class="range-slider" id="le9uo-clean-min-slider" min="0" max="100" step="1" value="15">
                                 <div class="slider-labels">
-                                    <span>0</span>
-                                    <span class="slider-value" id="le9ec-clean-min-value">0 MB</span>
-                                    <span>1 GB</span>
+                                    <span>0%</span>
+                                    <span class="slider-value" id="le9uo-clean-min-value">15%</span>
+                                    <span>100%</span>
                                 </div>
                             </div>
                         </div>
@@ -490,7 +490,7 @@
             <div class="module-card" id="io-scheduler-card" data-card-key="io-scheduler">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title">IO 调度器</div>
+                        <div class="module-card-title" data-module="io-scheduler">IO 调度器</div>
                         <div class="module-card-desc">磁盘读写调度与预读取</div>
                         <span class="module-card-badge" id="io-current">--</span>
                     </div>
@@ -511,7 +511,7 @@
             <div class="module-card" id="cpu-governor-card" data-card-key="cpu-governor">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title">CPU 调频器</div>
+                        <div class="module-card-title" data-module="cpu-governor">CPU 调频器</div>
                         <div class="module-card-desc">调频器 / 核心管理 / 频率锁定</div>
                         <span class="module-card-badge" id="cpu-gov-current">--</span>
                     </div>
@@ -565,7 +565,7 @@
             <div class="module-card" id="process-priority-card" data-card-key="process-priority">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title">进程优先级</div>
+                        <div class="module-card-title" data-module="process-priority">进程优先级</div>
                         <div class="module-card-desc">设置进程nice值和I/O优先级</div>
                         <span class="module-card-badge" id="priority-count">0 条</span>
                     </div>
@@ -586,7 +586,7 @@
             <div class="module-card" id="tcp-card" data-card-key="tcp">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title">TCP 拥塞算法</div>
+                        <div class="module-card-title" data-module="tcp">TCP 拥塞算法</div>
                         <div class="module-card-desc">网络传输拥塞控制</div>
                         <span class="module-card-badge" id="tcp-current">--</span>
                     </div>
@@ -603,7 +603,7 @@
             <div class="module-card" id="custom-scripts-card" data-card-key="custom-scripts">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title">自定义脚本</div>
+                        <div class="module-card-title" data-module="custom-scripts">自定义脚本</div>
                         <div class="module-card-desc">开机自动执行的Shell脚本</div>
                         <span class="module-card-badge" id="scripts-count">0 个</span>
                     </div>
@@ -624,7 +624,7 @@
             <div class="module-card" id="system-opt-card" data-card-key="system-opt">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title">系统优化</div>
+                        <div class="module-card-title" data-module="system-opt">系统优化</div>
                         <div class="module-card-desc">LMK / 回收控制 / 进程保护</div>
                         <span class="module-card-badge" id="system-opt-badge">--</span>
                     </div>
@@ -700,7 +700,7 @@
             <div class="module-card" id="app-settings-card" data-card-key="app-settings">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title">模块设置</div>
+                        <div class="module-card-title" data-module="module-settings">模块设置</div>
                     </div>
                     <div class="module-card-actions">
                         <div class="module-card-expand" id="app-settings-toggle">
@@ -750,10 +750,10 @@
                                     <span class="slider"></span>
                                 </label>
                             </div>
-                            <div class="card-visibility-item" data-card="le9ec">
-                                <span class="card-visibility-name">LE9EC 内存保护</span>
+                            <div class="card-visibility-item" data-card="le9uo">
+                                <span class="card-visibility-name">LE9UO 内存保护</span>
                                 <label class="switch">
-                                    <input type="checkbox" class="card-visibility-switch" data-card="le9ec" checked>
+                                    <input type="checkbox" class="card-visibility-switch" data-card="le9uo" checked>
                                     <span class="slider"></span>
                                 </label>
                             </div>
@@ -1019,6 +1019,19 @@
                     <button class="action-btn" id="script-cancel-btn">取消</button>
                     <button class="action-btn script-save-btn" id="script-save-btn">保存脚本</button>
                 </div>
+            </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden" id="module-intro-overlay">
+        <div class="detail-content module-intro-dialog">
+            <div class="detail-header">
+                <span id="module-intro-title">功能介绍</span>
+            </div>
+            <div class="module-intro-body">
+                <p id="module-intro-content"></p>
+            </div>
+            <div class="module-intro-actions">
+                <button class="action-btn" id="module-intro-close">了解了</button>
             </div>
         </div>
     </div>

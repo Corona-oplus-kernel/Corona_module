@@ -1530,7 +1530,7 @@ body.theme-dark #xinran-overlay .detail-card {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
-.le9ec-note {
+.le9uo-note {
     font-size: 11px;
     color: var(--text-dim);
     padding: 12px;
@@ -2794,6 +2794,69 @@ body.theme-dark .confirm-dialog {
     flex: 1;
 }
 
+.module-intro-dialog {
+    max-width: 340px;
+    width: 90%;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 24px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    transform: scale(0.9) translateY(20px);
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+}
+#module-intro-overlay {
+    align-items: center;
+    background: transparent;
+    transition: background 0.25s ease;
+}
+#module-intro-overlay.show {
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+#module-intro-overlay.show .module-intro-dialog {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+}
+#module-intro-overlay.closing .module-intro-dialog {
+    transform: scale(0.9) translateY(20px);
+    opacity: 0;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 1, 1), opacity 0.2s ease;
+}
+body.theme-dark #module-intro-overlay.show {
+    background: rgba(0, 0, 0, 0.5);
+}
+body.theme-dark .module-intro-dialog {
+    background: rgba(30, 30, 35, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+.module-intro-body {
+    padding: 16px 12px;
+}
+.module-intro-body p {
+    font-size: 13px;
+    color: var(--text-main);
+    line-height: 1.7;
+    white-space: pre-line;
+    text-align: left;
+}
+.module-intro-actions {
+    display: flex;
+    gap: 12px;
+    padding: 0 16px 8px;
+}
+.module-intro-actions .action-btn {
+    flex: 1;
+    background: var(--primary);
+    color: #fff;
+}
+
 @keyframes infiniteSpin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
@@ -3280,6 +3343,14 @@ body.theme-dark .script-tag {
     font-weight: 600;
     color: var(--text-main);
     margin-bottom: 2px;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+.module-card-title[data-module]:hover {
+    color: var(--primary);
+}
+.module-card-title[data-module]:active {
+    opacity: 0.7;
 }
 .module-card-desc {
     font-size: 12px;

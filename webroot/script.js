@@ -15,10 +15,10 @@ class CoronaAddon {
             tcp: null,
             cpuGovernor: null,
             zramEnabled: false,
-            le9ecEnabled: false,
-            le9ecAnon: 0,
-            le9ecCleanLow: 0,
-            le9ecCleanMin: 0,
+            le9uoEnabled: false,
+            le9uoAnon: 15,
+            le9uoCleanLow: 0,
+            le9uoCleanMin: 15,
             dualCell: false,
             freqLockEnabled: false,
             perCoreFreqEnabled: false,
@@ -49,7 +49,7 @@ class CoronaAddon {
         this.historyData = { cpu: [], mem: [], cpuTemp: [], batteryTemp: [] };
         this.chartType = 'cpu';
         this.maxHistoryPoints = 60;
-        this.le9ecSupported = false;
+        this.le9uoSupported = false;
         this.autoCleanTimer = null;
         this.dom = {};
         this.initDOMCache();
@@ -104,7 +104,8 @@ class CoronaAddon {
         this.initCustomScripts();
         this.initSystemOpt();
         this.initScrollEffect();
-        Promise.all([this.loadZramStatus(), this.loadLe9ecStatus()]);
+        this.initModuleIntro();
+        Promise.all([this.loadZramStatus(), this.loadLe9uoStatus()]);
     }
     updateSliderProgress(slider) {
         const min = parseFloat(slider.min) || 0;
@@ -300,7 +301,7 @@ class CoronaAddon {
     initExpandableCards() {
         const cards = [
             { toggle: 'memory-compression-toggle', content: 'memory-compression-content', onExpand: null },
-            { toggle: 'le9ec-toggle', content: 'le9ec-content', onExpand: () => this.loadLe9ecStatus() },
+            { toggle: 'le9uo-toggle', content: 'le9uo-content', onExpand: () => this.loadLe9uoStatus() },
             { toggle: 'io-scheduler-toggle', content: 'io-scheduler-content', onExpand: null },
             { toggle: 'cpu-governor-toggle', content: 'cpu-governor-content', onExpand: null },
             { toggle: 'process-priority-toggle', content: 'process-priority-content', onExpand: null },
@@ -470,6 +471,15 @@ class CoronaAddon {
     hideOverlay(id) {
         const overlay = document.getElementById(id);
         if (overlay) {
+            if (id === 'module-intro-overlay') {
+                overlay.classList.add('closing');
+                overlay.classList.remove('show');
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                    overlay.classList.remove('closing');
+                }, 250);
+                return;
+            }
             overlay.classList.remove('show');
             if (overlay.classList.contains('no-close-btn')) {
                 const floatingHeader = document.getElementById('floating-header');
@@ -1042,62 +1052,62 @@ class CoronaAddon {
         document.getElementById('zram-size-slider').addEventListener('change', (e) => { this.state.zramSize = parseFloat(e.target.value); if (this.state.zramEnabled) this.applyZramImmediate(); else this.saveZramConfig(); });
         document.getElementById('swappiness-slider').addEventListener('input', (e) => { this.state.swappiness = parseInt(e.target.value); document.getElementById('swappiness-value').textContent = this.state.swappiness; });
         document.getElementById('swappiness-slider').addEventListener('change', (e) => { this.state.swappiness = parseInt(e.target.value); if (this.state.zramEnabled) this.applySwappinessImmediate(); else this.saveZramConfig(); });
-        document.getElementById('le9ec-switch').addEventListener('change', (e) => { this.state.le9ecEnabled = e.target.checked; this.toggleLe9ecSettings(e.target.checked); this.saveLe9ecConfig(); });
-        document.getElementById('le9ec-anon-slider').addEventListener('input', (e) => { this.state.le9ecAnon = parseInt(e.target.value); document.getElementById('le9ec-anon-value').textContent = `${(this.state.le9ecAnon / 1024).toFixed(0)} MB`; });
-        document.getElementById('le9ec-anon-slider').addEventListener('change', (e) => { this.state.le9ecAnon = parseInt(e.target.value); if (this.state.le9ecEnabled) this.applyLe9ecImmediate(); else this.saveLe9ecConfig(); });
-        document.getElementById('le9ec-clean-low-slider').addEventListener('input', (e) => { this.state.le9ecCleanLow = parseInt(e.target.value); document.getElementById('le9ec-clean-low-value').textContent = `${(this.state.le9ecCleanLow / 1024).toFixed(0)} MB`; });
-        document.getElementById('le9ec-clean-low-slider').addEventListener('change', (e) => { this.state.le9ecCleanLow = parseInt(e.target.value); if (this.state.le9ecEnabled) this.applyLe9ecImmediate(); else this.saveLe9ecConfig(); });
-        document.getElementById('le9ec-clean-min-slider').addEventListener('input', (e) => { this.state.le9ecCleanMin = parseInt(e.target.value); document.getElementById('le9ec-clean-min-value').textContent = `${(this.state.le9ecCleanMin / 1024).toFixed(0)} MB`; });
-        document.getElementById('le9ec-clean-min-slider').addEventListener('change', (e) => { this.state.le9ecCleanMin = parseInt(e.target.value); if (this.state.le9ecEnabled) this.applyLe9ecImmediate(); else this.saveLe9ecConfig(); });
+        document.getElementById('le9uo-switch').addEventListener('change', (e) => { this.state.le9uoEnabled = e.target.checked; this.toggleLe9uoSettings(e.target.checked); this.saveLe9uoConfig(); });
+        document.getElementById('le9uo-anon-slider').addEventListener('input', (e) => { this.state.le9uoAnon = parseInt(e.target.value); document.getElementById('le9uo-anon-value').textContent = `${this.state.le9uoAnon}%`; });
+        document.getElementById('le9uo-anon-slider').addEventListener('change', (e) => { this.state.le9uoAnon = parseInt(e.target.value); if (this.state.le9uoEnabled) this.applyLe9uoImmediate(); else this.saveLe9uoConfig(); });
+        document.getElementById('le9uo-clean-low-slider').addEventListener('input', (e) => { this.state.le9uoCleanLow = parseInt(e.target.value); document.getElementById('le9uo-clean-low-value').textContent = `${this.state.le9uoCleanLow}%`; });
+        document.getElementById('le9uo-clean-low-slider').addEventListener('change', (e) => { this.state.le9uoCleanLow = parseInt(e.target.value); if (this.state.le9uoEnabled) this.applyLe9uoImmediate(); else this.saveLe9uoConfig(); });
+        document.getElementById('le9uo-clean-min-slider').addEventListener('input', (e) => { this.state.le9uoCleanMin = parseInt(e.target.value); document.getElementById('le9uo-clean-min-value').textContent = `${this.state.le9uoCleanMin}%`; });
+        document.getElementById('le9uo-clean-min-slider').addEventListener('change', (e) => { this.state.le9uoCleanMin = parseInt(e.target.value); if (this.state.le9uoEnabled) this.applyLe9uoImmediate(); else this.saveLe9uoConfig(); });
     }
-    toggleLe9ecSettings(show) { const settings = document.getElementById('le9ec-settings'); if (show) { settings.classList.remove('hidden'); this.loadLe9ecStatus(); } else { settings.classList.add('hidden'); } }
-    async loadLe9ecConfig() {
-        const exists = await this.exec('cat /proc/sys/vm/anon_min_kbytes 2>/dev/null');
-        this.le9ecSupported = !!exists;
-        if (!exists) { document.getElementById('le9ec-card').style.display = 'none'; return; }
-        const config = await this.exec(`cat ${this.configDir}/le9ec.conf 2>/dev/null`);
+    toggleLe9uoSettings(show) { const settings = document.getElementById('le9uo-settings'); if (show) { settings.classList.remove('hidden'); this.loadLe9uoStatus(); } else { settings.classList.add('hidden'); } }
+    async loadLe9uoConfig() {
+        const exists = await this.exec('cat /proc/sys/vm/anon_min_ratio 2>/dev/null');
+        this.le9uoSupported = !!exists;
+        if (!exists) { document.getElementById('le9uo-card').style.display = 'none'; return; }
+        const config = await this.exec(`cat ${this.configDir}/le9uo.conf 2>/dev/null`);
         if (config) {
             const enabledMatch = config.match(/enabled=(\d)/);
             const anonMatch = config.match(/anon_min=(\d+)/);
             const cleanLowMatch = config.match(/clean_low=(\d+)/);
             const cleanMinMatch = config.match(/clean_min=(\d+)/);
-            if (enabledMatch) { this.state.le9ecEnabled = enabledMatch[1] === '1'; document.getElementById('le9ec-switch').checked = this.state.le9ecEnabled; this.toggleLe9ecSettings(this.state.le9ecEnabled); }
-            if (anonMatch) { this.state.le9ecAnon = parseInt(anonMatch[1]); document.getElementById('le9ec-anon-slider').value = this.state.le9ecAnon; document.getElementById('le9ec-anon-value').textContent = `${(this.state.le9ecAnon / 1024).toFixed(0)} MB`; }
-            if (cleanLowMatch) { this.state.le9ecCleanLow = parseInt(cleanLowMatch[1]); document.getElementById('le9ec-clean-low-slider').value = this.state.le9ecCleanLow; document.getElementById('le9ec-clean-low-value').textContent = `${(this.state.le9ecCleanLow / 1024).toFixed(0)} MB`; }
-            if (cleanMinMatch) { this.state.le9ecCleanMin = parseInt(cleanMinMatch[1]); document.getElementById('le9ec-clean-min-slider').value = this.state.le9ecCleanMin; document.getElementById('le9ec-clean-min-value').textContent = `${(this.state.le9ecCleanMin / 1024).toFixed(0)} MB`; }
+            if (enabledMatch) { this.state.le9uoEnabled = enabledMatch[1] === '1'; document.getElementById('le9uo-switch').checked = this.state.le9uoEnabled; this.toggleLe9uoSettings(this.state.le9uoEnabled); }
+            if (anonMatch) { this.state.le9uoAnon = parseInt(anonMatch[1]); document.getElementById('le9uo-anon-slider').value = this.state.le9uoAnon; document.getElementById('le9uo-anon-value').textContent = `${this.state.le9uoAnon}%`; }
+            if (cleanLowMatch) { this.state.le9uoCleanLow = parseInt(cleanLowMatch[1]); document.getElementById('le9uo-clean-low-slider').value = this.state.le9uoCleanLow; document.getElementById('le9uo-clean-low-value').textContent = `${this.state.le9uoCleanLow}%`; }
+            if (cleanMinMatch) { this.state.le9uoCleanMin = parseInt(cleanMinMatch[1]); document.getElementById('le9uo-clean-min-slider').value = this.state.le9uoCleanMin; document.getElementById('le9uo-clean-min-value').textContent = `${this.state.le9uoCleanMin}%`; }
         }
-        await this.loadLe9ecStatus();
+        await this.loadLe9uoStatus();
     }
-    async loadLe9ecStatus() {
+    async loadLe9uoStatus() {
         const [anon, cleanLow, cleanMin] = await Promise.all([
-            this.exec('cat /proc/sys/vm/anon_min_kbytes 2>/dev/null'),
-            this.exec('cat /proc/sys/vm/clean_low_kbytes 2>/dev/null'),
-            this.exec('cat /proc/sys/vm/clean_min_kbytes 2>/dev/null')
+            this.exec('cat /proc/sys/vm/anon_min_ratio 2>/dev/null'),
+            this.exec('cat /proc/sys/vm/clean_low_ratio 2>/dev/null'),
+            this.exec('cat /proc/sys/vm/clean_min_ratio 2>/dev/null')
         ]);
-        document.getElementById('le9ec-anon-current').textContent = anon ? `${(parseInt(anon) / 1024).toFixed(0)} MB` : '--';
-        document.getElementById('le9ec-clean-low-current').textContent = cleanLow ? `${(parseInt(cleanLow) / 1024).toFixed(0)} MB` : '--';
-        document.getElementById('le9ec-clean-min-current').textContent = cleanMin ? `${(parseInt(cleanMin) / 1024).toFixed(0)} MB` : '--';
-        const le9ecBadge = document.getElementById('le9ec-badge');
+        document.getElementById('le9uo-anon-current').textContent = anon ? `${parseInt(anon)}%` : '--';
+        document.getElementById('le9uo-clean-low-current').textContent = cleanLow ? `${parseInt(cleanLow)}%` : '--';
+        document.getElementById('le9uo-clean-min-current').textContent = cleanMin ? `${parseInt(cleanMin)}%` : '--';
+        const le9uoBadge = document.getElementById('le9uo-badge');
         const hasConfig = (anon && parseInt(anon) > 0) || (cleanLow && parseInt(cleanLow) > 0) || (cleanMin && parseInt(cleanMin) > 0);
-        if (le9ecBadge) le9ecBadge.textContent = hasConfig ? '已启用' : '未启用';
+        if (le9uoBadge) le9uoBadge.textContent = hasConfig ? '已启用' : '未启用';
     }
-    async saveLe9ecConfig() {
-        const config = `enabled=${this.state.le9ecEnabled ? '1' : '0'}\nanon_min=${this.state.le9ecAnon}\nclean_low=${this.state.le9ecCleanLow}\nclean_min=${this.state.le9ecCleanMin}`;
-        await this.exec(`echo '${config}' > ${this.configDir}/le9ec.conf`);
-        if (this.state.le9ecEnabled) { this.showLoading(true); await this.applyLe9ecImmediate(); this.showLoading(false); }
-        else { this.showToast('LE9EC 配置已保存（禁用状态）'); await this.updateModuleDescription(); }
+    async saveLe9uoConfig() {
+        const config = `enabled=${this.state.le9uoEnabled ? '1' : '0'}\nanon_min=${this.state.le9uoAnon}\nclean_low=${this.state.le9uoCleanLow}\nclean_min=${this.state.le9uoCleanMin}`;
+        await this.exec(`echo '${config}' > ${this.configDir}/le9uo.conf`);
+        if (this.state.le9uoEnabled) { this.showLoading(true); await this.applyLe9uoImmediate(); this.showLoading(false); }
+        else { this.showToast('LE9UO 配置已保存（禁用状态）'); await this.updateModuleDescription(); }
     }
-    async applyLe9ecImmediate() {
+    async applyLe9uoImmediate() {
         await Promise.all([
-            this.exec(`echo ${this.state.le9ecAnon} > /proc/sys/vm/anon_min_kbytes`),
-            this.exec(`echo ${this.state.le9ecCleanLow} > /proc/sys/vm/clean_low_kbytes`),
-            this.exec(`echo ${this.state.le9ecCleanMin} > /proc/sys/vm/clean_min_kbytes`)
+            this.exec(`echo ${this.state.le9uoAnon} > /proc/sys/vm/anon_min_ratio`),
+            this.exec(`echo ${this.state.le9uoCleanLow} > /proc/sys/vm/clean_low_ratio`),
+            this.exec(`echo ${this.state.le9uoCleanMin} > /proc/sys/vm/clean_min_ratio`)
         ]);
-        const config = `enabled=1\nanon_min=${this.state.le9ecAnon}\nclean_low=${this.state.le9ecCleanLow}\nclean_min=${this.state.le9ecCleanMin}`;
-        await this.exec(`echo '${config}' > ${this.configDir}/le9ec.conf`);
+        const config = `enabled=1\nanon_min=${this.state.le9uoAnon}\nclean_low=${this.state.le9uoCleanLow}\nclean_min=${this.state.le9uoCleanMin}`;
+        await this.exec(`echo '${config}' > ${this.configDir}/le9uo.conf`);
         await this.updateModuleDescription();
-        this.showToast('LE9EC 配置已应用');
-        setTimeout(() => this.loadLe9ecStatus(), 500);
+        this.showToast('LE9UO 配置已应用');
+        setTimeout(() => this.loadLe9uoStatus(), 500);
     }
     toggleZramSettings(show) { const settings = document.getElementById('zram-settings'); if (show) { settings.classList.remove('hidden'); this.loadZramStatus(); } else { settings.classList.add('hidden'); } }
     switchPage(pageName) {
@@ -1266,7 +1276,7 @@ class CoronaAddon {
         document.getElementById('swap-progress').style.width = `${percent}%`;
     }
     async loadAllConfigs() {
-        await Promise.all([ this.loadZramConfig(), this.loadLe9ecConfig(), this.loadIOConfig(), this.loadCpuGovernorConfig(), this.loadTCPConfig(), this.loadCpuCores(), this.loadPerformanceModeConfig(), this.loadFreqLockConfig() ]);
+        await Promise.all([ this.loadZramConfig(), this.loadLe9uoConfig(), this.loadIOConfig(), this.loadCpuGovernorConfig(), this.loadTCPConfig(), this.loadCpuCores(), this.loadPerformanceModeConfig(), this.loadFreqLockConfig() ]);
         await Promise.all([ this.loadZramStatus(), this.loadSwapStatus() ]);
         await this.updateModuleDescription();
         this.updateClusterBadge();
@@ -1546,7 +1556,7 @@ class CoronaAddon {
         else { const current = await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null'); if (current) descParts.push(`CPU:${current.trim()}`); else descParts.push(`CPU:--`); }
         if (this.state.tcp) { descParts.push(`TCP:${this.state.tcp}`); }
         else { const current = await this.exec('cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null'); if (current) descParts.push(`TCP:${current.trim()}`); else descParts.push(`TCP:--`); }
-        if (this.le9ecSupported && this.state.le9ecEnabled) { descParts.push(`LE9EC:开启`); }
+        if (this.le9uoSupported && this.state.le9uoEnabled) { descParts.push(`LE9UO:开启`); }
         const desc = descParts.join(' | ');
         const modulePropPath = `${this.modDir}/module.prop`;
         await this.exec(`sed -i 's/^description=.*/description=${desc.replace(/\//g, "\\/")}/' '${modulePropPath}' 2>/dev/null`);
@@ -2525,6 +2535,96 @@ class CoronaAddon {
         };
         window.addEventListener('scroll', handleScroll, { passive: true });
         handleScroll();
+    }
+    initModuleIntro() {
+        const moduleIntros = {
+            'memory-compression': {
+                title: '内存压缩',
+                content: `ZRAM 是 Linux 内核的一个功能，它在内存中创建一个压缩的块设备作为交换空间。
+
+当物理内存不足时，系统会将不常用的内存页压缩后存储到 ZRAM 中，从而有效扩展可用内存容量。
+
+Swap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的补充，适合内存较小的设备使用。`
+            },
+            'le9uo': {
+                title: 'LE9UO 内存保护',
+                content: `LE9UO (le9 Unofficial) 是一个内核补丁，用于保护工作集内存不被过度回收。
+
+通过设置匿名页和文件页的保护阈值，可以防止系统在内存压力下过度回收正在使用的内存，从而避免频繁的页面换入换出导致的系统卡顿和假死。
+
+此功能需要内核支持，未打补丁的内核将自动隐藏此选项。`
+            },
+            'io-scheduler': {
+                title: 'IO 调度器',
+                content: `IO 调度器决定了磁盘读写请求的处理顺序和优先级。
+
+不同的调度算法适合不同的使用场景，选择合适的调度器可以提升存储设备的读写性能和响应速度。
+
+预读大小控制系统预先读取的数据量，适当的预读可以提高顺序读取的性能。`
+            },
+            'cpu-governor': {
+                title: 'CPU 调频器',
+                content: `CPU 调频器控制处理器频率的调节策略，直接影响设备的性能表现和电池续航。
+
+不同的调频策略在性能和功耗之间有不同的侧重，可以根据实际使用需求选择合适的调频器。`
+            },
+            'process-priority': {
+                title: '进程优先级',
+                content: `通过调整进程的 CPU 优先级 (Nice) 和 IO 优先级，可以让重要的应用获得更多的系统资源。
+
+为游戏、音乐播放器等对性能敏感的应用设置较高优先级，可以获得更流畅的使用体验。
+
+设置的规则会在每次开机后自动应用。`
+            },
+            'tcp': {
+                title: 'TCP 拥塞算法',
+                content: `TCP 拥塞控制算法影响网络数据传输的效率和稳定性。
+
+不同的算法在各种网络环境下表现不同，选择合适的算法可以提升网络连接的速度和可靠性。`
+            },
+            'custom-scripts': {
+                title: '自定义脚本',
+                content: `在此添加您自己的 Shell 脚本，模块启动时会以 root 权限自动执行。
+
+可以用于个性化的系统调优、自动化任务等场景。
+
+注意：请确保脚本语法正确，避免执行可能导致系统不稳定的命令。`
+            },
+            'system-opt': {
+                title: '系统优化',
+                content: `一系列系统级优化选项，包括低内存杀手调优、后台进程保护、厂商回收抑制等功能。
+
+这些优化可以减少后台应用被杀、提升系统流畅度、保持存储性能。
+
+部分功能可能与特定厂商系统有关，请根据实际效果选择启用。`
+            },
+            'module-settings': {
+                title: '模块设置',
+                content: `Corona 模块的全局设置，包括主题切换、功能卡片显示控制、一键内存清理等功能。
+
+可以根据个人喜好自定义界面显示和快捷操作。`
+            }
+        };
+        document.querySelectorAll('.module-card-title[data-module]').forEach(title => {
+            title.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const moduleKey = title.getAttribute('data-module');
+                const intro = moduleIntros[moduleKey];
+                if (intro) {
+                    document.getElementById('module-intro-title').textContent = intro.title;
+                    document.getElementById('module-intro-content').textContent = intro.content;
+                    this.showOverlay('module-intro-overlay');
+                }
+            });
+        });
+        document.getElementById('module-intro-close').addEventListener('click', () => {
+            this.hideOverlay('module-intro-overlay');
+        });
+        document.getElementById('module-intro-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'module-intro-overlay') {
+                this.hideOverlay('module-intro-overlay');
+            }
+        });
     }
 }
 document.addEventListener('DOMContentLoaded', () => { window.corona = new CoronaAddon(); });
