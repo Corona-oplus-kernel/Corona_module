@@ -411,76 +411,76 @@
                     </div>
                 </div>
             </div>
-            <div class="module-card" id="le9uo-card" data-card-key="le9uo">
+            <div class="module-card" id="le9ec-card" data-card-key="le9ec">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title" data-module="le9uo">LE9UO 内存保护</div>
+                        <div class="module-card-title" data-module="le9ec">LE9EC 内存保护</div>
                         <div class="module-card-desc">防止工作集被过度回收</div>
-                        <span class="module-card-badge" id="le9uo-badge">--</span>
+                        <span class="module-card-badge" id="le9ec-badge">--</span>
                     </div>
                     <div class="module-card-actions">
-                        <div class="module-card-expand" id="le9uo-toggle">
+                        <div class="module-card-expand" id="le9ec-toggle">
                             <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
                         </div>
                     </div>
                 </div>
-                <div id="le9uo-content" class="module-card-content hidden">
+                <div id="le9ec-content" class="module-card-content hidden">
                     <div class="info-item">
                         <span class="info-label">匿名页保护</span>
-                        <span class="info-value" id="le9uo-anon-current">--</span>
+                        <span class="info-value" id="le9ec-anon-current">--</span>
                     </div>
                     <div class="info-item">
                         <span class="info-label">文件页软保护</span>
-                        <span class="info-value" id="le9uo-clean-low-current">--</span>
+                        <span class="info-value" id="le9ec-clean-low-current">--</span>
                     </div>
                     <div class="info-item">
                         <span class="info-label">文件页硬保护</span>
-                        <span class="info-value" id="le9uo-clean-min-current">--</span>
+                        <span class="info-value" id="le9ec-clean-min-current">--</span>
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">启用 LE9UO</span>
+                            <span class="switch-label">启用 LE9EC</span>
                             <span class="switch-desc">保护工作集，防止内存抖动</span>
                         </div>
                         <label class="switch">
-                            <input type="checkbox" id="le9uo-switch">
+                            <input type="checkbox" id="le9ec-switch">
                             <span class="slider"></span>
                         </label>
                     </div>
-                    <div id="le9uo-settings" class="sub-settings hidden">
+                    <div id="le9ec-settings" class="sub-settings hidden">
                         <div class="setting-section">
-                            <span class="section-label">vm.anon_min_ratio (匿名页硬保护)</span>
+                            <span class="section-label">vm.anon_min_kbytes (匿名页硬保护)</span>
                             <span class="section-desc">防止匿名页过度换出到ZRAM</span>
                             <div class="slider-container">
-                                <input type="range" class="range-slider" id="le9uo-anon-slider" min="0" max="100" step="1" value="15">
+                                <input type="range" class="range-slider" id="le9ec-anon-slider" min="0" max="4096" step="64" value="512">
                                 <div class="slider-labels">
-                                    <span>0%</span>
-                                    <span class="slider-value" id="le9uo-anon-value">15%</span>
-                                    <span>100%</span>
+                                    <span>0 MB</span>
+                                    <span class="slider-value" id="le9ec-anon-value">512 MB</span>
+                                    <span>4096 MB</span>
                                 </div>
                             </div>
                         </div>
                         <div class="setting-section">
-                            <span class="section-label">vm.clean_low_ratio (文件页软保护)</span>
+                            <span class="section-label">vm.clean_low_kbytes (文件页软保护)</span>
                             <span class="section-desc">除非OOM否则不回收低于此值的干净文件页</span>
                             <div class="slider-container">
-                                <input type="range" class="range-slider" id="le9uo-clean-low-slider" min="0" max="100" step="1" value="0">
+                                <input type="range" class="range-slider" id="le9ec-clean-low-slider" min="0" max="4096" step="64" value="0">
                                 <div class="slider-labels">
-                                    <span>0%</span>
-                                    <span class="slider-value" id="le9uo-clean-low-value">0%</span>
-                                    <span>100%</span>
+                                    <span>0 MB</span>
+                                    <span class="slider-value" id="le9ec-clean-low-value">0 MB</span>
+                                    <span>4096 MB</span>
                                 </div>
                             </div>
                         </div>
                         <div class="setting-section">
-                            <span class="section-label">vm.clean_min_ratio (文件页硬保护)</span>
+                            <span class="section-label">vm.clean_min_kbytes (文件页硬保护)</span>
                             <span class="section-desc">绝不回收低于此值的干净文件页</span>
                             <div class="slider-container">
-                                <input type="range" class="range-slider" id="le9uo-clean-min-slider" min="0" max="100" step="1" value="15">
+                                <input type="range" class="range-slider" id="le9ec-clean-min-slider" min="0" max="4096" step="64" value="512">
                                 <div class="slider-labels">
-                                    <span>0%</span>
-                                    <span class="slider-value" id="le9uo-clean-min-value">15%</span>
-                                    <span>100%</span>
+                                    <span>0 MB</span>
+                                    <span class="slider-value" id="le9ec-clean-min-value">512 MB</span>
+                                    <span>4096 MB</span>
                                 </div>
                             </div>
                         </div>
@@ -750,10 +750,10 @@
                                     <span class="slider"></span>
                                 </label>
                             </div>
-                            <div class="card-visibility-item" data-card="le9uo">
-                                <span class="card-visibility-name">LE9UO 内存保护</span>
+                            <div class="card-visibility-item" data-card="le9ec">
+                                <span class="card-visibility-name">LE9EC 内存保护</span>
                                 <label class="switch">
-                                    <input type="checkbox" class="card-visibility-switch" data-card="le9uo" checked>
+                                    <input type="checkbox" class="card-visibility-switch" data-card="le9ec" checked>
                                     <span class="slider"></span>
                                 </label>
                             </div>

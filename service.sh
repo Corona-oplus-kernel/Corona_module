@@ -113,16 +113,16 @@ apply_kernel_features_config() {
     [ -f /proc/sys/vm/compaction_proactiveness ] && [ -n "$compaction" ] && { [ "$compaction" = "1" ] && echo 20 > /proc/sys/vm/compaction_proactiveness 2>/dev/null || echo 0 > /proc/sys/vm/compaction_proactiveness 2>/dev/null; }
 }
 
-apply_le9uo_config() {
-    [ ! -f "$CONFIG_DIR/le9uo.conf" ] && return
-    enabled=$(grep "^enabled=" "$CONFIG_DIR/le9uo.conf" | cut -d'=' -f2)
+apply_le9ec_config() {
+    [ ! -f "$CONFIG_DIR/le9ec.conf" ] && return
+    enabled=$(grep "^enabled=" "$CONFIG_DIR/le9ec.conf" | cut -d'=' -f2)
     [ "$enabled" != "1" ] && return
-    anon_min=$(grep "^anon_min=" "$CONFIG_DIR/le9uo.conf" | cut -d'=' -f2)
-    clean_low=$(grep "^clean_low=" "$CONFIG_DIR/le9uo.conf" | cut -d'=' -f2)
-    clean_min=$(grep "^clean_min=" "$CONFIG_DIR/le9uo.conf" | cut -d'=' -f2)
-    [ -n "$anon_min" ] && echo "$anon_min" > /proc/sys/vm/anon_min_ratio 2>/dev/null
-    [ -n "$clean_low" ] && echo "$clean_low" > /proc/sys/vm/clean_low_ratio 2>/dev/null
-    [ -n "$clean_min" ] && echo "$clean_min" > /proc/sys/vm/clean_min_ratio 2>/dev/null
+    anon_min=$(grep "^anon_min=" "$CONFIG_DIR/le9ec.conf" | cut -d'=' -f2)
+    clean_low=$(grep "^clean_low=" "$CONFIG_DIR/le9ec.conf" | cut -d'=' -f2)
+    clean_min=$(grep "^clean_min=" "$CONFIG_DIR/le9ec.conf" | cut -d'=' -f2)
+    [ -n "$anon_min" ] && echo "$anon_min" > /proc/sys/vm/anon_min_kbytes 2>/dev/null
+    [ -n "$clean_low" ] && echo "$clean_low" > /proc/sys/vm/clean_low_kbytes 2>/dev/null
+    [ -n "$clean_min" ] && echo "$clean_min" > /proc/sys/vm/clean_min_kbytes 2>/dev/null
 }
 
 apply_io_config() {
@@ -341,7 +341,7 @@ apply_zram_config; sleep 2
 apply_swap_config; sleep 2
 apply_vm_config; sleep 1
 apply_kernel_features_config; sleep 1
-apply_le9uo_config; sleep 1
+apply_le9ec_config; sleep 1
 apply_io_config; sleep 1
 apply_cpu_governor_config; sleep 1
 apply_cpu_hotplug_config; sleep 1
