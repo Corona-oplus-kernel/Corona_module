@@ -38,6 +38,7 @@ class CoronaAddon {
             autoCleanEnabled: false
         };
         this.kernelFeatures = { lruGen: false, thp: false, ksm: false, compaction: false };
+        this.isCoronaKernel = false;
         this.cpuCores = [];
         this.cpuClusterInfo = { little: 0, mid: 0, big: 0, prime: 0 };
         this.cpuStats = {};
@@ -72,6 +73,7 @@ class CoronaAddon {
     $(id) { return this.dom[id] || (this.dom[id] = document.getElementById(id)); }
     async init() {
         await this.ensureConfigDir();
+        this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
         this.initTheme();
         this.bindAllEvents();
         const [,] = await Promise.all([
@@ -1178,7 +1180,7 @@ class CoronaAddon {
         if (battDesign && parseInt(battDesign) > 0) document.getElementById('battery-capacity').textContent = `${Math.round(parseInt(battDesign) / 1000)} mAh`;
     }
     async detectZramAlgorithms() {
-        if (this.kernelVersion.toLowerCase().includes('corona')) {
+        if (this.isCoronaKernel) {
             this.algorithms = ['lz4', 'lz4hc', 'lzo', 'lzo-rle', 'zstd', 'zstdn', 'deflate', 'lz4k', 'lz4kd'];
         } else {
             const algRaw = await this.exec('cat /sys/block/zram0/comp_algorithm 2>/dev/null');
@@ -1396,9 +1398,7 @@ class CoronaAddon {
         this.renderReadaheadOptions();
     }
     async applyIOSchedulerImmediate() {
-        const kernelVersion = await this.exec('uname -r');
-        const isCorona = kernelVersion.toLowerCase().includes('corona');
-        const schedCmd = isCorona ? `kernel:${this.state.ioScheduler}` : this.state.ioScheduler;
+        const schedCmd = this.isCoronaKernel ? `kernel:${this.state.ioScheduler}` : this.state.ioScheduler;
         await this.exec(`for f in /sys/block/*/queue/scheduler; do echo "${schedCmd}" > "$f" 2>/dev/null; done`);
         const config = `scheduler=${this.state.ioScheduler}\nreadahead=${this.state.readahead}`;
         await this.exec(`echo '${config}' > ${this.configDir}/io_scheduler.conf`);

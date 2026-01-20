@@ -2794,67 +2794,70 @@ body.theme-dark .confirm-dialog {
     flex: 1;
 }
 
-.module-intro-dialog {
+.module-intro-card {
     max-width: 340px;
     width: 90%;
-    text-align: center;
     background: rgba(255, 255, 255, 0.35);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 24px;
-    padding: 20px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-    transform: scale(0.9) translateY(20px);
+    border-radius: var(--radius-card);
+    padding: 14px 20px;
+    box-shadow: var(--glass-shadow);
+    transform: scale(0.95);
     opacity: 0;
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+    transition: transform 0.25s ease, opacity 0.2s ease;
 }
 #module-intro-overlay {
     align-items: center;
-    background: transparent;
-    transition: background 0.25s ease;
+    background: rgba(0, 0, 0, 0.2);
+    transition: background 0.2s ease;
 }
 #module-intro-overlay.show {
     background: rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
 }
-#module-intro-overlay.show .module-intro-dialog {
-    transform: scale(1) translateY(0);
+#module-intro-overlay.show .module-intro-card {
+    transform: scale(1);
     opacity: 1;
 }
-#module-intro-overlay.closing .module-intro-dialog {
-    transform: scale(0.9) translateY(20px);
+#module-intro-overlay.closing .module-intro-card {
+    transform: scale(0.95);
     opacity: 0;
-    transition: transform 0.2s cubic-bezier(0.4, 0, 1, 1), opacity 0.2s ease;
 }
-body.theme-dark #module-intro-overlay.show {
-    background: rgba(0, 0, 0, 0.5);
-}
-body.theme-dark .module-intro-dialog {
-    background: rgba(30, 30, 35, 0.45);
+body.theme-dark .module-intro-card {
+    background: rgba(30, 30, 35, 0.65);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
-.module-intro-body {
-    padding: 16px 12px;
+.module-intro-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
-.module-intro-body p {
+.module-intro-label {
+    font-size: 14px;
+    color: var(--text-sub);
+    font-weight: 500;
+}
+.module-intro-text {
     font-size: 13px;
+    font-weight: 500;
     color: var(--text-main);
     line-height: 1.7;
     white-space: pre-line;
-    text-align: left;
 }
-.module-intro-actions {
+.module-intro-close-row {
     display: flex;
-    gap: 12px;
-    padding: 0 16px 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
 }
-.module-intro-actions .action-btn {
-    flex: 1;
-    background: var(--primary);
+.module-intro-close-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: #fff;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
 }
 
 @keyframes infiniteSpin {

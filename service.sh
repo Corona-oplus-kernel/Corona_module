@@ -129,7 +129,7 @@ apply_io_config() {
     [ ! -f "$CONFIG_DIR/io_scheduler.conf" ] && return
     scheduler=$(grep "^scheduler=" "$CONFIG_DIR/io_scheduler.conf" | cut -d'=' -f2)
     readahead=$(grep "^readahead=" "$CONFIG_DIR/io_scheduler.conf" | cut -d'=' -f2)
-    uname -r | grep -qi "corona" && scheduler="kernel:$scheduler"
+    [ -f /proc/corona ] && [ "$(cat /proc/corona)" = "1" ] && scheduler="kernel:$scheduler"
     [ -n "$scheduler" ] && for f in /sys/block/*/queue/scheduler; do echo "$scheduler" > "$f" 2>/dev/null; done
     [ -n "$readahead" ] && for f in /sys/block/*/queue/read_ahead_kb; do echo "$readahead" > "$f" 2>/dev/null; done
 }
