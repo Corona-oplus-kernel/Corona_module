@@ -1,0 +1,63 @@
+#!/sbin/sh
+
+TMPDIR=/dev/tmp
+rm -rf $TMPDIR 2>/dev/null
+mkdir -p $TMPDIR
+
+ui_print() { echo "$1"; }
+
+require_new_magisk() {
+    ui_print "*******************************"
+    ui_print " Please install Magisk v20.4+! "
+    ui_print "*******************************"
+    exit 1
+}
+
+print_modname() {
+    ui_print "*******************************"
+    ui_print "   Corona附加模块"
+    ui_print "   By Frost_Bai"
+    ui_print "*******************************"
+}
+
+OUTFD=$2
+ZIPFILE=$3
+
+mount /data 2>/dev/null
+
+[ -f /data/adb/magisk/util_functions.sh ] || require_new_magisk
+. /data/adb/magisk/util_functions.sh
+[ $MAGISK_VER_CODE -lt 20400 ] && require_new_magisk
+
+setup_flashable
+mount_partitions
+api_level_arch_detect
+$BOOTMODE && boot_actions || recovery_actions
+
+unzip -o "$ZIPFILE" module.prop -d $TMPDIR >&2
+[ ! -f $TMPDIR/module.prop ] && abort "! Unable to extract zip file!"
+
+$BOOTMODE && MODDIRNAME=modules_update || MODDIRNAME=modules
+MODULEROOT=$NVBASE/$MODDIRNAME
+MODID=`grep_prop id $TMPDIR/module.prop`
+MODPATH=$MODULEROOT/$MODID
+
+rm -rf $MODPATH
+mkdir -p $MODPATH
+
+print_modname
+ui_print "- Extracting module files"
+unzip -o "$ZIPFILE" -x 'META-INF/*' -d $MODPATH >&2
+
+ui_print "- Setting permissions"
+set_perm_recursive $MODPATH 0 0 0755 0644
+set_perm $MODPATH/service.sh 0 0 0755
+
+mkdir -p $MODPATH/config
+
+cd /
+$BOOTMODE || recovery_cleanup
+rm -rf $TMPDIR
+
+ui_print "- 搞定😋"
+exit 0

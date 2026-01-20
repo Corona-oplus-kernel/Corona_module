@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Corona 控制台</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="floating-header" id="floating-header">
+        <span class="floating-header-title">Corona</span>
+    </div>
+    <div class="bg-decoration"></div>
+    <div class="container">
+        <div class="page active" id="page-home">
+            <div class="corona-title-container">
+                <h1 class="corona-title" id="corona-title">Corona</h1>
+            </div>
+            <div class="banner-image">
+                <img src="images/001.png" alt="Banner">
+            </div>
+            <div class="card-row">
+                <div class="card-col-left">
+                    <div class="card card-device">
+                        <div class="card-title">设备型号</div>
+                        <div class="card-content">
+                            <div class="device-brand" id="device-brand">--</div>
+                            <div class="device-model" id="device-model">--</div>
+                        </div>
+                        <div class="device-image" id="device-image-container">
+                            <img src="images/002.png" alt="Device" id="device-image">
+                        </div>
+                    </div>
+                </div>
+                <div class="card-col-right">
+                    <div class="card card-small card-clickable" id="cpu-card">
+                        <div class="card-title">处理器 ><span class="cpu-brand-badge hidden" id="cpu-brand-badge"></span></div>
+                        <div class="cpu-info-line">
+                            <span class="info-primary" id="cpu-info">--</span>
+                            <span class="info-secondary" id="cpu-cluster-info">--</span>
+                        </div>
+                    </div>
+                    <div class="card card-small card-clickable" id="mem-card">
+                        <div class="card-title">运行内存 ></div>
+                        <div class="info-primary" id="mem-total">--</div>
+                        <div class="info-secondary"><span id="mem-used">--</span> / <span id="mem-available">--</span></div>
+                        <div class="progress-bar-mini">
+                            <div class="progress-fill" id="mem-progress" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card card-clickable" id="swap-card">
+                <div class="card-title">交换分区 / ZRAM ></div>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">总容量</span>
+                        <span class="info-value" id="swap-total">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">已用 / 空闲</span>
+                        <span class="info-value"><span id="swap-used">--</span> / <span id="swap-free">--</span></span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill swap" id="swap-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card card-clickable" id="storage-card">
+                <div class="card-title">储存空间 ></div>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">总容量</span>
+                        <span class="info-value" id="storage-total">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">已用空间</span>
+                        <span class="info-value" id="storage-used">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">可用空间</span>
+                        <span class="info-value" id="storage-available">--</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="storage-progress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card card-clickable" id="battery-card">
+                <div class="card-title">电池与温度 ><span class="refresh-indicator"></span></div>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">电池电量</span>
+                        <span class="info-value" id="battery-level">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">电池容量</span>
+                        <span class="info-value" id="battery-capacity">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">电池温度</span>
+                        <span class="info-value" id="battery-temp">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">CPU 温度</span>
+                        <span class="info-value" id="cpu-temp">--</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card" id="system-info-card">
+                <div class="card-title">系统信息</div>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">系统版本</span>
+                        <span class="info-value" id="system-version">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">内核版本</span>
+                        <span class="info-value" id="kernel-version">--</span>
+                    </div>
+                </div>
+                <div class="chart-section">
+                    <div class="chart-header">
+                        <span class="chart-title">实时监控</span>
+                        <span class="chart-toggle-btns">
+                            <span class="chart-btn active" data-type="cpu">CPU</span>
+                            <span class="chart-btn" data-type="mem">内存</span>
+                            <span class="chart-btn" data-type="temp">温度</span>
+                        </span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="history-chart" width="400" height="150"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="card card-author" id="author-card">
+                <div class="author-row">
+                    <span class="author-label">模块作者</span>
+                    <span class="author-name">Frost_Bai</span>
+                </div>
+            </div>
+        </div>
+        <div class="page" id="page-settings">
+            <div class="corona-title-container">
+                <h1 class="corona-title" id="corona-title-settings">Corona</h1>
+            </div>
+            <div class="module-card" id="memory-compression-card" data-card-key="memory-compression">
+                <div class="module-card-header">
+                    <div class="module-card-info">
+                        <div class="module-card-title" data-module="memory-compression">内存压缩</div>
+                        <div class="module-card-desc">ZRAM / Swap / LRU / VM参数</div>
+                        <span class="module-card-badge" id="memory-compression-badge">--</span>
+                    </div>
+                    <div class="module-card-actions">
+                        <div class="module-card-expand" id="memory-compression-toggle">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="memory-compression-content" class="module-card-content hidden">
+                    <div class="sub-card" id="zram-sub">
+                        <div class="sub-card-header" id="zram-toggle">
+                            <span class="sub-card-title">ZRAM 管理</span>
+                            <span class="current-badge" id="zram-status">--</span>
+                            <span class="expand-icon">❯</span>
+                        </div>
+                        <div id="zram-content" class="sub-expandable-content">
+                            <div class="info-row">
+                                <div class="info-item">
+                                    <span class="info-label">当前算法</span>
+                                    <span class="info-value" id="zram-current-alg">--</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">当前大小</span>
+                                    <span class="info-value" id="zram-current-size">--</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Swappiness</span>
+                                    <span class="info-value" id="zram-current-swappiness">--</span>
+                                </div>
+                            </div>
+                            <div class="info-row info-row-single">
+                                <div class="info-item info-item-full">
+                                    <span class="info-label">设备路径</span>
+                                    <span class="info-value" id="zram-current-path">/dev/block/zram0</span>
+                                </div>
+                            </div>
+                            <div class="switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">启用 ZRAM</span>
+                                    <span class="switch-desc">压缩内存块，扩展可用RAM</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="zram-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div id="zram-settings" class="sub-settings hidden">
+                                <div class="setting-section">
+                                    <span class="section-label">压缩算法</span>
+                                    <div class="option-grid" id="algorithm-list"></div>
+                                </div>
+                                <div class="setting-section">
+                                    <span class="section-label">ZRAM 大小</span>
+                                    <div class="slider-container">
+                                        <input type="range" class="range-slider" id="zram-size-slider" min="0" max="24" step="0.25" value="8">
+                                        <div class="slider-labels">
+                                            <span>0GB</span>
+                                            <span class="slider-value" id="zram-size-value">8.00 GB</span>
+                                            <span>24GB</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="setting-section">
+                                    <span class="section-label">Swappiness</span>
+                                    <div class="slider-container">
+                                        <input type="range" class="range-slider" id="swappiness-slider" min="0" max="200" step="1" value="100">
+                                        <div class="slider-labels">
+                                            <span>0</span>
+                                            <span class="slider-value" id="swappiness-value">100</span>
+                                            <span>200</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="setting-section">
+                                    <span class="section-label">ZRAM 回写</span>
+                                    <div class="option-grid" id="zram-writeback-list">
+                                        <div class="option-item selected" data-value="default">默认</div>
+                                        <div class="option-item" data-value="true">启用</div>
+                                        <div class="option-item" data-value="false">禁用</div>
+                                    </div>
+                                </div>
+                                <div class="setting-section">
+                                    <span class="section-label">ZRAM 设备路径</span>
+                                    <div class="zram-path-container">
+                                        <input type="text" class="text-input" id="zram-path-input" placeholder="/dev/block/zram0" value="/dev/block/zram0">
+                                        <div class="zram-path-buttons">
+                                            <button class="btn-small" id="zram-path-detect">检测</button>
+                                            <button class="btn-small btn-primary" id="zram-path-save">保存</button>
+                                        </div>
+                                    </div>
+                                    <span class="setting-hint">自定义 ZRAM 设备路径，适用于多 ZRAM 设备或非标准路径</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sub-card" id="swap-sub">
+                        <div class="sub-card-header" id="swap-toggle">
+                            <span class="sub-card-title">Swap 文件</span>
+                            <span class="current-badge" id="swap-status">未启用</span>
+                            <span class="expand-icon">❯</span>
+                        </div>
+                        <div id="swap-content" class="sub-expandable-content">
+                            <div class="info-row">
+                                <div class="info-item">
+                                    <span class="info-label">当前状态</span>
+                                    <span class="info-value" id="swap-current-status">--</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">当前大小</span>
+                                    <span class="info-value" id="swap-current-size">--</span>
+                                </div>
+                            </div>
+                            <div class="switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">启用 Swap</span>
+                                    <span class="switch-desc">使用文件作为交换空间</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="swap-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div id="swap-settings" class="sub-settings hidden">
+                                <div class="setting-section">
+                                    <span class="section-label">Swap 大小</span>
+                                    <div class="slider-container">
+                                        <input type="range" class="range-slider" id="swap-size-slider" min="512" max="16384" step="512" value="2048">
+                                        <div class="slider-labels">
+                                            <span>512MB</span>
+                                            <span class="slider-value" id="swap-size-value">2048 MB</span>
+                                            <span>16GB</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="setting-section">
+                                    <span class="section-label">Swap 优先级</span>
+                                    <div class="option-grid" id="swap-priority-list">
+                                        <div class="option-item" data-value="-2">低 (-2)</div>
+                                        <div class="option-item selected" data-value="0">默认 (0)</div>
+                                        <div class="option-item" data-value="5">高 (5)</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sub-card" id="lru-sub">
+                        <div class="sub-card-header" id="lru-toggle">
+                            <span class="sub-card-title">LRU 相关</span>
+                            <span class="current-badge" id="lru-status">--</span>
+                            <span class="expand-icon">❯</span>
+                        </div>
+                        <div id="lru-content" class="sub-expandable-content">
+                            <div class="lru-switch" id="lru-gen-container" style="display:none;">
+                                <div class="switch-info">
+                                    <span class="switch-label">多代 LRU (MGLRU)</span>
+                                    <span class="switch-desc">改进的页面回收算法，提升性能</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="lru-gen-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="lru-setting" id="thp-container" style="display:none;">
+                                <span class="section-label">透明大页 (THP)</span>
+                                <span class="section-desc">自动使用大页面提升内存访问效率</span>
+                                <div class="option-grid" id="thp-list">
+                                    <div class="option-item" data-value="always">始终</div>
+                                    <div class="option-item" data-value="madvise">按需</div>
+                                    <div class="option-item selected" data-value="never">禁用</div>
+                                </div>
+                            </div>
+                            <div class="lru-switch" id="ksm-container" style="display:none;">
+                                <div class="switch-info">
+                                    <span class="switch-label">内存页合并 (KSM)</span>
+                                    <span class="switch-desc">合并相同内存页节省内存</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="ksm-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="lru-switch" id="compaction-container" style="display:none;">
+                                <div class="switch-info">
+                                    <span class="switch-label">主动内存压缩</span>
+                                    <span class="switch-desc">后台压缩内存碎片</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="compaction-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="kernel-features-empty" id="kernel-features-empty">
+                                <span>未检测到可配置的 LRU 特性</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sub-card" id="vm-sub">
+                        <div class="sub-card-header" id="vm-toggle">
+                            <span class="sub-card-title">虚拟内存参数</span>
+                            <span class="current-badge" id="vm-status">默认</span>
+                            <span class="expand-icon">❯</span>
+                        </div>
+                        <div id="vm-content" class="sub-expandable-content">
+                            <div class="setting-section">
+                                <span class="section-label">内存回收水位线 (watermark_scale_factor)</span>
+                                <div class="slider-container">
+                                    <input type="range" class="range-slider" id="watermark-slider" min="1" max="1000" step="1" value="100">
+                                    <div class="slider-labels">
+                                        <span>1</span>
+                                        <span class="slider-value" id="watermark-value">100</span>
+                                        <span>1000</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="setting-section">
+                                <span class="section-label">额外空闲内存 (extra_free_kbytes)</span>
+                                <div class="slider-container">
+                                    <input type="range" class="range-slider" id="extra-free-slider" min="0" max="262144" step="4096" value="0">
+                                    <div class="slider-labels">
+                                        <span>0</span>
+                                        <span class="slider-value" id="extra-free-value">0 KB</span>
+                                        <span>256MB</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="setting-section">
+                                <span class="section-label">脏页比例 (dirty_ratio)</span>
+                                <div class="slider-container">
+                                    <input type="range" class="range-slider" id="dirty-ratio-slider" min="5" max="90" step="1" value="20">
+                                    <div class="slider-labels">
+                                        <span>5%</span>
+                                        <span class="slider-value" id="dirty-ratio-value">20%</span>
+                                        <span>90%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="setting-section">
+                                <span class="section-label">后台脏页比例 (dirty_background_ratio)</span>
+                                <div class="slider-container">
+                                    <input type="range" class="range-slider" id="dirty-bg-slider" min="1" max="50" step="1" value="10">
+                                    <div class="slider-labels">
+                                        <span>1%</span>
+                                        <span class="slider-value" id="dirty-bg-value">10%</span>
+                                        <span>50%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="setting-section">
+                                <span class="section-label">VFS缓存压力 (vfs_cache_pressure)</span>
+                                <div class="slider-container">
+                                    <input type="range" class="range-slider" id="vfs-pressure-slider" min="0" max="500" step="10" value="100">
+                                    <div class="slider-labels">
+                                        <span>0</span>
+                                        <span class="slider-value" id="vfs-pressure-value">100</span>
+                                        <span>500</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="module-card" id="le9ec-card" data-card-key="le9ec">
+                <div class="module-card-header">
+                    <div class="module-card-info">
+                        <div class="module-card-title" data-module="le9ec">LE9EC 内存保护</div>
+                        <div class="module-card-desc">防止工作集被过度回收</div>
+                        <span class="module-card-badge" id="le9ec-badge">--</span>
+                    </div>
+                    <div class="module-card-actions">
+                        <div class="module-card-expand" id="le9ec-toggle">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="le9ec-content" class="module-card-content hidden">
+                    <div class="info-item">
+                        <span class="info-label">匿名页保护</span>
+                        <span class="info-value" id="le9ec-anon-current">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">文件页软保护</span>
+                        <span class="info-value" id="le9ec-clean-low-current">--</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">文件页硬保护</span>
+                        <span class="info-value" id="le9ec-clean-min-current">--</span>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">启用 LE9EC</span>
+                            <span class="switch-desc">保护工作集，防止内存抖动</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="le9ec-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div id="le9ec-settings" class="sub-settings hidden">
+                        <div class="setting-section">
+                            <span class="section-label">vm.anon_min_kbytes (匿名页硬保护)</span>
+                            <span class="section-desc">防止匿名页过度换出到ZRAM</span>
+                            <div class="slider-container">
+                                <input type="range" class="range-slider" id="le9ec-anon-slider" min="0" max="4096" step="64" value="512">
+                                <div class="slider-labels">
+                                    <span>0 MB</span>
+                                    <span class="slider-value" id="le9ec-anon-value">512 MB</span>
+                                    <span>4096 MB</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="setting-section">
+                            <span class="section-label">vm.clean_low_kbytes (文件页软保护)</span>
+                            <span class="section-desc">除非OOM否则不回收低于此值的干净文件页</span>
+                            <div class="slider-container">
+                                <input type="range" class="range-slider" id="le9ec-clean-low-slider" min="0" max="4096" step="64" value="0">
+                                <div class="slider-labels">
+                                    <span>0 MB</span>
+                                    <span class="slider-value" id="le9ec-clean-low-value">0 MB</span>
+                                    <span>4096 MB</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="setting-section">
+                            <span class="section-label">vm.clean_min_kbytes (文件页硬保护)</span>
+                            <span class="section-desc">绝不回收低于此值的干净文件页</span>
+                            <div class="slider-container">
+                                <input type="range" class="range-slider" id="le9ec-clean-min-slider" min="0" max="4096" step="64" value="512">
+                                <div class="slider-labels">
+                                    <span>0 MB</span>
+                                    <span class="slider-value" id="le9ec-clean-min-value">512 MB</span>
+                                    <span>4096 MB</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="module-card" id="io-scheduler-card" data-card-key="io-scheduler">
+                <div class="module-card-header">
+                    <div class="module-card-info">
+                        <div class="module-card-title" data-module="io-scheduler">IO 调度器</div>
+                        <div class="module-card-desc">磁盘读写调度与预读取</div>
+                        <span class="module-card-badge" id="io-current">--</span>
+                    </div>
+                    <div class="module-card-actions">
+                        <div class="module-card-expand" id="io-scheduler-toggle">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="io-scheduler-content" class="module-card-content hidden">
+                    <div class="option-list" id="io-scheduler-list"></div>
+                    <div class="setting-section">
+                        <span class="section-label">预读取大小 (KB)</span>
+                        <div class="option-grid cols-4" id="readahead-list"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="module-card" id="cpu-governor-card" data-card-key="cpu-governor">
+                <div class="module-card-header">
+                    <div class="module-card-info">
+                        <div class="module-card-title" data-module="cpu-governor">CPU 调频器</div>
+                        <div class="module-card-desc">调频器 / 核心管理 / 频率锁定</div>
+                        <span class="module-card-badge" id="cpu-gov-current">--</span>
+                    </div>
+                    <div class="module-card-actions">
+                        <div class="module-card-expand" id="cpu-governor-toggle">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="cpu-governor-content" class="module-card-content hidden">
+                    <div class="option-list" id="cpu-governor-list"></div>
+                    <div class="setting-section">
+                        <div class="section-header">
+                            <span class="section-label">核心管理 (点击切换)</span>
+                            <span class="cpu-cluster-badge" id="cpu-cluster-badge">--</span>
+                        </div>
+                        <div class="cpu-grid" id="cpu-cores-list"></div>
+                    </div>
+                    <div class="setting-section freq-lock-section">
+                        <div class="section-header-row">
+                            <span class="section-label">频率锁定</span>
+                            <span class="current-badge" id="freq-lock-status">关闭</span>
+                        </div>
+                        <div class="freq-mode-options" id="freq-mode-options">
+                            <div class="freq-mode-option selected" data-mode="off">
+                                <span class="freq-mode-name">关闭</span>
+                            </div>
+                            <div class="freq-mode-option" data-mode="global">
+                                <span class="freq-mode-name">全局锁定</span>
+                            </div>
+                            <div class="freq-mode-option" data-mode="per-core">
+                                <span class="freq-mode-name">单独设置</span>
+                            </div>
+                        </div>
+                        <div id="freq-global-settings" class="sub-settings hidden">
+                            <div class="setting-section">
+                                <span class="section-label">最小频率</span>
+                                <select class="freq-select" id="global-min-freq"></select>
+                            </div>
+                            <div class="setting-section">
+                                <span class="section-label">最大频率</span>
+                                <select class="freq-select" id="global-max-freq"></select>
+                            </div>
+                        </div>
+                        <div id="freq-per-core-settings" class="sub-settings hidden">
+                            <div id="per-core-freq-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="module-card" id="process-priority-card" data-card-key="process-priority">
+                <div class="module-card-header">
+                    <div class="module-card-info">
+                        <div class="module-card-title" data-module="process-priority">进程优先级</div>
+                        <div class="module-card-desc">设置进程nice值和I/O优先级</div>
+                        <span class="module-card-badge" id="priority-count">0 条</span>
+                    </div>
+                    <div class="module-card-actions">
+                        <div class="module-card-expand" id="process-priority-toggle">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="process-priority-content" class="module-card-content hidden">
+                    <div class="priority-desc">为进程设置 nice 值和 I/O 优先级</div>
+                    <div class="priority-rules-container" id="priority-rules-list">
+                        <div class="priority-empty">暂无优先级规则</div>
+                    </div>
+                    <button class="action-btn priority-add-btn" id="priority-add-btn"><span class="add-icon">+</span> 添加进程规则</button>
+                </div>
+            </div>
+            <div class="module-card" id="tcp-card" data-card-key="tcp">
+                <div class="module-card-header">
+                    <div class="module-card-info">
+                        <div class="module-card-title" data-module="tcp">TCP 拥塞算法</div>
+                        <div class="module-card-desc">网络传输拥塞控制</div>
+                        <span class="module-card-badge" id="tcp-current">--</span>
+                    </div>
+                    <div class="module-card-actions">
+                        <div class="module-card-expand" id="tcp-toggle">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="tcp-content" class="module-card-content hidden">
+                    <div class="option-list" id="tcp-list"></div>
+                </div>
+            </div>
+            <div class="module-card" id="custom-scripts-card" data-card-key="custom-scripts">
+                <div class="module-card-header">
+                    <div class="module-card-info">
+                        <div class="module-card-title" data-module="custom-scripts">自定义脚本</div>
+                        <div class="module-card-desc">开机自动执行的Shell脚本</div>
+                        <span class="module-card-badge" id="scripts-count">0 个</span>
+                    </div>
+                    <div class="module-card-actions">
+                        <div class="module-card-expand" id="custom-scripts-toggle">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="custom-scripts-content" class="module-card-content hidden">
+                    <div class="scripts-desc">添加自定义Shell脚本，开机时自动执行</div>
+                    <div class="scripts-list-container" id="scripts-list">
+                        <div class="scripts-empty">暂无自定义脚本</div>
+                    </div>
+                    <button class="action-btn scripts-add-btn" id="scripts-add-btn"><span class="add-icon">+</span> 添加脚本</button>
+                </div>
+            </div>
+            <div class="module-card" id="system-opt-card" data-card-key="system-opt">
+                <div class="module-card-header">
+                    <div class="module-card-info">
+                        <div class="module-card-title" data-module="system-opt">系统优化</div>
+                        <div class="module-card-desc">LMK / 回收控制 / 进程保护</div>
+                        <span class="module-card-badge" id="system-opt-badge">--</span>
+                    </div>
+                    <div class="module-card-actions">
+                        <div class="module-card-expand" id="system-opt-toggle">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="system-opt-content" class="module-card-content hidden">
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">LMK 优化</span>
+                            <span class="switch-desc">根据内存大小自动配置 minfree_levels</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="lmk-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">解锁后台限制</span>
+                            <span class="switch-desc">max_cached_processes 设为 32768</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="device-config-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">禁用激进回收</span>
+                            <span class="switch-desc">禁用 DAMON/process_reclaim/mi_reclaim</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="reclaim-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">kswapd 优化</span>
+                            <span class="switch-desc">将 kswapd 放入前台 cpuset</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="kswapd-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">关键进程保护</span>
+                            <span class="switch-desc">保护 SystemUI/Launcher 等进程</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="protect-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">开机 fstrim</span>
+                            <span class="switch-desc">开机时自动执行 fstrim</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="fstrim-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="module-card" id="app-settings-card" data-card-key="app-settings">
+                <div class="module-card-header">
+                    <div class="module-card-info">
+                        <div class="module-card-title" data-module="module-settings">模块设置</div>
+                    </div>
+                    <div class="module-card-actions">
+                        <div class="module-card-expand" id="app-settings-toggle">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="app-settings-content" class="module-card-content hidden">
+                    <div class="theme-options" id="theme-options">
+                        <div class="theme-option selected" data-theme="auto">
+                            <div class="theme-preview auto-preview"></div>
+                            <span>跟随系统</span>
+                        </div>
+                        <div class="theme-option" data-theme="light">
+                            <div class="theme-preview light-preview"></div>
+                            <span>浅色模式</span>
+                        </div>
+                        <div class="theme-option" data-theme="dark">
+                            <div class="theme-preview dark-preview"></div>
+                            <span>深色模式</span>
+                        </div>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">自动清理缓存</span>
+                            <span class="switch-desc">每小时自动清理系统缓存</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="auto-clean-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="last-clean-container" id="last-clean-container">
+                        <span class="last-clean-label">上次清理:</span>
+                        <span class="last-clean-time" id="last-clean-time">--</span>
+                    </div>
+                    <div class="card-visibility-section">
+                        <div class="card-visibility-header" id="card-visibility-toggle">
+                            <span class="card-visibility-title">显示的配置卡片</span>
+                            <span class="expand-icon">❯</span>
+                        </div>
+                        <div class="card-visibility-list" id="card-visibility-list">
+                            <div class="card-visibility-item" data-card="memory-compression">
+                                <span class="card-visibility-name">内存压缩</span>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="memory-compression" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="card-visibility-item" data-card="le9ec">
+                                <span class="card-visibility-name">LE9EC 内存保护</span>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="le9ec" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="card-visibility-item" data-card="io-scheduler">
+                                <span class="card-visibility-name">IO 调度器</span>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="io-scheduler" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="card-visibility-item" data-card="cpu-governor">
+                                <span class="card-visibility-name">CPU 调频器</span>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="cpu-governor" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="card-visibility-item" data-card="process-priority">
+                                <span class="card-visibility-name">进程优先级</span>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="process-priority" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="card-visibility-item" data-card="tcp">
+                                <span class="card-visibility-name">TCP 拥塞算法</span>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="tcp" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="card-visibility-item" data-card="custom-scripts">
+                                <span class="card-visibility-name">自定义脚本</span>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="custom-scripts" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="card-visibility-item" data-card="system-opt">
+                                <span class="card-visibility-name">系统优化</span>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="system-opt" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="setting-section danger-section">
+                        <span class="section-label">危险操作</span>
+                        <div class="action-desc">清除所有配置并重启设备</div>
+                        <button class="action-btn action-btn-danger" id="reset-all-btn">一键重置</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="tab-bar-container">
+            <nav class="tab-bar">
+                <div class="tab-slider" id="tab-slider"></div>
+                <div class="tab-item active" data-page="home">
+                    <span class="tab-label">主页</span>
+                </div>
+                <div class="tab-item" data-page="settings">
+                    <span class="tab-label">配置</span>
+                </div>
+            </nav>
+        </div>
+    <div class="toast" id="toast"></div>
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <span class="loading-text">处理中...</span>
+    </div>
+    <div class="easter-egg-overlay" id="easter-egg-overlay">
+        <div class="easter-egg-card" id="easter-egg-card">
+            <div class="easter-egg-content" id="easter-egg-content">
+                <div class="rainbow-text">感谢使用<span class="corona-c-rainbow">C</span>orona模块</div>
+                <div class="rainbow-text ciallo">Ciallo~(∠・ω< )⌒★</div>
+            </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden no-close-btn" id="battery-detail-overlay">
+        <div class="detail-card">
+            <div class="detail-header">
+                <span class="detail-title">电池详情</span>
+            </div>
+            <div class="detail-content" id="battery-detail-content"></div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden no-close-btn" id="ufs-detail-overlay">
+        <div class="detail-card">
+            <div class="detail-header">
+                <span class="detail-title">UFS 寿命</span>
+            </div>
+            <div class="detail-content" id="ufs-detail-content"></div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden no-close-btn" id="storage-detail-overlay">
+        <div class="detail-card">
+            <div class="detail-header">
+                <span class="detail-title">储存管理</span>
+            </div>
+            <div class="detail-content" id="storage-detail-content">
+                <div class="action-section">
+                    <div class="action-title">垃圾回收 (GC)</div>
+                    <div class="action-desc">执行F2FS文件系统垃圾回收</div>
+                    <button class="action-btn" id="gc-btn">执行 GC</button>
+                </div>
+                <div class="action-section" id="memclean-section">
+                    <div class="action-title">内存清理</div>
+                    <div class="action-desc">释放系统缓存与后台进程内存</div>
+                    <div class="memclean-options" id="memclean-options">
+                        <div class="memclean-option" data-mode="drop-caches">
+                            <div class="memclean-name">清理缓存</div>
+                            <div class="memclean-desc">释放页面缓存</div>
+                        </div>
+                        <div class="memclean-option" data-mode="drop-all">
+                            <div class="memclean-name">深度清理</div>
+                            <div class="memclean-desc">释放所有可回收内存</div>
+                        </div>
+                        <div class="memclean-option" data-mode="compact">
+                            <div class="memclean-name">内存整理</div>
+                            <div class="memclean-desc">压缩内存碎片</div>
+                        </div>
+                        <div class="memclean-option" data-mode="kill-bg">
+                            <div class="memclean-name">清理后台</div>
+                            <div class="memclean-desc">终止后台应用</div>
+                        </div>
+                        <div class="memclean-option" data-mode="full-clean">
+                            <div class="memclean-name">完全清理</div>
+                            <div class="memclean-desc">执行所有清理操作</div>
+                        </div>
+                    </div>
+                    <div class="memclean-progress-container hidden" id="memclean-progress">
+                        <div class="memclean-progress-header">
+                            <span class="memclean-progress-title">清理进度</span>
+                            <span class="memclean-progress-percent" id="memclean-percent">0%</span>
+                        </div>
+                        <div class="memclean-progress-bar">
+                            <div class="memclean-progress-fill" id="memclean-fill" style="width: 0%"></div>
+                        </div>
+                        <div class="memclean-progress-status" id="memclean-status">准备中...</div>
+                    </div>
+                    <div class="memclean-result hidden" id="memclean-result">
+                        <div class="memclean-result-title">清理结果</div>
+                        <div class="memclean-result-content" id="memclean-result-content"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden no-close-btn" id="xinran-overlay">
+        <div class="detail-card xinran-card">
+            <img src="images/003.png" alt="Xinran" class="xinran-image">
+        </div>
+    </div>
+    <div class="detail-overlay hidden no-close-btn" id="priority-process-overlay">
+        <div class="detail-card priority-process-card">
+            <div class="detail-header">
+                <span class="detail-title">选择进程</span>
+            </div>
+            <div class="priority-search-container">
+                <input type="text" class="priority-search" id="priority-process-search" placeholder="搜索进程...">
+            </div>
+            <div class="priority-process-list" id="priority-process-list">
+                <div class="priority-loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden no-close-btn" id="priority-setting-overlay">
+        <div class="detail-card priority-setting-card">
+            <div class="detail-header">
+                <span class="detail-title">设置优先级</span>
+            </div>
+            <div class="priority-process-info" id="priority-selected-process">
+                <span class="process-name">--</span>
+            </div>
+            <div class="priority-setting-section">
+                <div class="priority-setting-label">CPU 优先级 (nice)</div>
+                <div class="priority-nice-slider-container">
+                    <input type="range" class="range-slider priority-nice-slider" id="nice-slider" min="-20" max="19" step="1" value="0">
+                    <div class="slider-labels">
+                        <span>-20 (最高)</span>
+                        <span class="slider-value" id="nice-slider-value">0</span>
+                        <span>19 (最低)</span>
+                    </div>
+                </div>
+                <div class="priority-setting-hint">nice 值越低优先级越高 (-20 到 19)</div>
+            </div>
+            <div class="priority-setting-section">
+                <div class="priority-setting-label">I/O 优先级</div>
+                <div class="priority-io-options" id="io-options">
+                    <div class="io-option" data-class="1" data-level="0">
+                        <div class="io-class">实时</div>
+                        <div class="io-desc">最高优先级</div>
+                    </div>
+                    <div class="io-option selected" data-class="2" data-level="4">
+                        <div class="io-class">尽力</div>
+                        <div class="io-desc">默认优先级</div>
+                    </div>
+                    <div class="io-option" data-class="3" data-level="7">
+                        <div class="io-class">空闲</div>
+                        <div class="io-desc">后台任务</div>
+                    </div>
+                </div>
+                <div class="priority-setting-hint">I/O调度类别：实时 > 尽力 > 空闲</div>
+            </div>
+            <div class="priority-actions">
+                <button class="action-btn priority-cancel-btn" id="priority-cancel-btn">取消</button>
+                <button class="action-btn priority-save-btn" id="priority-save-btn">保存规则</button>
+            </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden" id="confirm-dialog-overlay">
+        <div class="detail-content confirm-dialog">
+            <div class="detail-header">
+                <span id="confirm-dialog-title">确认</span>
+            </div>
+            <div class="confirm-dialog-body">
+                <p id="confirm-dialog-message"></p>
+            </div>
+            <div class="confirm-dialog-actions">
+                <button class="action-btn" id="confirm-dialog-cancel">取消</button>
+                <button class="action-btn action-btn-danger" id="confirm-dialog-ok">确定</button>
+            </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden no-close-btn" id="script-edit-overlay">
+        <div class="detail-card script-edit-card">
+            <div class="detail-header">
+                <span class="detail-title" id="script-edit-title">添加脚本</span>
+            </div>
+            <div class="script-edit-content">
+                <div class="script-edit-section">
+                    <span class="script-edit-label">脚本名称</span>
+                    <input type="text" class="script-name-input" id="script-name-input" placeholder="例如: 性能优化">
+                </div>
+                <div class="script-edit-section">
+                    <span class="script-edit-label">分类标签</span>
+                    <div class="script-tags" id="script-tags">
+                        <div class="script-tag selected" data-tag="性能">性能</div>
+                        <div class="script-tag" data-tag="省电">省电</div>
+                        <div class="script-tag" data-tag="网络">网络</div>
+                        <div class="script-tag" data-tag="内存">内存</div>
+                        <div class="script-tag" data-tag="其他">其他</div>
+                    </div>
+                </div>
+                <div class="script-edit-section">
+                    <span class="script-edit-label">脚本内容</span>
+                    <textarea class="script-code-input" id="script-code-input" placeholder="#!/system/bin/sh&#10;# 在此输入Shell脚本代码&#10;echo 'Hello Corona'"></textarea>
+                </div>
+                <div class="script-edit-section">
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">启用此脚本</span>
+                            <span class="switch-desc">关闭后开机不会执行</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="script-enabled-switch" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div class="script-edit-actions">
+                    <button class="action-btn" id="script-cancel-btn">取消</button>
+                    <button class="action-btn script-save-btn" id="script-save-btn">保存脚本</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden" id="module-intro-overlay">
+        <div class="detail-content module-intro-card">
+            <div class="module-intro-row">
+                <span class="module-intro-label" id="module-intro-title">功能介绍</span>
+                <span class="module-intro-text" id="module-intro-content"></span>
+            </div>
+            <div class="module-intro-close-row">
+                <button class="action-btn module-intro-close-btn" id="module-intro-close">了解了</button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
