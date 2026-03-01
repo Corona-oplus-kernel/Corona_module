@@ -1,6 +1,6 @@
 id=Corona
 name=Corona
-version=v3.5.1
-versionCode=3510
+version=v3.6.1
+versionCode=3610
 author=Frost_Bai
-description=等待首次设置……
+description=做为内核附加，可进行部分简单的参数设置

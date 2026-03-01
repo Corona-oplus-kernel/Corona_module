@@ -1,24 +1,21 @@
 #!/system/bin/sh
 MODDIR=${0%/*}
 CONFIG_DIR="$MODDIR/config"
+RUNTIME_CONF="$CONFIG_DIR/runtime.conf"
 
 set_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/dev/null; }
 lock_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/dev/null && chmod 444 "$2" 2>/dev/null; }
+get_conf_value() { [ -f "$1" ] && grep -m1 "^$2=" "$1" | cut -d'=' -f2-; }
 
 wait_until_boot_complete() { until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 5; done; }
 wait_until_login() { until [ -d "/data/data/android" ]; do sleep 5; done; }
-
-load_kernel_modules() {
-    [ -f "$MODDIR/zksmalloc.ko" ] && insmod "$MODDIR/zksmalloc.ko" 2>/dev/null
-    [ -f "$MODDIR/zakom.ko" ] && insmod "$MODDIR/zakom.ko" 2>/dev/null
-}
 
 get_system_info() {
     mem_total_str=$(cat /proc/meminfo | grep MemTotal)
     mem_total_kb=${mem_total_str:16:8}
     sdk_version=$(getprop ro.build.version.sdk)
     kernel_version=$(uname -r | cut -d'-' -f1)
-    kernel_version1=$(echo $kernel_version | cut -d'.' -f1)
+    kernel_version1=$(echo "$kernel_version" | cut -d'.' -f1)
     is_oplus=0; find /proc -maxdepth 1 -name "oplus*" 2>/dev/null | grep -q . && is_oplus=1
     is_xiaomi=0; [ "$(getprop ro.miui.ui.version.name)" != "" ] && is_xiaomi=1
 }
@@ -70,7 +67,9 @@ apply_swap_config() {
     enabled=$(grep "^enabled=" "$CONFIG_DIR/swap.conf" | cut -d'=' -f2)
     size=$(grep "^size=" "$CONFIG_DIR/swap.conf" | cut -d'=' -f2)
     priority=$(grep "^priority=" "$CONFIG_DIR/swap.conf" | cut -d'=' -f2)
-    swapfile="/data/swapfile"
+    swapfile=$(get_conf_value "$CONFIG_DIR/swap.conf" "path")
+    [ -z "$swapfile" ] && swapfile=$(get_conf_value "$RUNTIME_CONF" "swapfile_path")
+    [ -z "$swapfile" ] && swapfile="$MODDIR/swapfile.img"
     if [ "$enabled" = "1" ] && [ -n "$size" ]; then
         [ -f "$swapfile" ] && {
             current_size=$(($(stat -c %s "$swapfile" 2>/dev/null || echo 0) / 1024 / 1024))
@@ -163,7 +162,9 @@ cpu_mask_to_hex() {
             start=$(echo "$part" | cut -d'-' -f1); end=$(echo "$part" | cut -d'-' -f2); i=$start
             while [ "$i" -le "$end" ]; do result=$((result | (1 << i))); i=$((i + 1)); done
         else result=$((result | (1 << part))); fi
-    done; unset IFS; printf "0x%x" "$result"
+    done
+    unset IFS
+    printf "0x%x" "$result"
 }
 
 apply_cpu_affinity_config() {
@@ -215,7 +216,7 @@ apply_freq_lock_config() {
 }
 
 apply_user_scripts() {
-    [ -f "$CONFIG_DIR/user_scripts.sh" ] && chmod 755 "$CONFIG_DIR/user_scripts.sh" && sh "$CONFIG_DIR/user_scripts.sh" 2>/dev/null &
+    [ -f "$CONFIG_DIR/user_scripts.sh" ] && chmod 755 "$CONFIG_DIR/user_scripts.sh" && sh "$CONFIG_DIR/user_scripts.sh" 2>/dev/null
 }
 
 apply_lmk_config() {
@@ -320,18 +321,7 @@ apply_fstrim_config() {
     [ -f "$busybox" ] && { sm fstrim 2>/dev/null; $busybox fstrim /data 2>/dev/null; }
 }
 
-start_auto_clean() {
-    while true; do
-        sleep 3600
-        [ -f "$CONFIG_DIR/autoclean.conf" ] && {
-            enabled=$(grep "^enabled=" "$CONFIG_DIR/autoclean.conf" | cut -d'=' -f2)
-            [ "$enabled" = "1" ] && { sync; echo 3 > /proc/sys/vm/drop_caches 2>/dev/null; sed -i "s/last_clean=.*/last_clean=$(date +%s)000/" "$CONFIG_DIR/autoclean.conf"; }
-        }
-    done
-}
-
 wait_until_boot_complete
-#load_kernel_modules
 wait_until_login
 sleep 10
 get_system_info
@@ -363,4 +353,4 @@ apply_process_priority_config
 apply_freq_lock_config
 apply_protect_config
 
-start_auto_clean &
+exit 0
