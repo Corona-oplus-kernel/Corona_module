@@ -1,7 +1,9 @@
 class CoronaAddon {
     constructor() {
-        this.modDir = '/data/adb/modules/Corona';
-        this.configDir = `${this.modDir}/config`;
+        this.moduleId = '';
+        this.modDir = '';
+        this.configDir = '';
+        this.runtimeConfig = { swapPath: '' };
         this.algorithms = ['lz4', 'lz4hc', 'lzo', 'lzo-rle', 'zstd', 'zstdn', 'deflate', 'lz4k', 'lz4kd'];
         this.readaheadOptions = [128, 256, 384, 512, 768, 1024, 2048, 4096];
         this.state = {
@@ -26,6 +28,7 @@ class CoronaAddon {
             swapEnabled: false,
             swapSize: 2048,
             swapPriority: 0,
+            swapPath: '',
             watermarkScale: 100,
             extraFreeKbytes: 0,
             dirtyRatio: 20,
@@ -34,8 +37,7 @@ class CoronaAddon {
             lruGenEnabled: false,
             thp: 'never',
             ksmEnabled: false,
-            compactionEnabled: false,
-            autoCleanEnabled: false
+            compactionEnabled: false
         };
         this.kernelFeatures = { lruGen: false, thp: false, ksm: false, compaction: false };
         this.isCoronaKernel = false;
@@ -51,7 +53,11 @@ class CoronaAddon {
         this.chartType = 'cpu';
         this.maxHistoryPoints = 60;
         this.le9ecSupported = false;
-        this.autoCleanTimer = null;
+        this.realtimeIntervalMs = 4000;
+        this.realtimeTimer = null;
+        this.realtimeBusy = false;
+        this.realtimeTick = 0;
+        this.isInitializing = true;
         this.dom = {};
         this.initDOMCache();
         this.init();
@@ -66,48 +72,59 @@ class CoronaAddon {
             'system-version', 'kernel-version', 'history-chart',
             'zram-current-alg', 'zram-current-size', 'zram-current-swappiness', 'zram-status',
             'swap-status', 'swap-current-status', 'swap-current-size', 'swap-size-value',
-            'vm-status', 'lru-status', 'auto-clean-switch', 'last-clean-time'
+            'vm-status', 'lru-status'
         ];
         ids.forEach(id => { this.dom[id] = document.getElementById(id); });
     }
     $(id) { return this.dom[id] || (this.dom[id] = document.getElementById(id)); }
     async init() {
-        await this.ensureConfigDir();
-        this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
-        this.initTheme();
-        this.bindAllEvents();
-        const [,] = await Promise.all([
-            this.loadDeviceInfo(),
-            this.loadAllConfigs()
-        ]);
-        this.renderStaticOptions();
-        this.startRealtimeMonitor();
-        await Promise.all([
-            this.loadDualCellConfig(),
-            this.detectKernelFeatures()
-        ]);
-        this.initBannerDrag();
-        this.initEasterEgg();
-        this.initDeviceImageInteraction();
-        this.initDetailOverlays();
-        this.initHomeCardClicks();
-        this.initPerformanceMode();
-        this.initChart();
-        this.initFreqLockNew();
-        this.initExpandableCards();
-        this.initThemeSelector();
-        this.initSliderProgress();
-        this.initSwapSettings();
-        this.initVmSettings();
-        this.initKernelFeatures();
-        this.initZramWriteback();
-        this.initZramPath();
-        this.initAutoClean();
-        this.initCustomScripts();
-        this.initSystemOpt();
-        this.initScrollEffect();
-        this.initModuleIntro();
-        Promise.all([this.loadZramStatus(), this.loadLe9ecStatus()]);
+        this.showInitOverlay(true);
+        try {
+            await this.resolvePaths();
+            await this.ensureConfigDir();
+            await this.loadRuntimeConfig();
+            this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
+            this.initTheme();
+            this.bindAllEvents();
+            await Promise.all([
+                this.loadDeviceInfo(),
+                this.loadAllConfigs()
+            ]);
+            this.renderStaticOptions();
+            await Promise.all([
+                this.loadDualCellConfig(),
+                this.detectKernelFeatures()
+            ]);
+            this.initBannerDrag();
+            this.initEasterEgg();
+            this.initDeviceImageInteraction();
+            this.initDetailOverlays();
+            this.initHomeCardClicks();
+            this.initPerformanceMode();
+            this.initChart();
+            this.initFreqLockNew();
+            this.initExpandableCards();
+            this.initThemeSelector();
+            this.initSliderProgress();
+            this.initSwapSettings();
+            this.initVmSettings();
+            this.initKernelFeatures();
+            this.initZramWriteback();
+            this.initZramPath();
+            this.initCustomScripts();
+            this.initSystemOpt();
+            this.initScrollEffect();
+            this.initModuleIntro();
+            await Promise.all([
+                this.loadZramStatus(),
+                this.loadLe9ecStatus(),
+                this.updateRealtimeData(true)
+            ]);
+            this.startRealtimeMonitor();
+        } finally {
+            this.isInitializing = false;
+            this.showInitOverlay(false);
+        }
     }
     updateSliderProgress(slider) {
         const min = parseFloat(slider.min) || 0;
@@ -134,6 +151,46 @@ class CoronaAddon {
             try { ksu.exec(cmd, '{}', callbackId); } catch (e) { clearTimeout(timeout); delete window[callbackId]; resolve(''); }
         });
     }
+    shellQuote(value) {
+        return `'${String(value).replace(/'/g, `'\\''`)}'`;
+    }
+    async resolvePaths() {
+        const pathname = decodeURIComponent(window.location.pathname || '');
+        const match = pathname.match(/(\/data\/adb\/modules\/([^/]+))/);
+        if (match) {
+            this.modDir = match[1];
+            this.moduleId = match[2];
+        }
+        if (!this.modDir) {
+            const found = (await this.exec('for d in /data/adb/modules/*; do [ -f "$d/webroot/script.js" ] && [ -f "$d/module.prop" ] && echo "$d" && break; done')).trim();
+            if (found) {
+                this.modDir = found.split('\n')[0].trim();
+                const parts = this.modDir.split('/');
+                this.moduleId = parts[parts.length - 1] || '';
+            }
+        }
+        if (!this.modDir) {
+            this.moduleId = 'module';
+            this.modDir = `/data/adb/modules/${this.moduleId}`;
+        }
+        this.configDir = `${this.modDir}/config`;
+    }
+    async loadRuntimeConfig() {
+        const runtimePath = `${this.configDir}/runtime.conf`;
+        const content = await this.exec(`cat ${this.shellQuote(runtimePath)} 2>/dev/null`);
+        if (content) {
+            content.split('\n').forEach(line => {
+                const idx = line.indexOf('=');
+                if (idx <= 0) return;
+                const key = line.slice(0, idx).trim();
+                const value = line.slice(idx + 1).trim();
+                if (key === 'swapfile_path' && value) this.runtimeConfig.swapPath = value;
+                if (key === 'module_id' && value && !this.moduleId) this.moduleId = value;
+            });
+        }
+        if (!this.runtimeConfig.swapPath) this.runtimeConfig.swapPath = `${this.modDir}/swapfile.img`;
+        if (!this.state.swapPath) this.state.swapPath = this.runtimeConfig.swapPath;
+    }
     showConfirm(message, title = '确认') {
         return new Promise((resolve) => {
             const overlay = document.getElementById('confirm-dialog-overlay');
@@ -158,7 +215,7 @@ class CoronaAddon {
             this.showOverlay('confirm-dialog-overlay');
         });
     }
-    async ensureConfigDir() { await this.exec(`mkdir -p ${this.configDir}`); }
+    async ensureConfigDir() { await this.exec(`mkdir -p ${this.shellQuote(this.configDir)}`); }
     initTheme() {
         const savedTheme = localStorage.getItem('corona_theme') || 'auto';
         this.state.theme = savedTheme;
@@ -1049,11 +1106,11 @@ class CoronaAddon {
     }
     bindAllEvents() {
         document.querySelectorAll('.tab-item').forEach(tab => { tab.addEventListener('click', (e) => this.switchPage(e.currentTarget.dataset.page)); });
-        document.getElementById('zram-switch').addEventListener('change', (e) => { this.state.zramEnabled = e.target.checked; this.toggleZramSettings(e.target.checked); this.saveZramConfig(); });
+        document.getElementById('zram-switch').addEventListener('change', async (e) => { this.state.zramEnabled = e.target.checked; this.toggleZramSettings(e.target.checked); await this.saveZramConfig(); });
         document.getElementById('zram-size-slider').addEventListener('input', (e) => { this.state.zramSize = parseFloat(e.target.value); document.getElementById('zram-size-value').textContent = `${this.state.zramSize.toFixed(2)} GB`; });
-        document.getElementById('zram-size-slider').addEventListener('change', (e) => { this.state.zramSize = parseFloat(e.target.value); if (this.state.zramEnabled) this.applyZramImmediate(); else this.saveZramConfig(); });
+        document.getElementById('zram-size-slider').addEventListener('change', async (e) => { this.state.zramSize = parseFloat(e.target.value); if (this.state.zramEnabled) await this.applyZramImmediate(); else await this.saveZramConfig(); });
         document.getElementById('swappiness-slider').addEventListener('input', (e) => { this.state.swappiness = parseInt(e.target.value); document.getElementById('swappiness-value').textContent = this.state.swappiness; });
-        document.getElementById('swappiness-slider').addEventListener('change', (e) => { this.state.swappiness = parseInt(e.target.value); if (this.state.zramEnabled) this.applySwappinessImmediate(); else this.saveZramConfig(); });
+        document.getElementById('swappiness-slider').addEventListener('change', async (e) => { this.state.swappiness = parseInt(e.target.value); if (this.state.zramEnabled) await this.applySwappinessImmediate(); else await this.saveZramConfig(); });
         document.getElementById('le9ec-switch').addEventListener('change', (e) => { this.state.le9ecEnabled = e.target.checked; this.toggleLe9ecSettings(e.target.checked); this.saveLe9ecConfig(); });
         document.getElementById('le9ec-anon-slider').addEventListener('input', (e) => { this.state.le9ecAnon = parseInt(e.target.value) * 1024; document.getElementById('le9ec-anon-value').textContent = `${e.target.value} MB`; });
         document.getElementById('le9ec-anon-slider').addEventListener('change', (e) => { this.state.le9ecAnon = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(); else this.saveLe9ecConfig(); });
@@ -1208,20 +1265,45 @@ class CoronaAddon {
     }
     formatClusterInfo() { const parts = []; if (this.cpuClusterInfo.little > 0) parts.push(this.cpuClusterInfo.little); if (this.cpuClusterInfo.mid > 0) parts.push(this.cpuClusterInfo.mid); if (this.cpuClusterInfo.big > 0) parts.push(this.cpuClusterInfo.big); if (this.cpuClusterInfo.prime > 0) parts.push(this.cpuClusterInfo.prime); return parts.length === 0 ? '' : parts.join('+'); }
     getTotalCoreCount() { return this.cpuClusterInfo.little + this.cpuClusterInfo.mid + this.cpuClusterInfo.big + this.cpuClusterInfo.prime; }
-    startRealtimeMonitor() { this.updateRealtimeData(); setInterval(() => this.updateRealtimeData(), 3000); }
-    async updateRealtimeData() {
-        const [batteryData, memData, cpuData] = await Promise.all([this.updateBatteryInfo(), this.updateMemoryInfo(), this.updateCpuUsage()]);
-        await Promise.all([this.updateSwapInfo(), this.updateStorageInfo(), this.updateCpuTemp()]);
-        const cpuTemp = parseFloat(document.getElementById('cpu-temp').textContent) || 0;
-        const batteryTemp = parseFloat(document.getElementById('battery-temp').textContent) || 0;
-        const memPercent = memData || 0;
-        const cpuPercent = cpuData || 0;
-        this.updateHistoryData(cpuPercent, memPercent, cpuTemp, batteryTemp);
-        if (document.getElementById('page-settings').classList.contains('active')) await this.updateCpuLoads();
+    startRealtimeMonitor() {
+        if (this.realtimeTimer) clearInterval(this.realtimeTimer);
+        this.realtimeTimer = setInterval(() => this.updateRealtimeData(false), this.realtimeIntervalMs);
+    }
+    async updateRealtimeData(forceHeavy) {
+        if (this.realtimeBusy) return;
+        this.realtimeBusy = true;
+        this.realtimeTick += 1;
+        try {
+            const runHeavy = forceHeavy || (this.realtimeTick % 2 === 0);
+            const [batteryTemp, memData, cpuData] = await Promise.all([
+                this.updateBatteryInfo(),
+                this.updateMemoryInfo(),
+                this.updateCpuUsage()
+            ]);
+            let cpuTemp = 0;
+            if (runHeavy) {
+                const [, , cpuTempVal] = await Promise.all([
+                    this.updateSwapInfo(),
+                    this.updateStorageInfo(),
+                    this.updateCpuTemp()
+                ]);
+                cpuTemp = cpuTempVal || 0;
+            } else {
+                cpuTemp = parseFloat((this.$('cpu-temp') || {}).textContent) || 0;
+            }
+            const memPercent = memData || 0;
+            const cpuPercent = cpuData || 0;
+            this.updateHistoryData(cpuPercent, memPercent, cpuTemp, batteryTemp || 0);
+            if (runHeavy && document.getElementById('page-settings').classList.contains('active')) {
+                await this.updateCpuLoads();
+            }
+        } finally {
+            this.realtimeBusy = false;
+        }
     }
     async updateCpuUsage() {
         const stat1 = await this.exec('cat /proc/stat | head -1');
-        await this.sleep(100);
+        await this.sleep(60);
         const stat2 = await this.exec('cat /proc/stat | head -1');
         const parse = (line) => { const parts = line.split(/\s+/).slice(1).map(Number); const idle = parts[3] + (parts[4] || 0); const total = parts.reduce((a, b) => a + b, 0); return { idle, total }; };
         const s1 = parse(stat1); const s2 = parse(stat2);
@@ -1231,12 +1313,26 @@ class CoronaAddon {
     async updateBatteryInfo() {
         const [level, temp] = await Promise.all([this.exec('cat /sys/class/power_supply/battery/capacity'), this.exec('cat /sys/class/power_supply/battery/temp')]);
         document.getElementById('battery-level').textContent = `${level}%`;
-        if (temp && !isNaN(temp)) document.getElementById('battery-temp').textContent = `${(parseInt(temp) / 10).toFixed(1)}°C`;
+        if (temp && !isNaN(temp)) {
+            const tempC = (parseInt(temp) / 10).toFixed(1);
+            document.getElementById('battery-temp').textContent = `${tempC}°C`;
+            return parseFloat(tempC) || 0;
+        }
+        return 0;
     }
     async updateCpuTemp() {
         const tempPaths = ['/sys/class/thermal/thermal_zone0/temp', '/sys/devices/virtual/thermal/thermal_zone0/temp', '/sys/class/hwmon/hwmon0/temp1_input'];
-        for (const path of tempPaths) { const temp = await this.exec(`cat ${path} 2>/dev/null`); if (temp && !isNaN(temp)) { const val = parseInt(temp); document.getElementById('cpu-temp').textContent = `${(val > 1000 ? val / 1000 : val).toFixed(1)}°C`; return; } }
+        for (const path of tempPaths) {
+            const temp = await this.exec(`cat ${path} 2>/dev/null`);
+            if (temp && !isNaN(temp)) {
+                const val = parseInt(temp);
+                const tempC = (val > 1000 ? val / 1000 : val).toFixed(1);
+                document.getElementById('cpu-temp').textContent = `${tempC}°C`;
+                return parseFloat(tempC) || 0;
+            }
+        }
         document.getElementById('cpu-temp').textContent = '--';
+        return 0;
     }
     async updateMemoryInfo() {
         const meminfo = await this.exec('cat /proc/meminfo');
@@ -1333,15 +1429,28 @@ class CoronaAddon {
     async saveZramConfig() {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
         const config = `enabled=${this.state.zramEnabled ? '1' : '0'}\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
-        await this.exec(`echo '${config}' > ${this.configDir}/zram.conf`);
-        if (this.state.zramEnabled) { this.showLoading(true); await this.applyZramImmediate(); this.showLoading(false); }
-        else { this.showToast('ZRAM 配置已保存（禁用状态）'); await this.updateModuleDescription(); }
+        this.showLoading(true);
+        try {
+            await this.sleep(0);
+            await this.exec(`echo '${config}' > ${this.configDir}/zram.conf`);
+            if (this.state.zramEnabled) {
+                await this.applyZramImmediate(false);
+            } else {
+                this.showToast('ZRAM 配置已保存（禁用状态）');
+                await this.updateModuleDescription();
+            }
+        } finally {
+            this.showLoading(false);
+        }
     }
-    async applyZramImmediate() {
+    async applyZramImmediate(manageLoading = true) {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
         const zramDev = this.state.zramPath;
         const zramBlock = zramDev.replace('/dev/block/', '').replace('/dev/', '');
-        this.showLoading(true);
+        if (manageLoading) {
+            this.showLoading(true);
+            await this.sleep(0);
+        }
         await this.exec(`swapoff ${zramDev} 2>/dev/null`);
         await this.exec(`echo 1 > /sys/block/${zramBlock}/reset 2>/dev/null`);
         await this.exec(`echo "${this.state.algorithm}" > /sys/block/${zramBlock}/comp_algorithm`);
@@ -1355,17 +1464,23 @@ class CoronaAddon {
         const config = `enabled=1\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
         await this.exec(`echo '${config}' > ${this.configDir}/zram.conf`);
         await this.updateModuleDescription();
-        this.showLoading(false);
+        if (manageLoading) this.showLoading(false);
         this.showToast('ZRAM 配置已应用');
         setTimeout(() => this.loadZramStatus(), 500);
     }
     async applySwappinessImmediate() {
-        await this.exec(`echo "${this.state.swappiness}" > /proc/sys/vm/swappiness`);
-        const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
-        const config = `enabled=${this.state.zramEnabled ? '1' : '0'}\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
-        await this.exec(`echo '${config}' > ${this.configDir}/zram.conf`);
-        await this.updateModuleDescription();
-        this.showToast(`Swappiness: ${this.state.swappiness}`);
+        this.showLoading(true);
+        try {
+            await this.sleep(0);
+            await this.exec(`echo "${this.state.swappiness}" > /proc/sys/vm/swappiness`);
+            const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
+            const config = `enabled=${this.state.zramEnabled ? '1' : '0'}\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
+            await this.exec(`echo '${config}' > ${this.configDir}/zram.conf`);
+            await this.updateModuleDescription();
+            this.showToast(`Swappiness: ${this.state.swappiness}`);
+        } finally {
+            this.showLoading(false);
+        }
     }
     async loadIOConfig() {
         const schedulerRaw = await this.exec('cat /sys/block/sda/queue/scheduler 2>/dev/null || cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null');
@@ -1570,7 +1685,27 @@ class CoronaAddon {
     }
     sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
     showToast(message) { const toast = document.getElementById('toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500); }
-    showLoading(show) { const el = document.getElementById('loading'); if (el) el.classList.toggle('show', show); }
+    showInitOverlay(show) {
+        const el = document.getElementById('loading');
+        const text = el ? el.querySelector('.loading-text') : null;
+        if (!el) return;
+        if (show) {
+            document.body.classList.add('init-lock');
+            el.classList.add('init-mode');
+            if (text) text.textContent = '正在初始化，请稍候...';
+            el.classList.add('show');
+        } else {
+            el.classList.remove('init-mode');
+            if (text) text.textContent = '处理中...';
+            el.classList.remove('show');
+            document.body.classList.remove('init-lock');
+        }
+    }
+    showLoading(show) {
+        if (this.isInitializing) return;
+        const el = document.getElementById('loading');
+        if (el) el.classList.toggle('show', show);
+    }
     initBannerDrag() {
         const banner = document.querySelector('.banner-image');
         if (!banner) return;
@@ -1881,11 +2016,12 @@ class CoronaAddon {
         }
     }
     async loadSwapConfig() {
-        const config = await this.exec(`cat ${this.configDir}/swap.conf 2>/dev/null`);
+        const config = await this.exec(`cat ${this.shellQuote(`${this.configDir}/swap.conf`)} 2>/dev/null`);
         if (config) {
             const enabledMatch = config.match(/enabled=(\d)/);
             const sizeMatch = config.match(/size=(\d+)/);
             const priorityMatch = config.match(/priority=([\-\d]+)/);
+            const pathMatch = config.match(/^path=(.+)$/m);
             if (enabledMatch) {
                 this.state.swapEnabled = enabledMatch[1] === '1';
                 const sw = document.getElementById('swap-switch');
@@ -1910,33 +2046,36 @@ class CoronaAddon {
                     });
                 }
             }
+            if (pathMatch && pathMatch[1].trim()) this.state.swapPath = pathMatch[1].trim();
         }
         await this.loadSwapStatus();
     }
     async saveSwapConfig() {
-        const config = `enabled=${this.state.swapEnabled ? '1' : '0'}\nsize=${this.state.swapSize}\npriority=${this.state.swapPriority}`;
-        await this.exec(`echo '${config}' > ${this.configDir}/swap.conf`);
+        const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
+        const config = `enabled=${this.state.swapEnabled ? '1' : '0'}\nsize=${this.state.swapSize}\npriority=${this.state.swapPriority}\npath=${swapPath}`;
+        await this.exec(`echo '${config}' > ${this.shellQuote(`${this.configDir}/swap.conf`)}`);
         if (this.state.swapEnabled) {
             this.showLoading(true);
             await this.applySwapImmediate();
             this.showLoading(false);
         } else {
-            await this.exec('swapoff /data/swapfile 2>/dev/null');
-            await this.exec('rm -f /data/swapfile 2>/dev/null');
+            await this.exec(`swapoff ${this.shellQuote(swapPath)} 2>/dev/null`);
+            await this.exec(`rm -f ${this.shellQuote(swapPath)} 2>/dev/null`);
             this.showToast('Swap 已关闭');
             await this.loadSwapStatus();
         }
     }
     async applySwapImmediate() {
-        await this.exec('swapoff /data/swapfile 2>/dev/null');
-        await this.exec('rm -f /data/swapfile 2>/dev/null');
-        await this.exec(`dd if=/dev/zero of=/data/swapfile bs=1M count=${this.state.swapSize} 2>/dev/null`);
-        await this.exec('chmod 600 /data/swapfile');
-        await this.exec('mkswap /data/swapfile');
+        const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
+        await this.exec(`swapoff ${this.shellQuote(swapPath)} 2>/dev/null`);
+        await this.exec(`rm -f ${this.shellQuote(swapPath)} 2>/dev/null`);
+        await this.exec(`dd if=/dev/zero of=${this.shellQuote(swapPath)} bs=1M count=${this.state.swapSize} 2>/dev/null`);
+        await this.exec(`chmod 600 ${this.shellQuote(swapPath)}`);
+        await this.exec(`mkswap ${this.shellQuote(swapPath)}`);
         if (this.state.swapPriority !== 0) {
-            await this.exec(`swapon /data/swapfile -p ${this.state.swapPriority}`);
+            await this.exec(`swapon ${this.shellQuote(swapPath)} -p ${this.state.swapPriority}`);
         } else {
-            await this.exec('swapon /data/swapfile');
+            await this.exec(`swapon ${this.shellQuote(swapPath)}`);
         }
         this.showToast(`Swap 已启用 (${this.state.swapSize} MB)`);
         await this.loadSwapStatus();
@@ -2136,79 +2275,6 @@ class CoronaAddon {
         await Promise.all(promises);
         this.showLoading(false);
         this.showToast('内核特性已应用');
-    }
-    initAutoClean() {
-        const sw = this.$('auto-clean-switch');
-        const container = document.getElementById('last-clean-container');
-        if (sw) {
-            sw.addEventListener('change', (e) => {
-                this.state.autoCleanEnabled = e.target.checked;
-                this.saveAutoCleanConfig();
-                if (e.target.checked) {
-                    this.startAutoClean();
-                    if (container) container.classList.remove('hidden');
-                    this.showToast('已开启自动清理');
-                } else {
-                    this.stopAutoClean();
-                    if (container) container.classList.add('hidden');
-                    this.showToast('已关闭自动清理');
-                }
-            });
-        }
-        if (container) container.classList.add('hidden');
-        this.loadAutoCleanConfig();
-    }
-    async loadAutoCleanConfig() {
-        const config = await this.exec(`cat ${this.configDir}/autoclean.conf 2>/dev/null`);
-        const container = document.getElementById('last-clean-container');
-        if (config) {
-            const enabledMatch = config.match(/enabled=(\d)/);
-            const lastCleanMatch = config.match(/last_clean=(\d+)/);
-            if (enabledMatch) {
-                this.state.autoCleanEnabled = enabledMatch[1] === '1';
-                const sw = this.$('auto-clean-switch');
-                if (sw) sw.checked = this.state.autoCleanEnabled;
-                if (this.state.autoCleanEnabled) {
-                    this.startAutoClean();
-                    if (container) container.classList.remove('hidden');
-                }
-            }
-            if (lastCleanMatch && this.state.autoCleanEnabled) {
-                const lastTime = parseInt(lastCleanMatch[1]);
-                this.updateLastCleanTime(lastTime);
-            }
-        }
-    }
-    async saveAutoCleanConfig() {
-        const config = `enabled=${this.state.autoCleanEnabled ? '1' : '0'}\nlast_clean=${Date.now()}`;
-        await this.exec(`echo '${config}' > ${this.configDir}/autoclean.conf`);
-    }
-    startAutoClean() {
-        this.stopAutoClean();
-        this.autoCleanTimer = setInterval(() => this.doAutoClean(), 3600000);
-    }
-    stopAutoClean() {
-        if (this.autoCleanTimer) {
-            clearInterval(this.autoCleanTimer);
-            this.autoCleanTimer = null;
-        }
-    }
-    async doAutoClean() {
-        await this.exec('sync && echo 3 > /proc/sys/vm/drop_caches');
-        const now = Date.now();
-        this.updateLastCleanTime(now);
-        await this.exec(`sed -i 's/last_clean=.*/last_clean=${now}/' ${this.configDir}/autoclean.conf`);
-    }
-    updateLastCleanTime(timestamp) {
-        const el = this.$('last-clean-time');
-        if (el && timestamp) {
-            const date = new Date(timestamp);
-            const month = date.getMonth() + 1;
-            const day = date.getDate();
-            const hours = date.getHours().toString().padStart(2, '0');
-            const minutes = date.getMinutes().toString().padStart(2, '0');
-            el.textContent = `${month}月${day}日 ${hours}:${minutes}`;
-        }
     }
     initCustomScripts() {
         this.customScripts = {};
