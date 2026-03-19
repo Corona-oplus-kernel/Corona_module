@@ -51,13 +51,20 @@ class CoronaAddon {
         this.cpuFreqsPerCore = {};
         this.historyData = { cpu: [], mem: [], cpuTemp: [], batteryTemp: [] };
         this.chartType = 'cpu';
-        this.maxHistoryPoints = 60;
+        this.maxHistoryPoints = 36;
         this.le9ecSupported = false;
-        this.realtimeIntervalMs = 4000;
+        this.realtimeIntervalMs = 6000;
         this.realtimeTimer = null;
         this.realtimeBusy = false;
         this.realtimeTick = 0;
         this.isInitializing = true;
+        this.lightweightUi = true;
+        this.pendingChartDraw = false;
+        this.prevCpuStat = null;
+        this.deferredHomeReady = false;
+        this.settingsUiInitialized = false;
+        this.settingsDataLoaded = false;
+        this.settingsInitPromise = null;
         this.dom = {};
         this.initDOMCache();
         this.init();
@@ -86,41 +93,21 @@ class CoronaAddon {
             this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
             this.initTheme();
             this.bindAllEvents();
-            await Promise.all([
-                this.loadDeviceInfo(),
-                this.loadAllConfigs()
-            ]);
-            this.renderStaticOptions();
-            await Promise.all([
-                this.loadDualCellConfig(),
-                this.detectKernelFeatures()
-            ]);
-            this.initBannerDrag();
-            this.initEasterEgg();
-            this.initDeviceImageInteraction();
+            await this.loadDeviceInfo();
             this.initDetailOverlays();
             this.initHomeCardClicks();
-            this.initPerformanceMode();
             this.initChart();
-            this.initFreqLockNew();
-            this.initExpandableCards();
-            this.initThemeSelector();
-            this.initSliderProgress();
-            this.initSwapSettings();
-            this.initVmSettings();
-            this.initKernelFeatures();
-            this.initZramWriteback();
-            this.initZramPath();
-            this.initCustomScripts();
-            this.initSystemOpt();
-            this.initScrollEffect();
+            if (!this.lightweightUi) {
+                this.initScrollEffect();
+            } else {
+                this.initStaticHeader();
+            }
             this.initModuleIntro();
             await Promise.all([
-                this.loadZramStatus(),
-                this.loadLe9ecStatus(),
                 this.updateRealtimeData(true)
             ]);
             this.startRealtimeMonitor();
+            this.scheduleDeferredInit();
         } finally {
             this.isInitializing = false;
             this.showInitOverlay(false);
@@ -267,7 +254,12 @@ class CoronaAddon {
             this.historyData.cpu.shift(); this.historyData.mem.shift();
             this.historyData.cpuTemp.shift(); this.historyData.batteryTemp.shift();
         }
-        this.drawChart();
+        if (document.getElementById('page-home')?.classList.contains('active')) {
+            this.pendingChartDraw = false;
+            this.drawChart();
+        } else {
+            this.pendingChartDraw = true;
+        }
     }
     drawChart() {
         if (!this.chartCtx) return;
@@ -275,6 +267,7 @@ class CoronaAddon {
         const ctx = this.chartCtx;
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
         ctx.scale(dpr, dpr);
@@ -493,8 +486,18 @@ class CoronaAddon {
         this.showToast('频率已恢复默认');
     }
     initHomeCardClicks() {
-        document.getElementById('cpu-card').addEventListener('click', () => { this.switchPage('settings'); setTimeout(() => { const cpuCard = document.getElementById('cpu-governor-card'); if (cpuCard) cpuCard.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300); });
-        document.getElementById('swap-card').addEventListener('click', () => { this.switchPage('settings'); setTimeout(() => { const zramCard = document.getElementById('zram-card'); if (zramCard) zramCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300); });
+        document.getElementById('cpu-card').addEventListener('click', async () => {
+            this.switchPage('settings');
+            await this.ensureSettingsPageReady();
+            const cpuCard = document.getElementById('cpu-governor-card');
+            if (cpuCard) cpuCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+        document.getElementById('swap-card').addEventListener('click', async () => {
+            this.switchPage('settings');
+            await this.ensureSettingsPageReady();
+            const zramCard = document.getElementById('zram-card');
+            if (zramCard) zramCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
         document.getElementById('battery-card').addEventListener('click', () => this.showBatteryDetail());
         document.getElementById('mem-card').addEventListener('click', () => this.showUFSDetail());
         document.getElementById('storage-card').addEventListener('click', () => this.showStorageDetail());
@@ -1182,6 +1185,13 @@ class CoronaAddon {
         currentActive.classList.remove('active');
         targetPage.classList.add('active');
         tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.page === pageName));
+        if (pageName === 'settings') {
+            this.ensureSettingsPageReady();
+        }
+        if (pageName === 'home' && this.pendingChartDraw) {
+            requestAnimationFrame(() => this.drawChart());
+            this.pendingChartDraw = false;
+        }
     }
     renderStaticOptions() { this.renderAlgorithmOptions(); this.renderReadaheadOptions(); }
     renderAlgorithmOptions() {
@@ -1268,6 +1278,17 @@ class CoronaAddon {
     startRealtimeMonitor() {
         if (this.realtimeTimer) clearInterval(this.realtimeTimer);
         this.realtimeTimer = setInterval(() => this.updateRealtimeData(false), this.realtimeIntervalMs);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (this.realtimeTimer) clearInterval(this.realtimeTimer);
+                this.realtimeTimer = null;
+                return;
+            }
+            this.updateRealtimeData(false);
+            if (!this.realtimeTimer) {
+                this.realtimeTimer = setInterval(() => this.updateRealtimeData(false), this.realtimeIntervalMs);
+            }
+        });
     }
     async updateRealtimeData(forceHeavy) {
         if (this.realtimeBusy) return;
@@ -1302,13 +1323,89 @@ class CoronaAddon {
         }
     }
     async updateCpuUsage() {
-        const stat1 = await this.exec('cat /proc/stat | head -1');
-        await this.sleep(60);
-        const stat2 = await this.exec('cat /proc/stat | head -1');
-        const parse = (line) => { const parts = line.split(/\s+/).slice(1).map(Number); const idle = parts[3] + (parts[4] || 0); const total = parts.reduce((a, b) => a + b, 0); return { idle, total }; };
-        const s1 = parse(stat1); const s2 = parse(stat2);
-        const idleDiff = s2.idle - s1.idle; const totalDiff = s2.total - s1.total;
+        const stat = await this.exec('cat /proc/stat | head -1');
+        const parse = (line) => {
+            const parts = line.split(/\s+/).slice(1).map(Number);
+            const idle = parts[3] + (parts[4] || 0);
+            const total = parts.reduce((a, b) => a + b, 0);
+            return { idle, total };
+        };
+        const current = parse(stat);
+        if (!this.prevCpuStat) {
+            this.prevCpuStat = current;
+            const lastPoint = this.historyData.cpu.length ? this.historyData.cpu[this.historyData.cpu.length - 1].value : 0;
+            return parseFloat((lastPoint || 0).toFixed(1));
+        }
+        const idleDiff = current.idle - this.prevCpuStat.idle;
+        const totalDiff = current.total - this.prevCpuStat.total;
+        this.prevCpuStat = current;
         return totalDiff > 0 ? ((1 - idleDiff / totalDiff) * 100) : 0;
+    }
+    initStaticHeader() {
+        const title = document.getElementById('corona-title');
+        const floatingHeader = document.getElementById('floating-header');
+        const floatingTitle = floatingHeader ? floatingHeader.querySelector('.floating-header-title') : null;
+        if (title && floatingTitle) floatingTitle.textContent = title.textContent;
+        if (floatingHeader) floatingHeader.classList.remove('visible', 'overlay-hidden');
+    }
+    scheduleDeferredInit() {
+        if (this.deferredHomeReady) return;
+        this.deferredHomeReady = true;
+        const run = async () => {
+            try {
+                this.initBannerDrag();
+                this.initEasterEgg();
+                this.initDeviceImageInteraction();
+                this.initScrollEffect();
+                await this.ensureSettingsPageReady(true);
+            } catch (e) {}
+        };
+        if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(() => setTimeout(run, 120), { timeout: 1500 });
+        } else {
+            setTimeout(run, 600);
+        }
+    }
+    async ensureSettingsPageReady(silent = false) {
+        if (this.settingsUiInitialized && this.settingsDataLoaded) return;
+        if (this.settingsInitPromise) return this.settingsInitPromise;
+        if (!silent) this.showLoading(true);
+        this.settingsInitPromise = (async () => {
+            if (!this.settingsUiInitialized) {
+                this.renderStaticOptions();
+                this.initPerformanceMode();
+                this.initFreqLockNew();
+                this.initExpandableCards();
+                this.initThemeSelector();
+                this.initSliderProgress();
+                this.initSwapSettings();
+                this.initVmSettings();
+                this.initKernelFeatures();
+                this.initZramWriteback();
+                this.initZramPath();
+                this.initCustomScripts();
+                this.initSystemOpt();
+                this.settingsUiInitialized = true;
+            }
+            if (!this.settingsDataLoaded) {
+                await Promise.all([
+                    this.loadAllConfigs(),
+                    this.loadDualCellConfig(),
+                    this.detectKernelFeatures()
+                ]);
+                await Promise.all([
+                    this.loadZramStatus(),
+                    this.loadLe9ecStatus()
+                ]);
+                this.settingsDataLoaded = true;
+            }
+        })();
+        try {
+            await this.settingsInitPromise;
+        } finally {
+            this.settingsInitPromise = null;
+            if (!silent) this.showLoading(false);
+        }
     }
     async updateBatteryInfo() {
         const [level, temp] = await Promise.all([this.exec('cat /sys/class/power_supply/battery/capacity'), this.exec('cat /sys/class/power_supply/battery/temp')]);
