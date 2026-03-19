@@ -3805,6 +3805,43 @@ body.theme-dark #memory-compression-content .sub-card {
     border-color: transparent !important;
 }
 
+#page-settings #memory-compression-content .sub-card,
+#page-settings #memory-compression-content .sub-card:last-child {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-bottom: 1px solid var(--glass-border) !important;
+    border-radius: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+#page-settings #memory-compression-content .sub-card:last-child {
+    border-bottom: none !important;
+}
+
+#page-settings #memory-compression-content .sub-card-header,
+#page-settings #memory-compression-content .setting-section,
+#page-settings #memory-compression-content .info-row,
+#page-settings #memory-compression-content .lru-switch,
+#page-settings #memory-compression-content .lru-setting {
+    border: none !important;
+}
+
+#page-settings #memory-compression-content {
+    overflow: visible !important;
+}
+
+#page-settings #memory-compression-content .sub-expandable-content,
+#page-settings #memory-compression-content .sub-expandable-content.expanded {
+    overflow: visible !important;
+}
+
+body.theme-dark #page-settings #memory-compression-content .sub-card,
+body.theme-dark #page-settings #memory-compression-content .sub-card:last-child {
+    background: transparent !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
 body.theme-dark .option-item {
     background: rgba(255, 255, 255, 0.05) !important;
     border-color: transparent !important;
