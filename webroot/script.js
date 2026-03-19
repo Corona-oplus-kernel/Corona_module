@@ -368,14 +368,15 @@ class CoronaAddon {
             if (toggle && content) {
                 content.classList.remove('hidden');
                 content.classList.remove('expanded');
+                content.classList.remove('opening', 'closing');
                 toggle.classList.remove('expanded');
                 toggle.addEventListener('click', () => {
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
-                        content.classList.remove('expanded');
+                        this.toggleAnimatedSection(content, false);
                         toggle.classList.remove('expanded');
                     } else {
-                        content.classList.add('expanded');
+                        this.toggleAnimatedSection(content, true);
                         toggle.classList.add('expanded');
                         if (card.onExpand) card.onExpand();
                     }
@@ -426,11 +427,11 @@ class CoronaAddon {
                 toggle.addEventListener('click', () => {
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
-                        content.classList.remove('expanded');
+                        this.toggleAnimatedSection(content, false);
                         toggle.classList.remove('expanded');
                         if (icon) icon.classList.remove('expanded');
                     } else {
-                        content.classList.add('expanded');
+                        this.toggleAnimatedSection(content, true);
                         toggle.classList.add('expanded');
                         if (icon) icon.classList.add('expanded');
                         if (card.onExpand) card.onExpand();
@@ -438,6 +439,27 @@ class CoronaAddon {
                 });
             }
         });
+    }
+    toggleAnimatedSection(content, expand) {
+        content.classList.remove('opening', 'closing');
+        if (expand) {
+            content.classList.add('expanded');
+            requestAnimationFrame(() => {
+                content.classList.add('opening');
+                const clearOpening = () => {
+                    content.classList.remove('opening');
+                    content.removeEventListener('animationend', clearOpening);
+                };
+                content.addEventListener('animationend', clearOpening);
+            });
+            return;
+        }
+        content.classList.add('closing');
+        const finish = () => {
+            content.classList.remove('expanded', 'closing', 'opening');
+            content.removeEventListener('animationend', finish);
+        };
+        content.addEventListener('animationend', finish);
     }
     initFreqLockNew() {
         this.freqMode = 'off';
