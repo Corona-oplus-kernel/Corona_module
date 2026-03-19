@@ -425,6 +425,10 @@ class CoronaAddon {
             if (toggle && content) {
                 const icon = toggle.querySelector('.expand-icon');
                 toggle.addEventListener('click', () => {
+                    const parentSection = content.closest('.module-card-content');
+                    const parentStartHeight = parentSection && parentSection.classList.contains('expanded')
+                        ? parentSection.scrollHeight
+                        : 0;
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
                         this.toggleAnimatedSection(content, false);
@@ -436,9 +440,43 @@ class CoronaAddon {
                         if (icon) icon.classList.add('expanded');
                         if (card.onExpand) card.onExpand();
                     }
+                    if (parentSection && parentSection.id === 'memory-compression-content') {
+                        requestAnimationFrame(() => this.syncParentExpandableHeight(parentSection, parentStartHeight));
+                    }
                 });
             }
         });
+    }
+    syncParentExpandableHeight(parentSection, startHeight) {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const endHeight = parentSection.scrollHeight;
+        if (prefersReducedMotion || !startHeight || !endHeight || Math.abs(endHeight - startHeight) < 2) {
+            parentSection.style.height = '';
+            return;
+        }
+        if (parentSection._sectionAnimation) {
+            parentSection._sectionAnimation.cancel();
+            parentSection._sectionAnimation = null;
+        }
+        parentSection.style.height = `${startHeight}px`;
+        parentSection.style.overflow = 'hidden';
+        const animation = parentSection.animate([
+            { height: `${startHeight}px` },
+            { height: `${endHeight}px` }
+        ], {
+            duration: 260,
+            easing: 'cubic-bezier(0.2, 0, 0, 1)',
+            fill: 'forwards'
+        });
+        parentSection._sectionAnimation = animation;
+        animation.onfinish = () => {
+            parentSection.style.height = '';
+            parentSection.style.overflow = '';
+            parentSection._sectionAnimation = null;
+        };
+        animation.oncancel = () => {
+            parentSection._sectionAnimation = null;
+        };
     }
     toggleAnimatedSection(content, expand) {
         const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
