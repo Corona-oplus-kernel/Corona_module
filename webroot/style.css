@@ -3668,8 +3668,7 @@ body.theme-dark #page-settings .sub-card {
 
 .card,
 .module-card,
-.banner-image,
-.tab-bar-container {
+.banner-image {
     background: rgba(255, 255, 255, 0.38);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -3677,6 +3676,16 @@ body.theme-dark #page-settings .sub-card {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
+}
+
+.tab-bar-container {
+    background: rgba(255, 255, 255, 0.38);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+    transform: translateX(-50%) translateZ(0);
+    -webkit-transform: translateX(-50%) translateZ(0);
 }
 
 .sub-card {
@@ -3779,13 +3788,22 @@ body.theme-dark .floating-header {
 
 body.theme-dark .card,
 body.theme-dark .module-card,
-body.theme-dark .banner-image,
+body.theme-dark .banner-image {
+    background: rgba(24, 29, 40, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+}
+
 body.theme-dark .tab-bar-container {
     background: rgba(24, 29, 40, 0.55);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-color: rgba(255, 255, 255, 0.08);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+    transform: translateX(-50%) translateZ(0);
+    -webkit-transform: translateX(-50%) translateZ(0);
 }
 
 body.theme-dark .sub-card {
