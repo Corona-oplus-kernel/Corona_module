@@ -368,7 +368,6 @@ class CoronaAddon {
             if (toggle && content) {
                 content.classList.remove('hidden');
                 content.classList.remove('expanded');
-                content.classList.remove('opening', 'closing');
                 toggle.classList.remove('expanded');
                 toggle.addEventListener('click', () => {
                     const isExpanded = content.classList.contains('expanded');
@@ -376,11 +375,22 @@ class CoronaAddon {
                         if (content.id === 'memory-compression-content') {
                             this.collapseMemoryCompressionChildren(content);
                         }
-                        this.toggleAnimatedSection(content, false);
+                        content.style.maxHeight = content.scrollHeight + 'px';
+                        content.offsetHeight;
+                        content.classList.remove('expanded');
                         toggle.classList.remove('expanded');
+                        requestAnimationFrame(() => {
+                            content.style.maxHeight = '';
+                        });
                     } else {
-                        this.toggleAnimatedSection(content, true);
+                        content.classList.add('expanded');
                         toggle.classList.add('expanded');
+                        content.style.maxHeight = content.scrollHeight + 'px';
+                        const onTransitionEnd = () => {
+                            content.style.maxHeight = '';
+                            content.removeEventListener('transitionend', onTransitionEnd);
+                        };
+                        content.addEventListener('transitionend', onTransitionEnd);
                         if (card.onExpand) card.onExpand();
                     }
                 });
@@ -428,23 +438,16 @@ class CoronaAddon {
             if (toggle && content) {
                 const icon = toggle.querySelector('.expand-icon');
                 toggle.addEventListener('click', () => {
-                    const parentSection = content.closest('.module-card-content');
-                    const parentStartHeight = parentSection && parentSection.classList.contains('expanded')
-                        ? parentSection.offsetHeight
-                        : 0;
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
-                        this.toggleMemoryCompressionSubSection(content, false);
+                        content.classList.remove('expanded');
                         toggle.classList.remove('expanded');
                         if (icon) icon.classList.remove('expanded');
                     } else {
-                        this.toggleMemoryCompressionSubSection(content, true);
+                        content.classList.add('expanded');
                         toggle.classList.add('expanded');
                         if (icon) icon.classList.add('expanded');
                         if (card.onExpand) card.onExpand();
-                    }
-                    if (parentSection && parentSection.id === 'memory-compression-content') {
-                        requestAnimationFrame(() => this.syncParentExpandableHeight(parentSection, parentStartHeight));
                     }
                 });
             }
@@ -457,210 +460,10 @@ class CoronaAddon {
             const content = document.getElementById(contentId);
             const icon = toggle.querySelector('.expand-icon');
             if (!content || !content.classList.contains('expanded')) return;
-            this.resetAnimatedSection(content);
             content.classList.remove('expanded');
             toggle.classList.remove('expanded');
             if (icon) icon.classList.remove('expanded');
         });
-    }
-    toggleMemoryCompressionSubSection(content, expand) {
-        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (content._sectionAnimation) {
-            content._sectionAnimation.cancel();
-            content._sectionAnimation = null;
-        }
-        if (expand) {
-            content.classList.add('expanded', 'animating');
-            const targetHeight = content.scrollHeight;
-            if (prefersReducedMotion) {
-                content.classList.remove('animating');
-                this.resetAnimatedSection(content);
-                return;
-            }
-            content.style.height = '0px';
-            content.style.opacity = '0';
-            content.style.transform = 'translateY(-6px)';
-            content.style.overflow = 'hidden';
-            const animation = content.animate([
-                { height: '0px', opacity: 0, transform: 'translateY(-6px)' },
-                { height: `${targetHeight}px`, opacity: 1, transform: 'translateY(0)' }
-            ], {
-                duration: 220,
-                easing: 'cubic-bezier(0.2, 0, 0, 1)',
-                fill: 'forwards'
-            });
-            content._sectionAnimation = animation;
-            animation.onfinish = () => {
-                content._sectionAnimation = null;
-                content.classList.remove('animating');
-                this.resetAnimatedSection(content);
-            };
-            animation.oncancel = () => {
-                content._sectionAnimation = null;
-            };
-            return;
-        }
-        const startHeight = content.offsetHeight;
-        if (prefersReducedMotion) {
-            content.classList.remove('expanded', 'animating');
-            this.resetAnimatedSection(content);
-            return;
-        }
-        content.classList.add('animating');
-        content.style.height = `${startHeight}px`;
-        content.style.opacity = '1';
-        content.style.transform = 'translateY(0)';
-        content.style.overflow = 'hidden';
-        const animation = content.animate([
-            { height: `${startHeight}px`, opacity: 1, transform: 'translateY(0)' },
-            { height: '0px', opacity: 0, transform: 'translateY(-4px)' }
-        ], {
-            duration: 180,
-            easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-            fill: 'forwards'
-        });
-        content._sectionAnimation = animation;
-        animation.onfinish = () => {
-            content._sectionAnimation = null;
-            content.classList.remove('expanded', 'animating');
-            this.resetAnimatedSection(content);
-        };
-        animation.oncancel = () => {
-            content._sectionAnimation = null;
-        };
-    }
-    resetAnimatedSection(content) {
-        if (content._sectionAnimation) {
-            content._sectionAnimation.cancel();
-            content._sectionAnimation = null;
-        }
-        content.classList.remove('animating', 'opening', 'closing');
-        content.style.height = '';
-        content.style.opacity = '';
-        content.style.transform = '';
-        content.style.overflow = '';
-        content.style.paddingTop = '';
-        content.style.paddingBottom = '';
-    }
-    syncParentExpandableHeight(parentSection, startHeight) {
-        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const endHeight = parentSection.scrollHeight;
-        if (prefersReducedMotion || !startHeight || !endHeight || Math.abs(endHeight - startHeight) < 2) {
-            parentSection.style.height = '';
-            return;
-        }
-        if (parentSection._sectionAnimation) {
-            parentSection._sectionAnimation.cancel();
-            parentSection._sectionAnimation = null;
-        }
-        parentSection.style.height = `${startHeight}px`;
-        parentSection.style.overflow = 'hidden';
-        const animation = parentSection.animate([
-            { height: `${startHeight}px` },
-            { height: `${endHeight}px` }
-        ], {
-            duration: 260,
-            easing: 'cubic-bezier(0.2, 0, 0, 1)',
-            fill: 'forwards'
-        });
-        parentSection._sectionAnimation = animation;
-        animation.onfinish = () => {
-            parentSection.style.height = '';
-            parentSection.style.overflow = '';
-            parentSection._sectionAnimation = null;
-        };
-        animation.oncancel = () => {
-            parentSection._sectionAnimation = null;
-        };
-    }
-    toggleAnimatedSection(content, expand) {
-        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const openingTransform = 'translateY(-8px) scale(0.985)';
-        const closingTransform = 'translateY(-6px) scale(0.99)';
-        const clearInlineState = () => {
-            content.style.height = '';
-            content.style.opacity = '';
-            content.style.transform = '';
-            content.style.overflow = '';
-            content.style.paddingTop = '';
-            content.style.paddingBottom = '';
-        };
-        if (content._sectionAnimation) {
-            content._sectionAnimation.cancel();
-            content._sectionAnimation = null;
-        }
-        content.classList.remove('opening', 'closing');
-        if (expand) {
-            content.classList.add('expanded', 'animating');
-            const expandedStyle = window.getComputedStyle(content);
-            const targetHeight = content.scrollHeight;
-            const targetPaddingTop = expandedStyle.paddingTop;
-            const targetPaddingBottom = expandedStyle.paddingBottom;
-            if (prefersReducedMotion) {
-                content.classList.remove('animating');
-                clearInlineState();
-                return;
-            }
-            content.style.height = '0px';
-            content.style.opacity = '0';
-            content.style.transform = openingTransform;
-            content.style.overflow = 'hidden';
-            content.style.paddingTop = '0px';
-            content.style.paddingBottom = '0px';
-            requestAnimationFrame(() => {
-                const animation = content.animate([
-                    { height: '0px', opacity: 0, transform: openingTransform, paddingTop: '0px', paddingBottom: '0px' },
-                    { height: `${targetHeight}px`, opacity: 1, transform: 'translateY(0) scale(1)', paddingTop: targetPaddingTop, paddingBottom: targetPaddingBottom }
-                ], {
-                    duration: 280,
-                    easing: 'cubic-bezier(0.2, 0, 0, 1)',
-                    fill: 'forwards'
-                });
-                content._sectionAnimation = animation;
-                animation.onfinish = () => {
-                    clearInlineState();
-                    content.classList.remove('animating');
-                    content._sectionAnimation = null;
-                };
-                animation.oncancel = () => {
-                    content._sectionAnimation = null;
-                };
-            });
-            return;
-        }
-        const startHeight = content.offsetHeight;
-        const currentStyle = window.getComputedStyle(content);
-        const startPaddingTop = currentStyle.paddingTop;
-        const startPaddingBottom = currentStyle.paddingBottom;
-        if (prefersReducedMotion) {
-            content.classList.remove('expanded', 'animating', 'closing', 'opening');
-            clearInlineState();
-            return;
-        }
-        content.classList.add('animating', 'closing');
-        content.style.height = `${startHeight}px`;
-        content.style.opacity = '1';
-        content.style.transform = 'translateY(0) scale(1)';
-        content.style.overflow = 'hidden';
-        content.style.paddingTop = startPaddingTop;
-        content.style.paddingBottom = startPaddingBottom;
-        const animation = content.animate([
-            { height: `${startHeight}px`, opacity: 1, transform: 'translateY(0) scale(1)', paddingTop: startPaddingTop, paddingBottom: startPaddingBottom },
-            { height: '0px', opacity: 0, transform: closingTransform, paddingTop: '0px', paddingBottom: '0px' }
-        ], {
-            duration: 240,
-            easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-            fill: 'forwards'
-        });
-        content._sectionAnimation = animation;
-        animation.onfinish = () => {
-            content.classList.remove('expanded', 'animating', 'closing', 'opening');
-            clearInlineState();
-            content._sectionAnimation = null;
-        };
-        animation.oncancel = () => {
-            content._sectionAnimation = null;
-        };
     }
     initFreqLockNew() {
         this.freqMode = 'off';
