@@ -441,25 +441,79 @@ class CoronaAddon {
         });
     }
     toggleAnimatedSection(content, expand) {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const openingTransform = 'translateY(-8px) scale(0.985)';
+        const closingTransform = 'translateY(-6px) scale(0.99)';
+        if (content._sectionAnimation) {
+            content._sectionAnimation.cancel();
+            content._sectionAnimation = null;
+        }
         content.classList.remove('opening', 'closing');
         if (expand) {
-            content.classList.add('expanded');
+            content.classList.add('expanded', 'animating');
+            const targetHeight = content.scrollHeight;
+            if (prefersReducedMotion) {
+                content.classList.remove('animating');
+                return;
+            }
+            content.style.height = '0px';
+            content.style.opacity = '0';
+            content.style.transform = openingTransform;
+            content.style.overflow = 'hidden';
             requestAnimationFrame(() => {
-                content.classList.add('opening');
-                const clearOpening = () => {
-                    content.classList.remove('opening');
-                    content.removeEventListener('animationend', clearOpening);
+                const animation = content.animate([
+                    { height: '0px', opacity: 0, transform: openingTransform },
+                    { height: `${targetHeight}px`, opacity: 1, transform: 'translateY(0) scale(1)' }
+                ], {
+                    duration: 280,
+                    easing: 'cubic-bezier(0.2, 0, 0, 1)',
+                    fill: 'forwards'
+                });
+                content._sectionAnimation = animation;
+                animation.onfinish = () => {
+                    content.style.height = '';
+                    content.style.opacity = '';
+                    content.style.transform = '';
+                    content.style.overflow = '';
+                    content.classList.remove('animating');
+                    content._sectionAnimation = null;
                 };
-                content.addEventListener('animationend', clearOpening);
+                animation.oncancel = () => {
+                    content._sectionAnimation = null;
+                };
             });
             return;
         }
-        content.classList.add('closing');
-        const finish = () => {
-            content.classList.remove('expanded', 'closing', 'opening');
-            content.removeEventListener('animationend', finish);
+        const startHeight = content.offsetHeight;
+        if (prefersReducedMotion) {
+            content.classList.remove('expanded', 'animating', 'closing', 'opening');
+            return;
+        }
+        content.classList.add('animating', 'closing');
+        content.style.height = `${startHeight}px`;
+        content.style.opacity = '1';
+        content.style.transform = 'translateY(0) scale(1)';
+        content.style.overflow = 'hidden';
+        const animation = content.animate([
+            { height: `${startHeight}px`, opacity: 1, transform: 'translateY(0) scale(1)' },
+            { height: '0px', opacity: 0, transform: closingTransform }
+        ], {
+            duration: 240,
+            easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+            fill: 'forwards'
+        });
+        content._sectionAnimation = animation;
+        animation.onfinish = () => {
+            content.classList.remove('expanded', 'animating', 'closing', 'opening');
+            content.style.height = '';
+            content.style.opacity = '';
+            content.style.transform = '';
+            content.style.overflow = '';
+            content._sectionAnimation = null;
         };
-        content.addEventListener('animationend', finish);
+        animation.oncancel = () => {
+            content._sectionAnimation = null;
+        };
     }
     initFreqLockNew() {
         this.freqMode = 'off';
