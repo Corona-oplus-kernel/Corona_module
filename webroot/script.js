@@ -375,23 +375,26 @@ class CoronaAddon {
                         if (content.id === 'memory-compression-content') {
                             this.collapseMemoryCompressionChildren(content);
                         }
-                        content.style.maxHeight = content.scrollHeight + 'px';
+                        const h = content.scrollHeight;
+                        content.style.maxHeight = h + 'px';
                         content.offsetHeight;
                         content.classList.remove('expanded');
                         toggle.classList.remove('expanded');
-                        requestAnimationFrame(() => {
-                            content.style.maxHeight = '';
-                        });
+                        content.style.maxHeight = '0px';
                     } else {
                         content.classList.add('expanded');
                         toggle.classList.add('expanded');
-                        content.style.maxHeight = content.scrollHeight + 'px';
-                        const onTransitionEnd = () => {
-                            content.style.maxHeight = '';
-                            content.removeEventListener('transitionend', onTransitionEnd);
-                        };
-                        content.addEventListener('transitionend', onTransitionEnd);
                         if (card.onExpand) card.onExpand();
+                        requestAnimationFrame(() => {
+                            const h = content.scrollHeight;
+                            content.style.maxHeight = h + 'px';
+                            const clear = (e) => {
+                                if (e.target !== content) return;
+                                content.style.maxHeight = 'none';
+                                content.removeEventListener('transitionend', clear);
+                            };
+                            content.addEventListener('transitionend', clear);
+                        });
                     }
                 });
             }
@@ -440,14 +443,28 @@ class CoronaAddon {
                 toggle.addEventListener('click', () => {
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
+                        const h = content.scrollHeight;
+                        content.style.maxHeight = h + 'px';
+                        content.offsetHeight;
                         content.classList.remove('expanded');
                         toggle.classList.remove('expanded');
                         if (icon) icon.classList.remove('expanded');
+                        content.style.maxHeight = '0px';
                     } else {
                         content.classList.add('expanded');
                         toggle.classList.add('expanded');
                         if (icon) icon.classList.add('expanded');
                         if (card.onExpand) card.onExpand();
+                        requestAnimationFrame(() => {
+                            const h = content.scrollHeight;
+                            content.style.maxHeight = h + 'px';
+                            const clear = (e) => {
+                                if (e.target !== content) return;
+                                content.style.maxHeight = 'none';
+                                content.removeEventListener('transitionend', clear);
+                            };
+                            content.addEventListener('transitionend', clear);
+                        });
                     }
                 });
             }
