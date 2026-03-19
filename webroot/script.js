@@ -444,6 +444,16 @@ class CoronaAddon {
         const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const openingTransform = 'translateY(-8px) scale(0.985)';
         const closingTransform = 'translateY(-6px) scale(0.99)';
+        const readCurrentVisualState = () => {
+            const computed = window.getComputedStyle(content);
+            return {
+                height: computed.height,
+                opacity: computed.opacity,
+                transform: computed.transform === 'none' ? 'translateY(0) scale(1)' : computed.transform,
+                paddingTop: computed.paddingTop,
+                paddingBottom: computed.paddingBottom
+            };
+        };
         const clearInlineState = () => {
             content.style.height = '';
             content.style.opacity = '';
@@ -453,6 +463,13 @@ class CoronaAddon {
             content.style.paddingBottom = '';
         };
         if (content._sectionAnimation) {
+            const snapshot = readCurrentVisualState();
+            content.style.height = snapshot.height;
+            content.style.opacity = snapshot.opacity;
+            content.style.transform = snapshot.transform;
+            content.style.paddingTop = snapshot.paddingTop;
+            content.style.paddingBottom = snapshot.paddingBottom;
+            content.style.overflow = 'hidden';
             content._sectionAnimation.cancel();
             content._sectionAnimation = null;
         }
@@ -468,51 +485,54 @@ class CoronaAddon {
                 clearInlineState();
                 return;
             }
-            content.style.height = '0px';
-            content.style.opacity = '0';
-            content.style.transform = openingTransform;
-            content.style.overflow = 'hidden';
-            content.style.paddingTop = '0px';
-            content.style.paddingBottom = '0px';
-            requestAnimationFrame(() => {
-                const animation = content.animate([
-                    { height: '0px', opacity: 0, transform: openingTransform, paddingTop: '0px', paddingBottom: '0px' },
-                    { height: `${targetHeight}px`, opacity: 1, transform: 'translateY(0) scale(1)', paddingTop: targetPaddingTop, paddingBottom: targetPaddingBottom }
-                ], {
-                    duration: 280,
-                    easing: 'cubic-bezier(0.2, 0, 0, 1)',
-                    fill: 'forwards'
-                });
-                content._sectionAnimation = animation;
-                animation.onfinish = () => {
-                    clearInlineState();
-                    content.classList.remove('animating');
-                    content._sectionAnimation = null;
-                };
-                animation.oncancel = () => {
-                    content._sectionAnimation = null;
-                };
+            const start = readCurrentVisualState();
+            const isCollapsed = parseFloat(start.height) < 1;
+            const animation = content.animate([
+                {
+                    height: isCollapsed ? '0px' : start.height,
+                    opacity: isCollapsed ? 0 : start.opacity,
+                    transform: isCollapsed ? openingTransform : start.transform,
+                    paddingTop: isCollapsed ? '0px' : start.paddingTop,
+                    paddingBottom: isCollapsed ? '0px' : start.paddingBottom
+                },
+                {
+                    height: `${targetHeight}px`,
+                    opacity: 1,
+                    transform: 'translateY(0) scale(1)',
+                    paddingTop: targetPaddingTop,
+                    paddingBottom: targetPaddingBottom
+                }
+            ], {
+                duration: 280,
+                easing: 'cubic-bezier(0.2, 0, 0, 1)',
+                fill: 'forwards'
             });
+            content._sectionAnimation = animation;
+            animation.onfinish = () => {
+                clearInlineState();
+                content.classList.remove('animating');
+                content._sectionAnimation = null;
+            };
+            animation.oncancel = () => {
+                content._sectionAnimation = null;
+            };
             return;
         }
-        const startHeight = content.offsetHeight;
-        const currentStyle = window.getComputedStyle(content);
-        const startPaddingTop = currentStyle.paddingTop;
-        const startPaddingBottom = currentStyle.paddingBottom;
+        const start = readCurrentVisualState();
         if (prefersReducedMotion) {
             content.classList.remove('expanded', 'animating', 'closing', 'opening');
             clearInlineState();
             return;
         }
         content.classList.add('animating', 'closing');
-        content.style.height = `${startHeight}px`;
-        content.style.opacity = '1';
-        content.style.transform = 'translateY(0) scale(1)';
+        content.style.height = start.height;
+        content.style.opacity = start.opacity;
+        content.style.transform = start.transform;
         content.style.overflow = 'hidden';
-        content.style.paddingTop = startPaddingTop;
-        content.style.paddingBottom = startPaddingBottom;
+        content.style.paddingTop = start.paddingTop;
+        content.style.paddingBottom = start.paddingBottom;
         const animation = content.animate([
-            { height: `${startHeight}px`, opacity: 1, transform: 'translateY(0) scale(1)', paddingTop: startPaddingTop, paddingBottom: startPaddingBottom },
+            { height: start.height, opacity: start.opacity, transform: start.transform, paddingTop: start.paddingTop, paddingBottom: start.paddingBottom },
             { height: '0px', opacity: 0, transform: closingTransform, paddingTop: '0px', paddingBottom: '0px' }
         ], {
             duration: 240,
