@@ -597,6 +597,25 @@ class CoronaAddon {
     showOverlay(id) {
         const overlay = document.getElementById(id);
         if (overlay) {
+            if (overlay._hideTimer) {
+                clearTimeout(overlay._hideTimer);
+                overlay._hideTimer = null;
+            }
+            if (overlay._hideTransitionEnd) {
+                overlay.removeEventListener('transitionend', overlay._hideTransitionEnd);
+                overlay._hideTransitionEnd = null;
+            }
+            overlay.classList.remove('hidden', 'closing');
+            const cards = overlay.querySelectorAll('.detail-card, .priority-process-card, .script-edit-card');
+            cards.forEach(card => {
+                card.scrollTop = 0;
+                card.style.height = '';
+                card.style.maxHeight = '';
+                card.style.transform = '';
+            });
+            overlay.querySelectorAll('textarea, input').forEach(field => {
+                if (field.tagName === 'TEXTAREA') field.scrollTop = 0;
+            });
             overlay.classList.remove('hidden');
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => overlay.classList.add('show'));
@@ -612,12 +631,21 @@ class CoronaAddon {
     hideOverlay(id) {
         const overlay = document.getElementById(id);
         if (overlay) {
+            if (overlay._hideTimer) {
+                clearTimeout(overlay._hideTimer);
+                overlay._hideTimer = null;
+            }
+            if (overlay._hideTransitionEnd) {
+                overlay.removeEventListener('transitionend', overlay._hideTransitionEnd);
+                overlay._hideTransitionEnd = null;
+            }
             if (id === 'module-intro-overlay') {
                 overlay.classList.add('closing');
                 overlay.classList.remove('show');
-                setTimeout(() => {
+                overlay._hideTimer = setTimeout(() => {
                     overlay.classList.add('hidden');
                     overlay.classList.remove('closing');
+                    overlay._hideTimer = null;
                 }, 250);
                 return;
             }
@@ -631,11 +659,15 @@ class CoronaAddon {
             const onTransitionEnd = () => {
                 overlay.classList.add('hidden');
                 overlay.removeEventListener('transitionend', onTransitionEnd);
+                overlay._hideTransitionEnd = null;
             };
+            overlay._hideTransitionEnd = onTransitionEnd;
             overlay.addEventListener('transitionend', onTransitionEnd);
-            setTimeout(() => {
+            overlay._hideTimer = setTimeout(() => {
                 overlay.classList.add('hidden');
                 overlay.removeEventListener('transitionend', onTransitionEnd);
+                overlay._hideTransitionEnd = null;
+                overlay._hideTimer = null;
             }, 350);
         }
     }
@@ -2576,6 +2608,8 @@ class CoronaAddon {
                 t.classList.toggle('selected', i === 0);
             });
         }
+        codeInput.scrollTop = 0;
+        nameInput.scrollTop = 0;
         this.showOverlay('script-edit-overlay');
     }
     async saveScript() {
