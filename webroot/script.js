@@ -350,6 +350,21 @@ class CoronaAddon {
             }
         });
     }
+
+    /* ── smooth height animation helper ── */
+    _animateHeight(el, from, to, duration, easing, onDone) {
+        el.style.overflow = 'hidden';
+        const anim = el.animate(
+            [{ height: from + 'px' }, { height: to + 'px' }],
+            { duration, easing, fill: 'forwards' }
+        );
+        anim.onfinish = () => {
+            anim.cancel();
+            if (onDone) onDone();
+        };
+        return anim;
+    }
+
     initExpandableCards() {
         const cards = [
             { toggle: 'memory-compression-toggle', content: 'memory-compression-content', onExpand: null },
@@ -369,31 +384,35 @@ class CoronaAddon {
                 content.classList.remove('hidden');
                 content.classList.remove('expanded');
                 toggle.classList.remove('expanded');
+                content.style.height = '0px';
                 toggle.addEventListener('click', () => {
+                    if (content._animating) return;
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
                         if (content.id === 'memory-compression-content') {
                             this.collapseMemoryCompressionChildren(content);
                         }
-                        const h = content.scrollHeight;
-                        content.style.maxHeight = h + 'px';
-                        content.offsetHeight;
+                        const from = content.scrollHeight;
+                        content._animating = true;
                         content.classList.remove('expanded');
                         toggle.classList.remove('expanded');
-                        content.style.maxHeight = '0px';
+                        this._animateHeight(content, from, 0, 300, 'cubic-bezier(0.2, 0, 0, 1)', () => {
+                            content.style.height = '0px';
+                            content.style.overflow = 'hidden';
+                            content._animating = false;
+                        });
                     } else {
                         content.classList.add('expanded');
                         toggle.classList.add('expanded');
                         if (card.onExpand) card.onExpand();
-                        requestAnimationFrame(() => {
-                            const h = content.scrollHeight;
-                            content.style.maxHeight = h + 'px';
-                            const clear = (e) => {
-                                if (e.target !== content) return;
-                                content.style.maxHeight = 'none';
-                                content.removeEventListener('transitionend', clear);
-                            };
-                            content.addEventListener('transitionend', clear);
+                        content.style.height = 'auto';
+                        const targetH = content.scrollHeight;
+                        content.style.height = '0px';
+                        content._animating = true;
+                        this._animateHeight(content, 0, targetH, 350, 'cubic-bezier(0.2, 0, 0, 1)', () => {
+                            content.style.height = 'auto';
+                            content.style.overflow = '';
+                            content._animating = false;
                         });
                     }
                 });
@@ -406,10 +425,33 @@ class CoronaAddon {
         const toggle = document.getElementById('card-visibility-toggle');
         const list = document.getElementById('card-visibility-list');
         if (toggle && list) {
+            list.style.height = '0px';
             toggle.addEventListener('click', () => {
+                if (list._animating) return;
                 const isExpanded = list.classList.contains('expanded');
-                list.classList.toggle('expanded', !isExpanded);
-                toggle.classList.toggle('expanded', !isExpanded);
+                if (isExpanded) {
+                    const from = list.scrollHeight;
+                    list._animating = true;
+                    list.classList.remove('expanded');
+                    toggle.classList.remove('expanded');
+                    this._animateHeight(list, from, 0, 280, 'cubic-bezier(0.2, 0, 0, 1)', () => {
+                        list.style.height = '0px';
+                        list.style.overflow = 'hidden';
+                        list._animating = false;
+                    });
+                } else {
+                    list.classList.add('expanded');
+                    toggle.classList.add('expanded');
+                    list.style.height = 'auto';
+                    const targetH = list.scrollHeight;
+                    list.style.height = '0px';
+                    list._animating = true;
+                    this._animateHeight(list, 0, targetH, 300, 'cubic-bezier(0.2, 0, 0, 1)', () => {
+                        list.style.height = 'auto';
+                        list.style.overflow = '';
+                        list._animating = false;
+                    });
+                }
             });
         }
         const savedVisibility = localStorage.getItem('corona_card_visibility');
@@ -440,30 +482,34 @@ class CoronaAddon {
             const content = document.getElementById(card.content);
             if (toggle && content) {
                 const icon = toggle.querySelector('.expand-icon');
+                content.style.height = '0px';
                 toggle.addEventListener('click', () => {
+                    if (content._animating) return;
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
-                        const h = content.scrollHeight;
-                        content.style.maxHeight = h + 'px';
-                        content.offsetHeight;
+                        const from = content.scrollHeight;
+                        content._animating = true;
                         content.classList.remove('expanded');
                         toggle.classList.remove('expanded');
                         if (icon) icon.classList.remove('expanded');
-                        content.style.maxHeight = '0px';
+                        this._animateHeight(content, from, 0, 280, 'cubic-bezier(0.2, 0, 0, 1)', () => {
+                            content.style.height = '0px';
+                            content.style.overflow = 'hidden';
+                            content._animating = false;
+                        });
                     } else {
                         content.classList.add('expanded');
                         toggle.classList.add('expanded');
                         if (icon) icon.classList.add('expanded');
                         if (card.onExpand) card.onExpand();
-                        requestAnimationFrame(() => {
-                            const h = content.scrollHeight;
-                            content.style.maxHeight = h + 'px';
-                            const clear = (e) => {
-                                if (e.target !== content) return;
-                                content.style.maxHeight = 'none';
-                                content.removeEventListener('transitionend', clear);
-                            };
-                            content.addEventListener('transitionend', clear);
+                        content.style.height = 'auto';
+                        const targetH = content.scrollHeight;
+                        content.style.height = '0px';
+                        content._animating = true;
+                        this._animateHeight(content, 0, targetH, 320, 'cubic-bezier(0.2, 0, 0, 1)', () => {
+                            content.style.height = 'auto';
+                            content.style.overflow = '';
+                            content._animating = false;
                         });
                     }
                 });
