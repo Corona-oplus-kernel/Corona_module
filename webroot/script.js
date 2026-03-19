@@ -427,15 +427,17 @@ class CoronaAddon {
                 toggle.addEventListener('click', () => {
                     const parentSection = content.closest('.module-card-content');
                     const parentStartHeight = parentSection && parentSection.classList.contains('expanded')
-                        ? parentSection.scrollHeight
+                        ? parentSection.offsetHeight
                         : 0;
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
-                        this.toggleAnimatedSection(content, false);
+                        this.resetAnimatedSection(content);
+                        content.classList.remove('expanded');
                         toggle.classList.remove('expanded');
                         if (icon) icon.classList.remove('expanded');
                     } else {
-                        this.toggleAnimatedSection(content, true);
+                        this.resetAnimatedSection(content);
+                        content.classList.add('expanded');
                         toggle.classList.add('expanded');
                         if (icon) icon.classList.add('expanded');
                         if (card.onExpand) card.onExpand();
@@ -446,6 +448,19 @@ class CoronaAddon {
                 });
             }
         });
+    }
+    resetAnimatedSection(content) {
+        if (content._sectionAnimation) {
+            content._sectionAnimation.cancel();
+            content._sectionAnimation = null;
+        }
+        content.classList.remove('animating', 'opening', 'closing');
+        content.style.height = '';
+        content.style.opacity = '';
+        content.style.transform = '';
+        content.style.overflow = '';
+        content.style.paddingTop = '';
+        content.style.paddingBottom = '';
     }
     syncParentExpandableHeight(parentSection, startHeight) {
         const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
