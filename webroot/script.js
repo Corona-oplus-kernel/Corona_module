@@ -372,22 +372,11 @@ class CoronaAddon {
                 toggle.addEventListener('click', () => {
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
-                        content.style.maxHeight = content.scrollHeight + 'px';
-                        content.offsetHeight;
                         content.classList.remove('expanded');
                         toggle.classList.remove('expanded');
-                        requestAnimationFrame(() => {
-                            content.style.maxHeight = '';
-                        });
                     } else {
                         content.classList.add('expanded');
                         toggle.classList.add('expanded');
-                        content.style.maxHeight = content.scrollHeight + 'px';
-                        const onTransitionEnd = () => {
-                            content.style.maxHeight = '';
-                            content.removeEventListener('transitionend', onTransitionEnd);
-                        };
-                        content.addEventListener('transitionend', onTransitionEnd);
                         if (card.onExpand) card.onExpand();
                     }
                 });

@@ -3032,20 +3032,21 @@ body.theme-dark .sub-card-header.expanded {
 }
 
 .sub-expandable-content {
-    overflow: hidden;
-    max-height: 0;
+    display: none;
     opacity: 0;
     margin-top: 0;
     padding: 0;
-    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, padding 0.25s ease;
-    will-change: max-height, opacity;
+    transform: translateY(-6px);
+    transition: opacity 0.18s ease, transform 0.18s ease, padding 0.18s ease;
+    will-change: opacity, transform;
 }
 
 .sub-expandable-content.expanded {
-    max-height: 2000px;
+    display: block;
     opacity: 1;
     margin-top: 0;
     padding: 4px 0 20px 0;
+    transform: translateY(0);
     overflow: visible;
 }
 
@@ -3084,7 +3085,7 @@ body.theme-dark .info-row {
     justify-content: space-between;
     align-items: center;
     padding: 14px 0;
-    border-bottom: 1px solid var(--glass-border);
+    border-bottom: none;
 }
 
 .lru-switch:last-of-type {
@@ -3097,7 +3098,7 @@ body.theme-dark .lru-switch {
 
 .lru-setting {
     padding: 14px 0;
-    border-bottom: 1px solid var(--glass-border);
+    border-bottom: none;
 }
 
 .lru-setting:last-of-type {
@@ -3122,7 +3123,7 @@ body.theme-dark .lru-setting {
 
 #io-scheduler-content .setting-section {
     padding-top: 16px;
-    border-top: 1px solid var(--glass-border);
+    border-top: none;
     margin-top: 0;
 }
 
@@ -3508,33 +3509,31 @@ body.theme-dark .card-visibility-item {
 }
 
 #page-settings .sub-card {
-    border-bottom-color: rgba(0, 0, 0, 0.1);
+    border-bottom-color: transparent;
 }
 body.theme-dark #page-settings .sub-card {
-    border-bottom-color: rgba(255, 255, 255, 0.1);
+    border-bottom-color: transparent;
 }
 
 .module-card-content {
     padding: 0 18px;
-    overflow: hidden;
-    max-height: 0;
+    display: none;
     opacity: 0;
-    transform: translateY(-10px) translateZ(0);
-    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
-                opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+    overflow: hidden;
+    transform: translateY(-8px) translateZ(0);
+    transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1), 
                 transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
                 padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    will-change: max-height, opacity, transform;
+    will-change: opacity, transform;
 }
 .module-card-content.expanded {
-    max-height: 3000px;
+    display: block;
     opacity: 1;
     transform: translateY(0) translateZ(0);
     padding: 16px 18px 18px;
 }
 .module-card-content.hidden {
-    display: block;
-    max-height: 0;
+    display: none;
     opacity: 0;
     transform: translateY(-10px) translateZ(0);
     padding: 0 18px;
@@ -3741,6 +3740,20 @@ body.theme-dark .loading-overlay {
 #module-intro-overlay.show {
     backdrop-filter: blur(8px) !important;
     -webkit-backdrop-filter: blur(8px) !important;
+}
+
+#page-settings .sub-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#page-settings .sub-card-header,
+#page-settings .setting-section,
+#page-settings .info-row,
+#page-settings .lru-switch,
+#page-settings .lru-setting {
+    border: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
