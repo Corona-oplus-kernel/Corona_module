@@ -3653,69 +3653,112 @@ body.theme-dark #page-settings .sub-card {
     background: var(--accent-light);
 }
 
-/* Lightweight WebUI overrides: keep the existing layout, but remove the
-   heaviest blur/compositing paths that make KernelSU WebView stutter. */
+/* Glass blur overrides: all cards use backdrop-filter blur with GPU
+   acceleration for smooth 60fps rendering on KernelSU WebView. */
 
-.floating-header,
+.floating-header {
+    background: rgba(245, 248, 255, 0.72);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(143, 166, 214, 0.16);
+    box-shadow: 0 10px 30px rgba(24, 39, 75, 0.06);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
 .card,
 .module-card,
-.sub-card,
-.detail-card,
+.banner-image,
+.tab-bar-container {
+    background: rgba(255, 255, 255, 0.38);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+.sub-card {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+.detail-card {
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.08);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+.theme-option,
+.option-item {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+.sub-card-header {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+.toast {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+.loading-overlay {
+    background: rgba(245, 248, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+.easter-egg-card {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+.card-author {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+.module-card-expand {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
 .detail-overlay.show,
 .easter-egg-overlay.show,
 #xinran-overlay.show,
 #confirm-dialog-overlay.show,
-#module-intro-overlay.show,
-.toast,
-.theme-option,
-.option-item,
-.sub-card-header,
-.module-card-expand,
-.loading-overlay {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}
-
-.floating-header {
-    background: rgba(245, 248, 255, 0.94);
-    border-bottom: 1px solid rgba(143, 166, 214, 0.16);
-    box-shadow: 0 10px 30px rgba(24, 39, 75, 0.06);
-}
-
-.card,
-.module-card,
-.sub-card,
-.detail-card,
-.theme-option,
-.option-item {
-    background: rgba(255, 255, 255, 0.88) !important;
-    border: 1px solid rgba(140, 166, 210, 0.16) !important;
-    box-shadow: 0 12px 28px rgba(24, 39, 75, 0.06) !important;
+#module-intro-overlay.show {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .card:active,
 .module-card-expand:active,
 .option-item:active,
 .tab-item:active {
-    transform: scale(0.992);
-}
-
-.progress-fill,
-.progress-fill.swap,
-.progress-fill.storage,
-.progress-fill.danger {
-    animation: none !important;
-}
-
-.banner-image,
-.device-image img,
-.corona-title,
-.page,
-.module-card-content,
-.sub-expandable-content,
-.detail-card,
-.toast {
-    will-change: auto;
+    transform: scale(0.992) translateZ(0);
 }
 
 .banner-image {
@@ -3726,24 +3769,61 @@ body.theme-dark #page-settings .sub-card {
     animation: none !important;
 }
 
-.loading-overlay {
-    background: rgba(245, 248, 255, 0.9);
+/* Dark theme glass overrides */
+body.theme-dark .floating-header {
+    background: rgba(20, 24, 32, 0.72);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
-body.theme-dark .floating-header,
 body.theme-dark .card,
 body.theme-dark .module-card,
-body.theme-dark .sub-card,
-body.theme-dark .detail-card,
-body.theme-dark .theme-option,
-body.theme-dark .option-item,
-body.theme-dark .loading-overlay {
-    background: rgba(24, 29, 40, 0.92) !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.24) !important;
+body.theme-dark .banner-image,
+body.theme-dark .tab-bar-container {
+    background: rgba(24, 29, 40, 0.55);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
 }
 
-/* Restore the original glass cards while removing the extra top inset. */
+body.theme-dark .sub-card {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+body.theme-dark .detail-card {
+    background: rgba(24, 29, 40, 0.65);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.3);
+}
+
+body.theme-dark .theme-option,
+body.theme-dark .option-item {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+body.theme-dark .toast {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+body.theme-dark .loading-overlay {
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+body.theme-dark .easter-egg-card {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+/* Layout fix */
 .floating-header {
     height: 56px !important;
     padding-top: 0 !important;
@@ -3753,25 +3833,6 @@ body.theme-dark .loading-overlay {
     padding-top: 0 !important;
 }
 
-.card,
-.module-card,
-.sub-card,
-.detail-card,
-.theme-option,
-.option-item,
-.sub-card-header {
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-}
-
-.detail-overlay.show,
-.easter-egg-overlay.show,
-#xinran-overlay.show,
-#confirm-dialog-overlay.show,
-#module-intro-overlay.show {
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
-}
 
 #page-settings .sub-card {
     background: rgba(255, 255, 255, 0.24) !important;
