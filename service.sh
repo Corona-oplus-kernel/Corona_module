@@ -348,6 +348,8 @@ apply_fstrim_config; sleep 1
 apply_user_scripts
 
 sleep 30
+apply_io_config
+apply_cpu_governor_config
 apply_cpu_affinity_config
 apply_process_priority_config
 apply_freq_lock_config

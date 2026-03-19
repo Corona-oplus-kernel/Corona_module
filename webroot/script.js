@@ -143,13 +143,13 @@ class CoronaAddon {
     }
     async resolvePaths() {
         const pathname = decodeURIComponent(window.location.pathname || '');
-        const match = pathname.match(/(\/data\/adb\/modules\/([^/]+))/);
+        const match = pathname.match(/(\/data\/adb\/(?:ksu\/|ap\/)?modules\/([^/]+))/);
         if (match) {
             this.modDir = match[1];
             this.moduleId = match[2];
         }
         if (!this.modDir) {
-            const found = (await this.exec('for d in /data/adb/modules/*; do [ -f "$d/webroot/script.js" ] && [ -f "$d/module.prop" ] && echo "$d" && break; done')).trim();
+            const found = (await this.exec('for base in /data/adb/modules /data/adb/ksu/modules /data/adb/ap/modules; do [ -d "$base" ] || continue; for d in "$base"/*; do [ -f "$d/webroot/script.js" ] && [ -f "$d/module.prop" ] && echo "$d" && break 2; done; done')).trim();
             if (found) {
                 this.modDir = found.split('\n')[0].trim();
                 const parts = this.modDir.split('/');
@@ -157,8 +157,9 @@ class CoronaAddon {
             }
         }
         if (!this.modDir) {
-            this.moduleId = 'module';
-            this.modDir = `/data/adb/modules/${this.moduleId}`;
+            if (!this.moduleId) this.moduleId = 'module';
+            const base = (await this.exec('[ -d /data/adb/ksu/modules ] && echo /data/adb/ksu/modules || echo /data/adb/modules')).trim() || '/data/adb/modules';
+            this.modDir = `${base}/${this.moduleId}`;
         }
         this.configDir = `${this.modDir}/config`;
     }
@@ -1272,7 +1273,20 @@ class CoronaAddon {
             item.addEventListener('click', async (e) => { container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.readahead = parseInt(e.currentTarget.dataset.value); await this.applyReadaheadImmediate(); });
         });
     }
-    async applyReadaheadImmediate() { await this.exec(`for f in /sys/block/*/queue/read_ahead_kb; do echo ${this.state.readahead} > "$f" 2>/dev/null; done`); await this.exec(`echo 'readahead=${this.state.readahead}' >> ${this.configDir}/io_scheduler.conf`); this.showToast(`预读取大小: ${this.state.readahead} KB`); }
+    async applyReadaheadImmediate() {
+        await this.exec(`for f in /sys/block/*/queue/read_ahead_kb; do echo ${this.state.readahead} > "$f" 2>/dev/null; done`);
+        let scheduler = this.state.ioScheduler;
+        if (!scheduler) {
+            const current = await this.exec(`cat ${this.configDir}/io_scheduler.conf 2>/dev/null`);
+            const match = current.match(/^scheduler=(.*)$/m);
+            if (match) scheduler = match[1].trim();
+        }
+        const lines = [];
+        if (scheduler) lines.push(`scheduler=${scheduler}`);
+        lines.push(`readahead=${this.state.readahead}`);
+        await this.exec(`echo '${lines.join('\n')}' > ${this.configDir}/io_scheduler.conf`);
+        this.showToast(`预读取大小: ${this.state.readahead} KB`);
+    }
     async loadDeviceInfo() {
         const [brand, model, socModel, hardware, chipname, androidVersion, sdk, kernelVersion, battDesign] = await Promise.all([
             this.exec('getprop ro.product.brand'),
