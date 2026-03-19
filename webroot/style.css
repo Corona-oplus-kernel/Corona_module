@@ -3622,3 +3622,133 @@ body.theme-dark #page-settings .sub-card {
     transform: scale(0.98) translateZ(0);
     background: var(--accent-light);
 }
+
+/* Lightweight WebUI overrides: keep the existing layout, but remove the
+   heaviest blur/compositing paths that make KernelSU WebView stutter. */
+
+.floating-header,
+.card,
+.module-card,
+.sub-card,
+.detail-card,
+.detail-overlay.show,
+.easter-egg-overlay.show,
+#xinran-overlay.show,
+#confirm-dialog-overlay.show,
+#module-intro-overlay.show,
+.toast,
+.theme-option,
+.option-item,
+.sub-card-header,
+.module-card-expand,
+.loading-overlay {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.floating-header {
+    background: rgba(245, 248, 255, 0.94);
+    border-bottom: 1px solid rgba(143, 166, 214, 0.16);
+    box-shadow: 0 10px 30px rgba(24, 39, 75, 0.06);
+}
+
+.card,
+.module-card,
+.sub-card,
+.detail-card,
+.theme-option,
+.option-item {
+    background: rgba(255, 255, 255, 0.88) !important;
+    border: 1px solid rgba(140, 166, 210, 0.16) !important;
+    box-shadow: 0 12px 28px rgba(24, 39, 75, 0.06) !important;
+}
+
+.card:active,
+.module-card-expand:active,
+.option-item:active,
+.tab-item:active {
+    transform: scale(0.992);
+}
+
+.progress-fill,
+.progress-fill.swap,
+.progress-fill.storage,
+.progress-fill.danger {
+    animation: none !important;
+}
+
+.banner-image,
+.device-image img,
+.corona-title,
+.page,
+.module-card-content,
+.sub-expandable-content,
+.detail-card,
+.toast {
+    will-change: auto;
+}
+
+.banner-image {
+    transition: transform 0.18s ease-out;
+}
+
+.device-image img {
+    animation: none !important;
+}
+
+.loading-overlay {
+    background: rgba(245, 248, 255, 0.9);
+}
+
+body.theme-dark .floating-header,
+body.theme-dark .card,
+body.theme-dark .module-card,
+body.theme-dark .sub-card,
+body.theme-dark .detail-card,
+body.theme-dark .theme-option,
+body.theme-dark .option-item,
+body.theme-dark .loading-overlay {
+    background: rgba(24, 29, 40, 0.92) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.24) !important;
+}
+
+/* Restore the original glass cards while removing the extra top inset. */
+.floating-header {
+    height: 56px !important;
+    padding-top: 0 !important;
+}
+
+.corona-title-container {
+    padding-top: 0 !important;
+}
+
+.card,
+.module-card,
+.sub-card,
+.detail-card,
+.theme-option,
+.option-item,
+.sub-card-header {
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+}
+
+.detail-overlay.show,
+.easter-egg-overlay.show,
+#xinran-overlay.show,
+#confirm-dialog-overlay.show,
+#module-intro-overlay.show {
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation: none !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
