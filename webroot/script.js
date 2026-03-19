@@ -373,6 +373,9 @@ class CoronaAddon {
                 toggle.addEventListener('click', () => {
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
+                        if (content.id === 'memory-compression-content') {
+                            this.collapseMemoryCompressionChildren(content);
+                        }
                         this.toggleAnimatedSection(content, false);
                         toggle.classList.remove('expanded');
                     } else {
@@ -431,13 +434,11 @@ class CoronaAddon {
                         : 0;
                     const isExpanded = content.classList.contains('expanded');
                     if (isExpanded) {
-                        this.resetAnimatedSection(content);
-                        content.classList.remove('expanded');
+                        this.toggleMemoryCompressionSubSection(content, false);
                         toggle.classList.remove('expanded');
                         if (icon) icon.classList.remove('expanded');
                     } else {
-                        this.resetAnimatedSection(content);
-                        content.classList.add('expanded');
+                        this.toggleMemoryCompressionSubSection(content, true);
                         toggle.classList.add('expanded');
                         if (icon) icon.classList.add('expanded');
                         if (card.onExpand) card.onExpand();
@@ -448,6 +449,85 @@ class CoronaAddon {
                 });
             }
         });
+    }
+    collapseMemoryCompressionChildren(parentContent) {
+        const items = parentContent.querySelectorAll('.sub-card-header[id$="-toggle"]');
+        items.forEach(toggle => {
+            const contentId = toggle.id.replace('-toggle', '-content');
+            const content = document.getElementById(contentId);
+            const icon = toggle.querySelector('.expand-icon');
+            if (!content || !content.classList.contains('expanded')) return;
+            this.resetAnimatedSection(content);
+            content.classList.remove('expanded');
+            toggle.classList.remove('expanded');
+            if (icon) icon.classList.remove('expanded');
+        });
+    }
+    toggleMemoryCompressionSubSection(content, expand) {
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (content._sectionAnimation) {
+            content._sectionAnimation.cancel();
+            content._sectionAnimation = null;
+        }
+        if (expand) {
+            content.classList.add('expanded', 'animating');
+            const targetHeight = content.scrollHeight;
+            if (prefersReducedMotion) {
+                content.classList.remove('animating');
+                this.resetAnimatedSection(content);
+                return;
+            }
+            content.style.height = '0px';
+            content.style.opacity = '0';
+            content.style.transform = 'translateY(-6px)';
+            content.style.overflow = 'hidden';
+            const animation = content.animate([
+                { height: '0px', opacity: 0, transform: 'translateY(-6px)' },
+                { height: `${targetHeight}px`, opacity: 1, transform: 'translateY(0)' }
+            ], {
+                duration: 220,
+                easing: 'cubic-bezier(0.2, 0, 0, 1)',
+                fill: 'forwards'
+            });
+            content._sectionAnimation = animation;
+            animation.onfinish = () => {
+                content._sectionAnimation = null;
+                content.classList.remove('animating');
+                this.resetAnimatedSection(content);
+            };
+            animation.oncancel = () => {
+                content._sectionAnimation = null;
+            };
+            return;
+        }
+        const startHeight = content.offsetHeight;
+        if (prefersReducedMotion) {
+            content.classList.remove('expanded', 'animating');
+            this.resetAnimatedSection(content);
+            return;
+        }
+        content.classList.add('animating');
+        content.style.height = `${startHeight}px`;
+        content.style.opacity = '1';
+        content.style.transform = 'translateY(0)';
+        content.style.overflow = 'hidden';
+        const animation = content.animate([
+            { height: `${startHeight}px`, opacity: 1, transform: 'translateY(0)' },
+            { height: '0px', opacity: 0, transform: 'translateY(-4px)' }
+        ], {
+            duration: 180,
+            easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+            fill: 'forwards'
+        });
+        content._sectionAnimation = animation;
+        animation.onfinish = () => {
+            content._sectionAnimation = null;
+            content.classList.remove('expanded', 'animating');
+            this.resetAnimatedSection(content);
+        };
+        animation.oncancel = () => {
+            content._sectionAnimation = null;
+        };
     }
     resetAnimatedSection(content) {
         if (content._sectionAnimation) {
