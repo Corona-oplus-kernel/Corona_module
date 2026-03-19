@@ -3111,10 +3111,32 @@ body.theme-dark .lru-setting {
 
 #memory-compression-content {
     padding-top: 4px;
+    overflow: visible;
 }
 
 #memory-compression-content .sub-card:first-child .sub-card-header {
     padding-top: 8px;
+}
+
+#memory-compression-content .sub-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin-bottom: 0 !important;
+    overflow: visible;
+}
+
+#memory-compression-content .sub-card-header,
+#memory-compression-content .info-row,
+#memory-compression-content .setting-section,
+#memory-compression-content .lru-switch,
+#memory-compression-content .lru-setting {
+    border: none !important;
+}
+
+#memory-compression-content .sub-expandable-content,
+#memory-compression-content .sub-expandable-content.expanded {
+    overflow: visible;
 }
 
 #io-scheduler-content .option-list {
@@ -3776,6 +3798,11 @@ body.theme-dark .loading-overlay {
 body.theme-dark #page-settings .sub-card {
     background: rgba(255, 255, 255, 0.04) !important;
     border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.theme-dark #memory-compression-content .sub-card {
+    background: transparent !important;
+    border-color: transparent !important;
 }
 
 body.theme-dark .option-item {
