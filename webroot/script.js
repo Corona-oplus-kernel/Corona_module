@@ -444,6 +444,14 @@ class CoronaAddon {
         const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const openingTransform = 'translateY(-8px) scale(0.985)';
         const closingTransform = 'translateY(-6px) scale(0.99)';
+        const clearInlineState = () => {
+            content.style.height = '';
+            content.style.opacity = '';
+            content.style.transform = '';
+            content.style.overflow = '';
+            content.style.paddingTop = '';
+            content.style.paddingBottom = '';
+        };
         if (content._sectionAnimation) {
             content._sectionAnimation.cancel();
             content._sectionAnimation = null;
@@ -451,19 +459,25 @@ class CoronaAddon {
         content.classList.remove('opening', 'closing');
         if (expand) {
             content.classList.add('expanded', 'animating');
+            const expandedStyle = window.getComputedStyle(content);
             const targetHeight = content.scrollHeight;
+            const targetPaddingTop = expandedStyle.paddingTop;
+            const targetPaddingBottom = expandedStyle.paddingBottom;
             if (prefersReducedMotion) {
                 content.classList.remove('animating');
+                clearInlineState();
                 return;
             }
             content.style.height = '0px';
             content.style.opacity = '0';
             content.style.transform = openingTransform;
             content.style.overflow = 'hidden';
+            content.style.paddingTop = '0px';
+            content.style.paddingBottom = '0px';
             requestAnimationFrame(() => {
                 const animation = content.animate([
-                    { height: '0px', opacity: 0, transform: openingTransform },
-                    { height: `${targetHeight}px`, opacity: 1, transform: 'translateY(0) scale(1)' }
+                    { height: '0px', opacity: 0, transform: openingTransform, paddingTop: '0px', paddingBottom: '0px' },
+                    { height: `${targetHeight}px`, opacity: 1, transform: 'translateY(0) scale(1)', paddingTop: targetPaddingTop, paddingBottom: targetPaddingBottom }
                 ], {
                     duration: 280,
                     easing: 'cubic-bezier(0.2, 0, 0, 1)',
@@ -471,10 +485,7 @@ class CoronaAddon {
                 });
                 content._sectionAnimation = animation;
                 animation.onfinish = () => {
-                    content.style.height = '';
-                    content.style.opacity = '';
-                    content.style.transform = '';
-                    content.style.overflow = '';
+                    clearInlineState();
                     content.classList.remove('animating');
                     content._sectionAnimation = null;
                 };
@@ -485,8 +496,12 @@ class CoronaAddon {
             return;
         }
         const startHeight = content.offsetHeight;
+        const currentStyle = window.getComputedStyle(content);
+        const startPaddingTop = currentStyle.paddingTop;
+        const startPaddingBottom = currentStyle.paddingBottom;
         if (prefersReducedMotion) {
             content.classList.remove('expanded', 'animating', 'closing', 'opening');
+            clearInlineState();
             return;
         }
         content.classList.add('animating', 'closing');
@@ -494,9 +509,11 @@ class CoronaAddon {
         content.style.opacity = '1';
         content.style.transform = 'translateY(0) scale(1)';
         content.style.overflow = 'hidden';
+        content.style.paddingTop = startPaddingTop;
+        content.style.paddingBottom = startPaddingBottom;
         const animation = content.animate([
-            { height: `${startHeight}px`, opacity: 1, transform: 'translateY(0) scale(1)' },
-            { height: '0px', opacity: 0, transform: closingTransform }
+            { height: `${startHeight}px`, opacity: 1, transform: 'translateY(0) scale(1)', paddingTop: startPaddingTop, paddingBottom: startPaddingBottom },
+            { height: '0px', opacity: 0, transform: closingTransform, paddingTop: '0px', paddingBottom: '0px' }
         ], {
             duration: 240,
             easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
@@ -505,10 +522,7 @@ class CoronaAddon {
         content._sectionAnimation = animation;
         animation.onfinish = () => {
             content.classList.remove('expanded', 'animating', 'closing', 'opening');
-            content.style.height = '';
-            content.style.opacity = '';
-            content.style.transform = '';
-            content.style.overflow = '';
+            clearInlineState();
             content._sectionAnimation = null;
         };
         animation.oncancel = () => {
