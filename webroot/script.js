@@ -4,7 +4,7 @@ class CoronaAddon {
         this.modDir = '';
         this.configDir = '';
         this.runtimeConfig = { swapPath: '' };
-        this.algorithms = ['lz4', 'lz4hc', 'lzo', 'lzo-rle', 'zstd', 'zstdn', 'deflate', 'lz4k', 'lz4kd'];
+        this.algorithms = [];
         this.readaheadOptions = [128, 256, 384, 512, 768, 1024, 2048, 4096];
         this.state = {
             algorithm: 'lz4',
@@ -1325,17 +1325,21 @@ class CoronaAddon {
         if (battDesign && parseInt(battDesign) > 0) document.getElementById('battery-capacity').textContent = `${Math.round(parseInt(battDesign) / 1000)} mAh`;
     }
     async detectZramAlgorithms() {
-        if (this.isCoronaKernel) {
-            this.algorithms = ['lz4', 'lz4hc', 'lzo', 'lzo-rle', 'zstd', 'zstdn', 'deflate', 'lz4k', 'lz4kd'];
-        } else {
-            const algRaw = await this.exec('cat /sys/block/zram0/comp_algorithm 2>/dev/null');
-            if (algRaw) {
-                this.algorithms = algRaw.replace(/\[|\]/g, '').split(/\s+/).filter(a => a.length > 0);
-            }
-            if (!this.algorithms || this.algorithms.length === 0) {
-                this.algorithms = ['lz4', 'lzo', 'zstd'];
-            }
+        const algRaw = await this.exec('cat /sys/block/zram0/comp_algorithm 2>/dev/null');
+        if (algRaw) {
+            this.algorithms = algRaw.replace(/\[|\]/g, '').split(/\s+/).filter(a => a.length > 0).map(a => a.replace(/^kernel:/, ''));
+            this.algorithms = [...new Set(this.algorithms)];
         }
+        if (!this.algorithms || this.algorithms.length === 0) {
+            this.algorithms = ['lz4', 'lzo', 'zstd'];
+        }
+    }
+
+    async getZramAlgorithmCommand(algorithm, zramBlock) {
+        const algRaw = await this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`);
+        const prefixed = `kernel:${algorithm}`;
+        if (this.isCoronaKernel && algRaw && algRaw.includes(prefixed)) return prefixed;
+        return algorithm;
     }
     async detectCpuClusters() {
         this.cpuClusterInfo = { little: 0, mid: 0, big: 0, prime: 0 };
@@ -1628,7 +1632,8 @@ class CoronaAddon {
         }
         await this.exec(`swapoff ${zramDev} 2>/dev/null`);
         await this.exec(`echo 1 > /sys/block/${zramBlock}/reset 2>/dev/null`);
-        await this.exec(`echo "${this.state.algorithm}" > /sys/block/${zramBlock}/comp_algorithm`);
+        const algCmd = await this.getZramAlgorithmCommand(this.state.algorithm, zramBlock);
+        await this.exec(`echo "${algCmd}" > /sys/block/${zramBlock}/comp_algorithm`);
         if (this.state.zramWriteback === 'false') {
             await this.exec(`echo none > /sys/block/${zramBlock}/backing_dev 2>/dev/null`);
         }
