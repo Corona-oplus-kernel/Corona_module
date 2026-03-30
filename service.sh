@@ -7,6 +7,18 @@ set_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/d
 lock_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/dev/null && chmod 444 "$2" 2>/dev/null; }
 get_conf_value() { [ -f "$1" ] && grep -m1 "^$2=" "$1" | cut -d'=' -f2-; }
 
+
+zram_algorithm_cmd() {
+    local alg="$1" prefixed current
+    [ -z "$alg" ] && return 1
+    current=$(cat "/sys/block/$zram_block/comp_algorithm" 2>/dev/null)
+    prefixed="kernel:$alg"
+    if [ "$isCoronaKernel" = "1" ]; then
+        echo "$current" | grep -qw "$prefixed" && { echo "$prefixed"; return 0; }
+    fi
+    echo "$alg"
+}
+
 wait_until_boot_complete() { until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 5; done; }
 wait_until_login() { until [ -d "/data/data/android" ]; do sleep 5; done; }
 
@@ -18,6 +30,7 @@ get_system_info() {
     kernel_version1=$(echo "$kernel_version" | cut -d'.' -f1)
     is_oplus=0; find /proc -maxdepth 1 -name "oplus*" 2>/dev/null | grep -q . && is_oplus=1
     is_xiaomi=0; [ "$(getprop ro.miui.ui.version.name)" != "" ] && is_xiaomi=1
+    isCoronaKernel=0; uname -r | grep -qi "corona" && isCoronaKernel=1
 }
 
 apply_zram_config() {
@@ -45,7 +58,10 @@ apply_zram_config() {
         fi
     fi
     set_value 4 /sys/block/$zram_block/max_comp_streams
-    [ -n "$algorithm" ] && grep -q "$algorithm" /sys/block/$zram_block/comp_algorithm && echo "$algorithm" > /sys/block/$zram_block/comp_algorithm 2>/dev/null
+    if [ -n "$algorithm" ]; then
+        algorithm_cmd=$(zram_algorithm_cmd "$algorithm")
+        [ -n "$algorithm_cmd" ] && echo "$algorithm_cmd" > /sys/block/$zram_block/comp_algorithm 2>/dev/null
+    fi
     [ -n "$size" ] && echo "$size" > /sys/block/$zram_block/disksize 2>/dev/null
     mkswap "$zram_path" 2>/dev/null
     swapon "$zram_path" -p 32758 2>/dev/null || swapon "$zram_path" 2>/dev/null
