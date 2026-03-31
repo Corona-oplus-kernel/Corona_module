@@ -3513,6 +3513,7 @@ body.theme-dark .module-card {
                 margin-top 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 .card-visibility-list.expanded {
+    max-height: 520px;
     opacity: 1;
     margin-top: 12px;
 }
