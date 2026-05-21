@@ -380,9 +380,11 @@ class CoronaAddon {
                     if (content._anim) {
                         content.removeEventListener('transitionend', content._anim);
                         content._anim = null;
+                        content.style.removeProperty('overflow');
                         endExpand();
                     }
                     beginExpand();
+                    content.style.setProperty('overflow', 'hidden', 'important');
                     if (isExpanded) {
                         if (content.id === 'memory-compression-content') {
                             this.collapseMemoryCompressionChildren(content);
@@ -397,6 +399,7 @@ class CoronaAddon {
                             if (e.target !== content || e.propertyName !== 'max-height') return;
                             content.removeEventListener('transitionend', done);
                             content._anim = null;
+                            content.style.removeProperty('overflow');
                             if (cardEl) cardEl.classList.remove('expanding');
                             endExpand();
                         };
@@ -415,6 +418,9 @@ class CoronaAddon {
                                 content._anim = null;
                                 if (content.classList.contains('expanded')) {
                                     content.style.maxHeight = 'none';
+                                    content.style.removeProperty('overflow');
+                                } else {
+                                    content.style.removeProperty('overflow');
                                 }
                                 if (cardEl) cardEl.classList.remove('expanding');
                                 endExpand();
@@ -474,9 +480,11 @@ class CoronaAddon {
                     if (content._anim) {
                         content.removeEventListener('transitionend', content._anim);
                         content._anim = null;
+                        content.style.removeProperty('overflow');
                         endExpand();
                     }
                     beginExpand();
+                    content.style.setProperty('overflow', 'hidden', 'important');
                     if (isExpanded) {
                         const h = content.scrollHeight;
                         content.style.maxHeight = h + 'px';
@@ -489,6 +497,7 @@ class CoronaAddon {
                             if (e.target !== content || e.propertyName !== 'max-height') return;
                             content.removeEventListener('transitionend', done);
                             content._anim = null;
+                            content.style.removeProperty('overflow');
                             if (cardEl) cardEl.classList.remove('expanding');
                             endExpand();
                         };
@@ -508,6 +517,9 @@ class CoronaAddon {
                                 content._anim = null;
                                 if (content.classList.contains('expanded')) {
                                     content.style.maxHeight = 'none';
+                                    content.style.removeProperty('overflow');
+                                } else {
+                                    content.style.removeProperty('overflow');
                                 }
                                 if (cardEl) cardEl.classList.remove('expanding');
                                 endExpand();
