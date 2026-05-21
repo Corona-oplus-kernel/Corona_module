@@ -3076,6 +3076,8 @@ body.theme-dark .lru-setting {
 
 #memory-compression-content {
     padding-top: 4px;
+}
+#memory-compression-content.expanded {
     overflow: visible;
 }
 
@@ -3099,7 +3101,6 @@ body.theme-dark .lru-setting {
     border: none !important;
 }
 
-#memory-compression-content .sub-expandable-content,
 #memory-compression-content .sub-expandable-content.expanded {
     overflow: visible;
 }
@@ -3642,10 +3643,6 @@ body.theme-dark #page-settings .sub-card {
 }
 
 .sub-card {
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
 }
 
 .detail-card {
@@ -3660,32 +3657,16 @@ body.theme-dark #page-settings .sub-card {
 
 .theme-option,
 .option-item {
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
 }
 
 .sub-card-header {
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
 }
 
 .toast {
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
 }
 
 .loading-overlay {
     background: rgba(245, 248, 255, 0.85);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
 }
 
 .easter-egg-card {
@@ -3696,15 +3677,9 @@ body.theme-dark #page-settings .sub-card {
 }
 
 .card-author {
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
 }
 
 .module-card-expand {
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
 }
 
 .detail-overlay.show,
@@ -3873,11 +3848,10 @@ body.theme-dark #page-settings #memory-compression-content .sub-card:last-child 
     border: none !important;
 }
 
-#page-settings #memory-compression-content {
+#page-settings #memory-compression-content.expanded {
     overflow: visible !important;
 }
 
-#page-settings #memory-compression-content .sub-expandable-content,
 #page-settings #memory-compression-content .sub-expandable-content.expanded {
     overflow: visible !important;
 }
