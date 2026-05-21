@@ -125,9 +125,10 @@ class CoronaAddon {
         slider.style.background = `linear-gradient(to right, ${filledColor} 0%, ${filledColor} ${percent}%, ${emptyColor} ${percent}%, ${emptyColor} 100%)`;
     }
     initSliderProgress() {
+        const throttled = rafThrottle((slider) => this.updateSliderProgress(slider));
         document.querySelectorAll('.range-slider').forEach(slider => {
             this.updateSliderProgress(slider);
-            slider.addEventListener('input', () => this.updateSliderProgress(slider));
+            slider.addEventListener('input', () => throttled(slider));
         });
     }
     async exec(cmd) {
@@ -264,6 +265,8 @@ class CoronaAddon {
     }
     drawChart() {
         if (!this.chartCtx) return;
+        const homeActive = document.getElementById('page-home')?.classList.contains('active');
+        if (!homeActive) { this.pendingChartDraw = true; return; }
         const canvas = this.chartCanvas;
         const ctx = this.chartCtx;
         const dpr = window.devicePixelRatio || 1;
@@ -2781,7 +2784,7 @@ class CoronaAddon {
             }
             lastScrollY = scrollY;
         };
-        window.addEventListener('scroll', handleScroll, { passive: true });
+        window.addEventListener('scroll', rafThrottle(handleScroll), { passive: true });
         handleScroll();
     }
     initModuleIntro() {
@@ -2875,4 +2878,22 @@ Swap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的
         });
     }
 }
+function rafThrottle(fn) {
+    let scheduled = false;
+    let lastArgs = null;
+    let lastThis = null;
+    return function() {
+        lastArgs = arguments;
+        lastThis = this;
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(() => {
+            scheduled = false;
+            fn.apply(lastThis, lastArgs);
+        });
+    };
+}
 document.addEventListener('DOMContentLoaded', () => { window.corona = new CoronaAddon(); });
+document.addEventListener('visibilitychange', () => {
+    document.body.classList.toggle('app-hidden', document.hidden);
+});
