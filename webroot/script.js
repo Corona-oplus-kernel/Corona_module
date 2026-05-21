@@ -375,6 +375,8 @@ class CoronaAddon {
                 toggle.classList.remove('expanded');
                 toggle.addEventListener('click', () => {
                     const isExpanded = content.classList.contains('expanded');
+                    const cardEl = toggle.closest('.module-card');
+                    if (cardEl) cardEl.classList.add('expanding');
                     if (isExpanded) {
                         if (content.id === 'memory-compression-content') {
                             this.collapseMemoryCompressionChildren(content);
@@ -400,6 +402,12 @@ class CoronaAddon {
                             content.addEventListener('transitionend', clear);
                         });
                     }
+                    const stop = (e) => {
+                        if (e.target !== content) return;
+                        if (cardEl) cardEl.classList.remove('expanding');
+                        content.removeEventListener('transitionend', stop);
+                    };
+                    content.addEventListener('transitionend', stop);
                 });
             }
         });
@@ -446,6 +454,8 @@ class CoronaAddon {
                 const icon = toggle.querySelector('.expand-icon');
                 toggle.addEventListener('click', () => {
                     const isExpanded = content.classList.contains('expanded');
+                    const cardEl = toggle.closest('.module-card');
+                    if (cardEl) cardEl.classList.add('expanding');
                     if (isExpanded) {
                         const h = content.scrollHeight;
                         content.style.maxHeight = h + 'px';
@@ -470,6 +480,12 @@ class CoronaAddon {
                             content.addEventListener('transitionend', clear);
                         });
                     }
+                    const stop = (e) => {
+                        if (e.target !== content) return;
+                        if (cardEl) cardEl.classList.remove('expanding');
+                        content.removeEventListener('transitionend', stop);
+                    };
+                    content.addEventListener('transitionend', stop);
                 });
             }
         });

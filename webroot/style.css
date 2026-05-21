@@ -2740,9 +2740,9 @@ body.theme-dark .range-slider::-webkit-slider-thumb {
     max-height: 0;
     opacity: 0;
     margin-top: 0;
-    transition: max-height 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                opacity 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                margin-top 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition: max-height 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                opacity 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                margin-top 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 .expandable-content.expanded {
     opacity: 1;
@@ -3039,11 +3039,10 @@ body.theme-dark .sub-card-header.expanded {
     opacity: 0;
     margin-top: 0;
     padding: 0;
-    transform: translateZ(0);
-    transition: max-height 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                opacity 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                padding 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    will-change: max-height, opacity;
+    transition: max-height 0.26s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                opacity 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                padding 0.26s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    will-change: opacity;
 }
 
 .sub-expandable-content.expanded {
@@ -3546,23 +3545,18 @@ body.theme-dark #page-settings .sub-card {
     max-height: 0;
     opacity: 0;
     overflow: hidden;
-    transform: translateY(-8px) translateZ(0);
-    transition: max-height 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                opacity 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                transform 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                padding 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    will-change: max-height, opacity, transform;
+    transition: max-height 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                opacity 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    will-change: opacity;
 }
 .module-card-content.expanded {
     opacity: 1;
-    transform: translateY(0) translateZ(0);
     padding: 16px 18px 18px;
 }
 .module-card-content.hidden {
     display: block;
     max-height: 0;
     opacity: 0;
-    transform: translateY(-8px) translateZ(0);
     padding: 0 18px;
 }
 
@@ -3946,4 +3940,10 @@ body.app-hidden *,
 body.app-hidden *::before,
 body.app-hidden *::after {
     animation-play-state: paused !important;
+}
+
+.module-card.expanding,
+.module-card.expanding * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
