@@ -3933,16 +3933,8 @@ body.app-hidden *::after {
     animation-play-state: paused !important;
 }
 
-.module-card.expanding,
-.module-card.expanding * {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}
-
-body.cards-expanding .module-card,
-body.cards-expanding .card {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
+body.cards-expanding {
+    /* expand-state hook reserved for future use */
 }
 
 #memory-compression-card .expandable-content {
