@@ -377,6 +377,10 @@ class CoronaAddon {
                     const isExpanded = content.classList.contains('expanded');
                     const cardEl = toggle.closest('.module-card');
                     if (cardEl) cardEl.classList.add('expanding');
+                    if (content._anim) {
+                        content.removeEventListener('transitionend', content._anim);
+                        content._anim = null;
+                    }
                     if (isExpanded) {
                         if (content.id === 'memory-compression-content') {
                             this.collapseMemoryCompressionChildren(content);
@@ -387,6 +391,14 @@ class CoronaAddon {
                         content.classList.remove('expanded');
                         toggle.classList.remove('expanded');
                         content.style.maxHeight = '0px';
+                        const done = (e) => {
+                            if (e.target !== content || e.propertyName !== 'max-height') return;
+                            content.removeEventListener('transitionend', done);
+                            content._anim = null;
+                            if (cardEl) cardEl.classList.remove('expanding');
+                        };
+                        content._anim = done;
+                        content.addEventListener('transitionend', done);
                     } else {
                         content.classList.add('expanded');
                         toggle.classList.add('expanded');
@@ -394,20 +406,19 @@ class CoronaAddon {
                         requestAnimationFrame(() => {
                             const h = content.scrollHeight;
                             content.style.maxHeight = h + 'px';
-                            const clear = (e) => {
-                                if (e.target !== content) return;
-                                content.style.maxHeight = 'none';
-                                content.removeEventListener('transitionend', clear);
+                            const done = (e) => {
+                                if (e.target !== content || e.propertyName !== 'max-height') return;
+                                content.removeEventListener('transitionend', done);
+                                content._anim = null;
+                                if (content.classList.contains('expanded')) {
+                                    content.style.maxHeight = 'none';
+                                }
+                                if (cardEl) cardEl.classList.remove('expanding');
                             };
-                            content.addEventListener('transitionend', clear);
+                            content._anim = done;
+                            content.addEventListener('transitionend', done);
                         });
                     }
-                    const stop = (e) => {
-                        if (e.target !== content) return;
-                        if (cardEl) cardEl.classList.remove('expanding');
-                        content.removeEventListener('transitionend', stop);
-                    };
-                    content.addEventListener('transitionend', stop);
                 });
             }
         });
@@ -456,6 +467,10 @@ class CoronaAddon {
                     const isExpanded = content.classList.contains('expanded');
                     const cardEl = toggle.closest('.module-card');
                     if (cardEl) cardEl.classList.add('expanding');
+                    if (content._anim) {
+                        content.removeEventListener('transitionend', content._anim);
+                        content._anim = null;
+                    }
                     if (isExpanded) {
                         const h = content.scrollHeight;
                         content.style.maxHeight = h + 'px';
@@ -464,6 +479,14 @@ class CoronaAddon {
                         toggle.classList.remove('expanded');
                         if (icon) icon.classList.remove('expanded');
                         content.style.maxHeight = '0px';
+                        const done = (e) => {
+                            if (e.target !== content || e.propertyName !== 'max-height') return;
+                            content.removeEventListener('transitionend', done);
+                            content._anim = null;
+                            if (cardEl) cardEl.classList.remove('expanding');
+                        };
+                        content._anim = done;
+                        content.addEventListener('transitionend', done);
                     } else {
                         content.classList.add('expanded');
                         toggle.classList.add('expanded');
@@ -472,20 +495,19 @@ class CoronaAddon {
                         requestAnimationFrame(() => {
                             const h = content.scrollHeight;
                             content.style.maxHeight = h + 'px';
-                            const clear = (e) => {
-                                if (e.target !== content) return;
-                                content.style.maxHeight = 'none';
-                                content.removeEventListener('transitionend', clear);
+                            const done = (e) => {
+                                if (e.target !== content || e.propertyName !== 'max-height') return;
+                                content.removeEventListener('transitionend', done);
+                                content._anim = null;
+                                if (content.classList.contains('expanded')) {
+                                    content.style.maxHeight = 'none';
+                                }
+                                if (cardEl) cardEl.classList.remove('expanding');
                             };
-                            content.addEventListener('transitionend', clear);
+                            content._anim = done;
+                            content.addEventListener('transitionend', done);
                         });
                     }
-                    const stop = (e) => {
-                        if (e.target !== content) return;
-                        if (cardEl) cardEl.classList.remove('expanding');
-                        content.removeEventListener('transitionend', stop);
-                    };
-                    content.addEventListener('transitionend', stop);
                 });
             }
         });
