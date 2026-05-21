@@ -799,7 +799,7 @@ class CoronaAddon {
     async saveFreqLockConfig() {
         let config = `mode=${this.freqMode}\n`;
         if (this.freqMode === 'global') { const minFreq = document.getElementById('global-min-freq').value; const maxFreq = document.getElementById('global-max-freq').value; config += `global_min=${minFreq}\nglobal_max=${maxFreq}\n`; }
-        if (this.freqMode === 'per-core') { const minSels = document.querySelectorAll('.per-core-min'); const maxSels = document.querySelectorAll('.per-core-max'); for (let i = 0; i < minSels.length; i++) { config += `cpu${i}_min=${minSels[i].value}\ncpu${i}_max=${maxSels[i].value}\n`; } }
+        if (this.freqMode === 'per-core') { const minSels = document.querySelectorAll('.per-core-min'); const maxSels = document.querySelectorAll('.per-core-max'); for (let i = 0; i < minSels.length; i++) { const cpu = minSels[i].dataset.cpu; config += `core${cpu}=${minSels[i].value},${maxSels[i].value}\n`; } }
         await this.exec(`echo '${config}' > ${this.configDir}/freq_lock.conf`);
     }
     updateFreqLockStatus() { const badge = document.getElementById('freq-lock-status'); const modeNames = { 'off': '关闭', 'global': '全局', 'per-core': '按核心' }; badge.textContent = modeNames[this.freqMode] || '关闭'; }
