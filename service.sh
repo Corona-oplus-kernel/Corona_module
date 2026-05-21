@@ -171,28 +171,6 @@ apply_tcp_config() {
     [ -n "$congestion" ] && echo "$congestion" > /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null
 }
 
-cpu_mask_to_hex() {
-    mask_str="$1"; result=0; IFS=','
-    for part in $mask_str; do
-        if echo "$part" | grep -q "-"; then
-            start=$(echo "$part" | cut -d'-' -f1); end=$(echo "$part" | cut -d'-' -f2); i=$start
-            while [ "$i" -le "$end" ]; do result=$((result | (1 << i))); i=$((i + 1)); done
-        else result=$((result | (1 << part))); fi
-    done
-    unset IFS
-    printf "0x%x" "$result"
-}
-
-apply_cpu_affinity_config() {
-    [ ! -f "$CONFIG_DIR/cpu_affinity.conf" ] && return
-    while IFS='=' read -r process_name cpu_mask; do
-        [ -n "$process_name" ] && [ -n "$cpu_mask" ] && {
-            hex_mask=$(cpu_mask_to_hex "$cpu_mask")
-            for pid in $(pgrep -f "$process_name" 2>/dev/null); do taskset -p "$hex_mask" "$pid" 2>/dev/null; done
-        }
-    done < "$CONFIG_DIR/cpu_affinity.conf"
-}
-
 apply_process_priority_config() {
     [ ! -f "$CONFIG_DIR/process_priority.conf" ] && return
     while IFS='=' read -r process_name values; do
@@ -352,7 +330,6 @@ apply_io_config; sleep 1
 apply_cpu_governor_config; sleep 1
 apply_cpu_hotplug_config; sleep 1
 apply_tcp_config; sleep 1
-apply_cpu_affinity_config; sleep 1
 apply_process_priority_config; sleep 1
 apply_freq_lock_config; sleep 1
 apply_lmk_config; sleep 1
@@ -366,7 +343,6 @@ apply_user_scripts
 sleep 30
 apply_io_config
 apply_cpu_governor_config
-apply_cpu_affinity_config
 apply_process_priority_config
 apply_freq_lock_config
 apply_protect_config
