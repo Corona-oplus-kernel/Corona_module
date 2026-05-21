@@ -90,7 +90,7 @@ class CoronaAddon {
             await this.resolvePaths();
             await this.ensureConfigDir();
             await this.loadRuntimeConfig();
-            this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
+            this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1' || /corona/i.test(await this.exec('uname -r 2>/dev/null'));
             this.initTheme();
             this.bindAllEvents();
             await this.loadDeviceInfo();
@@ -141,6 +141,32 @@ class CoronaAddon {
     }
     shellQuote(value) {
         return `'${String(value).replace(/'/g, `'\\''`)}'`;
+    }
+    async writeConfig(filename, content) {
+        const path = `${this.configDir}/${filename}`;
+        const b64 = btoa(unescape(encodeURIComponent(String(content))));
+        await this.exec(`echo '${b64}' | base64 -d > ${this.shellQuote(path)}`);
+    }
+    withLock(key, fn) {
+        if (!this._locks) this._locks = {};
+        const prev = this._locks[key] || Promise.resolve();
+        const next = prev.catch(() => {}).then(() => fn());
+        this._locks[key] = next.finally(() => {
+            if (this._locks[key] === next) delete this._locks[key];
+        });
+        return next;
+    }
+    async writeAndVerifySysfs(value, sysfsPath, label) {
+        await this.exec(`echo "${value}" > ${sysfsPath} 2>/dev/null`);
+        const readback = (await this.exec(`cat ${sysfsPath} 2>/dev/null`)).trim();
+        if (readback !== '' && readback !== String(value).trim()) {
+            const m = readback.match(/\[([^\]]+)\]/);
+            if (!(m && m[1] === String(value).trim())) {
+                this.showToast(`${label} 写入未生效（当前: ${readback || '空'}）`);
+                return false;
+            }
+        }
+        return true;
     }
     async resolvePaths() {
         const pathname = decodeURIComponent(window.location.pathname || '');
@@ -608,6 +634,7 @@ class CoronaAddon {
         document.getElementById('gc-btn').addEventListener('click', async () => await this.runGC());
         document.querySelectorAll('.memclean-option').forEach(opt => { opt.addEventListener('click', async () => { if (this.memCleanRunning) return; await this.runMemClean(opt.dataset.mode); }); });
         this.initResetAllBtn();
+        this.initUserScriptsLogToggle();
     }
     showOverlay(id) {
         const overlay = document.getElementById(id);
@@ -730,12 +757,46 @@ class CoronaAddon {
     async loadFreqLockConfig() {
         const config = await this.exec(`cat ${this.configDir}/freq_lock.conf 2>/dev/null`);
         this.freqMode = 'off';
-        if (config) { const lines = config.split('\n'); for (const line of lines) { if (line.startsWith('mode=')) this.freqMode = line.split('=')[1]; } }
+        this.freqSaved = { globalMin: null, globalMax: null, perCore: {} };
+        if (config) {
+            const lines = config.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('mode=')) this.freqMode = line.split('=')[1].trim();
+                else if (line.startsWith('global_min=')) this.freqSaved.globalMin = line.split('=')[1].trim();
+                else if (line.startsWith('global_max=')) this.freqSaved.globalMax = line.split('=')[1].trim();
+                else if (line.startsWith('core')) {
+                    const m = line.match(/^core(\d+)=([\d]+),([\d]+)/);
+                    if (m) this.freqSaved.perCore[m[1]] = { min: m[2], max: m[3] };
+                }
+            }
+        }
         const options = document.querySelectorAll('.freq-mode-option');
         options.forEach(opt => opt.classList.toggle('selected', opt.dataset.mode === this.freqMode));
         document.getElementById('freq-global-settings').classList.toggle('hidden', this.freqMode !== 'global');
         document.getElementById('freq-per-core-settings').classList.toggle('hidden', this.freqMode !== 'per-core');
+        this.applyFreqSavedToSelects();
         this.updateFreqLockStatus();
+    }
+    applyFreqSavedToSelects() {
+        if (!this.freqSaved) return;
+        const minSel = document.getElementById('global-min-freq');
+        const maxSel = document.getElementById('global-max-freq');
+        if (minSel && this.freqSaved.globalMin && minSel.querySelector(`option[value="${this.freqSaved.globalMin}"]`)) {
+            minSel.value = this.freqSaved.globalMin;
+        }
+        if (maxSel && this.freqSaved.globalMax && maxSel.querySelector(`option[value="${this.freqSaved.globalMax}"]`)) {
+            maxSel.value = this.freqSaved.globalMax;
+        }
+        document.querySelectorAll('.per-core-min').forEach(sel => {
+            const cpu = sel.dataset.cpu;
+            const saved = this.freqSaved.perCore[cpu];
+            if (saved && sel.querySelector(`option[value="${saved.min}"]`)) sel.value = saved.min;
+        });
+        document.querySelectorAll('.per-core-max').forEach(sel => {
+            const cpu = sel.dataset.cpu;
+            const saved = this.freqSaved.perCore[cpu];
+            if (saved && sel.querySelector(`option[value="${saved.max}"]`)) sel.value = saved.max;
+        });
     }
     async loadGlobalFreqSelects() {
         const allFreqs = [];
@@ -746,6 +807,7 @@ class CoronaAddon {
         minSel.innerHTML = allFreqs.map(f => `<option value="${f}">${(f/1000).toFixed(0)} MHz</option>`).join('');
         maxSel.innerHTML = allFreqs.map(f => `<option value="${f}">${(f/1000).toFixed(0)} MHz</option>`).join('');
         if (allFreqs.length > 0) { minSel.value = allFreqs[0]; maxSel.value = allFreqs[allFreqs.length - 1]; }
+        this.applyFreqSavedToSelects();
     }
     renderPerCoreFreqSettings() {
         const container = document.getElementById('per-core-freq-list');
@@ -763,6 +825,7 @@ class CoronaAddon {
             minSel.addEventListener('change', () => this.applyPerCoreFreq());
             maxSel.addEventListener('change', () => this.applyPerCoreFreq());
         }
+        this.applyFreqSavedToSelects();
     }
     async applyGlobalFreq() {
         const minFreq = document.getElementById('global-min-freq').value;
@@ -800,7 +863,7 @@ class CoronaAddon {
         let config = `mode=${this.freqMode}\n`;
         if (this.freqMode === 'global') { const minFreq = document.getElementById('global-min-freq').value; const maxFreq = document.getElementById('global-max-freq').value; config += `global_min=${minFreq}\nglobal_max=${maxFreq}\n`; }
         if (this.freqMode === 'per-core') { const minSels = document.querySelectorAll('.per-core-min'); const maxSels = document.querySelectorAll('.per-core-max'); for (let i = 0; i < minSels.length; i++) { const cpu = minSels[i].dataset.cpu; config += `core${cpu}=${minSels[i].value},${maxSels[i].value}\n`; } }
-        await this.exec(`echo '${config}' > ${this.configDir}/freq_lock.conf`);
+        await this.writeConfig('freq_lock.conf', config);
     }
     updateFreqLockStatus() { const badge = document.getElementById('freq-lock-status'); const modeNames = { 'off': '关闭', 'global': '全局', 'per-core': '按核心' }; badge.textContent = modeNames[this.freqMode] || '关闭'; }
     async runMemClean(mode) {
@@ -847,6 +910,25 @@ class CoronaAddon {
         const btn = document.getElementById('reset-all-btn');
         if (!btn) return;
         btn.addEventListener('click', () => this.resetAllSettings());
+    }
+    async initUserScriptsLogToggle() {
+        const sw = document.getElementById('user-scripts-log-switch');
+        const viewBtn = document.getElementById('view-user-scripts-log-btn');
+        if (!sw) return;
+        const conf = await this.exec(`cat ${this.configDir}/log.conf 2>/dev/null`);
+        const enabled = /^user_scripts_log=1/m.test(conf);
+        sw.checked = enabled;
+        if (viewBtn) viewBtn.style.display = enabled ? '' : 'none';
+        sw.addEventListener('change', async () => {
+            await this.writeConfig('log.conf', `user_scripts_log=${sw.checked ? '1' : '0'}`);
+            if (viewBtn) viewBtn.style.display = sw.checked ? '' : 'none';
+            this.showToast(sw.checked ? '已启用脚本日志' : '已关闭脚本日志');
+            if (!sw.checked) await this.exec(`rm -f ${this.configDir}/user_scripts.log 2>/dev/null`);
+        });
+        if (viewBtn) viewBtn.addEventListener('click', async () => {
+            const log = await this.exec(`tail -c 8192 ${this.configDir}/user_scripts.log 2>/dev/null`);
+            await this.showConfirm(log && log.trim() ? log : '（暂无日志）', '脚本日志');
+        });
     }
     async resetAllSettings() {
         const confirmed = await this.showConfirm('确定要重置所有设置吗？\n\n此操作将删除所有配置文件并立刻重启，且不可撤销！', '一键重置');
@@ -1281,7 +1363,7 @@ class CoronaAddon {
     }
     async saveLe9ecConfig() {
         const config = `enabled=${this.state.le9ecEnabled ? '1' : '0'}\nanon_min=${this.state.le9ecAnon}\nclean_low=${this.state.le9ecCleanLow}\nclean_min=${this.state.le9ecCleanMin}`;
-        await this.exec(`echo '${config}' > ${this.configDir}/le9ec.conf`);
+        await this.writeConfig('le9ec.conf', config);
         if (this.state.le9ecEnabled) { this.showLoading(true); await this.applyLe9ecImmediate(); this.showLoading(false); }
         else { this.showToast('LE9EC 配置已保存（禁用状态）'); await this.updateModuleDescription(); }
     }
@@ -1292,7 +1374,7 @@ class CoronaAddon {
             this.exec(`echo ${this.state.le9ecCleanMin} > /proc/sys/vm/clean_min_kbytes`)
         ]);
         const config = `enabled=1\nanon_min=${this.state.le9ecAnon}\nclean_low=${this.state.le9ecCleanLow}\nclean_min=${this.state.le9ecCleanMin}`;
-        await this.exec(`echo '${config}' > ${this.configDir}/le9ec.conf`);
+        await this.writeConfig('le9ec.conf', config);
         await this.updateModuleDescription();
         this.showToast('LE9EC 配置已应用');
         setTimeout(() => this.loadLe9ecStatus(), 500);
@@ -1345,7 +1427,7 @@ class CoronaAddon {
         const lines = [];
         if (scheduler) lines.push(`scheduler=${scheduler}`);
         lines.push(`readahead=${this.state.readahead}`);
-        await this.exec(`echo '${lines.join('\n')}' > ${this.configDir}/io_scheduler.conf`);
+        await this.writeConfig('io_scheduler.conf', lines.join('\n'));
         this.showToast(`预读取大小: ${this.state.readahead} KB`);
     }
     async loadDeviceInfo() {
@@ -1672,7 +1754,7 @@ class CoronaAddon {
         this.showLoading(true);
         try {
             await this.sleep(0);
-            await this.exec(`echo '${config}' > ${this.configDir}/zram.conf`);
+            await this.writeConfig('zram.conf', config);
             if (this.state.zramEnabled) {
                 await this.applyZramImmediate(false);
             } else {
@@ -1684,6 +1766,7 @@ class CoronaAddon {
         }
     }
     async applyZramImmediate(manageLoading = true) {
+      return this.withLock('zram', async () => {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
         const zramDev = this.state.zramPath;
         const zramBlock = zramDev.replace('/dev/block/', '').replace('/dev/', '');
@@ -1703,29 +1786,33 @@ class CoronaAddon {
         await this.exec(`swapon ${zramDev} -p 32758 2>/dev/null || swapon ${zramDev}`);
         await this.exec(`echo "${this.state.swappiness}" > /proc/sys/vm/swappiness`);
         const config = `enabled=1\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
-        await this.exec(`echo '${config}' > ${this.configDir}/zram.conf`);
+        await this.writeConfig('zram.conf', config);
         await this.updateModuleDescription();
         if (manageLoading) this.showLoading(false);
         this.showToast('ZRAM 配置已应用');
         setTimeout(() => this.loadZramStatus(), 500);
+      });
     }
     async applySwappinessImmediate() {
+      return this.withLock('zram', async () => {
         this.showLoading(true);
         try {
             await this.sleep(0);
-            await this.exec(`echo "${this.state.swappiness}" > /proc/sys/vm/swappiness`);
+            const ok = await this.writeAndVerifySysfs(this.state.swappiness, '/proc/sys/vm/swappiness', 'Swappiness');
             const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
             const config = `enabled=${this.state.zramEnabled ? '1' : '0'}\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
-            await this.exec(`echo '${config}' > ${this.configDir}/zram.conf`);
+            await this.writeConfig('zram.conf', config);
             await this.updateModuleDescription();
-            this.showToast(`Swappiness: ${this.state.swappiness}`);
+            if (ok) this.showToast(`Swappiness: ${this.state.swappiness}`);
         } finally {
             this.showLoading(false);
         }
+      });
     }
     async loadIOConfig() {
         const schedulerRaw = await this.exec('cat /sys/block/sda/queue/scheduler 2>/dev/null || cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null');
         const readahead = await this.exec('cat /sys/block/sda/queue/read_ahead_kb 2>/dev/null || cat /sys/block/mmcblk0/queue/read_ahead_kb 2>/dev/null');
+        const conf = await this.exec(`cat ${this.configDir}/io_scheduler.conf 2>/dev/null`);
         const availableSchedulers = [];
         let currentScheduler = '';
         if (schedulerRaw) {
@@ -1735,8 +1822,14 @@ class CoronaAddon {
                 if (!availableSchedulers.includes(s)) availableSchedulers.push(s);
             });
         }
+        if (conf) {
+            const sm = conf.match(/scheduler=(\S+)/);
+            const rm = conf.match(/readahead=(\d+)/);
+            if (sm && availableSchedulers.includes(sm[1])) currentScheduler = sm[1];
+            if (rm) this.state.readahead = parseInt(rm[1]);
+        }
         this.state.ioScheduler = currentScheduler;
-        if (readahead) this.state.readahead = parseInt(readahead);
+        if (!this.state.readahead && readahead) this.state.readahead = parseInt(readahead);
         const container = document.getElementById('io-scheduler-list');
         if (container) {
             container.innerHTML = availableSchedulers.map(s => `<div class="option-item ${s === currentScheduler ? 'selected' : ''}" data-value="${s}">${s}</div>`).join('');
@@ -1754,20 +1847,34 @@ class CoronaAddon {
         this.renderReadaheadOptions();
     }
     async applyIOSchedulerImmediate() {
+      return this.withLock('io', async () => {
         const schedCmd = this.isCoronaKernel ? `kernel:${this.state.ioScheduler}` : this.state.ioScheduler;
         await this.exec(`for f in /sys/block/*/queue/scheduler; do echo "${schedCmd}" > "$f" 2>/dev/null; done`);
+        const readbackRaw = (await this.exec('cat /sys/block/sda/queue/scheduler 2>/dev/null || cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null')).trim();
+        const active = readbackRaw.match(/\[([^\]]+)\]/)?.[1] || '';
         const config = `scheduler=${this.state.ioScheduler}\nreadahead=${this.state.readahead}`;
-        await this.exec(`echo '${config}' > ${this.configDir}/io_scheduler.conf`);
+        await this.writeConfig('io_scheduler.conf', config);
         await this.updateModuleDescription();
         const currentEl = document.getElementById('io-current');
-        if (currentEl) currentEl.textContent = this.state.ioScheduler;
-        this.showToast(`I/O 调度器: ${this.state.ioScheduler}`);
+        if (currentEl) currentEl.textContent = active || this.state.ioScheduler;
+        if (active && active !== this.state.ioScheduler) {
+            this.showToast(`I/O 调度器写入未生效（当前: ${active}）`);
+        } else {
+            this.showToast(`I/O 调度器: ${this.state.ioScheduler}`);
+        }
+      });
     }
     async loadCpuGovernorConfig() {
         const governorRaw = await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors 2>/dev/null');
         const currentGovernor = await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null');
+        const conf = await this.exec(`cat ${this.configDir}/cpu_governor.conf 2>/dev/null`);
         const availableGovernors = governorRaw.split(/\s+/).filter(g => g);
-        this.state.cpuGovernor = currentGovernor.trim();
+        let resolved = currentGovernor.trim();
+        if (conf) {
+            const m = conf.match(/governor=(\S+)/);
+            if (m && availableGovernors.includes(m[1])) resolved = m[1];
+        }
+        this.state.cpuGovernor = resolved;
         const container = document.getElementById('cpu-governor-list');
         if (container) {
             container.innerHTML = availableGovernors.map(g => `<div class="option-item ${g === this.state.cpuGovernor ? 'selected' : ''}" data-value="${g}">${g}</div>`).join('');
@@ -1784,17 +1891,30 @@ class CoronaAddon {
         if (currentEl) currentEl.textContent = this.state.cpuGovernor || '--';
     }
     async applyCpuGovernorImmediate() {
+      return this.withLock('governor', async () => {
         await this.exec(`for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo "${this.state.cpuGovernor}" > "$f" 2>/dev/null; done`);
-        await this.exec(`echo 'governor=${this.state.cpuGovernor}' > ${this.configDir}/cpu_governor.conf`);
+        const readback = (await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null')).trim();
+        await this.writeConfig('cpu_governor.conf', `governor=${this.state.cpuGovernor}`);
         await this.updateModuleDescription();
-        document.getElementById('cpu-gov-current').textContent = this.state.cpuGovernor;
-        this.showToast(`CPU 调频器: ${this.state.cpuGovernor}`);
+        document.getElementById('cpu-gov-current').textContent = readback || this.state.cpuGovernor;
+        if (readback && readback !== this.state.cpuGovernor) {
+            this.showToast(`CPU 调频器写入未生效（当前: ${readback}）`);
+        } else {
+            this.showToast(`CPU 调频器: ${this.state.cpuGovernor}`);
+        }
+      });
     }
     async loadTCPConfig() {
         const tcpRaw = await this.exec('cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null');
         const currentTcp = await this.exec('cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null');
+        const conf = await this.exec(`cat ${this.configDir}/tcp.conf 2>/dev/null`);
         const availableTcp = tcpRaw.split(/\s+/).filter(t => t);
-        this.state.tcp = currentTcp.trim();
+        let resolved = currentTcp.trim();
+        if (conf) {
+            const m = conf.match(/congestion=(\S+)/);
+            if (m && availableTcp.includes(m[1])) resolved = m[1];
+        }
+        this.state.tcp = resolved;
         const container = document.getElementById('tcp-list');
         container.innerHTML = availableTcp.map(t => `<div class="option-item ${t === this.state.tcp ? 'selected' : ''}" data-value="${t}">${t}</div>`).join('');
         container.querySelectorAll('.option-item').forEach(item => {
@@ -1808,11 +1928,13 @@ class CoronaAddon {
         document.getElementById('tcp-current').textContent = this.state.tcp || '--';
     }
     async applyTcpImmediate() {
-        await this.exec(`echo "${this.state.tcp}" > /proc/sys/net/ipv4/tcp_congestion_control`);
-        await this.exec(`echo 'congestion=${this.state.tcp}' > ${this.configDir}/tcp.conf`);
+      return this.withLock('tcp', async () => {
+        const ok = await this.writeAndVerifySysfs(this.state.tcp, '/proc/sys/net/ipv4/tcp_congestion_control', 'TCP 拥塞算法');
+        await this.writeConfig('tcp.conf', `congestion=${this.state.tcp}`);
         await this.updateModuleDescription();
         document.getElementById('tcp-current').textContent = this.state.tcp;
-        this.showToast(`TCP 拥塞算法: ${this.state.tcp}`);
+        if (ok) this.showToast(`TCP 拥塞算法: ${this.state.tcp}`);
+      });
     }
     async loadCpuCores() {
         const cpuCount = parseInt(await this.exec('ls -d /sys/devices/system/cpu/cpu[0-9]* 2>/dev/null | wc -l')) || 8;
@@ -1893,7 +2015,7 @@ class CoronaAddon {
     }
     async saveCpuHotplugConfig() {
         const config = this.cpuCores.map(c => `cpu${c.id}=${c.online ? '1' : '0'}`).join('\n');
-        await this.exec(`echo '${config}' > ${this.configDir}/cpu_hotplug.conf`);
+        await this.writeConfig('cpu_hotplug.conf', config);
     }
     async updateModuleDescription() {
         const descParts = [];
@@ -2096,11 +2218,15 @@ class CoronaAddon {
         if (appliedCount > 0) { this.showToast(`已设置 ${this.selectedPriorityProcess}: nice=${this.selectedNice}, I/O=${ioClassNames[this.selectedIoClass]}`); }
         else { this.showToast(`已保存规则，进程启动时生效`); }
     }
-    async savePriorityConfig() { let configContent = ''; for (const [name, rule] of Object.entries(this.priorityRules)) { configContent += `${name}=${rule.nice},${rule.ioClass},${rule.ioLevel}\n`; } await this.exec(`echo '${configContent}' > ${this.configDir}/process_priority.conf`); }
+    async savePriorityConfig() { let configContent = ''; for (const [name, rule] of Object.entries(this.priorityRules)) { configContent += `${name}=${rule.nice},${rule.ioClass},${rule.ioLevel}\n`; } await this.writeConfig('process_priority.conf', configContent); }
     async applyPriorityRule(processName) {
         const rule = this.priorityRules[processName]; if (!rule) return 0;
         let appliedCount = 0;
-        const pids = await this.exec(`pgrep -f "${processName}" 2>/dev/null`);
+        const escaped = processName.replace(/[.[\](){}*+?\\^$|]/g, '\\$&');
+        let pids = await this.exec(`pgrep -f "${escaped}" 2>/dev/null`);
+        if (!pids || !pids.trim()) {
+            pids = await this.exec(`for d in /proc/[0-9]*; do [ -r "$d/cmdline" ] || continue; if tr '\\0' ' ' < "$d/cmdline" 2>/dev/null | grep -F -q "${escaped.replace(/"/g, '\\"')}"; then basename "$d"; fi; done`);
+        }
         if (pids && pids.trim()) {
             const pidList = pids.trim().split('\n').filter(p => p.trim());
             const promises = [];
@@ -2294,7 +2420,7 @@ class CoronaAddon {
     async saveSwapConfig() {
         const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
         const config = `enabled=${this.state.swapEnabled ? '1' : '0'}\nsize=${this.state.swapSize}\npriority=${this.state.swapPriority}\npath=${swapPath}`;
-        await this.exec(`echo '${config}' > ${this.shellQuote(`${this.configDir}/swap.conf`)}`);
+        await this.writeConfig('swap.conf', config);
         if (this.state.swapEnabled) {
             this.showLoading(true);
             await this.applySwapImmediate();
@@ -2307,19 +2433,47 @@ class CoronaAddon {
         }
     }
     async applySwapImmediate() {
+      return this.withLock('swap', async () => {
         const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
-        await this.exec(`swapoff ${this.shellQuote(swapPath)} 2>/dev/null`);
-        await this.exec(`rm -f ${this.shellQuote(swapPath)} 2>/dev/null`);
-        await this.exec(`dd if=/dev/zero of=${this.shellQuote(swapPath)} bs=1M count=${this.state.swapSize} 2>/dev/null`);
-        await this.exec(`chmod 600 ${this.shellQuote(swapPath)}`);
-        await this.exec(`mkswap ${this.shellQuote(swapPath)}`);
+        const q = this.shellQuote(swapPath);
+        await this.exec(`swapoff ${q} 2>/dev/null`);
+        await this.exec(`rm -f ${q} 2>/dev/null`);
+        const free = parseInt((await this.exec(`df -k ${this.shellQuote(swapPath.substring(0, swapPath.lastIndexOf('/')) || '/data')} 2>/dev/null | awk 'NR==2{print $4}'`)).trim()) || 0;
+        const needKb = this.state.swapSize * 1024;
+        if (free && free < needKb + 51200) {
+            this.showToast(`Swap 创建失败：剩余空间不足（需 ${this.state.swapSize}MB，剩 ${Math.floor(free/1024)}MB）`);
+            await this.loadSwapStatus();
+            return;
+        }
+        const allocOut = await this.exec(`(fallocate -l ${this.state.swapSize}M ${q} 2>&1 || dd if=/dev/zero of=${q} bs=1M count=${this.state.swapSize} 2>&1) ; ls -l ${q} 2>/dev/null`);
+        if (!allocOut.includes(swapPath)) {
+            this.showToast(`Swap 文件创建失败`);
+            await this.exec(`rm -f ${q} 2>/dev/null`);
+            await this.loadSwapStatus();
+            return;
+        }
+        await this.exec(`chmod 600 ${q}`);
+        const mkOut = await this.exec(`mkswap ${q} 2>&1`);
+        if (/error|fail/i.test(mkOut)) {
+            this.showToast(`mkswap 失败：${mkOut.split('\n')[0]}`);
+            await this.exec(`rm -f ${q} 2>/dev/null`);
+            await this.loadSwapStatus();
+            return;
+        }
+        let onOut;
         if (this.state.swapPriority !== 0) {
-            await this.exec(`swapon ${this.shellQuote(swapPath)} -p ${this.state.swapPriority}`);
+            onOut = await this.exec(`swapon ${q} -p ${this.state.swapPriority} 2>&1`);
         } else {
-            await this.exec(`swapon ${this.shellQuote(swapPath)}`);
+            onOut = await this.exec(`swapon ${q} 2>&1`);
+        }
+        if (/error|fail|invalid/i.test(onOut)) {
+            this.showToast(`swapon 失败：${onOut.split('\n')[0]}`);
+            await this.loadSwapStatus();
+            return;
         }
         this.showToast(`Swap 已启用 (${this.state.swapSize} MB)`);
         await this.loadSwapStatus();
+      });
     }
     async loadSwapStatus() {
         const swaps = await this.exec('cat /proc/swaps 2>/dev/null | grep -v zram | grep -v Filename');
@@ -2403,9 +2557,10 @@ class CoronaAddon {
         if (value) value.textContent = `${val}${suffix}`;
     }
     async applyVmConfig() {
+      return this.withLock('vm', async () => {
         this.showLoading(true);
         const config = `watermark_scale_factor=${this.state.watermarkScale}\nextra_free_kbytes=${this.state.extraFreeKbytes}\ndirty_ratio=${this.state.dirtyRatio}\ndirty_background_ratio=${this.state.dirtyBgRatio}\nvfs_cache_pressure=${this.state.vfsCachePressure}`;
-        await this.exec(`echo '${config}' > ${this.configDir}/vm.conf`);
+        await this.writeConfig('vm.conf', config);
         await Promise.all([
             this.exec(`echo ${this.state.watermarkScale} > /proc/sys/vm/watermark_scale_factor 2>/dev/null`),
             this.exec(`echo ${this.state.extraFreeKbytes} > /proc/sys/vm/extra_free_kbytes 2>/dev/null`),
@@ -2417,6 +2572,7 @@ class CoronaAddon {
         this.showToast('VM 参数已应用');
         const vmStatus = document.getElementById('vm-status');
         if (vmStatus) vmStatus.textContent = '已修改';
+      });
     }
     initKernelFeatures() {
         const emptyEl = document.getElementById('kernel-features-empty');
@@ -2497,9 +2653,10 @@ class CoronaAddon {
         }
     }
     async applyKernelFeatures() {
+      return this.withLock('kernel-features', async () => {
         this.showLoading(true);
         const config = `lru_gen=${this.state.lruGenEnabled ? '1' : '0'}\nthp=${this.state.thp}\nksm=${this.state.ksmEnabled ? '1' : '0'}\ncompaction=${this.state.compactionEnabled ? '1' : '0'}`;
-        await this.exec(`echo '${config}' > ${this.configDir}/kernel.conf`);
+        await this.writeConfig('kernel.conf', config);
         const promises = [];
         if (this.kernelFeatures.lruGen) {
             promises.push(this.exec(`echo ${this.state.lruGenEnabled ? 'Y' : 'N'} > /sys/kernel/mm/lru_gen/enabled 2>/dev/null`));
@@ -2516,6 +2673,7 @@ class CoronaAddon {
         await Promise.all(promises);
         this.showLoading(false);
         this.showToast('内核特性已应用');
+      });
     }
     initCustomScripts() {
         this.customScripts = {};
@@ -2743,7 +2901,7 @@ class CoronaAddon {
         const sw = document.getElementById(switchMap[name]);
         if (!sw) return;
         const enabled = sw.checked ? '1' : '0';
-        await this.exec(`echo "enabled=${enabled}" > ${this.configDir}/${fileMap[name]}`);
+        await this.writeConfig(fileMap[name], `enabled=${enabled}`);
         if (sw.checked) {
             this.showLoading(true);
             await this.applySystemOptNow(name);

@@ -23,14 +23,15 @@ wait_until_boot_complete() { until [ "$(getprop sys.boot_completed)" = "1" ]; do
 wait_until_login() { until [ -d "/data/data/android" ]; do sleep 5; done; }
 
 get_system_info() {
-    mem_total_str=$(cat /proc/meminfo | grep MemTotal)
-    mem_total_kb=${mem_total_str:16:8}
+    mem_total_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
     sdk_version=$(getprop ro.build.version.sdk)
     kernel_version=$(uname -r | cut -d'-' -f1)
     kernel_version1=$(echo "$kernel_version" | cut -d'.' -f1)
     is_oplus=0; find /proc -maxdepth 1 -name "oplus*" 2>/dev/null | grep -q . && is_oplus=1
     is_xiaomi=0; [ "$(getprop ro.miui.ui.version.name)" != "" ] && is_xiaomi=1
-    isCoronaKernel=0; uname -r | grep -qi "corona" && isCoronaKernel=1
+    isCoronaKernel=0
+    uname -r | grep -qi "corona" && isCoronaKernel=1
+    [ -f /proc/corona ] && [ "$(cat /proc/corona 2>/dev/null)" = "1" ] && isCoronaKernel=1
 }
 
 apply_zram_config() {
@@ -144,7 +145,7 @@ apply_io_config() {
     [ ! -f "$CONFIG_DIR/io_scheduler.conf" ] && return
     scheduler=$(grep "^scheduler=" "$CONFIG_DIR/io_scheduler.conf" | cut -d'=' -f2)
     readahead=$(grep "^readahead=" "$CONFIG_DIR/io_scheduler.conf" | cut -d'=' -f2)
-    [ -f /proc/corona ] && [ "$(cat /proc/corona)" = "1" ] && scheduler="kernel:$scheduler"
+    [ "$isCoronaKernel" = "1" ] && scheduler="kernel:$scheduler"
     [ -n "$scheduler" ] && for f in /sys/block/*/queue/scheduler; do echo "$scheduler" > "$f" 2>/dev/null; done
     [ -n "$readahead" ] && for f in /sys/block/*/queue/read_ahead_kb; do echo "$readahead" > "$f" 2>/dev/null; done
 }
@@ -178,7 +179,13 @@ apply_process_priority_config() {
             nice_val=$(echo "$values" | cut -d',' -f1)
             io_class=$(echo "$values" | cut -d',' -f2)
             io_level=$(echo "$values" | cut -d',' -f3)
-            for pid in $(pgrep -f "$process_name" 2>/dev/null); do
+            pids=$(pgrep -f "$process_name" 2>/dev/null)
+            [ -z "$pids" ] && pids=$(for d in /proc/[0-9]*; do
+                [ -r "$d/cmdline" ] || continue
+                cmdline=$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null)
+                case "$cmdline" in *"$process_name"*) basename "$d";; esac
+            done)
+            for pid in $pids; do
                 renice -n "$nice_val" -p "$pid" 2>/dev/null
                 ionice -c "$io_class" -n "$io_level" -p "$pid" 2>/dev/null
             done
@@ -210,7 +217,17 @@ apply_freq_lock_config() {
 }
 
 apply_user_scripts() {
-    [ -f "$CONFIG_DIR/user_scripts.sh" ] && chmod 755 "$CONFIG_DIR/user_scripts.sh" && sh "$CONFIG_DIR/user_scripts.sh" 2>/dev/null
+    [ -f "$CONFIG_DIR/user_scripts.sh" ] || return
+    chmod 755 "$CONFIG_DIR/user_scripts.sh"
+    log_enabled=0
+    [ -f "$CONFIG_DIR/log.conf" ] && grep -q '^user_scripts_log=1' "$CONFIG_DIR/log.conf" 2>/dev/null && log_enabled=1
+    if [ "$log_enabled" = "1" ]; then
+        sh "$CONFIG_DIR/user_scripts.sh" >"$CONFIG_DIR/user_scripts.log" 2>&1
+        rc=$?
+        echo "exit=$rc time=$(date +%s)" >> "$CONFIG_DIR/user_scripts.log"
+    else
+        sh "$CONFIG_DIR/user_scripts.sh" >/dev/null 2>&1
+    fi
 }
 
 apply_lmk_config() {
