@@ -2462,19 +2462,14 @@ body.theme-dark #xinran-overlay .detail-card {
 }
 
 .auto-preview {
-    border-radius: 50%;
-    border: 1px solid rgba(0, 0, 0, 0.06);
     background:
-        radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 60%),
+        radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 60%),
         linear-gradient(135deg,
             #EAF2FF 0%,
             #C9D8F2 28%,
             #9CA9D8 52%,
             #4A4F7A 78%,
             #1F2440 100%);
-    box-shadow:
-        inset 0 0 0 1px rgba(255, 255, 255, 0.35),
-        0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .auto-preview::after,
@@ -3533,9 +3528,9 @@ body.theme-dark #page-settings .sub-card {
     max-height: 0;
     opacity: 0;
     overflow: hidden;
+    contain: layout paint;
     transition: max-height 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94),
                 opacity 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    will-change: opacity;
 }
 .module-card-content.expanded {
     opacity: 1;
@@ -3934,4 +3929,18 @@ body.app-hidden *::after {
 .module-card.expanding * {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+}
+
+body.cards-expanding .floating-header,
+body.cards-expanding .module-card,
+body.cards-expanding .card,
+body.cards-expanding .nav-bar {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+#memory-compression-card .expandable-content {
+    transition: max-height 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                opacity 0.16s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                margin-top 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }

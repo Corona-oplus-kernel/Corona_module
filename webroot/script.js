@@ -380,7 +380,9 @@ class CoronaAddon {
                     if (content._anim) {
                         content.removeEventListener('transitionend', content._anim);
                         content._anim = null;
+                        endExpand();
                     }
+                    beginExpand();
                     if (isExpanded) {
                         if (content.id === 'memory-compression-content') {
                             this.collapseMemoryCompressionChildren(content);
@@ -396,6 +398,7 @@ class CoronaAddon {
                             content.removeEventListener('transitionend', done);
                             content._anim = null;
                             if (cardEl) cardEl.classList.remove('expanding');
+                            endExpand();
                         };
                         content._anim = done;
                         content.addEventListener('transitionend', done);
@@ -414,6 +417,7 @@ class CoronaAddon {
                                     content.style.maxHeight = 'none';
                                 }
                                 if (cardEl) cardEl.classList.remove('expanding');
+                                endExpand();
                             };
                             content._anim = done;
                             content.addEventListener('transitionend', done);
@@ -470,7 +474,9 @@ class CoronaAddon {
                     if (content._anim) {
                         content.removeEventListener('transitionend', content._anim);
                         content._anim = null;
+                        endExpand();
                     }
+                    beginExpand();
                     if (isExpanded) {
                         const h = content.scrollHeight;
                         content.style.maxHeight = h + 'px';
@@ -484,6 +490,7 @@ class CoronaAddon {
                             content.removeEventListener('transitionend', done);
                             content._anim = null;
                             if (cardEl) cardEl.classList.remove('expanding');
+                            endExpand();
                         };
                         content._anim = done;
                         content.addEventListener('transitionend', done);
@@ -503,6 +510,7 @@ class CoronaAddon {
                                     content.style.maxHeight = 'none';
                                 }
                                 if (cardEl) cardEl.classList.remove('expanding');
+                                endExpand();
                             };
                             content._anim = done;
                             content.addEventListener('transitionend', done);
@@ -1789,7 +1797,7 @@ class CoronaAddon {
     }
     async applyTcpImmediate() {
         await this.exec(`echo "${this.state.tcp}" > /proc/sys/net/ipv4/tcp_congestion_control`);
-        await this.exec(`echo 'tcp=${this.state.tcp}' > ${this.configDir}/tcp.conf`);
+        await this.exec(`echo 'congestion=${this.state.tcp}' > ${this.configDir}/tcp.conf`);
         await this.updateModuleDescription();
         document.getElementById('tcp-current').textContent = this.state.tcp;
         this.showToast(`TCP 拥塞算法: ${this.state.tcp}`);
@@ -2930,6 +2938,15 @@ function rafThrottle(fn) {
             fn.apply(lastThis, lastArgs);
         });
     };
+}
+let _expandingCount = 0;
+function beginExpand() {
+    _expandingCount++;
+    if (_expandingCount === 1) document.body.classList.add('cards-expanding');
+}
+function endExpand() {
+    if (_expandingCount > 0) _expandingCount--;
+    if (_expandingCount === 0) document.body.classList.remove('cards-expanding');
 }
 document.addEventListener('DOMContentLoaded', () => { window.corona = new CoronaAddon(); });
 document.addEventListener('visibilitychange', () => {
