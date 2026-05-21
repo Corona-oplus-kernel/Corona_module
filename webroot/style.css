@@ -24,22 +24,9 @@
     -webkit-touch-callout: none;
 }
 
-*,
-*::before,
-*::after {
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-}
-
 .page,
 .detail-overlay,
-.detail-container,
-.module-card,
-.sub-card,
-.option-item,
-.switch .slider,
-.nav-item,
-.toast {
+.detail-container {
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
 }
