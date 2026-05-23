@@ -708,7 +708,7 @@ class CoronaAddon {
         };
         overlay._hideTransitionEnd = onTransitionEnd;
         overlay.addEventListener('transitionend', onTransitionEnd);
-        overlay._hideTimer = setTimeout(finalize, 480);
+        overlay._hideTimer = setTimeout(finalize, 360);
     }
     async showBatteryDetail() {
         this.showOverlay('battery-detail-overlay');
