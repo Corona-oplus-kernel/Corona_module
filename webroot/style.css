@@ -1058,6 +1058,7 @@ body {
     padding: 0;
     visibility: hidden;
     pointer-events: none;
+    transition: visibility 0s linear 0.42s;
 }
 
 .detail-overlay.show {
@@ -1066,6 +1067,7 @@ body {
     background: rgba(255, 255, 255, 0.3);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
+    transition: visibility 0s linear 0s;
 }
 
 body.theme-dark .detail-overlay.show {
@@ -1098,6 +1100,11 @@ body.theme-dark .detail-overlay.no-close-btn.show {
     align-items: center;
 }
 
+#confirm-dialog-overlay,
+#confirm-dialog-overlay.show {
+    transition: visibility 0s linear 0s;
+}
+
 .detail-card {
     background: rgba(255, 255, 255, 0.35);
     backdrop-filter: blur(10px);
@@ -1112,39 +1119,24 @@ body.theme-dark .detail-overlay.no-close-btn.show {
     overflow-y: auto;
     box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.06);
     transform: translateY(100%) translateZ(0);
-    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    transition: transform 0.42s cubic-bezier(0.6, 0, 0.86, 0.42);
     will-change: transform;
 }
 
 .detail-overlay.show .detail-card {
     transform: translateY(0) translateZ(0);
-}
-
-#storage-detail-overlay {
-    transition: visibility 0s linear 0.42s;
-}
-
-#storage-detail-overlay.show {
-    transition: visibility 0s linear 0s;
-}
-
-#storage-detail-overlay .detail-card {
-    transform: translateY(100%) translateZ(0);
-    transition: transform 0.42s cubic-bezier(0.6, 0, 0.86, 0.42);
-}
-
-#storage-detail-overlay.show .detail-card {
-    transform: translateY(0) translateZ(0);
     transition: transform 0.55s cubic-bezier(0.18, 1.18, 0.36, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-    #storage-detail-overlay,
-    #storage-detail-overlay.show {
+    .detail-overlay {
         transition: visibility 0s linear 0.2s;
     }
-    #storage-detail-overlay .detail-card,
-    #storage-detail-overlay.show .detail-card {
+    .detail-overlay.show {
+        transition: visibility 0s linear 0s;
+    }
+    .detail-card,
+    .detail-overlay.show .detail-card {
         transition: transform 0.2s ease;
     }
 }
