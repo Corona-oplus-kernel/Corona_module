@@ -697,6 +697,193 @@
                     </div>
                 </div>
             </div>
+            <div class="module-card" id="corona-kernel-card" data-card-key="corona-kernel">
+                <div class="module-card-header">
+                    <div class="module-card-info">
+                        <div class="module-card-title" data-module="corona-kernel">Corona 内核优化</div>
+                        <div class="module-card-desc">挂起省电 / 唤醒响应 / 后台空闲</div>
+                        <span class="module-card-badge" id="corona-kernel-badge">--</span>
+                    </div>
+                    <div class="module-card-actions">
+                        <div class="module-card-expand" id="corona-kernel-toggle">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="corona-kernel-content" class="module-card-content hidden">
+                    <div class="kernel-features-empty" id="corona-kernel-empty" style="display:none;">
+                        <span>未检测到 Corona 内核，此卡片仅在 Corona 内核下生效</span>
+                    </div>
+                    <div id="corona-kernel-body">
+                        <div class="setting-section">
+                            <span class="section-label">用户在场窗口 (user_window_ms)</span>
+                            <span class="section-desc">息屏后这段时间内的自动唤醒会跳过 restore，省掉存/恢复抖动</span>
+                            <div class="slider-container">
+                                <input type="range" class="range-slider" id="ck-user-window-slider" min="0" max="300000" step="5000" value="60000">
+                                <div class="slider-labels">
+                                    <span>0</span>
+                                    <span class="slider-value" id="ck-user-window-value">60 s</span>
+                                    <span>300 s</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="setting-section">
+                            <span class="section-label">挂起态 timer slack (slack_off_ms)</span>
+                            <span class="section-desc">PM_SUSPEND_PREPARE 时把全体用户态任务的 timer_slack 抬到此值，提升 hrtimer 合并率</span>
+                            <div class="slider-container">
+                                <input type="range" class="range-slider" id="ck-slack-off-slider" min="10" max="500" step="10" value="100">
+                                <div class="slider-labels">
+                                    <span>10 ms</span>
+                                    <span class="slider-value" id="ck-slack-off-value">100 ms</span>
+                                    <span>500 ms</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="setting-section">
+                            <span class="section-label">用户在场闸 (基础)</span>
+                            <div class="switch-container" data-ck-mod="wake_aware">
+                                <div class="switch-info">
+                                    <span class="switch-label">wake_aware</span>
+                                    <span class="switch-desc">输入驱动的用户在场广播，被下方挂起类模块订阅</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="wake_aware">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="setting-section">
+                            <span class="section-label">挂起省电</span>
+                            <div class="switch-container" data-ck-mod="suspend_swappiness_zero">
+                                <div class="switch-info">
+                                    <span class="switch-label">suspend_swappiness_zero</span>
+                                    <span class="switch-desc">挂起时把 vm_swappiness 钳到 0，避免 kswapd 在 suspend 尾声压缩匿名页</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="suspend_swappiness_zero">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container" data-ck-mod="suspend_dirty_freeze">
+                                <div class="switch-info">
+                                    <span class="switch-label">suspend_dirty_freeze</span>
+                                    <span class="switch-desc">挂起时拉高脏页阈值，挡掉 flusher 在 suspend 尾声写盘</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="suspend_dirty_freeze">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container" data-ck-mod="suspend_compact_freeze">
+                                <div class="switch-info">
+                                    <span class="switch-label">suspend_compact_freeze</span>
+                                    <span class="switch-desc">挂起时关掉主动 compaction，避免 kcompactd 拖延 freeze</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="suspend_compact_freeze">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container" data-ck-mod="suspend_net_quiesce">
+                                <div class="switch-info">
+                                    <span class="switch-label">suspend_net_quiesce</span>
+                                    <span class="switch-desc">挂起时静默非 wakeup 网卡的 NAPI 与 RPS</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="suspend_net_quiesce">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container" data-ck-mod="suspend_softlockup_disable">
+                                <div class="switch-info">
+                                    <span class="switch-label">suspend_softlockup_disable</span>
+                                    <span class="switch-desc">挂起时拆 watchdog 每 CPU hrtimer，省掉每 CPU 的 4s 周期唤醒</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="suspend_softlockup_disable">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container" data-ck-mod="suspend_timerslack">
+                                <div class="switch-info">
+                                    <span class="switch-label">suspend_timerslack</span>
+                                    <span class="switch-desc">挂起时一次性把全体用户态任务 timer_slack 抬到 100 ms</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="suspend_timerslack">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container" data-ck-mod="suspend_sched_slack">
+                                <div class="switch-info">
+                                    <span class="switch-label">suspend_sched_slack</span>
+                                    <span class="switch-desc">挂起时拉高调度 latency / migration_cost，加大 idle 概率</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="suspend_sched_slack">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container" data-ck-mod="suspend_pm_tunables">
+                                <div class="switch-info">
+                                    <span class="switch-label">suspend_pm_tunables</span>
+                                    <span class="switch-desc">挂起时压一波 pm_qos / cpufreq 上限，保险对待心跳唤醒</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="suspend_pm_tunables">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container" data-ck-mod="suspend_rcu_normalize">
+                                <div class="switch-info">
+                                    <span class="switch-label">suspend_rcu_normalize</span>
+                                    <span class="switch-desc">挂起时关掉 expedited RCU，让 grace period 走慢路径</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="suspend_rcu_normalize">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="setting-section">
+                            <span class="section-label">唤醒响应</span>
+                            <div class="switch-container" data-ck-mod="resume_freq_burst">
+                                <div class="switch-info">
+                                    <span class="switch-label">resume_freq_burst</span>
+                                    <span class="switch-desc">真实用户唤醒时短暂拉高 cpufreq 下限，吃掉首屏延迟</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="resume_freq_burst">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="setting-section">
+                            <span class="section-label">后台空闲</span>
+                            <div class="switch-container" data-ck-mod="idle_writeback">
+                                <div class="switch-info">
+                                    <span class="switch-label">idle_writeback</span>
+                                    <span class="switch-desc">系统空闲时机会性回写 zram，减少 LRU 抖动</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="idle_writeback">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container" data-ck-mod="idle_vmstat">
+                                <div class="switch-info">
+                                    <span class="switch-label">idle_vmstat</span>
+                                    <span class="switch-desc">空闲期合并 vmstat 同步，降低周期性 wake</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="idle_vmstat">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="module-card" id="app-settings-card" data-card-key="app-settings">
                 <div class="module-card-header">
                     <div class="module-card-info">
@@ -782,6 +969,13 @@
                                 <span class="card-visibility-name">系统优化</span>
                                 <label class="switch">
                                     <input type="checkbox" class="card-visibility-switch" data-card="system-opt" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="card-visibility-item" data-card="corona-kernel">
+                                <span class="card-visibility-name">Corona 内核优化</span>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="corona-kernel" checked>
                                     <span class="slider"></span>
                                 </label>
                             </div>
