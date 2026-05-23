@@ -1120,6 +1120,14 @@ body.theme-dark .detail-overlay.no-close-btn.show {
     transform: translateY(0) translateZ(0);
 }
 
+#storage-detail-overlay {
+    transition: visibility 0s linear 0.42s;
+}
+
+#storage-detail-overlay.show {
+    transition: visibility 0s linear 0s;
+}
+
 #storage-detail-overlay .detail-card {
     transform: translateY(100%) translateZ(0);
     transition: transform 0.42s cubic-bezier(0.6, 0, 0.86, 0.42);
@@ -1131,6 +1139,10 @@ body.theme-dark .detail-overlay.no-close-btn.show {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    #storage-detail-overlay,
+    #storage-detail-overlay.show {
+        transition: visibility 0s linear 0.2s;
+    }
     #storage-detail-overlay .detail-card,
     #storage-detail-overlay.show .detail-card {
         transition: transform 0.2s ease;

@@ -699,19 +699,26 @@ class CoronaAddon {
                     floatingHeader.classList.remove('overlay-hidden');
                 }
             }
-            const onTransitionEnd = () => {
+            const finalize = () => {
+                if (overlay._hideTimer) {
+                    clearTimeout(overlay._hideTimer);
+                    overlay._hideTimer = null;
+                }
+                if (overlay._hideTransitionEnd) {
+                    overlay.removeEventListener('transitionend', overlay._hideTransitionEnd);
+                    overlay._hideTransitionEnd = null;
+                }
                 overlay.classList.add('hidden');
-                overlay.removeEventListener('transitionend', onTransitionEnd);
-                overlay._hideTransitionEnd = null;
+            };
+            const onTransitionEnd = (e) => {
+                if (e.target.classList && e.target.classList.contains('detail-card') && e.propertyName === 'transform') {
+                    finalize();
+                }
             };
             overlay._hideTransitionEnd = onTransitionEnd;
             overlay.addEventListener('transitionend', onTransitionEnd);
-            overlay._hideTimer = setTimeout(() => {
-                overlay.classList.add('hidden');
-                overlay.removeEventListener('transitionend', onTransitionEnd);
-                overlay._hideTransitionEnd = null;
-                overlay._hideTimer = null;
-            }, 350);
+            const fallbackMs = id === 'storage-detail-overlay' ? 480 : 350;
+            overlay._hideTimer = setTimeout(finalize, fallbackMs);
         }
     }
     async showBatteryDetail() {
