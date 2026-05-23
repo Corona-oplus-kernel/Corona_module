@@ -122,6 +122,11 @@ body {
     background-size: 100% 100%;
 }
 
+body.monet-decoration .bg-decoration {
+    background: var(--bg-decoration, linear-gradient(-45deg, #E8F0FE, #F5E6FB, #E0F7FA, #FFF3E0, #E8F5E9));
+    background-size: 100% 100%;
+}
+
 .bg-decoration::before {
     content: '';
     position: absolute;
@@ -132,6 +137,13 @@ body {
     background: radial-gradient(circle at 30% 20%, rgba(52, 130, 255, 0.15) 0%, transparent 50%),
                 radial-gradient(circle at 70% 60%, rgba(156, 39, 176, 0.1) 0%, transparent 50%),
                 radial-gradient(circle at 40% 80%, rgba(0, 200, 83, 0.1) 0%, transparent 50%);
+}
+
+body.monet-decoration .bg-decoration::before {
+    background: var(--bg-decoration-blobs,
+                radial-gradient(circle at 30% 20%, rgba(52, 130, 255, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 70% 60%, rgba(156, 39, 176, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(0, 200, 83, 0.1) 0%, transparent 50%));
 }
 
 @keyframes gradientFlow {
@@ -2475,21 +2487,11 @@ body.theme-dark #xinran-overlay .detail-card {
     overflow: hidden;
 }
 
-.auto-preview::before,
 .auto-preview::after {
     content: '';
     position: absolute;
     inset: 0;
     pointer-events: none;
-}
-
-.auto-preview::before {
-    background: linear-gradient(135deg, #FFE7B8 0%, #FFB46A 45%, #C2693A 100%);
-    opacity: 0;
-    animation: auto-preview-dusk 9s ease-in-out infinite;
-}
-
-.auto-preview::after {
     background:
         radial-gradient(circle at 70% 32%, rgba(255, 255, 255, 0.18) 0%, transparent 32%),
         linear-gradient(135deg, #4A4F7A 0%, #2A2D55 55%, #1F2440 100%);
@@ -2497,20 +2499,13 @@ body.theme-dark #xinran-overlay .detail-card {
     animation: auto-preview-night 9s ease-in-out infinite;
 }
 
-@keyframes auto-preview-dusk {
-    0%, 12%   { opacity: 0; }
-    28%, 38%  { opacity: 1; }
-    54%, 100% { opacity: 0; }
-}
-
 @keyframes auto-preview-night {
-    0%, 38%   { opacity: 0; }
-    54%, 70%  { opacity: 1; }
-    88%, 100% { opacity: 0; }
+    0%, 20%   { opacity: 0; }
+    45%, 60%  { opacity: 1; }
+    85%, 100% { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .auto-preview::before,
     .auto-preview::after { animation: none; }
 }
 
