@@ -332,6 +332,34 @@ apply_fstrim_config() {
     [ -f "$busybox" ] && { sm fstrim 2>/dev/null; $busybox fstrim /data 2>/dev/null; }
 }
 
+apply_corona_kernel_config() {
+    [ "$isCoronaKernel" != "1" ] && return
+    [ ! -f "$CONFIG_DIR/corona_kernel.conf" ] && return
+    user_window_ms=$(get_conf_value "$CONFIG_DIR/corona_kernel.conf" user_window_ms)
+    slack_off_ms=$(get_conf_value "$CONFIG_DIR/corona_kernel.conf" slack_off_ms)
+    for mod in wake_aware \
+               idle_writeback idle_vmstat \
+               suspend_pm_tunables suspend_timerslack suspend_sched_slack \
+               suspend_rcu_normalize suspend_dirty_freeze suspend_compact_freeze \
+               suspend_softlockup_disable suspend_net_quiesce suspend_swappiness_zero \
+               resume_freq_burst; do
+        param_dir="/sys/module/$mod/parameters"
+        [ ! -d "$param_dir" ] && continue
+        v=$(get_conf_value "$CONFIG_DIR/corona_kernel.conf" "${mod}_enabled")
+        [ -n "$v" ] && set_value "$v" "$param_dir/enabled"
+        case "$mod" in
+            suspend_swappiness_zero|suspend_dirty_freeze|suspend_compact_freeze|\
+            suspend_net_quiesce|suspend_softlockup_disable|suspend_sched_slack|resume_freq_burst)
+                [ -n "$user_window_ms" ] && set_value "$user_window_ms" "$param_dir/user_window_ms"
+                ;;
+        esac
+        if [ "$mod" = "suspend_timerslack" ] && [ -n "$slack_off_ms" ]; then
+            slack_off_ns=$(( slack_off_ms * 1000 * 1000 ))
+            set_value "$slack_off_ns" "$param_dir/slack_off_ns"
+        fi
+    done
+}
+
 wait_until_boot_complete
 wait_until_login
 sleep 10
@@ -355,6 +383,7 @@ apply_reclaim_config; sleep 1
 apply_kswapd_config; sleep 1
 apply_protect_config; sleep 1
 apply_fstrim_config; sleep 1
+apply_corona_kernel_config; sleep 1
 apply_user_scripts
 
 sleep 30
