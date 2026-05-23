@@ -1428,8 +1428,9 @@ class CoronaAddon {
         this.showToast(`预读取大小: ${this.state.readahead} KB`);
     }
     async loadDeviceInfo() {
-        const [brand, model, socModel, hardware, chipname, androidVersion, sdk, kernelVersion, battDesign] = await Promise.all([
+        const [brand, marketName, model, socModel, hardware, chipname, androidVersion, sdk, kernelVersion, battDesign] = await Promise.all([
             this.exec('getprop ro.product.brand'),
+            this.exec('getprop ro.vendor.oplus.market.name'),
             this.exec('getprop ro.product.model'),
             this.exec('getprop ro.board.platform'),
             this.exec('getprop ro.hardware'),
@@ -1443,7 +1444,7 @@ class CoronaAddon {
         await this.detectZramAlgorithms();
         const brandEl = document.getElementById('device-brand');
         if (brandEl) brandEl.textContent = brand || '--';
-        document.getElementById('device-model').textContent = model || '--';
+        document.getElementById('device-model').textContent = (marketName && marketName.trim()) || model || '--';
         const cpuName = chipname || socModel || hardware || 'Unknown';
         document.getElementById('cpu-info').textContent = cpuName;
         await this.detectCpuClusters();
