@@ -717,7 +717,7 @@ class CoronaAddon {
             };
             overlay._hideTransitionEnd = onTransitionEnd;
             overlay.addEventListener('transitionend', onTransitionEnd);
-            const fallbackMs = id === 'storage-detail-overlay' ? 480 : 350;
+            const fallbackMs = 480;
             overlay._hideTimer = setTimeout(finalize, fallbackMs);
         }
     }
