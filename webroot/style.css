@@ -1120,6 +1120,23 @@ body.theme-dark .detail-overlay.no-close-btn.show {
     transform: translateY(0) translateZ(0);
 }
 
+#storage-detail-overlay .detail-card {
+    transform: translateY(100%) translateZ(0);
+    transition: transform 0.42s cubic-bezier(0.6, 0, 0.86, 0.42);
+}
+
+#storage-detail-overlay.show .detail-card {
+    transform: translateY(0) translateZ(0);
+    transition: transform 0.55s cubic-bezier(0.18, 1.18, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #storage-detail-overlay .detail-card,
+    #storage-detail-overlay.show .detail-card {
+        transition: transform 0.2s ease;
+    }
+}
+
 .detail-card::before {
     content: '';
     display: block;
