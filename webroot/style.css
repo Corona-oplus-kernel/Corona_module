@@ -3701,8 +3701,6 @@ body.theme-dark #page-settings .sub-card {
     -webkit-backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.22);
     box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.08);
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
 }
 
 .theme-option,
