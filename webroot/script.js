@@ -639,41 +639,58 @@ class CoronaAddon {
     }
     showOverlay(id) {
         const overlay = document.getElementById(id);
-        if (overlay) {
-            if (overlay._hideTimer) {
-                clearTimeout(overlay._hideTimer);
-                overlay._hideTimer = null;
-            }
-            if (overlay._hideTransitionEnd) {
-                overlay.removeEventListener('transitionend', overlay._hideTransitionEnd);
-                overlay._hideTransitionEnd = null;
-            }
-            overlay.classList.remove('hidden', 'closing');
-            const cards = overlay.querySelectorAll('.detail-card, .priority-process-card, .script-edit-card');
-            cards.forEach(card => {
-                card.scrollTop = 0;
-                card.style.height = '';
-                card.style.maxHeight = '';
-                card.style.transform = '';
-            });
-            overlay.querySelectorAll('textarea, input').forEach(field => {
-                if (field.tagName === 'TEXTAREA') field.scrollTop = 0;
-            });
-            overlay.classList.remove('hidden');
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => overlay.classList.add('show'));
-            });
-            if (overlay.classList.contains('no-close-btn')) {
-                const floatingHeader = document.getElementById('floating-header');
-                if (floatingHeader) {
-                    floatingHeader.classList.add('overlay-hidden');
-                }
-            }
+        if (!overlay) return;
+        if (overlay._hideTimer) {
+            clearTimeout(overlay._hideTimer);
+            overlay._hideTimer = null;
+        }
+        if (overlay._hideTransitionEnd) {
+            overlay.removeEventListener('transitionend', overlay._hideTransitionEnd);
+            overlay._hideTransitionEnd = null;
+        }
+        overlay.classList.remove('hidden', 'closing');
+        overlay.querySelectorAll('.detail-card, .priority-process-card, .script-edit-card').forEach(card => {
+            card.scrollTop = 0;
+            card.style.height = '';
+            card.style.maxHeight = '';
+            card.style.transform = '';
+        });
+        overlay.querySelectorAll('textarea').forEach(t => { t.scrollTop = 0; });
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => overlay.classList.add('show'));
+        });
+        if (overlay.classList.contains('no-close-btn')) {
+            const floatingHeader = document.getElementById('floating-header');
+            if (floatingHeader) floatingHeader.classList.add('overlay-hidden');
         }
     }
     hideOverlay(id) {
         const overlay = document.getElementById(id);
-        if (overlay) {
+        if (!overlay) return;
+        if (overlay._hideTimer) {
+            clearTimeout(overlay._hideTimer);
+            overlay._hideTimer = null;
+        }
+        if (overlay._hideTransitionEnd) {
+            overlay.removeEventListener('transitionend', overlay._hideTransitionEnd);
+            overlay._hideTransitionEnd = null;
+        }
+        if (id === 'module-intro-overlay') {
+            overlay.classList.add('closing');
+            overlay.classList.remove('show');
+            overlay._hideTimer = setTimeout(() => {
+                overlay.classList.add('hidden');
+                overlay.classList.remove('closing');
+                overlay._hideTimer = null;
+            }, 250);
+            return;
+        }
+        overlay.classList.remove('show');
+        if (overlay.classList.contains('no-close-btn')) {
+            const floatingHeader = document.getElementById('floating-header');
+            if (floatingHeader) floatingHeader.classList.remove('overlay-hidden');
+        }
+        const finalize = () => {
             if (overlay._hideTimer) {
                 clearTimeout(overlay._hideTimer);
                 overlay._hideTimer = null;
@@ -682,44 +699,16 @@ class CoronaAddon {
                 overlay.removeEventListener('transitionend', overlay._hideTransitionEnd);
                 overlay._hideTransitionEnd = null;
             }
-            if (id === 'module-intro-overlay') {
-                overlay.classList.add('closing');
-                overlay.classList.remove('show');
-                overlay._hideTimer = setTimeout(() => {
-                    overlay.classList.add('hidden');
-                    overlay.classList.remove('closing');
-                    overlay._hideTimer = null;
-                }, 250);
-                return;
+            overlay.classList.add('hidden');
+        };
+        const onTransitionEnd = (e) => {
+            if (e.propertyName === 'transform' && e.target.classList && e.target.classList.contains('detail-card')) {
+                finalize();
             }
-            overlay.classList.remove('show');
-            if (overlay.classList.contains('no-close-btn')) {
-                const floatingHeader = document.getElementById('floating-header');
-                if (floatingHeader) {
-                    floatingHeader.classList.remove('overlay-hidden');
-                }
-            }
-            const finalize = () => {
-                if (overlay._hideTimer) {
-                    clearTimeout(overlay._hideTimer);
-                    overlay._hideTimer = null;
-                }
-                if (overlay._hideTransitionEnd) {
-                    overlay.removeEventListener('transitionend', overlay._hideTransitionEnd);
-                    overlay._hideTransitionEnd = null;
-                }
-                overlay.classList.add('hidden');
-            };
-            const onTransitionEnd = (e) => {
-                if (e.target.classList && e.target.classList.contains('detail-card') && e.propertyName === 'transform') {
-                    finalize();
-                }
-            };
-            overlay._hideTransitionEnd = onTransitionEnd;
-            overlay.addEventListener('transitionend', onTransitionEnd);
-            const fallbackMs = 480;
-            overlay._hideTimer = setTimeout(finalize, fallbackMs);
-        }
+        };
+        overlay._hideTransitionEnd = onTransitionEnd;
+        overlay.addEventListener('transitionend', onTransitionEnd);
+        overlay._hideTimer = setTimeout(finalize, 480);
     }
     async showBatteryDetail() {
         this.showOverlay('battery-detail-overlay');
