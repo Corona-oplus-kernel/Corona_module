@@ -90,7 +90,7 @@ class CoronaAddon {
             await this.resolvePaths();
             await this.ensureConfigDir();
             await this.loadRuntimeConfig();
-            this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1' || /corona/i.test(await this.exec('uname -r 2>/dev/null'));
+            this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
             this.initTheme();
             this.bindAllEvents();
             await this.loadDeviceInfo();
@@ -3146,6 +3146,22 @@ Swap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的
             if (card) card.style.display = 'none';
             return;
         }
+        if (!this.coronaKernelPresent) {
+            const probe = await this.exec(
+                `for m in ${this.coronaKernelMods.join(' ')}; do ` +
+                `d=/sys/module/$m/parameters; ` +
+                `if [ -d "$d" ]; then echo "$m:1:$(cat "$d/enabled" 2>/dev/null)"; ` +
+                `else echo "$m:0:"; fi; done`
+            );
+            this.coronaKernelPresent = {};
+            this.coronaKernelLive = {};
+            probe.split('\n').forEach(line => {
+                const parts = line.split(':');
+                if (parts.length < 2 || !parts[0]) return;
+                this.coronaKernelPresent[parts[0]] = parts[1] === '1';
+                this.coronaKernelLive[parts[0]] = (parts[2] || '').trim();
+            });
+        }
         const conf = await this.exec(`cat ${this.configDir}/corona_kernel.conf 2>/dev/null`);
         const parsed = {};
         conf.split('\n').forEach(line => {
@@ -3157,13 +3173,12 @@ Swap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的
         for (const mod of this.coronaKernelMods) {
             const sw = document.querySelector(`.ck-switch[data-mod="${mod}"]`);
             const row = document.querySelector(`.switch-container[data-ck-mod="${mod}"]`);
-            const exists = (await this.exec(`[ -d /sys/module/${mod}/parameters ] && echo y`)).trim() === 'y';
-            if (!exists) {
+            if (!this.coronaKernelPresent[mod]) {
                 if (row) row.style.display = 'none';
                 continue;
             }
             presentCount++;
-            const live = (await this.exec(`cat /sys/module/${mod}/parameters/enabled 2>/dev/null`)).trim();
+            const live = this.coronaKernelLive[mod] || '';
             const cfg = parsed[`${mod}_enabled`];
             const on = cfg !== undefined ? (cfg === '1' || cfg === 'Y' || cfg === 'y')
                                          : (live === '1' || live === 'Y' || live === 'y');
@@ -3201,15 +3216,17 @@ Swap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的
     async toggleCoronaKernelModule(mod, on) {
         const v = on ? '1' : '0';
         await this.exec(`echo ${v} > /sys/module/${mod}/parameters/enabled 2>/dev/null`);
+        if (this.coronaKernelLive) this.coronaKernelLive[mod] = v;
         await this.persistCoronaKernelConfig();
         this.loadCoronaKernelConfig();
         this.showToast(on ? `${mod} 已启用` : `${mod} 已禁用`);
     }
     async saveCoronaKernelTunable(key, value) {
         if (key === 'user_window_ms') {
-            for (const mod of this.coronaKernelGated) {
-                await this.exec(`[ -f /sys/module/${mod}/parameters/user_window_ms ] && echo ${value} > /sys/module/${mod}/parameters/user_window_ms 2>/dev/null`);
-            }
+            const cmd = this.coronaKernelGated.map(m =>
+                `[ -f /sys/module/${m}/parameters/user_window_ms ] && echo ${value} > /sys/module/${m}/parameters/user_window_ms`
+            ).join('; ');
+            await this.exec(`(${cmd}) 2>/dev/null`);
         } else if (key === 'slack_off_ms') {
             const ns = value * 1000 * 1000;
             await this.exec(`[ -f /sys/module/suspend_timerslack/parameters/slack_off_ns ] && echo ${ns} > /sys/module/suspend_timerslack/parameters/slack_off_ns 2>/dev/null`);
@@ -3220,10 +3237,9 @@ Swap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的
     async persistCoronaKernelConfig() {
         const lines = [];
         for (const mod of this.coronaKernelMods) {
+            if (this.coronaKernelPresent && !this.coronaKernelPresent[mod]) continue;
             const sw = document.querySelector(`.ck-switch[data-mod="${mod}"]`);
             if (!sw) continue;
-            const row = document.querySelector(`.switch-container[data-ck-mod="${mod}"]`);
-            if (row && row.style.display === 'none') continue;
             lines.push(`${mod}_enabled=${sw.checked ? '1' : '0'}`);
         }
         const ws = document.getElementById('ck-user-window-slider');

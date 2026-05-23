@@ -30,7 +30,6 @@ get_system_info() {
     is_oplus=0; find /proc -maxdepth 1 -name "oplus*" 2>/dev/null | grep -q . && is_oplus=1
     is_xiaomi=0; [ "$(getprop ro.miui.ui.version.name)" != "" ] && is_xiaomi=1
     isCoronaKernel=0
-    uname -r | grep -qi "corona" && isCoronaKernel=1
     [ -f /proc/corona ] && [ "$(cat /proc/corona 2>/dev/null)" = "1" ] && isCoronaKernel=1
 }
 
@@ -337,6 +336,8 @@ apply_corona_kernel_config() {
     [ ! -f "$CONFIG_DIR/corona_kernel.conf" ] && return
     user_window_ms=$(get_conf_value "$CONFIG_DIR/corona_kernel.conf" user_window_ms)
     slack_off_ms=$(get_conf_value "$CONFIG_DIR/corona_kernel.conf" slack_off_ms)
+    case "$user_window_ms" in ''|*[!0-9]*) user_window_ms="" ;; esac
+    case "$slack_off_ms" in ''|*[!0-9]*) slack_off_ms="" ;; esac
     for mod in wake_aware \
                idle_writeback idle_vmstat \
                suspend_pm_tunables suspend_timerslack suspend_sched_slack \
@@ -346,14 +347,19 @@ apply_corona_kernel_config() {
         param_dir="/sys/module/$mod/parameters"
         [ ! -d "$param_dir" ] && continue
         v=$(get_conf_value "$CONFIG_DIR/corona_kernel.conf" "${mod}_enabled")
-        [ -n "$v" ] && set_value "$v" "$param_dir/enabled"
+        case "$v" in
+            1|Y|y) set_value Y "$param_dir/enabled" ;;
+            0|N|n) set_value N "$param_dir/enabled" ;;
+        esac
         case "$mod" in
             suspend_swappiness_zero|suspend_dirty_freeze|suspend_compact_freeze|\
             suspend_net_quiesce|suspend_softlockup_disable|suspend_sched_slack|resume_freq_burst)
-                [ -n "$user_window_ms" ] && set_value "$user_window_ms" "$param_dir/user_window_ms"
+                [ -n "$user_window_ms" ] && [ -f "$param_dir/user_window_ms" ] && \
+                    set_value "$user_window_ms" "$param_dir/user_window_ms"
                 ;;
         esac
-        if [ "$mod" = "suspend_timerslack" ] && [ -n "$slack_off_ms" ]; then
+        if [ "$mod" = "suspend_timerslack" ] && [ -n "$slack_off_ms" ] && \
+           [ -f "$param_dir/slack_off_ns" ]; then
             slack_off_ns=$(( slack_off_ms * 1000 * 1000 ))
             set_value "$slack_off_ns" "$param_dir/slack_off_ns"
         fi
