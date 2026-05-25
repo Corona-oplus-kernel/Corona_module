@@ -3113,12 +3113,14 @@ Swap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的
             'suspend_net_quiesce', 'suspend_softlockup_disable', 'suspend_timerslack',
             'suspend_sched_slack', 'suspend_pm_tunables', 'suspend_rcu_normalize',
             'resume_freq_burst',
+            'swappiness_pressure_throttle',
             'idle_writeback', 'idle_vmstat'
         ];
         this.coronaKernelGated = [
             'suspend_swappiness_zero', 'suspend_dirty_freeze', 'suspend_compact_freeze',
             'suspend_net_quiesce', 'suspend_softlockup_disable', 'suspend_sched_slack',
-            'resume_freq_burst'
+            'resume_freq_burst',
+            'swappiness_pressure_throttle'
         ];
         document.querySelectorAll('.ck-switch').forEach(sw => {
             sw.addEventListener('change', () => this.toggleCoronaKernelModule(sw.dataset.mod, sw.checked));

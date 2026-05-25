@@ -860,6 +860,16 @@
                         </div>
                         <div class="setting-section">
                             <span class="section-label">后台空闲</span>
+                            <div class="switch-container" data-ck-mod="swappiness_pressure_throttle">
+                                <div class="switch-info">
+                                    <span class="switch-label">swappiness_pressure_throttle</span>
+                                    <span class="switch-desc">RAM 吃紧时把 vm_swappiness 从 ceiling 钳到 floor，缓解后释放；带 PSI/wake_aware/熄屏+充电/温控自适应</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="ck-switch" data-mod="swappiness_pressure_throttle">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
                             <div class="switch-container" data-ck-mod="idle_writeback">
                                 <div class="switch-info">
                                     <span class="switch-label">idle_writeback</span>

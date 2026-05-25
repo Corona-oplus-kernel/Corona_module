@@ -66,7 +66,23 @@ apply_zram_config() {
     mkswap "$zram_path" 2>/dev/null
     swapon "$zram_path" -p 32758 2>/dev/null || swapon "$zram_path" 2>/dev/null
     [ -n "$swappiness" ] && {
-        lock_value "$swappiness" /proc/sys/vm/swappiness
+        # Corona kernel ships swappiness_pressure_throttle (SPT): a periodic
+        # in-kernel loop that drives vm_swappiness between a ceiling (RAM
+        # below low watermark) and a floor (RAM at/above high watermark).
+        # If SPT is live, treat the user's chosen swappiness as the SPT
+        # ceiling and let SPT do the closed-loop write -- locking
+        # /proc/sys/vm/swappiness to a static value would just stop SPT's
+        # writes from being visible to userspace and confuse readers.
+        spt_dir=/sys/module/swappiness_pressure_throttle/parameters
+        if [ "$isCoronaKernel" = "1" ] && [ -d "$spt_dir" ]; then
+            set_value "$swappiness" "$spt_dir/ceiling"
+            # Seed vm_swappiness so the first tick observes the right value
+            # even before pressure rises -- still leave it writable so SPT
+            # can write its floor on the next tick.
+            set_value "$swappiness" /proc/sys/vm/swappiness
+        else
+            lock_value "$swappiness" /proc/sys/vm/swappiness
+        fi
         lock_value "$swappiness" /dev/memcg/memory.swappiness
         lock_value "$swappiness" /dev/memcg/apps/memory.swappiness
         lock_value "$swappiness" /sys/fs/cgroup/memory/memory.swappiness
@@ -343,6 +359,7 @@ apply_corona_kernel_config() {
                suspend_pm_tunables suspend_timerslack suspend_sched_slack \
                suspend_rcu_normalize suspend_dirty_freeze suspend_compact_freeze \
                suspend_softlockup_disable suspend_net_quiesce suspend_swappiness_zero \
+               swappiness_pressure_throttle \
                resume_freq_burst; do
         param_dir="/sys/module/$mod/parameters"
         [ ! -d "$param_dir" ] && continue
@@ -353,7 +370,8 @@ apply_corona_kernel_config() {
         esac
         case "$mod" in
             suspend_swappiness_zero|suspend_dirty_freeze|suspend_compact_freeze|\
-            suspend_net_quiesce|suspend_softlockup_disable|suspend_sched_slack|resume_freq_burst)
+            suspend_net_quiesce|suspend_softlockup_disable|suspend_sched_slack|\
+            resume_freq_burst|swappiness_pressure_throttle)
                 [ -n "$user_window_ms" ] && [ -f "$param_dir/user_window_ms" ] && \
                     set_value "$user_window_ms" "$param_dir/user_window_ms"
                 ;;
