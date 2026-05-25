@@ -67,18 +67,24 @@ apply_zram_config() {
     swapon "$zram_path" -p 32758 2>/dev/null || swapon "$zram_path" 2>/dev/null
     [ -n "$swappiness" ] && {
         # Corona kernel ships swappiness_pressure_throttle (SPT): a periodic
-        # in-kernel loop that drives vm_swappiness between a ceiling (RAM
-        # below low watermark) and a floor (RAM at/above high watermark).
-        # If SPT is live, treat the user's chosen swappiness as the SPT
-        # ceiling and let SPT do the closed-loop write -- locking
-        # /proc/sys/vm/swappiness to a static value would just stop SPT's
-        # writes from being visible to userspace and confuse readers.
+        # in-kernel loop that drives vm_swappiness between an idle value
+        # (RAM below low watermark) and a pressure value (RAM at/above
+        # high watermark, when anon-to-zram is boosted to retain apps).
+        # If SPT is live, map the user's configured swappiness to the
+        # pressure value and don't lock /proc/sys/vm/swappiness -- SPT
+        # writes through it on every tick.  The pre-pressure value is
+        # left at SPT's swappiness_idle default (lower CPU cost when RAM
+        # is healthy), unless the user picked a smaller-than-idle value.
         spt_dir=/sys/module/swappiness_pressure_throttle/parameters
         if [ "$isCoronaKernel" = "1" ] && [ -d "$spt_dir" ]; then
-            set_value "$swappiness" "$spt_dir/ceiling"
-            # Seed vm_swappiness so the first tick observes the right value
-            # even before pressure rises -- still leave it writable so SPT
-            # can write its floor on the next tick.
+            if [ -f "$spt_dir/swappiness_pressure" ]; then
+                set_value "$swappiness" "$spt_dir/swappiness_pressure"
+            elif [ -f "$spt_dir/ceiling" ]; then
+                # Older SPT (pre-inversion): legacy ceiling fallback.
+                set_value "$swappiness" "$spt_dir/ceiling"
+            fi
+            # Seed vm_swappiness so the first tick observes a sane value
+            # even before pressure rises; SPT will overwrite as needed.
             set_value "$swappiness" /proc/sys/vm/swappiness
         else
             lock_value "$swappiness" /proc/sys/vm/swappiness
