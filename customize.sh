@@ -45,9 +45,11 @@ module_name=$MODULE_NAME
 swapfile_path=$MODPATH/swapfile.img
 EOF
 
-DESC_TEXT='description="等待首次设置……"'
-if [ -f "$MODPATH/module.prop" ]; then
-    if grep -q '^description=' "$MODPATH/module.prop"; then
-        sed -i "s|^description=.*|$DESC_TEXT|" "$MODPATH/module.prop"
+if [ -d "$OLD_MODDIR" ] && [ -f "$OLD_MODDIR/module.prop" ]; then
+    OLD_DESC=$(grep -E '^description=' "$OLD_MODDIR/module.prop" | cut -d'=' -f2-)
+    if [ -n "$OLD_DESC" ]; then
+        sed -i "s|^description=.*|description=${OLD_DESC}|" "$MODPATH/module.prop"
     fi
+else
+    sed -i 's|^description=.*|description=等待首次设置……|' "$MODPATH/module.prop"
 fi
