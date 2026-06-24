@@ -3863,3 +3863,28 @@ body.theme-dark .update-result.no-update {
     font-size: 0.72rem;
     color: var(--text-secondary);
 }
+.update-warning {
+    color: #e53935;
+    font-weight: 600;
+    font-size: 0.75rem;
+    margin-bottom: 8px;
+}
+.update-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-tertiary, #e0e0e0);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 8px 0;
+}
+.update-progress-fill {
+    height: 100%;
+    width: 0;
+    background: var(--primary, #4caf50);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+#update-status-text {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}

@@ -836,25 +836,35 @@ class CoronaAddon {
         const progress = document.getElementById('update-progress');
         const dlBtn = document.getElementById('update-download-btn');
         if (dlBtn) dlBtn.disabled = true;
-        if (progress) { progress.classList.remove('hidden'); progress.textContent = '正在下载...'; }
+        if (progress) {
+            progress.classList.remove('hidden');
+            progress.innerHTML = '<div class="update-warning">安装完成前请勿退出此页面</div><div class="update-progress-bar"><div class="update-progress-fill" id="update-progress-fill"></div></div><div id="update-status-text">正在下载...</div>';
+        }
+        const fill = document.getElementById('update-progress-fill');
+        const statusText = document.getElementById('update-status-text');
+        const setProgress = (pct, text) => {
+            if (fill) fill.style.width = pct + '%';
+            if (statusText) statusText.textContent = text;
+        };
         const tmpPath = '/data/local/tmp/Corona_update.zip';
         const tmpDir = '/data/local/tmp/Corona_update';
+        setProgress(10, '正在下载...');
         const dlResult = await this.exec(`curl -L -o ${tmpPath} "${zipUrl}" 2>&1 && echo __DL_OK__`);
         if (!dlResult.includes('__DL_OK__')) {
-            if (progress) progress.textContent = `下载失败：${dlResult.split('\n').pop()}`;
+            setProgress(0, `下载失败：${dlResult.split('\n').pop()}`);
             if (dlBtn) dlBtn.disabled = false;
             return;
         }
-        if (progress) progress.textContent = '正在解压并替换文件...';
+        setProgress(50, '正在解压并替换文件...');
         await this.exec(`rm -rf ${tmpDir} && mkdir -p ${tmpDir}`);
         const unzipResult = await this.exec(`unzip -o ${tmpPath} -d ${tmpDir} 2>&1 && echo __UZ_OK__`);
         if (!unzipResult.includes('__UZ_OK__')) {
-            if (progress) progress.textContent = `解压失败：${unzipResult.split('\n').pop()}`;
+            setProgress(0, `解压失败：${unzipResult.split('\n').pop()}`);
             await this.exec(`rm -rf ${tmpPath} ${tmpDir}`);
             if (dlBtn) dlBtn.disabled = false;
             return;
         }
-        const configBackup = `${this.modDir}/config`;
+        setProgress(70, '正在替换模块文件...');
         await this.exec(`cp -a ${tmpDir}/webroot/ ${this.modDir}/webroot/ 2>/dev/null`);
         await this.exec(`cp -f ${tmpDir}/module.prop ${this.modDir}/module.prop 2>/dev/null`);
         await this.exec(`cp -f ${tmpDir}/service.sh ${this.modDir}/service.sh 2>/dev/null`);
@@ -862,8 +872,9 @@ class CoronaAddon {
         await this.exec(`cp -f ${tmpDir}/uninstall.sh ${this.modDir}/uninstall.sh 2>/dev/null`);
         await this.exec(`cp -af ${tmpDir}/odm ${this.modDir}/ 2>/dev/null`);
         await this.exec(`cp -af ${tmpDir}/META-INF ${this.modDir}/ 2>/dev/null`);
+        setProgress(90, '正在清理...');
         await this.exec(`rm -rf ${tmpPath} ${tmpDir}`);
-        if (progress) progress.textContent = '更新完成，刷新页面即可使用新版本';
+        setProgress(100, '更新完成，刷新页面即可使用新版本');
         this.showToast('模块文件已更新');
     }
     initDeviceImageInteraction() {
