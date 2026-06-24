@@ -1852,23 +1852,23 @@ class CoronaAddon {
     }
     async updateModuleDescription() {
         const descParts = [];
-        const hasZramConf = (await this.exec(`[ -f ${this.configDir}/zram.conf ] && echo 1`)).trim() === '1';
-        if (hasZramConf) {
-            if (this.state.zramEnabled) {
-                const algRaw = await this.exec('cat /sys/block/zram0/comp_algorithm 2>/dev/null');
-                const currentAlg = algRaw.match(/\[([^\]]+)\]/)?.[1] || algRaw.split(' ')[0] || this.state.algorithm;
-                descParts.push(`ZRAM:${currentAlg}`);
-            } else { descParts.push(`ZRAM:关闭`); }
+        if (this.state.zramEnabled) {
+            const algRaw = await this.exec('cat /sys/block/zram0/comp_algorithm 2>/dev/null');
+            const currentAlg = algRaw.match(/\[([^\]]+)\]/)?.[1] || algRaw.split(' ')[0] || this.state.algorithm;
+            descParts.push(`ZRAM:${currentAlg}`);
+        } else { descParts.push(`ZRAM:关闭`); }
+        if (this.state.ioScheduler) { descParts.push(`IO:${this.state.ioScheduler}`); }
+        else {
+            const schedulerRaw = await this.exec('cat /sys/block/sda/queue/scheduler 2>/dev/null || cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null');
+            if (schedulerRaw) { const current = schedulerRaw.match(/\[([^\]]+)\]/)?.[1] || schedulerRaw.split(' ')[0]; if (current) descParts.push(`IO:${current}`); else descParts.push(`IO:--`); }
+            else { descParts.push(`IO:--`); }
         }
-        const hasIoConf = (await this.exec(`[ -f ${this.configDir}/io_scheduler.conf ] && echo 1`)).trim() === '1';
-        if (hasIoConf && this.state.ioScheduler) { descParts.push(`IO:${this.state.ioScheduler}`); }
-        const hasCpuConf = (await this.exec(`[ -f ${this.configDir}/cpu_governor.conf ] && echo 1`)).trim() === '1';
-        if (hasCpuConf && this.state.cpuGovernor) { descParts.push(`CPU:${this.state.cpuGovernor}`); }
-        const hasTcpConf = (await this.exec(`[ -f ${this.configDir}/tcp.conf ] && echo 1`)).trim() === '1';
-        if (hasTcpConf && this.state.tcp) { descParts.push(`TCP:${this.state.tcp}`); }
-        const hasLe9ecConf = (await this.exec(`[ -f ${this.configDir}/le9ec.conf ] && echo 1`)).trim() === '1';
-        if (hasLe9ecConf && this.state.le9ecEnabled) { descParts.push(`LE9EC:开启`); }
-        const desc = descParts.length > 0 ? descParts.join(' | ') : '做为内核附加，可进行部分简单的参数设置';
+        if (this.state.cpuGovernor) { descParts.push(`CPU:${this.state.cpuGovernor}`); }
+        else { const current = await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null'); if (current) descParts.push(`CPU:${current.trim()}`); else descParts.push(`CPU:--`); }
+        if (this.state.tcp) { descParts.push(`TCP:${this.state.tcp}`); }
+        else { const current = await this.exec('cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null'); if (current) descParts.push(`TCP:${current.trim()}`); else descParts.push(`TCP:--`); }
+        if (this.le9ecSupported && this.state.le9ecEnabled) { descParts.push(`LE9EC:开启`); }
+        const desc = descParts.join(' | ');
         const modulePropPath = `${this.modDir}/module.prop`;
         await this.exec(`sed -i 's/^description=.*/description=${desc.replace(/\//g, "\\/")}/' '${modulePropPath}' 2>/dev/null`);
     }
