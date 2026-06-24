@@ -848,14 +848,14 @@ class CoronaAddon {
         };
         const tmpPath = '/data/local/tmp/Corona_update.zip';
         const tmpDir = '/data/local/tmp/Corona_update';
-        setProgress(10, '正在下载...');
+        setProgress(20, '正在下载...');
         const dlResult = await this.exec(`curl -L -o ${tmpPath} "${zipUrl}" 2>&1 && echo __DL_OK__`);
         if (!dlResult.includes('__DL_OK__')) {
             setProgress(0, `下载失败：${dlResult.split('\n').pop()}`);
             if (dlBtn) dlBtn.disabled = false;
             return;
         }
-        setProgress(50, '正在解压并替换文件...');
+        setProgress(50, '下载完成，正在解压...');
         await this.exec(`rm -rf ${tmpDir} && mkdir -p ${tmpDir}`);
         const unzipResult = await this.exec(`unzip -o ${tmpPath} -d ${tmpDir} 2>&1 && echo __UZ_OK__`);
         if (!unzipResult.includes('__UZ_OK__')) {
@@ -864,7 +864,7 @@ class CoronaAddon {
             if (dlBtn) dlBtn.disabled = false;
             return;
         }
-        setProgress(70, '正在替换模块文件...');
+        setProgress(70, '正在安装...');
         const oldDesc = await this.exec(`grep '^description=' ${this.modDir}/module.prop | cut -d= -f2-`);
         await this.exec(`cp -a ${tmpDir}/webroot/ ${this.modDir}/webroot/ 2>/dev/null`);
         await this.exec(`cp -f ${tmpDir}/module.prop ${this.modDir}/module.prop 2>/dev/null`);
@@ -878,8 +878,9 @@ class CoronaAddon {
         }
         setProgress(90, '正在清理...');
         await this.exec(`rm -rf ${tmpPath} ${tmpDir}`);
-        setProgress(100, '更新完成，刷新页面即可使用新版本');
-        this.showToast('模块文件已更新');
+        setProgress(100, '安装完成，正在重新载入...');
+        await new Promise(r => setTimeout(r, 1000));
+        location.reload();
     }
     initDeviceImageInteraction() {
         const container = document.getElementById('device-image-container');
