@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths: [module.prop]
+  workflow_dispatch:
 
 jobs:
   release:
@@ -12,6 +13,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Parse version
         id: version
@@ -21,12 +24,24 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "versionCode=$versionCode" >> "$GITHUB_OUTPUT"
 
+      - name: Generate changelog
+        id: changelog
+        run: |
+          prev_tag=$(git tag --sort=-v:refname | head -1)
+          if [ -n "$prev_tag" ]; then
+            log=$(git log "$prev_tag"..HEAD --pretty=format:"- %s" --no-merges | grep -v "^- bump:" | grep -v "^- update:")
+          else
+            log=$(git log --pretty=format:"- %s" --no-merges -20 | grep -v "^- bump:" | grep -v "^- update:")
+          fi
+          [ -z "$log" ] && log="- 版本更新"
+          printf "# Corona %s\n\n%s\n" "${{ steps.version.outputs.version }}" "$log" > changelog.md
+
       - name: Build zip
         run: |
           zip -r "Corona-${{ steps.version.outputs.version }}.zip" . \
             -x ".git/*" -x ".github/*"
 
-      - name: Update update.json
+      - name: Update update.json and changelog
         run: |
           printf '{\n  "version": "%s",\n  "versionCode": %s,\n  "zipUrl": "https://github.com/%s/releases/download/%s/Corona-%s.zip",\n  "changelog": "https://raw.githubusercontent.com/%s/main/changelog.md"\n}\n' \
             "${{ steps.version.outputs.version }}" \
@@ -37,8 +52,8 @@ jobs:
             "${{ github.repository }}" > update.json
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add update.json
-          git diff --cached --quiet || (git commit -m "update: update.json -> ${{ steps.version.outputs.version }}" && git push)
+          git add update.json changelog.md
+          git diff --cached --quiet || (git commit -m "update: ${{ steps.version.outputs.version }}" && git push)
 
       - name: Create Release
         env:
@@ -48,4 +63,4 @@ jobs:
           gh release create "${{ steps.version.outputs.version }}" \
             "Corona-${{ steps.version.outputs.version }}.zip" \
             --title "${{ steps.version.outputs.version }}" \
-            --generate-notes
+            --notes-file changelog.md
