@@ -865,6 +865,7 @@ class CoronaAddon {
             return;
         }
         setProgress(70, '正在替换模块文件...');
+        const oldDesc = await this.exec(`grep '^description=' ${this.modDir}/module.prop | cut -d= -f2-`);
         await this.exec(`cp -a ${tmpDir}/webroot/ ${this.modDir}/webroot/ 2>/dev/null`);
         await this.exec(`cp -f ${tmpDir}/module.prop ${this.modDir}/module.prop 2>/dev/null`);
         await this.exec(`cp -f ${tmpDir}/service.sh ${this.modDir}/service.sh 2>/dev/null`);
@@ -872,6 +873,9 @@ class CoronaAddon {
         await this.exec(`cp -f ${tmpDir}/uninstall.sh ${this.modDir}/uninstall.sh 2>/dev/null`);
         await this.exec(`cp -af ${tmpDir}/odm ${this.modDir}/ 2>/dev/null`);
         await this.exec(`cp -af ${tmpDir}/META-INF ${this.modDir}/ 2>/dev/null`);
+        if (oldDesc.trim()) {
+            await this.exec(`sed -i 's/^description=.*/description=${oldDesc.trim().replace(/\//g, "\\/")}/' '${this.modDir}/module.prop' 2>/dev/null`);
+        }
         setProgress(90, '正在清理...');
         await this.exec(`rm -rf ${tmpPath} ${tmpDir}`);
         setProgress(100, '更新完成，刷新页面即可使用新版本');
