@@ -148,7 +148,7 @@
                 <div class="module-card-header">
                     <div class="module-card-info">
                         <div class="module-card-title" data-module="memory-compression">内存压缩</div>
-                        <div class="module-card-desc">ZRAM / Swap / LRU / VM参数 <span class="reboot-badge">重启生效</span></div>
+                        <div class="module-card-desc">ZRAM / Swap / LRU / VM参数</div>
                         <span class="module-card-badge" id="memory-compression-badge">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -160,7 +160,7 @@
                 <div id="memory-compression-content" class="module-card-content hidden">
                     <div class="sub-card" id="zram-sub">
                         <div class="sub-card-header" id="zram-toggle">
-                            <span class="sub-card-title">ZRAM 管理</span>
+                            <span class="sub-card-title">ZRAM 管理<span class="reboot-hint">重启生效</span></span>
                             <span class="current-badge" id="zram-status">--</span>
                             <span class="expand-icon">❯</span>
                         </div>
@@ -246,7 +246,7 @@
                     </div>
                     <div class="sub-card" id="swap-sub">
                         <div class="sub-card-header" id="swap-toggle">
-                            <span class="sub-card-title">Swap 文件</span>
+                            <span class="sub-card-title">Swap 文件<span class="reboot-hint">重启生效</span></span>
                             <span class="current-badge" id="swap-status">未启用</span>
                             <span class="expand-icon">❯</span>
                         </div>
@@ -296,7 +296,7 @@
                     </div>
                     <div class="sub-card" id="lru-sub">
                         <div class="sub-card-header" id="lru-toggle">
-                            <span class="sub-card-title">LRU 相关</span>
+                            <span class="sub-card-title">LRU 相关<span class="reboot-hint">重启生效</span></span>
                             <span class="current-badge" id="lru-status">--</span>
                             <span class="expand-icon">❯</span>
                         </div>
@@ -347,7 +347,7 @@
                     </div>
                     <div class="sub-card" id="vm-sub">
                         <div class="sub-card-header" id="vm-toggle">
-                            <span class="sub-card-title">虚拟内存参数</span>
+                            <span class="sub-card-title">虚拟内存参数<span class="reboot-hint">重启生效</span></span>
                             <span class="current-badge" id="vm-status">默认</span>
                             <span class="expand-icon">❯</span>
                         </div>
@@ -415,7 +415,7 @@
                 <div class="module-card-header">
                     <div class="module-card-info">
                         <div class="module-card-title" data-module="le9ec">LE9EC 内存保护</div>
-                        <div class="module-card-desc">防止工作集被过度回收 <span class="reboot-badge">重启生效</span></div>
+                        <div class="module-card-desc">防止工作集被过度回收</div>
                         <span class="module-card-badge" id="le9ec-badge">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -439,7 +439,7 @@
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">启用 LE9EC</span>
+                            <span class="switch-label">启用 LE9EC<span class="reboot-hint">重启生效</span></span>
                             <span class="switch-desc">保护工作集，防止内存抖动</span>
                         </div>
                         <label class="switch">
@@ -595,7 +595,7 @@
                 <div class="module-card-header">
                     <div class="module-card-info">
                         <div class="module-card-title" data-module="system-opt">系统优化</div>
-                        <div class="module-card-desc">LMK / 回收控制 / 进程保护 <span class="reboot-badge">部分重启生效</span></div>
+                        <div class="module-card-desc">LMK / 回收控制 / 进程保护</div>
                         <span class="module-card-badge" id="system-opt-badge">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -607,8 +607,8 @@
                 <div id="system-opt-content" class="module-card-content hidden">
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">LMK 优化</span>
-                            <span class="switch-desc">根据内存大小自动配置 minfree_levels（重启生效）</span>
+                            <span class="switch-label">LMK 优化<span class="reboot-hint">重启生效</span></span>
+                            <span class="switch-desc">根据内存大小自动配置 minfree_levels</span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="lmk-switch">
@@ -627,8 +627,8 @@
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">禁用激进回收</span>
-                            <span class="switch-desc">禁用 DAMON/process_reclaim/mi_reclaim（重启生效）</span>
+                            <span class="switch-label">禁用激进回收<span class="reboot-hint">重启生效</span></span>
+                            <span class="switch-desc">禁用 DAMON/process_reclaim/mi_reclaim</span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="reclaim-switch">
@@ -637,8 +637,8 @@
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">kswapd 优化</span>
-                            <span class="switch-desc">将 kswapd 放入前台 cpuset（重启生效）</span>
+                            <span class="switch-label">kswapd 优化<span class="reboot-hint">重启生效</span></span>
+                            <span class="switch-desc">将 kswapd 放入前台 cpuset</span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="kswapd-switch">
@@ -671,7 +671,7 @@
                 <div class="module-card-header">
                     <div class="module-card-info">
                         <div class="module-card-title" data-module="corona-kernel">Corona 内核优化</div>
-                        <div class="module-card-desc">挂起省电 / 唤醒响应 / 后台空闲 <span class="reboot-badge">重启生效</span></div>
+                        <div class="module-card-desc">挂起省电 / 唤醒响应 / 后台空闲</div>
                         <span class="module-card-badge" id="corona-kernel-badge">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -685,6 +685,7 @@
                         <span>未检测到 Corona 内核，此卡片仅在 Corona 内核下生效</span>
                     </div>
                     <div id="corona-kernel-body">
+                        <div class="reboot-notice">以下参数均需重启后生效</div>
                         <div class="setting-section">
                             <span class="section-label">用户在场窗口 (user_window_ms)</span>
                             <span class="section-desc">息屏后这段时间内的自动唤醒会跳过 restore，省掉存/恢复抖动</span>
@@ -960,18 +961,6 @@
                                 </label>
                             </div>
                         </div>
-                    </div>
-                    <div class="setting-section">
-                        <span class="section-label">脚本日志</span>
-                        <div class="action-desc">记录自定义脚本输出（service.sh）</div>
-                        <div class="card-visibility-item">
-                            <span class="card-visibility-name">启用日志</span>
-                            <label class="switch">
-                                <input type="checkbox" id="user-scripts-log-switch">
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <button class="action-btn" id="view-user-scripts-log-btn">查看最近日志</button>
                     </div>
                     <div class="setting-section danger-section">
                         <span class="section-label">危险操作</span>

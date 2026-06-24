@@ -2,6 +2,17 @@
 SKIPMOUNT=false
 PROPFILE=false
 POSTFSDATA=false
+
+BRAND=$(getprop ro.product.brand | tr '[:upper:]' '[:lower:]')
+MANUFACTURER=$(getprop ro.product.manufacturer | tr '[:upper:]' '[:lower:]')
+if [ "$BRAND" != "oneplus" ] && [ "$MANUFACTURER" != "oneplus" ] && [ "$BRAND" != "oplus" ] && [ "$MANUFACTURER" != "oplus" ]; then
+    ui_print "================================================"
+    ui_print " 错误：此模块仅支持 OnePlus/一加 设备"
+    ui_print " 当前品牌: $(getprop ro.product.brand)"
+    ui_print "================================================"
+    abort "不支持的设备，安装中止"
+fi
+
 MODULE_NAME=$(grep -E '^name=' "${MODPATH}/module.prop" | cut -d'=' -f2-)
 MODULE_VERSION=$(grep -E '^version=' "${MODPATH}/module.prop" | cut -d'=' -f2-)
 ui_print "================================================"

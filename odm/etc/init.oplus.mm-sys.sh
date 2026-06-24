@@ -86,7 +86,6 @@ init_zram() {
     swap_size_mb=16384
   fi
 
-  # Corona overlay: read user ZRAM config
   local corona_zram_enabled=$(corona_get zram.conf enabled)
   if [ "$corona_zram_enabled" = "1" ]; then
     local corona_size=$(corona_get zram.conf size)
@@ -133,7 +132,6 @@ init_zram() {
       /system/bin/swapon /dev/block/zram0 -p $magic 2>/dev/null
     fi
 
-    # Corona overlay: writeback control
     local corona_writeback=$(corona_get zram.conf zram_writeback)
     if [ "$corona_writeback" = "false" ]; then
       echo none > /sys/block/zram0/backing_dev 2>/dev/null
@@ -154,7 +152,6 @@ init_zram() {
     /system/bin/swapon /dev/block/zram0 -p $magic 2>/dev/null
   fi
 
-  # Corona overlay: swappiness
   local corona_swappiness=$(corona_get zram.conf swappiness)
   if [ -n "$corona_swappiness" ]; then
     local spt_dir=/sys/module/swappiness_pressure_throttle/parameters

@@ -86,6 +86,12 @@ class CoronaAddon {
         this.showInitOverlay(true);
         try {
             await this.resolvePaths();
+            const brand = (await this.exec('getprop ro.product.brand')).toLowerCase();
+            const manufacturer = (await this.exec('getprop ro.product.manufacturer')).toLowerCase();
+            if (brand !== 'oneplus' && manufacturer !== 'oneplus' && brand !== 'oplus' && manufacturer !== 'oplus') {
+                this.showUnsupportedDevice(brand || manufacturer);
+                return;
+            }
             await this.ensureConfigDir();
             await this.loadRuntimeConfig();
             this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
@@ -387,7 +393,7 @@ class CoronaAddon {
             { toggle: 'process-priority-toggle', content: 'process-priority-content', onExpand: null },
             { toggle: 'tcp-toggle', content: 'tcp-content', onExpand: null },
             { toggle: 'custom-scripts-toggle', content: 'custom-scripts-content', onExpand: null },
-            { toggle: 'system-opt-toggle', content: 'system-opt-content', onExpand: () => this.loadSystemOptConfig() },
+            { toggle: 'system-opt-toggle', content: 'system-opt-content', onExpand: null },
             { toggle: 'corona-kernel-toggle', content: 'corona-kernel-content', onExpand: () => this.loadCoronaKernelConfig() },
             { toggle: 'app-settings-toggle', content: 'app-settings-content', onExpand: null }
         ];
@@ -598,7 +604,6 @@ class CoronaAddon {
         document.getElementById('gc-btn').addEventListener('click', async () => await this.runGC());
         document.querySelectorAll('.memclean-option').forEach(opt => { opt.addEventListener('click', async () => { if (this.memCleanRunning) return; await this.runMemClean(opt.dataset.mode); }); });
         this.initResetAllBtn();
-        this.initUserScriptsLogToggle();
     }
     showOverlay(id) {
         const overlay = document.getElementById(id);
@@ -758,25 +763,6 @@ class CoronaAddon {
         const btn = document.getElementById('reset-all-btn');
         if (!btn) return;
         btn.addEventListener('click', () => this.resetAllSettings());
-    }
-    async initUserScriptsLogToggle() {
-        const sw = document.getElementById('user-scripts-log-switch');
-        const viewBtn = document.getElementById('view-user-scripts-log-btn');
-        if (!sw) return;
-        const conf = await this.exec(`cat ${this.configDir}/log.conf 2>/dev/null`);
-        const enabled = /^user_scripts_log=1/m.test(conf);
-        sw.checked = enabled;
-        if (viewBtn) viewBtn.style.display = enabled ? '' : 'none';
-        sw.addEventListener('change', async () => {
-            await this.writeConfig('log.conf', `user_scripts_log=${sw.checked ? '1' : '0'}`);
-            if (viewBtn) viewBtn.style.display = sw.checked ? '' : 'none';
-            this.showToast(sw.checked ? '已启用脚本日志' : '已关闭脚本日志');
-            if (!sw.checked) await this.exec(`rm -rf ${this.modDir}/scripts.d/.logs 2>/dev/null`);
-        });
-        if (viewBtn) viewBtn.addEventListener('click', async () => {
-            const log = await this.exec(`cat ${this.modDir}/scripts.d/.logs/*.log 2>/dev/null | tail -c 8192`);
-            await this.showConfirm(log && log.trim() ? log : '（暂无日志）', '脚本日志');
-        });
     }
     async resetAllSettings() {
         const confirmed = await this.showConfirm('确定要重置所有设置吗？\n\n此操作将删除所有配置文件并立刻重启，且不可撤销！', '一键重置');
@@ -1911,6 +1897,11 @@ class CoronaAddon {
             el.classList.remove('show');
             document.body.classList.remove('init-lock');
         }
+    }
+    showUnsupportedDevice(brand) {
+        document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;padding:24px;text-align:center;font-family:system-ui,sans-serif">
+            <div><h2 style="color:#e53935;margin-bottom:12px">设备不支持</h2>
+            <p style="color:#666;font-size:14px">此模块仅支持 OnePlus/一加 设备<br>当前品牌: ${brand}</p></div></div>`;
     }
     showLoading(show) {
         if (this.isInitializing) return;

@@ -3554,9 +3554,6 @@ body.theme-dark #page-settings .sub-card {
     background: var(--accent-light);
 }
 
-/* Glass blur overrides: all cards use backdrop-filter blur with GPU
-   acceleration for smooth 60fps rendering on KernelSU WebView. */
-
 .floating-header {
     background: rgba(245, 248, 255, 0.72);
     backdrop-filter: blur(10px);
@@ -3624,7 +3621,6 @@ body.theme-dark #page-settings .sub-card {
     animation: none !important;
 }
 
-/* Dark theme glass overrides */
 body.theme-dark .floating-header {
     background: rgba(20, 24, 32, 0.72);
     backdrop-filter: blur(10px);
@@ -3687,7 +3683,6 @@ body.theme-dark .easter-egg-card {
     -webkit-backdrop-filter: blur(10px);
 }
 
-/* Layout fix */
 .floating-header {
     height: 56px !important;
     padding-top: 0 !important;
@@ -3802,7 +3797,6 @@ body.app-hidden *::after {
 }
 
 body.cards-expanding {
-    /* expand-state hook reserved for future use */
 }
 
 #memory-compression-card .expandable-content {
@@ -3810,13 +3804,20 @@ body.cards-expanding {
                 margin-top 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-.reboot-badge {
-    display: inline-block;
-    font-size: 0.65rem;
+.reboot-hint {
+    font-size: 0.6rem;
     padding: 1px 5px;
     border-radius: 4px;
-    background: rgba(255, 140, 0, 0.15);
+    background: rgba(255, 140, 0, 0.12);
     color: #e67700;
-    vertical-align: middle;
-    margin-left: 4px;
+    margin-left: 6px;
+}
+.reboot-notice {
+    font-size: 0.72rem;
+    color: #e67700;
+    background: rgba(255, 140, 0, 0.08);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 12px;
+    text-align: center;
 }
