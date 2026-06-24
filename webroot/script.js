@@ -99,6 +99,7 @@ class CoronaAddon {
             this.initTheme();
             this.bindAllEvents();
             await this.loadDeviceInfo();
+            await this.loadModuleVersion();
             this.initDetailOverlays();
             this.initHomeCardClicks();
             this.initChart();
@@ -800,8 +801,7 @@ class CoronaAddon {
             const localCode = localCodeMatch ? parseInt(localCodeMatch[1]) : 0;
             const localVerMatch = localProp.match(/version=(\S+)/);
             const localVer = localVerMatch ? localVerMatch[1] : 'unknown';
-            const versionEl = document.getElementById('current-version-text');
-            if (versionEl) versionEl.textContent = `当前版本：${localVer}`;
+            await this.loadModuleVersion();
             if (remoteCode > localCode) {
                 const zipAsset = release.assets && release.assets.find(a => a.name.endsWith('.zip'));
                 const zipUrl = zipAsset ? zipAsset.browser_download_url : `https://github.com/Corona-oplus-kernel/Corona_module/releases/download/${remoteVersion}/Corona-${remoteVersion}.zip`;
@@ -883,6 +883,13 @@ class CoronaAddon {
     }
     async cleanupUpdate() {
         await this.exec('rm -rf /data/local/tmp/Corona_update.zip /data/local/tmp/Corona_update');
+    }
+    async loadModuleVersion() {
+        const prop = await this.exec(`cat ${this.modDir}/module.prop`);
+        const match = prop.match(/version=(\S+)/);
+        const ver = match ? match[1] : '--';
+        const el = document.getElementById('current-version-text');
+        if (el) el.textContent = `当前版本：${ver}`;
     }
     initDeviceImageInteraction() {
         const container = document.getElementById('device-image-container');
