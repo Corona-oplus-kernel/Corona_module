@@ -3821,3 +3821,25 @@ body.cards-expanding {
     margin-bottom: 12px;
     text-align: center;
 }
+.apply-now-btn {
+    font-size: 0.6rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(52, 130, 255, 0.12);
+    color: var(--primary);
+    border: none;
+    margin-left: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+.apply-now-btn:active {
+    background: rgba(52, 130, 255, 0.25);
+}
+body.theme-dark .apply-now-btn {
+    background: rgba(52, 130, 255, 0.2);
+    color: #7ab4ff;
+}
+body.theme-dark .apply-now-btn:active {
+    background: rgba(52, 130, 255, 0.35);
+}

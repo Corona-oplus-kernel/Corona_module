@@ -160,7 +160,7 @@
                 <div id="memory-compression-content" class="module-card-content hidden">
                     <div class="sub-card" id="zram-sub">
                         <div class="sub-card-header" id="zram-toggle">
-                            <span class="sub-card-title">ZRAM 管理<span class="reboot-hint">重启生效</span></span>
+                            <span class="sub-card-title">ZRAM 管理<span class="reboot-hint">重启生效</span><button class="apply-now-btn" id="zram-apply-now">立即生效</button></span>
                             <span class="current-badge" id="zram-status">--</span>
                             <span class="expand-icon">❯</span>
                         </div>
@@ -246,7 +246,7 @@
                     </div>
                     <div class="sub-card" id="swap-sub">
                         <div class="sub-card-header" id="swap-toggle">
-                            <span class="sub-card-title">Swap 文件<span class="reboot-hint">重启生效</span></span>
+                            <span class="sub-card-title">Swap 文件<span class="reboot-hint">重启生效</span><button class="apply-now-btn" id="swap-apply-now">立即生效</button></span>
                             <span class="current-badge" id="swap-status">未启用</span>
                             <span class="expand-icon">❯</span>
                         </div>
@@ -296,7 +296,7 @@
                     </div>
                     <div class="sub-card" id="lru-sub">
                         <div class="sub-card-header" id="lru-toggle">
-                            <span class="sub-card-title">LRU 相关<span class="reboot-hint">重启生效</span></span>
+                            <span class="sub-card-title">LRU 相关<span class="reboot-hint">重启生效</span><button class="apply-now-btn" id="lru-apply-now">立即生效</button></span>
                             <span class="current-badge" id="lru-status">--</span>
                             <span class="expand-icon">❯</span>
                         </div>
@@ -347,7 +347,7 @@
                     </div>
                     <div class="sub-card" id="vm-sub">
                         <div class="sub-card-header" id="vm-toggle">
-                            <span class="sub-card-title">虚拟内存参数<span class="reboot-hint">重启生效</span></span>
+                            <span class="sub-card-title">虚拟内存参数<span class="reboot-hint">重启生效</span><button class="apply-now-btn" id="vm-apply-now">立即生效</button></span>
                             <span class="current-badge" id="vm-status">默认</span>
                             <span class="expand-icon">❯</span>
                         </div>
@@ -439,7 +439,7 @@
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">启用 LE9EC<span class="reboot-hint">重启生效</span></span>
+                            <span class="switch-label">启用 LE9EC<span class="reboot-hint">重启生效</span><button class="apply-now-btn" id="le9ec-apply-now">立即生效</button></span>
                             <span class="switch-desc">保护工作集，防止内存抖动</span>
                         </div>
                         <label class="switch">
@@ -607,7 +607,7 @@
                 <div id="system-opt-content" class="module-card-content hidden">
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">LMK 优化<span class="reboot-hint">重启生效</span></span>
+                            <span class="switch-label">LMK 优化<span class="reboot-hint">重启生效</span><button class="apply-now-btn" id="lmk-apply-now">立即生效</button></span>
                             <span class="switch-desc">根据内存大小自动配置 minfree_levels</span>
                         </div>
                         <label class="switch">
@@ -627,7 +627,7 @@
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">禁用激进回收<span class="reboot-hint">重启生效</span></span>
+                            <span class="switch-label">禁用激进回收<span class="reboot-hint">重启生效</span><button class="apply-now-btn" id="reclaim-apply-now">立即生效</button></span>
                             <span class="switch-desc">禁用 DAMON/process_reclaim/mi_reclaim</span>
                         </div>
                         <label class="switch">
@@ -637,7 +637,7 @@
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">kswapd 优化<span class="reboot-hint">重启生效</span></span>
+                            <span class="switch-label">kswapd 优化<span class="reboot-hint">重启生效</span><button class="apply-now-btn" id="kswapd-apply-now">立即生效</button></span>
                             <span class="switch-desc">将 kswapd 放入前台 cpuset</span>
                         </div>
                         <label class="switch">
@@ -685,7 +685,7 @@
                         <span>未检测到 Corona 内核，此卡片仅在 Corona 内核下生效</span>
                     </div>
                     <div id="corona-kernel-body">
-                        <div class="reboot-notice">以下参数均需重启后生效</div>
+                        <div class="reboot-notice">以下参数均需重启后生效 <button class="apply-now-btn" id="corona-kernel-apply-now">立即生效</button></div>
                         <div class="setting-section">
                             <span class="section-label">用户在场窗口 (user_window_ms)</span>
                             <span class="section-desc">息屏后这段时间内的自动唤醒会跳过 restore，省掉存/恢复抖动</span>
