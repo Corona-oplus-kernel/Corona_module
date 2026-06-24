@@ -1,0 +1,51 @@
+name: Auto Release
+
+on:
+  push:
+    branches: [main]
+    paths: [module.prop]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse version
+        id: version
+        run: |
+          version=$(grep '^version=' module.prop | cut -d'=' -f2-)
+          versionCode=$(grep '^versionCode=' module.prop | cut -d'=' -f2-)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "versionCode=$versionCode" >> "$GITHUB_OUTPUT"
+
+      - name: Build zip
+        run: |
+          zip -r "Corona-${{ steps.version.outputs.version }}.zip" . \
+            -x ".git/*" -x ".github/*"
+
+      - name: Update update.json
+        run: |
+          printf '{\n  "version": "%s",\n  "versionCode": %s,\n  "zipUrl": "https://github.com/%s/releases/download/%s/Corona-%s.zip",\n  "changelog": "https://raw.githubusercontent.com/%s/main/changelog.md"\n}\n' \
+            "${{ steps.version.outputs.version }}" \
+            "${{ steps.version.outputs.versionCode }}" \
+            "${{ github.repository }}" \
+            "${{ steps.version.outputs.version }}" \
+            "${{ steps.version.outputs.version }}" \
+            "${{ github.repository }}" > update.json
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add update.json
+          git diff --cached --quiet || (git commit -m "update: update.json -> ${{ steps.version.outputs.version }}" && git push)
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete "${{ steps.version.outputs.version }}" -y 2>/dev/null || true
+          gh release create "${{ steps.version.outputs.version }}" \
+            "Corona-${{ steps.version.outputs.version }}.zip" \
+            --title "${{ steps.version.outputs.version }}" \
+            --generate-notes
