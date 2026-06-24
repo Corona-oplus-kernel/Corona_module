@@ -148,7 +148,7 @@
                 <div class="module-card-header">
                     <div class="module-card-info">
                         <div class="module-card-title" data-module="memory-compression">内存压缩</div>
-                        <div class="module-card-desc">ZRAM / Swap / LRU / VM参数</div>
+                        <div class="module-card-desc">ZRAM / Swap / LRU / VM参数 <span class="reboot-badge">重启生效</span></div>
                         <span class="module-card-badge" id="memory-compression-badge">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -415,7 +415,7 @@
                 <div class="module-card-header">
                     <div class="module-card-info">
                         <div class="module-card-title" data-module="le9ec">LE9EC 内存保护</div>
-                        <div class="module-card-desc">防止工作集被过度回收</div>
+                        <div class="module-card-desc">防止工作集被过度回收 <span class="reboot-badge">重启生效</span></div>
                         <span class="module-card-badge" id="le9ec-badge">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -512,7 +512,7 @@
                 <div class="module-card-header">
                     <div class="module-card-info">
                         <div class="module-card-title" data-module="cpu-governor">CPU 调频器</div>
-                        <div class="module-card-desc">调频器 / 核心管理 / 频率锁定</div>
+                        <div class="module-card-desc">调频器 / 核心管理</div>
                         <span class="module-card-badge" id="cpu-gov-current">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -529,36 +529,6 @@
                             <span class="cpu-cluster-badge" id="cpu-cluster-badge">--</span>
                         </div>
                         <div class="cpu-grid" id="cpu-cores-list"></div>
-                    </div>
-                    <div class="setting-section freq-lock-section">
-                        <div class="section-header-row">
-                            <span class="section-label">频率锁定</span>
-                            <span class="current-badge" id="freq-lock-status">关闭</span>
-                        </div>
-                        <div class="freq-mode-options" id="freq-mode-options">
-                            <div class="freq-mode-option selected" data-mode="off">
-                                <span class="freq-mode-name">关闭</span>
-                            </div>
-                            <div class="freq-mode-option" data-mode="global">
-                                <span class="freq-mode-name">全局锁定</span>
-                            </div>
-                            <div class="freq-mode-option" data-mode="per-core">
-                                <span class="freq-mode-name">单独设置</span>
-                            </div>
-                        </div>
-                        <div id="freq-global-settings" class="sub-settings hidden">
-                            <div class="setting-section">
-                                <span class="section-label">最小频率</span>
-                                <select class="freq-select" id="global-min-freq"></select>
-                            </div>
-                            <div class="setting-section">
-                                <span class="section-label">最大频率</span>
-                                <select class="freq-select" id="global-max-freq"></select>
-                            </div>
-                        </div>
-                        <div id="freq-per-core-settings" class="sub-settings hidden">
-                            <div id="per-core-freq-list"></div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -625,7 +595,7 @@
                 <div class="module-card-header">
                     <div class="module-card-info">
                         <div class="module-card-title" data-module="system-opt">系统优化</div>
-                        <div class="module-card-desc">LMK / 回收控制 / 进程保护</div>
+                        <div class="module-card-desc">LMK / 回收控制 / 进程保护 <span class="reboot-badge">部分重启生效</span></div>
                         <span class="module-card-badge" id="system-opt-badge">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -638,7 +608,7 @@
                     <div class="switch-container">
                         <div class="switch-info">
                             <span class="switch-label">LMK 优化</span>
-                            <span class="switch-desc">根据内存大小自动配置 minfree_levels</span>
+                            <span class="switch-desc">根据内存大小自动配置 minfree_levels（重启生效）</span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="lmk-switch">
@@ -658,7 +628,7 @@
                     <div class="switch-container">
                         <div class="switch-info">
                             <span class="switch-label">禁用激进回收</span>
-                            <span class="switch-desc">禁用 DAMON/process_reclaim/mi_reclaim</span>
+                            <span class="switch-desc">禁用 DAMON/process_reclaim/mi_reclaim（重启生效）</span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="reclaim-switch">
@@ -668,7 +638,7 @@
                     <div class="switch-container">
                         <div class="switch-info">
                             <span class="switch-label">kswapd 优化</span>
-                            <span class="switch-desc">将 kswapd 放入前台 cpuset</span>
+                            <span class="switch-desc">将 kswapd 放入前台 cpuset（重启生效）</span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="kswapd-switch">
@@ -701,7 +671,7 @@
                 <div class="module-card-header">
                     <div class="module-card-info">
                         <div class="module-card-title" data-module="corona-kernel">Corona 内核优化</div>
-                        <div class="module-card-desc">挂起省电 / 唤醒响应 / 后台空闲</div>
+                        <div class="module-card-desc">挂起省电 / 唤醒响应 / 后台空闲 <span class="reboot-badge">重启生效</span></div>
                         <span class="module-card-badge" id="corona-kernel-badge">--</span>
                     </div>
                     <div class="module-card-actions">

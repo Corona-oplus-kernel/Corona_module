@@ -22,8 +22,6 @@ class CoronaAddon {
             le9ecCleanLow: 0,
             le9ecCleanMin: 524288,
             dualCell: false,
-            freqLockEnabled: false,
-            perCoreFreqEnabled: false,
             theme: 'auto',
             swapEnabled: false,
             swapSize: 2048,
@@ -571,41 +569,6 @@ class CoronaAddon {
             if (icon) icon.classList.remove('expanded');
         });
     }
-    initFreqLockNew() {
-        this.freqMode = 'off';
-        const options = document.querySelectorAll('.freq-mode-option');
-        options.forEach(opt => {
-            opt.addEventListener('click', async () => {
-                options.forEach(o => o.classList.remove('selected'));
-                opt.classList.add('selected');
-                this.freqMode = opt.dataset.mode;
-                document.getElementById('freq-global-settings').classList.toggle('hidden', this.freqMode !== 'global');
-                document.getElementById('freq-per-core-settings').classList.toggle('hidden', this.freqMode !== 'per-core');
-                if (this.freqMode === 'per-core') this.renderPerCoreFreqSettings();
-                if (this.freqMode === 'off') await this.resetFreqToDefault();
-                this.updateFreqLockStatus();
-                await this.saveFreqLockConfig();
-            });
-        });
-        document.getElementById('global-min-freq').addEventListener('change', () => this.applyGlobalFreq());
-        document.getElementById('global-max-freq').addEventListener('change', () => this.applyGlobalFreq());
-    }
-    async resetFreqToDefault() {
-        this.showLoading(true);
-        const coreCount = this.cpuCores.length || 8;
-        const promises = [];
-        for (let i = 0; i < coreCount; i++) {
-            const freqs = this.cpuFreqsPerCore[i] || [];
-            if (freqs.length > 0) {
-                const minFreq = freqs[0]; const maxFreq = freqs[freqs.length - 1];
-                promises.push(this.exec(`echo ${minFreq} > /sys/devices/system/cpu/cpu${i}/cpufreq/scaling_min_freq 2>/dev/null`));
-                promises.push(this.exec(`echo ${maxFreq} > /sys/devices/system/cpu/cpu${i}/cpufreq/scaling_max_freq 2>/dev/null`));
-            }
-        }
-        await Promise.all(promises);
-        this.showLoading(false);
-        this.showToast('频率已恢复默认');
-    }
     initHomeCardClicks() {
         document.getElementById('cpu-card').addEventListener('click', async () => {
             this.switchPage('settings');
@@ -751,118 +714,6 @@ class CoronaAddon {
     }
     showStorageDetail() { this.showOverlay('storage-detail-overlay'); }
     async runGC() { this.showLoading(true); await this.exec('sync && echo 1 > /sys/fs/f2fs/*/gc_urgent'); await this.sleep(2000); await this.exec('echo 0 > /sys/fs/f2fs/*/gc_urgent'); this.showLoading(false); this.showToast('GC 执行完成'); }
-    async loadFreqLockConfig() {
-        const config = await this.exec(`cat ${this.configDir}/freq_lock.conf 2>/dev/null`);
-        this.freqMode = 'off';
-        this.freqSaved = { globalMin: null, globalMax: null, perCore: {} };
-        if (config) {
-            const lines = config.split('\n');
-            for (const line of lines) {
-                if (line.startsWith('mode=')) this.freqMode = line.split('=')[1].trim();
-                else if (line.startsWith('global_min=')) this.freqSaved.globalMin = line.split('=')[1].trim();
-                else if (line.startsWith('global_max=')) this.freqSaved.globalMax = line.split('=')[1].trim();
-                else if (line.startsWith('core')) {
-                    const m = line.match(/^core(\d+)=([\d]+),([\d]+)/);
-                    if (m) this.freqSaved.perCore[m[1]] = { min: m[2], max: m[3] };
-                }
-            }
-        }
-        const options = document.querySelectorAll('.freq-mode-option');
-        options.forEach(opt => opt.classList.toggle('selected', opt.dataset.mode === this.freqMode));
-        document.getElementById('freq-global-settings').classList.toggle('hidden', this.freqMode !== 'global');
-        document.getElementById('freq-per-core-settings').classList.toggle('hidden', this.freqMode !== 'per-core');
-        this.applyFreqSavedToSelects();
-        this.updateFreqLockStatus();
-    }
-    applyFreqSavedToSelects() {
-        if (!this.freqSaved) return;
-        const minSel = document.getElementById('global-min-freq');
-        const maxSel = document.getElementById('global-max-freq');
-        if (minSel && this.freqSaved.globalMin && minSel.querySelector(`option[value="${this.freqSaved.globalMin}"]`)) {
-            minSel.value = this.freqSaved.globalMin;
-        }
-        if (maxSel && this.freqSaved.globalMax && maxSel.querySelector(`option[value="${this.freqSaved.globalMax}"]`)) {
-            maxSel.value = this.freqSaved.globalMax;
-        }
-        document.querySelectorAll('.per-core-min').forEach(sel => {
-            const cpu = sel.dataset.cpu;
-            const saved = this.freqSaved.perCore[cpu];
-            if (saved && sel.querySelector(`option[value="${saved.min}"]`)) sel.value = saved.min;
-        });
-        document.querySelectorAll('.per-core-max').forEach(sel => {
-            const cpu = sel.dataset.cpu;
-            const saved = this.freqSaved.perCore[cpu];
-            if (saved && sel.querySelector(`option[value="${saved.max}"]`)) sel.value = saved.max;
-        });
-    }
-    async loadGlobalFreqSelects() {
-        const allFreqs = [];
-        for (let i = 0; i < this.cpuCores.length; i++) { const freqs = this.cpuFreqsPerCore[i] || []; freqs.forEach(f => { if (!allFreqs.includes(f)) allFreqs.push(f); }); }
-        allFreqs.sort((a, b) => a - b);
-        const minSel = document.getElementById('global-min-freq');
-        const maxSel = document.getElementById('global-max-freq');
-        minSel.innerHTML = allFreqs.map(f => `<option value="${f}">${(f/1000).toFixed(0)} MHz</option>`).join('');
-        maxSel.innerHTML = allFreqs.map(f => `<option value="${f}">${(f/1000).toFixed(0)} MHz</option>`).join('');
-        if (allFreqs.length > 0) { minSel.value = allFreqs[0]; maxSel.value = allFreqs[allFreqs.length - 1]; }
-        this.applyFreqSavedToSelects();
-    }
-    renderPerCoreFreqSettings() {
-        const container = document.getElementById('per-core-freq-list');
-        container.innerHTML = '';
-        for (let i = 0; i < this.cpuCores.length; i++) {
-            const freqs = this.cpuFreqsPerCore[i] || [];
-            if (freqs.length === 0) continue;
-            const div = document.createElement('div');
-            div.className = 'per-core-freq-item';
-            div.innerHTML = `<div class="per-core-header">CPU ${i}</div><div class="per-core-selects"><select class="freq-select per-core-min" data-cpu="${i}">${freqs.map(f => `<option value="${f}">${(f/1000).toFixed(0)} MHz</option>`).join('')}</select><span>~</span><select class="freq-select per-core-max" data-cpu="${i}">${freqs.map(f => `<option value="${f}">${(f/1000).toFixed(0)} MHz</option>`).join('')}</select></div>`;
-            container.appendChild(div);
-            const minSel = div.querySelector('.per-core-min');
-            const maxSel = div.querySelector('.per-core-max');
-            if (freqs.length > 0) { minSel.value = freqs[0]; maxSel.value = freqs[freqs.length - 1]; }
-            minSel.addEventListener('change', () => this.applyPerCoreFreq());
-            maxSel.addEventListener('change', () => this.applyPerCoreFreq());
-        }
-        this.applyFreqSavedToSelects();
-    }
-    async applyGlobalFreq() {
-        const minFreq = document.getElementById('global-min-freq').value;
-        const maxFreq = document.getElementById('global-max-freq').value;
-        if (parseInt(minFreq) > parseInt(maxFreq)) { this.showToast('最小频率不能大于最大频率'); return; }
-        this.showLoading(true);
-        await Promise.all([
-            this.exec(`for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_min_freq; do echo "${minFreq}" > "$f" 2>/dev/null; done`),
-            this.exec(`for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_max_freq; do echo "${maxFreq}" > "$f" 2>/dev/null; done`)
-        ]);
-        await this.saveFreqLockConfig();
-        this.showLoading(false);
-        this.showToast(`频率已锁定: ${(minFreq/1000).toFixed(0)}~${(maxFreq/1000).toFixed(0)} MHz`);
-        this.updateFreqLockStatus();
-    }
-    async applyPerCoreFreq() {
-        this.showLoading(true);
-        const minSels = document.querySelectorAll('.per-core-min');
-        const maxSels = document.querySelectorAll('.per-core-max');
-        const promises = [];
-        for (let i = 0; i < minSels.length; i++) {
-            const minFreq = minSels[i].value; const maxFreq = maxSels[i].value; const cpu = minSels[i].dataset.cpu;
-            if (parseInt(minFreq) <= parseInt(maxFreq)) {
-                promises.push(this.exec(`echo "${minFreq}" > /sys/devices/system/cpu/cpu${cpu}/cpufreq/scaling_min_freq 2>/dev/null`));
-                promises.push(this.exec(`echo "${maxFreq}" > /sys/devices/system/cpu/cpu${cpu}/cpufreq/scaling_max_freq 2>/dev/null`));
-            }
-        }
-        await Promise.all(promises);
-        await this.saveFreqLockConfig();
-        this.showLoading(false);
-        this.showToast('核心频率已应用');
-        this.updateFreqLockStatus();
-    }
-    async saveFreqLockConfig() {
-        let config = `mode=${this.freqMode}\n`;
-        if (this.freqMode === 'global') { const minFreq = document.getElementById('global-min-freq').value; const maxFreq = document.getElementById('global-max-freq').value; config += `global_min=${minFreq}\nglobal_max=${maxFreq}\n`; }
-        if (this.freqMode === 'per-core') { const minSels = document.querySelectorAll('.per-core-min'); const maxSels = document.querySelectorAll('.per-core-max'); for (let i = 0; i < minSels.length; i++) { const cpu = minSels[i].dataset.cpu; config += `core${cpu}=${minSels[i].value},${maxSels[i].value}\n`; } }
-        await this.writeConfig('freq_lock.conf', config);
-    }
-    updateFreqLockStatus() { const badge = document.getElementById('freq-lock-status'); const modeNames = { 'off': '关闭', 'global': '全局', 'per-core': '按核心' }; badge.textContent = modeNames[this.freqMode] || '关闭'; }
     async runMemClean(mode) {
         this.memCleanRunning = true;
         const section = document.getElementById('memclean-section');
@@ -920,10 +771,10 @@ class CoronaAddon {
             await this.writeConfig('log.conf', `user_scripts_log=${sw.checked ? '1' : '0'}`);
             if (viewBtn) viewBtn.style.display = sw.checked ? '' : 'none';
             this.showToast(sw.checked ? '已启用脚本日志' : '已关闭脚本日志');
-            if (!sw.checked) await this.exec(`rm -f ${this.configDir}/user_scripts.log 2>/dev/null`);
+            if (!sw.checked) await this.exec(`rm -rf ${this.modDir}/scripts.d/.logs 2>/dev/null`);
         });
         if (viewBtn) viewBtn.addEventListener('click', async () => {
-            const log = await this.exec(`tail -c 8192 ${this.configDir}/user_scripts.log 2>/dev/null`);
+            const log = await this.exec(`cat ${this.modDir}/scripts.d/.logs/*.log 2>/dev/null | tail -c 8192`);
             await this.showConfirm(log && log.trim() ? log : '（暂无日志）', '脚本日志');
         });
     }
@@ -1597,7 +1448,6 @@ class CoronaAddon {
             if (!this.settingsUiInitialized) {
                 this.renderStaticOptions();
                 this.initPerformanceMode();
-                this.initFreqLockNew();
                 this.initExpandableCards();
                 this.initThemeSelector();
                 this.initSliderProgress();
@@ -1695,7 +1545,7 @@ class CoronaAddon {
         document.getElementById('swap-progress').style.width = `${percent}%`;
     }
     async loadAllConfigs() {
-        await Promise.all([ this.loadZramConfig(), this.loadLe9ecConfig(), this.loadIOConfig(), this.loadCpuGovernorConfig(), this.loadTCPConfig(), this.loadCpuCores(), this.loadPerformanceModeConfig(), this.loadFreqLockConfig() ]);
+        await Promise.all([ this.loadZramConfig(), this.loadLe9ecConfig(), this.loadIOConfig(), this.loadCpuGovernorConfig(), this.loadTCPConfig(), this.loadCpuCores(), this.loadPerformanceModeConfig() ]);
         await Promise.all([ this.loadZramStatus(), this.loadSwapStatus() ]);
         await this.updateModuleDescription();
         this.updateClusterBadge();
@@ -1956,7 +1806,6 @@ class CoronaAddon {
         }
         this.cpuCores.sort((a, b) => a.id - b.id);
         this.renderCpuCores();
-        this.loadGlobalFreqSelects();
         await this.updateCpuLoads();
     }
     renderCpuCores() {
@@ -2711,16 +2560,17 @@ class CoronaAddon {
         await this.generateScriptsFile();
     }
     async generateScriptsFile() {
-        let scriptContent = '#!/system/bin/sh\n';
+        const scriptsDir = this.modDir + '/scripts.d';
+        await this.exec(`rm -f ${scriptsDir}/*.sh 2>/dev/null`);
         for (const id in this.customScripts) {
             const script = this.customScripts[id];
             if (script.enabled) {
-                scriptContent += script.code + '\n';
+                const safeName = id.replace(/[^a-zA-Z0-9_]/g, '_');
+                const content = '#!/system/bin/sh\n' + script.code + '\n';
+                const base64 = btoa(unescape(encodeURIComponent(content)));
+                await this.exec(`echo '${base64}' | base64 -d > ${scriptsDir}/${safeName}.sh && chmod 755 ${scriptsDir}/${safeName}.sh`);
             }
         }
-        const base64Script = btoa(unescape(encodeURIComponent(scriptContent)));
-        await this.exec(`echo '${base64Script}' | base64 -d > ${this.configDir}/user_scripts.sh`);
-        await this.exec(`chmod 755 ${this.configDir}/user_scripts.sh`);
     }
     renderScriptsList() {
         const container = document.getElementById('scripts-list');
