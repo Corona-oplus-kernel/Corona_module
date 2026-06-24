@@ -24,6 +24,16 @@ mem_total_str=$(cat /proc/meminfo | grep MemTotal)
 mem_total_kb=${mem_total_str:16:8}
 mem_total_gb=$(((mem_total_kb/1024+2047)/2048*2))
 ui_print "- RAM: ${mem_total_gb}GB"
+
+OLD_MODDIR="/data/adb/modules/Corona"
+if [ -d "$OLD_MODDIR/config" ]; then
+    ui_print "- 迁移已有配置"
+    cp -af "$OLD_MODDIR/config/." "$MODPATH/config/"
+fi
+if [ -d "$OLD_MODDIR/scripts.d" ]; then
+    cp -af "$OLD_MODDIR/scripts.d/." "$MODPATH/scripts.d/"
+fi
+
 ui_print "- Done"
 
 mkdir -p "$MODPATH/config"

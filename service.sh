@@ -116,6 +116,158 @@ apply_fstrim_config() {
     [ -f "$busybox" ] && { sm fstrim 2>/dev/null; $busybox fstrim /data 2>/dev/null; }
 }
 
+apply_zram_config() {
+    [ ! -f "$CONFIG_DIR/zram.conf" ] && return
+    enabled=$(get_conf_value "$CONFIG_DIR/zram.conf" enabled)
+    [ "$enabled" != "1" ] && return
+    algorithm=$(get_conf_value "$CONFIG_DIR/zram.conf" algorithm)
+    size=$(get_conf_value "$CONFIG_DIR/zram.conf" size)
+    swappiness=$(get_conf_value "$CONFIG_DIR/zram.conf" swappiness)
+    zram_writeback=$(get_conf_value "$CONFIG_DIR/zram.conf" zram_writeback)
+    zram_path=$(get_conf_value "$CONFIG_DIR/zram.conf" zram_path)
+    [ -z "$zram_path" ] && zram_path="/dev/block/zram0"
+    zram_block=$(echo "$zram_path" | sed 's|/dev/block/||;s|/dev/||')
+    [ -z "$size" ] && return
+    swapoff "$zram_path" 2>/dev/null
+    echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
+    [ -n "$algorithm" ] && echo "$algorithm" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null
+    [ "$zram_writeback" = "false" ] && echo none > "/sys/block/$zram_block/backing_dev" 2>/dev/null
+    echo "$size" > "/sys/block/$zram_block/disksize" 2>/dev/null
+    mkswap "$zram_path" 2>/dev/null
+    swapon "$zram_path" -p 32758 2>/dev/null || swapon "$zram_path" 2>/dev/null
+    [ -n "$swappiness" ] && echo "$swappiness" > /proc/sys/vm/swappiness
+}
+
+apply_swap_config() {
+    [ ! -f "$CONFIG_DIR/swap.conf" ] && return
+    enabled=$(get_conf_value "$CONFIG_DIR/swap.conf" enabled)
+    [ "$enabled" != "1" ] && return
+    swap_size=$(get_conf_value "$CONFIG_DIR/swap.conf" size)
+    swap_priority=$(get_conf_value "$CONFIG_DIR/swap.conf" priority)
+    swap_path=$(get_conf_value "$CONFIG_DIR/swap.conf" path)
+    [ -z "$swap_path" ] && swap_path="$MODDIR/swapfile.img"
+    [ -z "$swap_size" ] && return
+    swapoff "$swap_path" 2>/dev/null
+    rm -f "$swap_path" 2>/dev/null
+    fallocate -l "${swap_size}M" "$swap_path" 2>/dev/null || dd if=/dev/zero of="$swap_path" bs=1M count="$swap_size" 2>/dev/null
+    chmod 600 "$swap_path"
+    mkswap "$swap_path" 2>/dev/null
+    if [ "$swap_priority" != "0" ] && [ -n "$swap_priority" ]; then
+        swapon "$swap_path" -p "$swap_priority" 2>/dev/null
+    else
+        swapon "$swap_path" 2>/dev/null
+    fi
+}
+
+apply_vm_config() {
+    [ ! -f "$CONFIG_DIR/vm.conf" ] && return
+    watermark=$(get_conf_value "$CONFIG_DIR/vm.conf" watermark_scale_factor)
+    extra_free=$(get_conf_value "$CONFIG_DIR/vm.conf" extra_free_kbytes)
+    dirty_ratio=$(get_conf_value "$CONFIG_DIR/vm.conf" dirty_ratio)
+    dirty_bg=$(get_conf_value "$CONFIG_DIR/vm.conf" dirty_background_ratio)
+    vfs_cache=$(get_conf_value "$CONFIG_DIR/vm.conf" vfs_cache_pressure)
+    [ -n "$watermark" ] && echo "$watermark" > /proc/sys/vm/watermark_scale_factor 2>/dev/null
+    [ -n "$extra_free" ] && echo "$extra_free" > /proc/sys/vm/extra_free_kbytes 2>/dev/null
+    [ -n "$dirty_ratio" ] && echo "$dirty_ratio" > /proc/sys/vm/dirty_ratio 2>/dev/null
+    [ -n "$dirty_bg" ] && echo "$dirty_bg" > /proc/sys/vm/dirty_background_ratio 2>/dev/null
+    [ -n "$vfs_cache" ] && echo "$vfs_cache" > /proc/sys/vm/vfs_cache_pressure 2>/dev/null
+}
+
+apply_kernel_features_config() {
+    [ ! -f "$CONFIG_DIR/kernel.conf" ] && return
+    lru_gen=$(get_conf_value "$CONFIG_DIR/kernel.conf" lru_gen)
+    thp=$(get_conf_value "$CONFIG_DIR/kernel.conf" thp)
+    ksm=$(get_conf_value "$CONFIG_DIR/kernel.conf" ksm)
+    compaction=$(get_conf_value "$CONFIG_DIR/kernel.conf" compaction)
+    [ "$lru_gen" = "1" ] && echo Y > /sys/kernel/mm/lru_gen/enabled 2>/dev/null
+    [ "$lru_gen" = "0" ] && echo N > /sys/kernel/mm/lru_gen/enabled 2>/dev/null
+    [ -n "$thp" ] && echo "$thp" > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
+    [ "$ksm" = "1" ] && echo 1 > /sys/kernel/mm/ksm/run 2>/dev/null
+    [ "$ksm" = "0" ] && echo 0 > /sys/kernel/mm/ksm/run 2>/dev/null
+    [ "$compaction" = "1" ] && echo 20 > /proc/sys/vm/compaction_proactiveness 2>/dev/null
+    [ "$compaction" = "0" ] && echo 0 > /proc/sys/vm/compaction_proactiveness 2>/dev/null
+}
+
+apply_le9ec_config() {
+    [ ! -f "$CONFIG_DIR/le9ec.conf" ] && return
+    enabled=$(get_conf_value "$CONFIG_DIR/le9ec.conf" enabled)
+    [ "$enabled" != "1" ] && return
+    anon_min=$(get_conf_value "$CONFIG_DIR/le9ec.conf" anon_min)
+    clean_low=$(get_conf_value "$CONFIG_DIR/le9ec.conf" clean_low)
+    clean_min=$(get_conf_value "$CONFIG_DIR/le9ec.conf" clean_min)
+    [ -n "$anon_min" ] && echo "$anon_min" > /proc/sys/vm/anon_min_kbytes 2>/dev/null
+    [ -n "$clean_low" ] && echo "$clean_low" > /proc/sys/vm/clean_low_kbytes 2>/dev/null
+    [ -n "$clean_min" ] && echo "$clean_min" > /proc/sys/vm/clean_min_kbytes 2>/dev/null
+}
+
+apply_lmk_config() {
+    [ ! -f "$CONFIG_DIR/lmk.conf" ] && return
+    enabled=$(get_conf_value "$CONFIG_DIR/lmk.conf" enabled)
+    [ "$enabled" != "1" ] && return
+    is_xiaomi=0; [ "$(getprop ro.miui.ui.version.name)" != "" ] && is_xiaomi=1
+    if [ "$is_xiaomi" = "1" ]; then
+        resetprop persist.sys.minfree_6g "16384,20480,32768,131072,262144,384000" 2>/dev/null
+        resetprop persist.sys.minfree_8g "16384,20480,32768,131072,384000,524288" 2>/dev/null
+        resetprop persist.sys.minfree_12g "16384,20480,131072,384000,524288,819200" 2>/dev/null
+    fi
+    if [ "$sdk_version" -gt 28 ] 2>/dev/null; then
+        levels='4096:0,5120:100,8192:200,32768:250,65536:900,96000:950'
+        [ "$mem_total_kb" -gt 8388608 ] && levels='4096:0,5120:100,32768:200,96000:250,131072:900,204800:950'
+        [ "$mem_total_kb" -gt 6291456 ] && [ "$mem_total_kb" -le 8388608 ] && levels='4096:0,5120:100,8192:200,32768:250,96000:900,131072:950'
+        resetprop sys.lmk.minfree_levels "$levels" 2>/dev/null
+    fi
+}
+
+apply_reclaim_config() {
+    [ ! -f "$CONFIG_DIR/reclaim.conf" ] && return
+    enabled=$(get_conf_value "$CONFIG_DIR/reclaim.conf" enabled)
+    [ "$enabled" != "1" ] && return
+    echo off > /sys/kernel/mm/damon/admin/kdamonds/0/state 2>/dev/null
+    echo 0 > /sys/module/process_reclaim/parameters/enable_process_reclaim 2>/dev/null
+    echo 0 > /sys/kernel/mi_reclaim/enable 2>/dev/null
+    if [ "$is_oplus" = "1" ]; then
+        echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
+        dumpsys osensemanager proc debug feature 0 2>/dev/null
+    fi
+}
+
+apply_kswapd_config() {
+    [ ! -f "$CONFIG_DIR/kswapd.conf" ] && return
+    enabled=$(get_conf_value "$CONFIG_DIR/kswapd.conf" enabled)
+    [ "$enabled" != "1" ] && return
+    kswapd_pid=$(pgrep kswapd 2>/dev/null | head -1)
+    [ -z "$kswapd_pid" ] && return
+    echo "$kswapd_pid" > /dev/cpuset/foreground/cgroup.procs 2>/dev/null
+    mkdir -p /dev/cpuctl/kswapd 2>/dev/null
+    echo "$kswapd_pid" > /dev/cpuctl/kswapd/cgroup.procs 2>/dev/null
+    echo 1 > /dev/cpuctl/kswapd/cpu.uclamp.latency_sensitive 2>/dev/null
+}
+
+apply_corona_kernel_config() {
+    [ ! -f "$CONFIG_DIR/corona_kernel.conf" ] && return
+    [ "$isCoronaKernel" != "1" ] && return
+    while IFS='=' read -r key value; do
+        [ -z "$key" ] && continue
+        case "$key" in
+            user_window_ms)
+                for mod in cpufreq_bouncer task_turbo uclamp_assist suspend_timerslack; do
+                    [ -f "/sys/module/$mod/parameters/user_window_ms" ] && echo "$value" > "/sys/module/$mod/parameters/user_window_ms" 2>/dev/null
+                done
+                ;;
+            slack_off_ms)
+                ns=$((value * 1000 * 1000))
+                [ -f /sys/module/suspend_timerslack/parameters/slack_off_ns ] && echo "$ns" > /sys/module/suspend_timerslack/parameters/slack_off_ns 2>/dev/null
+                ;;
+            *)
+                [ -f "/sys/module/$key/parameters/enabled" ] && {
+                    v="N"; [ "$value" = "1" ] && v="Y"
+                    echo "$v" > "/sys/module/$key/parameters/enabled" 2>/dev/null
+                }
+                ;;
+        esac
+    done < "$CONFIG_DIR/corona_kernel.conf"
+}
+
 run_user_scripts() {
     [ -d "$SCRIPTS_DIR" ] || return
     for script in "$SCRIPTS_DIR"/*.sh; do
@@ -127,18 +279,26 @@ run_user_scripts() {
 
 wait_until_boot_complete
 wait_until_login
-sleep 10
 get_system_info
 mkdir -p "$CONFIG_DIR"
 
-apply_io_config; sleep 1
-apply_cpu_governor_config; sleep 1
-apply_cpu_hotplug_config; sleep 1
-apply_tcp_config; sleep 1
-apply_process_priority_config; sleep 1
-apply_device_config; sleep 1
-apply_protect_config; sleep 1
-apply_fstrim_config; sleep 1
+apply_zram_config
+apply_swap_config
+apply_vm_config
+apply_kernel_features_config
+apply_le9ec_config
+apply_lmk_config
+apply_reclaim_config
+apply_kswapd_config
+apply_corona_kernel_config
+apply_io_config
+apply_cpu_governor_config
+apply_cpu_hotplug_config
+apply_tcp_config
+apply_process_priority_config
+apply_device_config
+apply_protect_config
+apply_fstrim_config
 run_user_scripts
 
 sleep 30
@@ -146,5 +306,7 @@ apply_io_config
 apply_cpu_governor_config
 apply_process_priority_config
 apply_protect_config
+apply_lmk_config
+apply_kswapd_config
 
 exit 0
