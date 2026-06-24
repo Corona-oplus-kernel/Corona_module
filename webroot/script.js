@@ -464,6 +464,7 @@ class CoronaAddon {
             }
         });
         this.initSubCards();
+        this.initApplyNowButtons();
         this.initCardVisibility();
     }
     initCardVisibility() {
@@ -562,6 +563,18 @@ class CoronaAddon {
                 });
             }
         });
+    }
+    initApplyNowButtons() {
+        const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', (e) => { e.stopPropagation(); fn(); }); };
+        bind('zram-apply-now', () => this.applyZramImmediate());
+        bind('swap-apply-now', () => this.applySwapNow());
+        bind('lru-apply-now', () => this.applyLruNow());
+        bind('vm-apply-now', () => this.applyVmNow());
+        bind('le9ec-apply-now', () => this.applyLe9ecNow());
+        bind('lmk-apply-now', () => this.applySystemOptNowBtn('lmk'));
+        bind('reclaim-apply-now', () => this.applySystemOptNowBtn('reclaim'));
+        bind('kswapd-apply-now', () => this.applySystemOptNowBtn('kswapd'));
+        bind('corona-kernel-apply-now', () => this.applyCoronaKernelNow());
     }
     collapseMemoryCompressionChildren(parentContent) {
         const items = parentContent.querySelectorAll('.sub-card-header[id$="-toggle"]');
@@ -3087,6 +3100,58 @@ Swap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的
         const ss = document.getElementById('ck-slack-off-slider');
         if (ss) lines.push(`slack_off_ms=${ss.value}`);
         await this.writeConfig('corona_kernel.conf', lines.join('\n'));
+    }
+    async applySwapNow() {
+        if (!this.state.swapEnabled) { this.showToast('Swap 未启用'); return; }
+        this.showLoading(true);
+        await this.applySwapImmediate();
+        this.showLoading(false);
+    }
+    async applyLruNow() {
+        await this.applyKernelFeatures();
+    }
+    async applyVmNow() {
+        await this.applyVmConfig();
+    }
+    async applyLe9ecNow() {
+        if (!this.state.le9ecEnabled) { this.showToast('LE9EC 未启用'); return; }
+        this.showLoading(true);
+        await this.applyLe9ecImmediate();
+        this.showLoading(false);
+    }
+    async applySystemOptNowBtn(name) {
+        const switchMap = { 'lmk': 'lmk-switch', 'reclaim': 'reclaim-switch', 'kswapd': 'kswapd-switch' };
+        const sw = document.getElementById(switchMap[name]);
+        if (!sw || !sw.checked) { this.showToast('该功能未启用'); return; }
+        this.showLoading(true);
+        await this.applySystemOptNow(name);
+        this.showLoading(false);
+        this.showToast('已立即生效');
+    }
+    async applyCoronaKernelNow() {
+        this.showLoading(true);
+        for (const mod of this.coronaKernelMods) {
+            if (this.coronaKernelPresent && !this.coronaKernelPresent[mod]) continue;
+            const sw = document.querySelector(`.ck-switch[data-mod="${mod}"]`);
+            if (!sw) continue;
+            const val = sw.checked ? 'Y' : 'N';
+            await this.exec(`[ -f /sys/module/${mod}/parameters/enabled ] && echo ${val} > /sys/module/${mod}/parameters/enabled 2>/dev/null`);
+        }
+        const ws = document.getElementById('ck-user-window-slider');
+        if (ws) {
+            const cmd = this.coronaKernelGated.map(m =>
+                `[ -f /sys/module/${m}/parameters/user_window_ms ] && echo ${ws.value} > /sys/module/${m}/parameters/user_window_ms`
+            ).join('; ');
+            await this.exec(`(${cmd}) 2>/dev/null`);
+        }
+        const ss = document.getElementById('ck-slack-off-slider');
+        if (ss) {
+            const ns = parseInt(ss.value) * 1000 * 1000;
+            await this.exec(`[ -f /sys/module/suspend_timerslack/parameters/slack_off_ns ] && echo ${ns} > /sys/module/suspend_timerslack/parameters/slack_off_ns 2>/dev/null`);
+        }
+        await this.persistCoronaKernelConfig();
+        this.showLoading(false);
+        this.showToast('Corona 内核参数已立即生效');
     }
 }
 function rafThrottle(fn) {
