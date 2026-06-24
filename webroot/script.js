@@ -86,6 +86,7 @@ class CoronaAddon {
         this.showInitOverlay(true);
         try {
             await this.resolvePaths();
+            this.cleanupUpdate();
             const brand = (await this.exec('getprop ro.product.brand')).toLowerCase();
             const manufacturer = (await this.exec('getprop ro.product.manufacturer')).toLowerCase();
             if (brand !== 'oneplus' && manufacturer !== 'oneplus' && brand !== 'oplus' && manufacturer !== 'oplus') {
@@ -848,14 +849,14 @@ class CoronaAddon {
         };
         const tmpPath = '/data/local/tmp/Corona_update.zip';
         const tmpDir = '/data/local/tmp/Corona_update';
-        setProgress(20, '正在下载...');
+        setProgress(30, '正在下载...');
         const dlResult = await this.exec(`curl -L -o ${tmpPath} "${zipUrl}" 2>&1 && echo __DL_OK__`);
         if (!dlResult.includes('__DL_OK__')) {
             setProgress(0, `下载失败：${dlResult.split('\n').pop()}`);
             if (dlBtn) dlBtn.disabled = false;
             return;
         }
-        setProgress(50, '下载完成，正在解压...');
+        setProgress(60, '下载完成，正在解压...');
         await this.exec(`rm -rf ${tmpDir} && mkdir -p ${tmpDir}`);
         const unzipResult = await this.exec(`unzip -o ${tmpPath} -d ${tmpDir} 2>&1 && echo __UZ_OK__`);
         if (!unzipResult.includes('__UZ_OK__')) {
@@ -864,7 +865,7 @@ class CoronaAddon {
             if (dlBtn) dlBtn.disabled = false;
             return;
         }
-        setProgress(70, '正在安装...');
+        setProgress(100, '正在安装...');
         const oldDesc = await this.exec(`grep '^description=' ${this.modDir}/module.prop | cut -d= -f2-`);
         await this.exec(`cp -a ${tmpDir}/webroot/ ${this.modDir}/webroot/ 2>/dev/null`);
         await this.exec(`cp -f ${tmpDir}/module.prop ${this.modDir}/module.prop 2>/dev/null`);
@@ -876,11 +877,12 @@ class CoronaAddon {
         if (oldDesc.trim()) {
             await this.exec(`sed -i 's/^description=.*/description=${oldDesc.trim().replace(/\//g, "\\/")}/' '${this.modDir}/module.prop' 2>/dev/null`);
         }
-        setProgress(90, '正在清理...');
-        await this.exec(`rm -rf ${tmpPath} ${tmpDir}`);
-        setProgress(100, '安装完成，正在重新载入...');
+        this.showToast('安装完成，正在重新载入...');
         await new Promise(r => setTimeout(r, 1000));
         location.reload();
+    }
+    async cleanupUpdate() {
+        await this.exec('rm -rf /data/local/tmp/Corona_update.zip /data/local/tmp/Corona_update');
     }
     initDeviceImageInteraction() {
         const container = document.getElementById('device-image-container');
