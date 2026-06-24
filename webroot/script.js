@@ -86,7 +86,6 @@ class CoronaAddon {
         this.showInitOverlay(true);
         try {
             await this.resolvePaths();
-            this.cleanupUpdate();
             const brand = (await this.exec('getprop ro.product.brand')).toLowerCase();
             const manufacturer = (await this.exec('getprop ro.product.manufacturer')).toLowerCase();
             if (brand !== 'oneplus' && manufacturer !== 'oneplus' && brand !== 'oplus' && manufacturer !== 'oplus') {
@@ -606,7 +605,6 @@ class CoronaAddon {
         document.getElementById('gc-btn').addEventListener('click', async () => await this.runGC());
         document.querySelectorAll('.memclean-option').forEach(opt => { opt.addEventListener('click', async () => { if (this.memCleanRunning) return; await this.runMemClean(opt.dataset.mode); }); });
         this.initResetAllBtn();
-        this.initCheckUpdate();
     }
     showOverlay(id) {
         const overlay = document.getElementById(id);
@@ -776,113 +774,6 @@ class CoronaAddon {
         this.showToast('配置已重置，正在重启...');
         await this.sleep(500);
         await this.exec('reboot');
-    }
-    initCheckUpdate() {
-        const btn = document.getElementById('check-update-btn');
-        if (!btn) return;
-        btn.addEventListener('click', () => this.checkForUpdate());
-    }
-    async checkForUpdate() {
-        const btn = document.getElementById('check-update-btn');
-        const result = document.getElementById('update-result');
-        if (!btn || !result) return;
-        btn.disabled = true;
-        btn.textContent = '检查中...';
-        result.classList.add('hidden');
-        result.classList.remove('has-update', 'no-update');
-        try {
-            const resp = await fetch('https://api.github.com/repos/Corona-oplus-kernel/Corona_module/releases/latest');
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            const release = await resp.json();
-            const remoteVersion = release.tag_name || '';
-            const remoteCode = this.parseVersionCode(remoteVersion);
-            const localProp = await this.exec(`cat ${this.modDir}/module.prop`);
-            const localCodeMatch = localProp.match(/versionCode=(\d+)/);
-            const localCode = localCodeMatch ? parseInt(localCodeMatch[1]) : 0;
-            const localVerMatch = localProp.match(/version=(\S+)/);
-            const localVer = localVerMatch ? localVerMatch[1] : 'unknown';
-            await this.loadModuleVersion();
-            if (remoteCode > localCode) {
-                const zipAsset = release.assets && release.assets.find(a => a.name.endsWith('.zip'));
-                const zipUrl = zipAsset ? zipAsset.browser_download_url : `https://github.com/Corona-oplus-kernel/Corona_module/releases/download/${remoteVersion}/Corona-${remoteVersion}.zip`;
-                result.classList.remove('hidden');
-                result.classList.add('has-update');
-                result.innerHTML = `<div class="update-version">新版本：${remoteVersion}</div>` +
-                    `<div class="update-changelog">${this.escapeHtml(release.body || '无更新日志')}</div>` +
-                    `<button class="update-download-btn" id="update-download-btn">下载并安装</button>` +
-                    `<div class="update-progress hidden" id="update-progress"></div>`;
-                document.getElementById('update-download-btn').addEventListener('click', () => this.downloadAndInstall(zipUrl));
-            } else {
-                result.classList.remove('hidden');
-                result.classList.add('no-update');
-                result.textContent = '当前已是最新版本';
-            }
-        } catch (e) {
-            result.classList.remove('hidden');
-            result.textContent = `检查失败：${e.message}`;
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '检查更新';
-        }
-    }
-    parseVersionCode(version) {
-        const m = version.match(/v?(\d+)\.(\d+)\.(\d+)/);
-        if (!m) return 0;
-        return parseInt(m[1]) * 1000 + parseInt(m[2]) * 100 + parseInt(m[3]) * 10;
-    }
-    escapeHtml(text) {
-        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
-    }
-    async downloadAndInstall(zipUrl) {
-        const progress = document.getElementById('update-progress');
-        const dlBtn = document.getElementById('update-download-btn');
-        if (dlBtn) dlBtn.disabled = true;
-        if (progress) {
-            progress.classList.remove('hidden');
-            progress.innerHTML = '<div class="update-warning">安装完成前请勿退出此页面</div><div class="update-progress-bar"><div class="update-progress-fill" id="update-progress-fill"></div></div><div id="update-status-text">正在下载...</div>';
-        }
-        const fill = document.getElementById('update-progress-fill');
-        const statusText = document.getElementById('update-status-text');
-        const setProgress = (pct, text) => {
-            if (fill) fill.style.width = pct + '%';
-            if (statusText) statusText.textContent = text;
-        };
-        const tmpPath = '/data/local/tmp/Corona_update.zip';
-        const tmpDir = '/data/local/tmp/Corona_update';
-        setProgress(30, '正在下载...');
-        const dlResult = await this.exec(`curl -L -o ${tmpPath} "${zipUrl}" 2>&1 && echo __DL_OK__`);
-        if (!dlResult.includes('__DL_OK__')) {
-            setProgress(0, `下载失败：${dlResult.split('\n').pop()}`);
-            if (dlBtn) dlBtn.disabled = false;
-            return;
-        }
-        setProgress(60, '下载完成，正在解压...');
-        await this.exec(`rm -rf ${tmpDir} && mkdir -p ${tmpDir}`);
-        const unzipResult = await this.exec(`unzip -o ${tmpPath} -d ${tmpDir} 2>&1 && echo __UZ_OK__`);
-        if (!unzipResult.includes('__UZ_OK__')) {
-            setProgress(0, `解压失败：${unzipResult.split('\n').pop()}`);
-            await this.exec(`rm -rf ${tmpPath} ${tmpDir}`);
-            if (dlBtn) dlBtn.disabled = false;
-            return;
-        }
-        setProgress(100, '正在安装...');
-        const oldDesc = await this.exec(`grep '^description=' ${this.modDir}/module.prop | cut -d= -f2-`);
-        await this.exec(`cp -a ${tmpDir}/webroot/ ${this.modDir}/webroot/ 2>/dev/null`);
-        await this.exec(`cp -f ${tmpDir}/module.prop ${this.modDir}/module.prop 2>/dev/null`);
-        await this.exec(`cp -f ${tmpDir}/service.sh ${this.modDir}/service.sh 2>/dev/null`);
-        await this.exec(`cp -f ${tmpDir}/customize.sh ${this.modDir}/customize.sh 2>/dev/null`);
-        await this.exec(`cp -f ${tmpDir}/uninstall.sh ${this.modDir}/uninstall.sh 2>/dev/null`);
-        await this.exec(`cp -af ${tmpDir}/odm ${this.modDir}/ 2>/dev/null`);
-        await this.exec(`cp -af ${tmpDir}/META-INF ${this.modDir}/ 2>/dev/null`);
-        if (oldDesc.trim()) {
-            await this.exec(`sed -i 's/^description=.*/description=${oldDesc.trim().replace(/\//g, "\\/")}/' '${this.modDir}/module.prop' 2>/dev/null`);
-        }
-        this.showToast('安装完成，正在重新载入...');
-        await new Promise(r => setTimeout(r, 1000));
-        location.reload();
-    }
-    async cleanupUpdate() {
-        await this.exec('rm -rf /data/local/tmp/Corona_update.zip /data/local/tmp/Corona_update');
     }
     async loadModuleVersion() {
         const prop = await this.exec(`cat ${this.modDir}/module.prop`);
