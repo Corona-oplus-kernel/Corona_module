@@ -464,7 +464,6 @@ class CoronaAddon {
             }
         });
         this.initSubCards();
-        this.initApplyNowButtons();
         this.initCardVisibility();
     }
     initCardVisibility() {
@@ -563,18 +562,6 @@ class CoronaAddon {
                 });
             }
         });
-    }
-    initApplyNowButtons() {
-        const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', (e) => { e.stopPropagation(); fn(); }); };
-        bind('zram-apply-now', () => this.applyZramImmediate());
-        bind('swap-apply-now', () => this.applySwapNow());
-        bind('lru-apply-now', () => this.applyLruNow());
-        bind('vm-apply-now', () => this.applyVmNow());
-        bind('le9ec-apply-now', () => this.applyLe9ecNow());
-        bind('lmk-apply-now', () => this.applySystemOptNowBtn('lmk'));
-        bind('reclaim-apply-now', () => this.applySystemOptNowBtn('reclaim'));
-        bind('kswapd-apply-now', () => this.applySystemOptNowBtn('kswapd'));
-        bind('corona-kernel-apply-now', () => this.applyCoronaKernelNow());
     }
     collapseMemoryCompressionChildren(parentContent) {
         const items = parentContent.querySelectorAll('.sub-card-header[id$="-toggle"]');
@@ -1258,9 +1245,10 @@ class CoronaAddon {
         document.querySelectorAll('.tab-item').forEach(tab => { tab.addEventListener('click', (e) => this.switchPage(e.currentTarget.dataset.page)); });
         document.getElementById('zram-switch').addEventListener('change', async (e) => { this.state.zramEnabled = e.target.checked; this.toggleZramSettings(e.target.checked); await this.saveZramConfig(); });
         document.getElementById('zram-size-slider').addEventListener('input', (e) => { this.state.zramSize = parseFloat(e.target.value); document.getElementById('zram-size-value').textContent = `${this.state.zramSize.toFixed(2)} GB`; });
-        document.getElementById('zram-size-slider').addEventListener('change', async (e) => { this.state.zramSize = parseFloat(e.target.value); if (this.state.zramEnabled) await this.applyZramImmediate(); else await this.saveZramConfig(); });
+        document.getElementById('zram-size-slider').addEventListener('change', async (e) => { this.state.zramSize = parseFloat(e.target.value); await this.saveZramConfig(); });
         document.getElementById('swappiness-slider').addEventListener('input', (e) => { this.state.swappiness = parseInt(e.target.value); document.getElementById('swappiness-value').textContent = this.state.swappiness; });
         document.getElementById('swappiness-slider').addEventListener('change', async (e) => { this.state.swappiness = parseInt(e.target.value); if (this.state.zramEnabled) await this.applySwappinessImmediate(); else await this.saveZramConfig(); });
+        document.getElementById('zram-apply-btn').addEventListener('click', async (e) => { e.stopPropagation(); if (!this.state.zramEnabled) { this.showToast('ZRAM 未启用'); return; } await this.saveZramConfig(); this.showLoading(true); await this.applyZramImmediate(); this.showLoading(false); });
         document.getElementById('le9ec-switch').addEventListener('change', (e) => { this.state.le9ecEnabled = e.target.checked; this.toggleLe9ecSettings(e.target.checked); this.saveLe9ecConfig(); });
         document.getElementById('le9ec-anon-slider').addEventListener('input', (e) => { this.state.le9ecAnon = parseInt(e.target.value) * 1024; document.getElementById('le9ec-anon-value').textContent = `${e.target.value} MB`; });
         document.getElementById('le9ec-anon-slider').addEventListener('change', (e) => { this.state.le9ecAnon = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(); else this.saveLe9ecConfig(); });
@@ -1345,7 +1333,7 @@ class CoronaAddon {
         const container = document.getElementById('algorithm-list');
         container.innerHTML = this.algorithms.map(alg => `<div class="option-item ${alg === this.state.algorithm ? 'selected' : ''}" data-value="${alg}">${alg}</div>`).join('');
         container.querySelectorAll('.option-item').forEach(item => {
-            item.addEventListener('click', async (e) => { container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.algorithm = e.currentTarget.dataset.value; if (this.state.zramEnabled) await this.applyZramImmediate(); else await this.saveZramConfig(); });
+            item.addEventListener('click', async (e) => { container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.algorithm = e.currentTarget.dataset.value; await this.saveZramConfig(); });
         });
     }
     renderReadaheadOptions() {
@@ -1691,19 +1679,9 @@ class CoronaAddon {
     async saveZramConfig() {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
         const config = `enabled=${this.state.zramEnabled ? '1' : '0'}\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
-        this.showLoading(true);
-        try {
-            await this.sleep(0);
-            await this.writeConfig('zram.conf', config);
-            if (this.state.zramEnabled) {
-                await this.applyZramImmediate(false);
-            } else {
-                this.showToast('ZRAM 配置已保存（禁用状态）');
-                await this.updateModuleDescription();
-            }
-        } finally {
-            this.showLoading(false);
-        }
+        await this.writeConfig('zram.conf', config);
+        await this.updateModuleDescription();
+        this.showToast('ZRAM 配置已保存');
     }
     async applyZramImmediate(manageLoading = true) {
       return this.withLock('zram', async () => {
@@ -2303,7 +2281,7 @@ class CoronaAddon {
             });
             swapSizeSlider.addEventListener('change', (e) => {
                 this.state.swapSize = parseInt(e.target.value);
-                if (this.state.swapEnabled) this.applySwapConfig();
+                if (this.state.swapEnabled) this.saveSwapConfig();
             });
         }
         if (priorityList) {
@@ -2312,11 +2290,13 @@ class CoronaAddon {
                     priorityList.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                     item.classList.add('selected');
                     this.state.swapPriority = parseInt(item.dataset.value);
-                    if (this.state.swapEnabled) this.applySwapConfig();
+                    if (this.state.swapEnabled) this.saveSwapConfig();
                 });
             });
         }
         this.loadSwapConfig();
+        const swapApplyBtn = document.getElementById('swap-apply-btn');
+        if (swapApplyBtn) swapApplyBtn.addEventListener('click', async (e) => { e.stopPropagation(); if (!this.state.swapEnabled) { this.showToast('Swap 未启用'); return; } this.showLoading(true); await this.applySwapImmediate(); this.showLoading(false); });
     }
     toggleSwapSettings(show) {
         const settings = document.getElementById('swap-settings');
@@ -2365,15 +2345,13 @@ class CoronaAddon {
         const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
         const config = `enabled=${this.state.swapEnabled ? '1' : '0'}\nsize=${this.state.swapSize}\npriority=${this.state.swapPriority}\npath=${swapPath}`;
         await this.writeConfig('swap.conf', config);
-        if (this.state.swapEnabled) {
-            this.showLoading(true);
-            await this.applySwapImmediate();
-            this.showLoading(false);
-        } else {
+        if (!this.state.swapEnabled) {
             await this.exec(`swapoff ${this.shellQuote(swapPath)} 2>/dev/null`);
             await this.exec(`rm -f ${this.shellQuote(swapPath)} 2>/dev/null`);
             this.showToast('Swap 已关闭');
             await this.loadSwapStatus();
+        } else {
+            this.showToast('Swap 配置已保存');
         }
     }
     async applySwapImmediate() {
@@ -3192,58 +3170,6 @@ Swap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的
         const ss = document.getElementById('ck-slack-off-slider');
         if (ss) lines.push(`slack_off_ms=${ss.value}`);
         await this.writeConfig('corona_kernel.conf', lines.join('\n'));
-    }
-    async applySwapNow() {
-        if (!this.state.swapEnabled) { this.showToast('Swap 未启用'); return; }
-        this.showLoading(true);
-        await this.applySwapImmediate();
-        this.showLoading(false);
-    }
-    async applyLruNow() {
-        await this.applyKernelFeatures();
-    }
-    async applyVmNow() {
-        await this.applyVmConfig();
-    }
-    async applyLe9ecNow() {
-        if (!this.state.le9ecEnabled) { this.showToast('LE9EC 未启用'); return; }
-        this.showLoading(true);
-        await this.applyLe9ecImmediate();
-        this.showLoading(false);
-    }
-    async applySystemOptNowBtn(name) {
-        const switchMap = { 'lmk': 'lmk-switch', 'reclaim': 'reclaim-switch', 'kswapd': 'kswapd-switch' };
-        const sw = document.getElementById(switchMap[name]);
-        if (!sw || !sw.checked) { this.showToast('该功能未启用'); return; }
-        this.showLoading(true);
-        await this.applySystemOptNow(name);
-        this.showLoading(false);
-        this.showToast('已立即生效');
-    }
-    async applyCoronaKernelNow() {
-        this.showLoading(true);
-        for (const mod of this.coronaKernelMods) {
-            if (this.coronaKernelPresent && !this.coronaKernelPresent[mod]) continue;
-            const sw = document.querySelector(`.ck-switch[data-mod="${mod}"]`);
-            if (!sw) continue;
-            const val = sw.checked ? 'Y' : 'N';
-            await this.exec(`[ -f /sys/module/${mod}/parameters/enabled ] && echo ${val} > /sys/module/${mod}/parameters/enabled 2>/dev/null`);
-        }
-        const ws = document.getElementById('ck-user-window-slider');
-        if (ws) {
-            const cmd = this.coronaKernelGated.map(m =>
-                `[ -f /sys/module/${m}/parameters/user_window_ms ] && echo ${ws.value} > /sys/module/${m}/parameters/user_window_ms`
-            ).join('; ');
-            await this.exec(`(${cmd}) 2>/dev/null`);
-        }
-        const ss = document.getElementById('ck-slack-off-slider');
-        if (ss) {
-            const ns = parseInt(ss.value) * 1000 * 1000;
-            await this.exec(`[ -f /sys/module/suspend_timerslack/parameters/slack_off_ns ] && echo ${ns} > /sys/module/suspend_timerslack/parameters/slack_off_ns 2>/dev/null`);
-        }
-        await this.persistCoronaKernelConfig();
-        this.showLoading(false);
-        this.showToast('Corona 内核参数已立即生效');
     }
 }
 function rafThrottle(fn) {
