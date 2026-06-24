@@ -4,6 +4,12 @@ CONFIG_DIR="$MODDIR/config"
 RUNTIME_CONF="$CONFIG_DIR/runtime.conf"
 SCRIPTS_DIR="$MODDIR/scripts.d"
 
+BRAND=$(getprop ro.product.brand | tr '[:upper:]' '[:lower:]')
+MANUFACTURER=$(getprop ro.product.manufacturer | tr '[:upper:]' '[:lower:]')
+if [ "$BRAND" != "oneplus" ] && [ "$MANUFACTURER" != "oneplus" ] && [ "$BRAND" != "oplus" ] && [ "$MANUFACTURER" != "oplus" ]; then
+    exit 0
+fi
+
 set_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/dev/null; }
 lock_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/dev/null && chmod 444 "$2" 2>/dev/null; }
 get_conf_value() { [ -f "$1" ] && grep -m1 "^$2=" "$1" | cut -d'=' -f2-; }
@@ -115,10 +121,7 @@ run_user_scripts() {
     for script in "$SCRIPTS_DIR"/*.sh; do
         [ -f "$script" ] || continue
         chmod 755 "$script"
-        log_dir="$SCRIPTS_DIR/.logs"
-        mkdir -p "$log_dir"
-        log_file="$log_dir/$(basename "$script" .sh).log"
-        sh "$script" >"$log_file" 2>&1
+        sh "$script" &
     done
 }
 
