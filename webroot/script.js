@@ -617,6 +617,7 @@ class CoronaAddon {
         document.getElementById('gc-btn').addEventListener('click', async () => await this.runGC());
         document.querySelectorAll('.memclean-option').forEach(opt => { opt.addEventListener('click', async () => { if (this.memCleanRunning) return; await this.runMemClean(opt.dataset.mode); }); });
         this.initResetAllBtn();
+        this.initCheckUpdate();
     }
     showOverlay(id) {
         const overlay = document.getElementById(id);
@@ -786,6 +787,98 @@ class CoronaAddon {
         this.showToast('配置已重置，正在重启...');
         await this.sleep(500);
         await this.exec('reboot');
+    }
+    initCheckUpdate() {
+        const btn = document.getElementById('check-update-btn');
+        if (!btn) return;
+        btn.addEventListener('click', () => this.checkForUpdate());
+    }
+    async checkForUpdate() {
+        const btn = document.getElementById('check-update-btn');
+        const result = document.getElementById('update-result');
+        if (!btn || !result) return;
+        btn.disabled = true;
+        btn.textContent = '检查中...';
+        result.classList.add('hidden');
+        result.classList.remove('has-update', 'no-update');
+        try {
+            const resp = await fetch('https://api.github.com/repos/Corona-oplus-kernel/Corona_module/releases/latest');
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const release = await resp.json();
+            const remoteVersion = release.tag_name || '';
+            const remoteCode = this.parseVersionCode(remoteVersion);
+            const localProp = await this.exec(`cat ${this.modDir}/module.prop`);
+            const localCodeMatch = localProp.match(/versionCode=(\d+)/);
+            const localCode = localCodeMatch ? parseInt(localCodeMatch[1]) : 0;
+            const localVerMatch = localProp.match(/version=(\S+)/);
+            const localVer = localVerMatch ? localVerMatch[1] : 'unknown';
+            const versionEl = document.getElementById('current-version-text');
+            if (versionEl) versionEl.textContent = `当前版本：${localVer}`;
+            if (remoteCode > localCode) {
+                const zipAsset = release.assets && release.assets.find(a => a.name.endsWith('.zip'));
+                const zipUrl = zipAsset ? zipAsset.browser_download_url : `https://github.com/Corona-oplus-kernel/Corona_module/releases/download/${remoteVersion}/Corona-${remoteVersion}.zip`;
+                result.classList.remove('hidden');
+                result.classList.add('has-update');
+                result.innerHTML = `<div class="update-version">新版本：${remoteVersion}</div>` +
+                    `<div class="update-changelog">${this.escapeHtml(release.body || '无更新日志')}</div>` +
+                    `<button class="update-download-btn" id="update-download-btn">下载并安装</button>` +
+                    `<div class="update-progress hidden" id="update-progress"></div>`;
+                document.getElementById('update-download-btn').addEventListener('click', () => this.downloadAndInstall(zipUrl));
+            } else {
+                result.classList.remove('hidden');
+                result.classList.add('no-update');
+                result.textContent = '当前已是最新版本';
+            }
+        } catch (e) {
+            result.classList.remove('hidden');
+            result.textContent = `检查失败：${e.message}`;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '检查更新';
+        }
+    }
+    parseVersionCode(version) {
+        const m = version.match(/v?(\d+)\.(\d+)\.(\d+)/);
+        if (!m) return 0;
+        return parseInt(m[1]) * 1000 + parseInt(m[2]) * 100 + parseInt(m[3]) * 10;
+    }
+    escapeHtml(text) {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+    }
+    async downloadAndInstall(zipUrl) {
+        const progress = document.getElementById('update-progress');
+        const dlBtn = document.getElementById('update-download-btn');
+        if (dlBtn) dlBtn.disabled = true;
+        if (progress) { progress.classList.remove('hidden'); progress.textContent = '正在下载...'; }
+        const tmpPath = '/data/local/tmp/Corona_update.zip';
+        const dlResult = await this.exec(`curl -L -o ${tmpPath} "${zipUrl}" 2>&1 && echo __DL_OK__`);
+        if (!dlResult.includes('__DL_OK__')) {
+            if (progress) progress.textContent = `下载失败：${dlResult.split('\n').pop()}`;
+            if (dlBtn) dlBtn.disabled = false;
+            return;
+        }
+        if (progress) progress.textContent = '正在安装...';
+        let installCmd = '';
+        const hasKsu = (await this.exec('which ksud 2>/dev/null')).trim();
+        const hasMagisk = (await this.exec('which magisk 2>/dev/null')).trim();
+        const hasApatch = (await this.exec('which apd 2>/dev/null')).trim();
+        if (hasKsu) installCmd = `ksud module install ${tmpPath}`;
+        else if (hasApatch) installCmd = `apd module install ${tmpPath}`;
+        else if (hasMagisk) installCmd = `magisk --install-module ${tmpPath}`;
+        else {
+            if (progress) progress.textContent = '未检测到模块管理器（KSU/APatch/Magisk）';
+            if (dlBtn) dlBtn.disabled = false;
+            return;
+        }
+        const installResult = await this.exec(`${installCmd} 2>&1`);
+        await this.exec(`rm -f ${tmpPath}`);
+        if (/error|fail/i.test(installResult) && !/success/i.test(installResult)) {
+            if (progress) progress.textContent = `安装失败：${installResult.split('\n').slice(-2).join(' ')}`;
+            if (dlBtn) dlBtn.disabled = false;
+            return;
+        }
+        if (progress) progress.textContent = '安装成功，重启后生效';
+        this.showToast('模块已更新，请重启设备');
     }
     initDeviceImageInteraction() {
         const container = document.getElementById('device-image-container');
