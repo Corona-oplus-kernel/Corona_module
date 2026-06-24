@@ -1448,7 +1448,6 @@ class CoronaAddon {
                 this.initSliderProgress();
                 this.initSwapSettings();
                 this.initVmSettings();
-                this.initKernelFeatures();
                 this.initZramWriteback();
                 this.initZramPath();
                 this.initCustomScripts();
@@ -1462,6 +1461,7 @@ class CoronaAddon {
                     this.loadDualCellConfig(),
                     this.detectKernelFeatures()
                 ]);
+                this.initKernelFeatures();
                 await Promise.all([
                     this.loadZramStatus(),
                     this.loadLe9ecStatus()
