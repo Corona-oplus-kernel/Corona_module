@@ -851,34 +851,33 @@ class CoronaAddon {
         if (dlBtn) dlBtn.disabled = true;
         if (progress) { progress.classList.remove('hidden'); progress.textContent = '正在下载...'; }
         const tmpPath = '/data/local/tmp/Corona_update.zip';
+        const tmpDir = '/data/local/tmp/Corona_update';
         const dlResult = await this.exec(`curl -L -o ${tmpPath} "${zipUrl}" 2>&1 && echo __DL_OK__`);
         if (!dlResult.includes('__DL_OK__')) {
             if (progress) progress.textContent = `下载失败：${dlResult.split('\n').pop()}`;
             if (dlBtn) dlBtn.disabled = false;
             return;
         }
-        if (progress) progress.textContent = '正在安装...';
-        let installCmd = '';
-        const hasKsu = (await this.exec('which ksud 2>/dev/null')).trim();
-        const hasMagisk = (await this.exec('which magisk 2>/dev/null')).trim();
-        const hasApatch = (await this.exec('which apd 2>/dev/null')).trim();
-        if (hasKsu) installCmd = `ksud module install ${tmpPath}`;
-        else if (hasApatch) installCmd = `apd module install ${tmpPath}`;
-        else if (hasMagisk) installCmd = `magisk --install-module ${tmpPath}`;
-        else {
-            if (progress) progress.textContent = '未检测到模块管理器（KSU/APatch/Magisk）';
+        if (progress) progress.textContent = '正在解压并替换文件...';
+        await this.exec(`rm -rf ${tmpDir} && mkdir -p ${tmpDir}`);
+        const unzipResult = await this.exec(`unzip -o ${tmpPath} -d ${tmpDir} 2>&1 && echo __UZ_OK__`);
+        if (!unzipResult.includes('__UZ_OK__')) {
+            if (progress) progress.textContent = `解压失败：${unzipResult.split('\n').pop()}`;
+            await this.exec(`rm -rf ${tmpPath} ${tmpDir}`);
             if (dlBtn) dlBtn.disabled = false;
             return;
         }
-        const installResult = await this.exec(`${installCmd} 2>&1`);
-        await this.exec(`rm -f ${tmpPath}`);
-        if (/error|fail/i.test(installResult) && !/success/i.test(installResult)) {
-            if (progress) progress.textContent = `安装失败：${installResult.split('\n').slice(-2).join(' ')}`;
-            if (dlBtn) dlBtn.disabled = false;
-            return;
-        }
-        if (progress) progress.textContent = '安装成功，重启后生效';
-        this.showToast('模块已更新，请重启设备');
+        const configBackup = `${this.modDir}/config`;
+        await this.exec(`cp -a ${tmpDir}/webroot/ ${this.modDir}/webroot/ 2>/dev/null`);
+        await this.exec(`cp -f ${tmpDir}/module.prop ${this.modDir}/module.prop 2>/dev/null`);
+        await this.exec(`cp -f ${tmpDir}/service.sh ${this.modDir}/service.sh 2>/dev/null`);
+        await this.exec(`cp -f ${tmpDir}/customize.sh ${this.modDir}/customize.sh 2>/dev/null`);
+        await this.exec(`cp -f ${tmpDir}/uninstall.sh ${this.modDir}/uninstall.sh 2>/dev/null`);
+        await this.exec(`cp -af ${tmpDir}/odm ${this.modDir}/ 2>/dev/null`);
+        await this.exec(`cp -af ${tmpDir}/META-INF ${this.modDir}/ 2>/dev/null`);
+        await this.exec(`rm -rf ${tmpPath} ${tmpDir}`);
+        if (progress) progress.textContent = '更新完成，刷新页面即可使用新版本';
+        this.showToast('模块文件已更新');
     }
     initDeviceImageInteraction() {
         const container = document.getElementById('device-image-container');
