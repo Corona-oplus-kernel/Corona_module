@@ -2721,17 +2721,6 @@ body.theme-dark .banner-image {
     border-color: rgba(255, 255, 255, 0.08);
 }
 
-body.theme-dark .tab-bar-container {
-    background: rgba(30, 30, 35, 0.45);
-    border-color: rgba(255, 255, 255, 0.08);
-}
-
-body.theme-dark .detail-card {
-    background: rgba(30, 30, 35, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.3);
-}
-
 body.theme-dark .action-section {
     background: rgba(30, 30, 35, 0.45);
     border-color: rgba(255, 255, 255, 0.08);
@@ -3928,7 +3917,7 @@ body.theme-gold #page-settings .lru-setting {
     box-shadow: none !important;
 }
 
-.option-item.selected {
+body.theme-gold .option-item.selected {
     border-color: var(--primary) !important;
     box-shadow: 0 2px 8px rgba(140, 103, 55, 0.14) !important;
 }
