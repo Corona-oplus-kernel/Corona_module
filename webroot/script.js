@@ -23,6 +23,7 @@ class CoronaAddon {
             le9ecCleanMin: 524288,
             dualCell: false,
             theme: 'gold',
+            popupAnimation: false,
             swapEnabled: false,
             swapSize: 2048,
             swapPriority: 0,
@@ -96,6 +97,7 @@ class CoronaAddon {
             await this.loadRuntimeConfig();
             this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
             this.initTheme();
+            this.initPopupAnimationPreference();
             this.bindAllEvents();
             await this.loadDeviceInfo();
             await this.loadModuleVersion();
@@ -322,6 +324,20 @@ class CoronaAddon {
         }
         this.applyTheme(normalizedTheme);
     }
+    initPopupAnimationPreference() {
+        const saved = localStorage.getItem('corona_popup_animation');
+        this.setPopupAnimationEnabled(saved === null ? true : saved === '1');
+    }
+    setPopupAnimationEnabled(enabled, persist = false) {
+        const normalized = !!enabled;
+        this.state.popupAnimation = normalized;
+        document.body.classList.toggle('popup-animations-enabled', normalized);
+        if (persist) {
+            localStorage.setItem('corona_popup_animation', normalized ? '1' : '0');
+        }
+        const toggle = document.getElementById('popup-animation-switch');
+        if (toggle) toggle.checked = normalized;
+    }
     applyTheme(theme) {
         const body = document.body;
         const normalizedTheme = theme === 'auto' ? 'light' : theme;
@@ -341,6 +357,15 @@ class CoronaAddon {
                 this.applyTheme(this.state.theme);
                 this.showToast(`主题已切换: ${opt.querySelector('span').textContent}`);
             });
+        });
+    }
+    initPopupAnimationToggle() {
+        const toggle = document.getElementById('popup-animation-switch');
+        if (!toggle) return;
+        toggle.checked = !!this.state.popupAnimation;
+        toggle.addEventListener('change', () => {
+            this.setPopupAnimationEnabled(toggle.checked, true);
+            this.showToast(`弹窗动画已${toggle.checked ? '开启' : '关闭'}`);
         });
     }
     initChart() {
@@ -1614,6 +1639,7 @@ class CoronaAddon {
                 this.initPerformanceMode();
                 this.initExpandableCards();
                 this.initThemeSelector();
+                this.initPopupAnimationToggle();
                 this.initSliderProgress();
                 this.initSwapSettings();
                 this.initVmSettings();

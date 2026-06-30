@@ -907,76 +907,15 @@
                             <span>纸韵主题</span>
                         </div>
                     </div>
-                    <div class="card-visibility-section">
-                        <div class="card-visibility-header" id="card-visibility-toggle">
-                            <span class="card-visibility-title">显示的配置卡片</span>
-                            <span class="expand-icon">❯</span>
+                    <div class="switch-container ui-pref-switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">弹窗动画</span>
+                            <span class="switch-desc">为确认框和介绍弹窗启用额外动效</span>
                         </div>
-                        <div class="card-visibility-list" id="card-visibility-list">
-                            <div class="card-visibility-item" data-card="memory-compression">
-                                <span class="card-visibility-name">内存压缩</span>
-                                <label class="switch">
-                                    <input type="checkbox" class="card-visibility-switch" data-card="memory-compression" checked>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="card-visibility-item" data-card="le9ec">
-                                <span class="card-visibility-name">LE9EC 内存保护</span>
-                                <label class="switch">
-                                    <input type="checkbox" class="card-visibility-switch" data-card="le9ec" checked>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="card-visibility-item" data-card="io-scheduler">
-                                <span class="card-visibility-name">IO 调度器</span>
-                                <label class="switch">
-                                    <input type="checkbox" class="card-visibility-switch" data-card="io-scheduler" checked>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="card-visibility-item" data-card="cpu-governor">
-                                <span class="card-visibility-name">CPU 调频器</span>
-                                <label class="switch">
-                                    <input type="checkbox" class="card-visibility-switch" data-card="cpu-governor" checked>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="card-visibility-item" data-card="process-priority">
-                                <span class="card-visibility-name">进程优先级</span>
-                                <label class="switch">
-                                    <input type="checkbox" class="card-visibility-switch" data-card="process-priority" checked>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="card-visibility-item" data-card="tcp">
-                                <span class="card-visibility-name">TCP 拥塞算法</span>
-                                <label class="switch">
-                                    <input type="checkbox" class="card-visibility-switch" data-card="tcp" checked>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="card-visibility-item" data-card="custom-scripts">
-                                <span class="card-visibility-name">自定义脚本</span>
-                                <label class="switch">
-                                    <input type="checkbox" class="card-visibility-switch" data-card="custom-scripts" checked>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="card-visibility-item" data-card="system-opt">
-                                <span class="card-visibility-name">系统优化</span>
-                                <label class="switch">
-                                    <input type="checkbox" class="card-visibility-switch" data-card="system-opt" checked>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                            <div class="card-visibility-item" data-card="corona-kernel">
-                                <span class="card-visibility-name">Corona 内核优化</span>
-                                <label class="switch">
-                                    <input type="checkbox" class="card-visibility-switch" data-card="corona-kernel" checked>
-                                    <span class="slider"></span>
-                                </label>
-                            </div>
-                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="popup-animation-switch">
+                            <span class="slider"></span>
+                        </label>
                     </div>
                     <div class="setting-section update-section">
                         <div class="section-header-row">
