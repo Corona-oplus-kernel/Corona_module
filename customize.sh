@@ -26,6 +26,8 @@ mem_total_gb=$(((mem_total_kb/1024+2047)/2048*2))
 ui_print "- RAM: ${mem_total_gb}GB"
 
 OLD_MODDIR="/data/adb/modules/Corona"
+mkdir -p "$MODPATH/config"
+mkdir -p "$MODPATH/scripts.d"
 if [ -d "$OLD_MODDIR/config" ]; then
     ui_print "- 迁移已有配置"
     cp -af "$OLD_MODDIR/config/." "$MODPATH/config/"
@@ -36,8 +38,6 @@ fi
 
 ui_print "- Done"
 
-mkdir -p "$MODPATH/config"
-mkdir -p "$MODPATH/scripts.d"
 touch "$MODPATH/scripts.d/.placeholder"
 cat > "$MODPATH/config/runtime.conf" <<EOF
 module_id=$(grep -E '^id=' "${MODPATH}/module.prop" | cut -d'=' -f2-)
@@ -46,10 +46,7 @@ swapfile_path=$MODPATH/swapfile.img
 EOF
 
 if [ -d "$OLD_MODDIR" ] && [ -f "$OLD_MODDIR/module.prop" ]; then
-    OLD_DESC=$(grep -E '^description=' "$OLD_MODDIR/module.prop" | cut -d'=' -f2-)
-    if [ -n "$OLD_DESC" ]; then
-        sed -i "s|^description=.*|description=${OLD_DESC}|" "$MODPATH/module.prop"
-    fi
+    sed -i 's|^description=.*|description=等待重启|' "$MODPATH/module.prop"
 else
     sed -i 's|^description=.*|description=等待首次设置……|' "$MODPATH/module.prop"
 fi

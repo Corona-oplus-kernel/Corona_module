@@ -3,9 +3,12 @@
 readonly HYB_ERR_UNSUPPORTED=1004
 readonly HYB_ERR_UNSET=1009
 readonly LOG_TAG="init_oplus_mm-sys"
-readonly CORONA_CONFIG="/data/adb/modules/Corona/config"
-
-MEM_TOTAL=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+CORONA_CONFIG="/data/adb/modules/Corona/config"
+for base in /data/adb/modules /data/adb/ksu/modules /data/adb/ap/modules; do
+  [ -d "$base/Corona/config" ] || continue
+  CORONA_CONFIG="$base/Corona/config"
+  break
+done
 
 logi() {
   /system/bin/log -p i -t ${LOG_TAG} "$1"
@@ -16,6 +19,100 @@ corona_get() {
   local file="$CORONA_CONFIG/$1"
   local key="$2"
   [ -f "$file" ] && grep -m1 "^${key}=" "$file" | cut -d'=' -f2-
+}
+
+normalize_zram_path() {
+  local requested_path="$1"
+  if [ -n "$requested_path" ] && [ -e "$requested_path" ]; then
+    echo "$requested_path"
+    return 0
+  fi
+  local candidate
+  for candidate in /dev/block/zram* /dev/zram*; do
+    [ -e "$candidate" ] || continue
+    echo "$candidate"
+    return 0
+  done
+  return 1
+}
+
+get_zram_block() {
+  local zram_block="$1"
+  zram_block=${zram_block#/dev/block/}
+  zram_block=${zram_block#/dev/}
+  [ -n "$zram_block" ] && [ -d "/sys/block/$zram_block" ] || return 1
+  echo "$zram_block"
+}
+
+get_zram_priority() {
+  awk -v dev="$1" 'NR > 1 && $1 == dev { print $5; exit }' /proc/swaps 2>/dev/null
+}
+
+get_active_zram_algorithm() {
+  local zram_block="$1"
+  local alg_raw=$(/system/bin/cat "/sys/block/$zram_block/comp_algorithm" 2>/dev/null)
+  local active=$(echo "$alg_raw" | sed -n 's/.*\[\([^]]*\)\].*/\1/p')
+  [ -n "$active" ] && {
+    echo "$active"
+    return
+  }
+  echo "$alg_raw" | awk '{print $1}'
+}
+
+write_zram_swappiness() {
+  local corona_swappiness="$1"
+  [ -n "$corona_swappiness" ] || return
+  local spt_dir=/sys/module/swappiness_pressure_throttle/parameters
+  if [ -d "$spt_dir" ] && [ -f "$spt_dir/swappiness_idle" ]; then
+    echo "$corona_swappiness" > "$spt_dir/swappiness_idle" 2>/dev/null
+  fi
+  echo "$corona_swappiness" > /proc/sys/vm/swappiness 2>/dev/null
+  echo "$corona_swappiness" > /dev/memcg/memory.swappiness 2>/dev/null
+  echo "$corona_swappiness" > /dev/memcg/apps/memory.swappiness 2>/dev/null
+  echo "$corona_swappiness" > /sys/module/zram_opt/parameters/vm_swappiness 2>/dev/null
+}
+
+configure_zram_device() {
+  local zram_path="$1"
+  local size="$2"
+  local comp_algorithm="$3"
+  local zram_writeback="$4"
+  local magic="$5"
+  local zram_block=$(get_zram_block "$zram_path") || return 1
+
+  /system/bin/swapoff "$zram_path" 2>/dev/null
+  echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
+  [ -n "$comp_algorithm" ] && echo "$comp_algorithm" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null
+  if [ "$zram_writeback" = "false" ]; then
+    echo none > "/sys/block/$zram_block/backing_dev" 2>/dev/null
+    [ -f "/sys/block/$zram_block/hybridswap_loop_device" ] && echo none > "/sys/block/$zram_block/hybridswap_loop_device" 2>/dev/null
+    echo 1 > "/sys/block/$zram_block/writeback_limit_enable" 2>/dev/null
+    echo 0 > "/sys/block/$zram_block/writeback_limit" 2>/dev/null
+  fi
+  echo "$size" > "/sys/block/$zram_block/disksize" 2>/dev/null
+  /system/bin/mkswap "$zram_path" 2>/dev/null || return 1
+  /system/bin/swapon "$zram_path" -p "$magic" 2>/dev/null || return 1
+  [ "$(get_zram_priority "$zram_path")" = "$magic" ] || return 1
+  return 0
+}
+
+zram_matches_config() {
+  local zram_path="$1"
+  local size="$2"
+  local comp_algorithm="$3"
+  local zram_writeback="$4"
+  local magic="$5"
+  local zram_block=$(get_zram_block "$zram_path") || return 1
+  [ "$(/system/bin/cat "/sys/block/$zram_block/disksize" 2>/dev/null | tr -d ' \n')" = "$size" ] || return 1
+  [ "$(get_zram_priority "$zram_path")" = "$magic" ] || return 1
+  if [ -n "$comp_algorithm" ]; then
+    local current_alg=$(get_active_zram_algorithm "$zram_block")
+    [ "$current_alg" = "$comp_algorithm" ] || [ "$current_alg" = "kernel:$comp_algorithm" ] || return 1
+  fi
+  if [ "$zram_writeback" = "false" ] && [ -f "/sys/block/$zram_block/backing_dev" ]; then
+    [ "$(/system/bin/cat "/sys/block/$zram_block/backing_dev" 2>/dev/null | tr -d ' \n')" = "none" ] || return 1
+  fi
+  return 0
 }
 
 write_kthread_to_cpuset() {
@@ -49,124 +146,43 @@ write_hybridswap_errcode() {
 }
 
 init_zram() {
-  local zram_increase_limit=2048
   local magic=32758
-  local comp_algorithm="lz4"
-  local force_enable="true"
-  local hybridswap_enable=$(getprop persist.sys.oplus.nandswap)
-
-  if [[ $(getprop sys.oplus.nandswap.init) == "true" ]]; then
-    logi "zram already init, just return"
-    return
-  fi
-
-  setprop sys.oplus.nandswap.init true
-  logi "setup zram"
-
-  if [[ $MEM_TOTAL -le 524288 ]]; then
-    swap_size_mb=384
-  elif [[ $MEM_TOTAL -le 1048576 ]]; then
-    swap_size_mb=768
-  elif [[ $MEM_TOTAL -le 2097152 ]]; then
-    swap_size_mb=1280
-  elif [[ $MEM_TOTAL -le 3145728 ]]; then
-    swap_size_mb=1536
-  elif [[ $MEM_TOTAL -le 4194304 ]]; then
-    swap_size_mb=2560
-  elif [[ $MEM_TOTAL -le 6291456 ]]; then
-    swap_size_mb=3072
-  elif [[ $MEM_TOTAL -le 8388608 ]]; then
-    comp_algorithm="zstdn"
-    swap_size_mb=5120
-  elif [[ $MEM_TOTAL -le 12582912 ]]; then
-    comp_algorithm="zstdn"
-    swap_size_mb=8192
-  else
-    comp_algorithm="zstdn"
-    swap_size_mb=16384
-  fi
-
   local corona_zram_enabled=$(corona_get zram.conf enabled)
-  if [ "$corona_zram_enabled" = "1" ]; then
-    local corona_size=$(corona_get zram.conf size)
-    local corona_alg=$(corona_get zram.conf algorithm)
-    [ -n "$corona_size" ] && swap_size_mb=$(( corona_size / 1024 / 1024 ))
-    [ -n "$corona_alg" ] && comp_algorithm="$corona_alg"
-    logi "Corona ZRAM override: size=${swap_size_mb}MB alg=${comp_algorithm}"
-  fi
+  [ "$corona_zram_enabled" = "1" ] || {
+    return
+  }
 
-  local zram_increase_size=$(( swap_size_mb - $(/system/bin/cat /sys/block/zram0/disksize 2>/dev/null | awk '{print int($1/1024/1024)}') ))
-  [[ $zram_increase_size -lt 0 ]] && zram_increase_size=0
+  local corona_size=$(corona_get zram.conf size)
+  [ -n "$corona_size" ] || {
+    return
+  }
+
+  local comp_algorithm=$(corona_get zram.conf algorithm)
+  local corona_writeback=$(corona_get zram.conf zram_writeback)
+  local corona_swappiness=$(corona_get zram.conf swappiness)
+  local requested_path=$(corona_get zram.conf zram_path)
+  local zram_path=$(normalize_zram_path "$requested_path") || {
+    return
+  }
 
   if [[ ! -d /dev/memcg ]] || [[ ! -e /proc/oplus_mem/hybridswap_enable ]]; then
-    logi "hybridswap not supported"
     write_hybridswap_errcode $HYB_ERR_UNSUPPORTED
-
-    /system/bin/swapoff /dev/block/zram0 2>/dev/null
-    echo 1 > /sys/block/zram0/reset 2>/dev/null
-    echo $comp_algorithm > /sys/block/zram0/comp_algorithm 2>/dev/null
-    echo $(( swap_size_mb * 1024 * 1024 )) > /sys/block/zram0/disksize 2>/dev/null
-    /system/bin/mkswap /dev/block/zram0 2>/dev/null
-    /system/bin/swapon /dev/block/zram0 -p $magic 2>/dev/null
-    return
-  fi
-
-  if [[ "$hybridswap_enable" == "true" ]] || [[ "$force_enable" == "true" ]]; then
-    logi "hybridswap enabled"
-    echo 1 > /proc/oplus_mem/hybridswap_enable 2>/dev/null
-    echo $comp_algorithm > /sys/block/zram0/comp_algorithm 2>/dev/null
-    echo 0 > /dev/memcg/memory.app_score 2>/dev/null
-
-    if [[ $zram_increase_size -le 0 ]]; then
-      logi "zram already larger"
-    elif [[ $zram_increase_size -le $zram_increase_limit ]]; then
-      echo $(( zram_increase_size * 1024 * 1024 )) > /sys/block/zram0/disksize 2>/dev/null
-      /system/bin/mkswap /dev/block/zram0 2>/dev/null
-      /system/bin/swapon /dev/block/zram0 -p $magic 2>/dev/null
-    else
-      /system/bin/swapoff /dev/block/zram0 2>/dev/null
-      echo 1 > /sys/block/zram0/reset 2>/dev/null
-      echo $comp_algorithm > /sys/block/zram0/comp_algorithm 2>/dev/null
-      echo $(( swap_size_mb * 1024 * 1024 )) > /sys/block/zram0/disksize 2>/dev/null
-      /system/bin/mkswap /dev/block/zram0 2>/dev/null
-      /system/bin/swapon /dev/block/zram0 -p $magic 2>/dev/null
-    fi
-
-    local corona_writeback=$(corona_get zram.conf zram_writeback)
-    if [ "$corona_writeback" = "false" ]; then
-      echo none > /sys/block/zram0/backing_dev 2>/dev/null
-      [ -f /sys/block/zram0/hybridswap_loop_device ] && echo none > /sys/block/zram0/hybridswap_loop_device 2>/dev/null
-      echo 1 > /sys/block/zram0/writeback_limit_enable 2>/dev/null
-      echo 0 > /sys/block/zram0/writeback_limit 2>/dev/null
-      logi "Corona: hybridswap writeback disabled"
-    fi
   else
-    logi "hybridswap disabled by user"
-    write_hybridswap_errcode $HYB_ERR_UNSET
-
-    /system/bin/swapoff /dev/block/zram0 2>/dev/null
-    echo 1 > /sys/block/zram0/reset 2>/dev/null
-    echo $comp_algorithm > /sys/block/zram0/comp_algorithm 2>/dev/null
-    echo $(( swap_size_mb * 1024 * 1024 )) > /sys/block/zram0/disksize 2>/dev/null
-    /system/bin/mkswap /dev/block/zram0 2>/dev/null
-    /system/bin/swapon /dev/block/zram0 -p $magic 2>/dev/null
+    echo 1 > /proc/oplus_mem/hybridswap_enable 2>/dev/null
+    echo 0 > /dev/memcg/memory.app_score 2>/dev/null
+    setprop persist.sys.oplus.hybridswap_app_uid_memcg true
   fi
 
-  local corona_swappiness=$(corona_get zram.conf swappiness)
-  if [ -n "$corona_swappiness" ]; then
-    local spt_dir=/sys/module/swappiness_pressure_throttle/parameters
-    if [ -d "$spt_dir" ] && [ -f "$spt_dir/swappiness_idle" ]; then
-      echo "$corona_swappiness" > "$spt_dir/swappiness_idle" 2>/dev/null
-    fi
-    echo "$corona_swappiness" > /proc/sys/vm/swappiness 2>/dev/null
-    echo "$corona_swappiness" > /dev/memcg/memory.swappiness 2>/dev/null
-    echo "$corona_swappiness" > /dev/memcg/apps/memory.swappiness 2>/dev/null
-    echo "$corona_swappiness" > /sys/module/zram_opt/parameters/vm_swappiness 2>/dev/null
-    logi "Corona: swappiness=${corona_swappiness}"
+  if [ "$(getprop sys.oplus.nandswap.init)" = "true" ] && \
+     zram_matches_config "$zram_path" "$corona_size" "$comp_algorithm" "$corona_writeback" "$magic"; then
+  else
+    configure_zram_device "$zram_path" "$corona_size" "$comp_algorithm" "$corona_writeback" "$magic" || {
+      return
+    }
   fi
 
-  logi "zram setup done, size=${swap_size_mb}MB"
-  setprop persist.sys.oplus.hybridswap_app_uid_memcg true
+  write_zram_swappiness "$corona_swappiness"
+  setprop sys.oplus.nandswap.init true
 }
 
 apply_corona_vm_config() {
@@ -220,14 +236,6 @@ apply_corona_lmk() {
   [ "$enabled" != "1" ] && return
   local mem_total_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
   local sdk_version=$(getprop ro.build.version.sdk)
-  local is_xiaomi=0
-  [ "$(getprop ro.miui.ui.version.name)" != "" ] && is_xiaomi=1
-
-  [ "$is_xiaomi" = "1" ] && {
-    setprop persist.sys.minfree_6g "16384,20480,32768,131072,262144,384000"
-    setprop persist.sys.minfree_8g "16384,20480,32768,131072,384000,524288"
-    setprop persist.sys.minfree_12g "16384,20480,131072,384000,524288,819200"
-  }
   local lowmemorykiller='/sys/module/lowmemorykiller/parameters'
   [ -d "$lowmemorykiller" ] && {
     if [ "$mem_total_kb" -gt 8388608 ]; then echo "4096,5120,32768,96000,131072,204800" > $lowmemorykiller/minfree 2>/dev/null
@@ -255,7 +263,6 @@ apply_corona_reclaim() {
   echo 0 > /sys/kernel/mm/damon/admin/kdamonds/nr_kdamonds 2>/dev/null
   chmod 444 /sys/kernel/mm/damon/admin/kdamonds/nr_kdamonds 2>/dev/null
   [ -d /sys/module/process_reclaim/parameters ] && echo 0 > /sys/module/process_reclaim/parameters/enable_process_reclaim 2>/dev/null
-  echo 0 > /sys/kernel/mi_reclaim/enable 2>/dev/null
   local is_oplus=0; [ -d /proc/oplus_mem ] && is_oplus=1
   [ "$is_oplus" = "1" ] && {
     echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
