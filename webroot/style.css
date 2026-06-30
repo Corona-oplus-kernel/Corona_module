@@ -2910,6 +2910,10 @@ body.theme-dark .range-slider::-webkit-slider-thumb {
     padding: 20px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
+.confirm-dialog.preview-mode {
+    max-width: min(560px, 92vw);
+    text-align: left;
+}
 body.theme-dark .confirm-dialog {
     background: rgba(30, 30, 35, 0.45);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -2918,11 +2922,31 @@ body.theme-dark .confirm-dialog {
 .confirm-dialog-body {
     padding: 20px 16px;
 }
-.confirm-dialog-body p {
+.confirm-dialog-body #confirm-dialog-message {
     font-size: 14px;
     color: var(--text-main);
     line-height: 1.6;
     white-space: pre-line;
+    margin: 0;
+    font-family: inherit;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    overflow: visible;
+}
+.confirm-dialog-body #confirm-dialog-message.preview-message {
+    white-space: pre-wrap;
+    max-height: min(56vh, 480px);
+    overflow: auto;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.045);
+    font-family: "SF Mono", "Consolas", monospace;
+    font-size: 12px;
+    line-height: 1.65;
+}
+body.theme-dark .confirm-dialog-body #confirm-dialog-message.preview-message {
+    background: rgba(255, 255, 255, 0.06);
 }
 .confirm-dialog-actions {
     display: flex;
