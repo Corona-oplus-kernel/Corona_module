@@ -23,7 +23,6 @@ get_system_info() {
     kernel_version=$(uname -r | cut -d'-' -f1)
     kernel_version1=$(echo "$kernel_version" | cut -d'.' -f1)
     is_oplus=0; find /proc -maxdepth 1 -name "oplus*" 2>/dev/null | grep -q . && is_oplus=1
-    is_xiaomi=0; [ "$(getprop ro.miui.ui.version.name)" != "" ] && is_xiaomi=1
     isCoronaKernel=0
     [ -f /proc/corona ] && [ "$(cat /proc/corona 2>/dev/null)" = "1" ] && isCoronaKernel=1
 }
@@ -99,7 +98,7 @@ apply_protect_config() {
         mkdir -p /dev/memcg/system/active_fg
         echo 0 > /dev/memcg/system/active_fg/memory.swappiness 2>/dev/null
         echo 1 > /dev/memcg/system/active_fg/memory.use_hierarchy 2>/dev/null
-        for app in com.android.systemui com.miui.home com.android.launcher surfaceflinger system_server; do
+        for app in com.android.systemui com.android.launcher surfaceflinger system_server; do
             pid=$(pidof $app 2>/dev/null | head -n1)
             [ -n "$pid" ] && echo "$pid" > /dev/memcg/system/active_fg/cgroup.procs 2>/dev/null
         done
@@ -116,6 +115,32 @@ apply_fstrim_config() {
     [ -f "$busybox" ] && { sm fstrim 2>/dev/null; $busybox fstrim /data 2>/dev/null; }
 }
 
+normalize_zram_path() {
+    requested_path="$1"
+    if [ -n "$requested_path" ] && [ -e "$requested_path" ]; then
+        echo "$requested_path"
+        return 0
+    fi
+    for candidate in /dev/block/zram* /dev/zram*; do
+        [ -e "$candidate" ] || continue
+        echo "$candidate"
+        return 0
+    done
+    return 1
+}
+
+get_zram_block() {
+    zram_block="$1"
+    zram_block=${zram_block#/dev/block/}
+    zram_block=${zram_block#/dev/}
+    [ -n "$zram_block" ] && [ -d "/sys/block/$zram_block" ] || return 1
+    echo "$zram_block"
+}
+
+get_swap_priority() {
+    awk -v dev="$1" 'NR > 1 && $1 == dev { print $5; exit }' /proc/swaps 2>/dev/null
+}
+
 apply_zram_config() {
     [ ! -f "$CONFIG_DIR/zram.conf" ] && return
     enabled=$(get_conf_value "$CONFIG_DIR/zram.conf" enabled)
@@ -125,16 +150,17 @@ apply_zram_config() {
     swappiness=$(get_conf_value "$CONFIG_DIR/zram.conf" swappiness)
     zram_writeback=$(get_conf_value "$CONFIG_DIR/zram.conf" zram_writeback)
     zram_path=$(get_conf_value "$CONFIG_DIR/zram.conf" zram_path)
-    [ -z "$zram_path" ] && zram_path="/dev/block/zram0"
-    zram_block=$(echo "$zram_path" | sed 's|/dev/block/||;s|/dev/||')
+    zram_path=$(normalize_zram_path "$zram_path") || return
+    zram_block=$(get_zram_block "$zram_path") || return
     [ -z "$size" ] && return
     swapoff "$zram_path" 2>/dev/null
     echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
     [ -n "$algorithm" ] && echo "$algorithm" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null
     [ "$zram_writeback" = "false" ] && echo none > "/sys/block/$zram_block/backing_dev" 2>/dev/null
     echo "$size" > "/sys/block/$zram_block/disksize" 2>/dev/null
-    mkswap "$zram_path" 2>/dev/null
-    swapon "$zram_path" -p 32758 2>/dev/null || swapon "$zram_path" 2>/dev/null
+    mkswap "$zram_path" 2>/dev/null || return
+    swapon "$zram_path" -p 32758 2>/dev/null || return
+    [ "$(get_swap_priority "$zram_path")" = "32758" ] || return
     [ -n "$swappiness" ] && echo "$swappiness" > /proc/sys/vm/swappiness
 }
 
@@ -204,12 +230,6 @@ apply_lmk_config() {
     [ ! -f "$CONFIG_DIR/lmk.conf" ] && return
     enabled=$(get_conf_value "$CONFIG_DIR/lmk.conf" enabled)
     [ "$enabled" != "1" ] && return
-    is_xiaomi=0; [ "$(getprop ro.miui.ui.version.name)" != "" ] && is_xiaomi=1
-    if [ "$is_xiaomi" = "1" ]; then
-        resetprop persist.sys.minfree_6g "16384,20480,32768,131072,262144,384000" 2>/dev/null
-        resetprop persist.sys.minfree_8g "16384,20480,32768,131072,384000,524288" 2>/dev/null
-        resetprop persist.sys.minfree_12g "16384,20480,131072,384000,524288,819200" 2>/dev/null
-    fi
     if [ "$sdk_version" -gt 28 ] 2>/dev/null; then
         levels='4096:0,5120:100,8192:200,32768:250,65536:900,96000:950'
         [ "$mem_total_kb" -gt 8388608 ] && levels='4096:0,5120:100,32768:200,96000:250,131072:900,204800:950'
@@ -224,7 +244,6 @@ apply_reclaim_config() {
     [ "$enabled" != "1" ] && return
     echo off > /sys/kernel/mm/damon/admin/kdamonds/0/state 2>/dev/null
     echo 0 > /sys/module/process_reclaim/parameters/enable_process_reclaim 2>/dev/null
-    echo 0 > /sys/kernel/mi_reclaim/enable 2>/dev/null
     if [ "$is_oplus" = "1" ]; then
         echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
         dumpsys osensemanager proc debug feature 0 2>/dev/null
@@ -268,6 +287,57 @@ apply_corona_kernel_config() {
     done < "$CONFIG_DIR/corona_kernel.conf"
 }
 
+update_module_description() {
+    module_prop="$MODDIR/module.prop"
+    [ -f "$module_prop" ] || return
+
+    desc_parts=""
+
+    if [ -f "$CONFIG_DIR/zram.conf" ] && [ "$(get_conf_value "$CONFIG_DIR/zram.conf" enabled)" = "1" ]; then
+        current_alg="$(get_conf_value "$CONFIG_DIR/zram.conf" algorithm)"
+        [ -z "$current_alg" ] && current_alg="--"
+        desc_parts="ZRAM:${current_alg}"
+    else
+        desc_parts="ZRAM:关闭"
+    fi
+
+    if [ -f "$CONFIG_DIR/io_scheduler.conf" ]; then
+        scheduler="$(get_conf_value "$CONFIG_DIR/io_scheduler.conf" scheduler)"
+    else
+        scheduler=""
+    fi
+    if [ -n "$scheduler" ]; then
+        desc_parts="$desc_parts | IO:${scheduler}"
+    else
+        scheduler_raw=$(cat /sys/block/sda/queue/scheduler 2>/dev/null || cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null)
+        current_scheduler=$(echo "$scheduler_raw" | sed -n 's/.*\[\([^]]*\)\].*/\1/p')
+        [ -z "$current_scheduler" ] && current_scheduler=$(echo "$scheduler_raw" | awk '{print $1}')
+        [ -n "$current_scheduler" ] && desc_parts="$desc_parts | IO:${current_scheduler}" || desc_parts="$desc_parts | IO:--"
+    fi
+
+    governor="$(get_conf_value "$CONFIG_DIR/cpu_governor.conf" governor)"
+    if [ -n "$governor" ]; then
+        desc_parts="$desc_parts | CPU:${governor}"
+    else
+        current_governor=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null | tr -d '\r\n')
+        [ -n "$current_governor" ] && desc_parts="$desc_parts | CPU:${current_governor}" || desc_parts="$desc_parts | CPU:--"
+    fi
+
+    congestion="$(get_conf_value "$CONFIG_DIR/tcp.conf" congestion)"
+    if [ -n "$congestion" ]; then
+        desc_parts="$desc_parts | TCP:${congestion}"
+    else
+        current_tcp=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null | tr -d '\r\n')
+        [ -n "$current_tcp" ] && desc_parts="$desc_parts | TCP:${current_tcp}" || desc_parts="$desc_parts | TCP:--"
+    fi
+
+    if [ -f "$CONFIG_DIR/le9ec.conf" ] && [ "$(get_conf_value "$CONFIG_DIR/le9ec.conf" enabled)" = "1" ]; then
+        desc_parts="$desc_parts | LE9EC:开启"
+    fi
+
+    sed -i "s/^description=.*/description=${desc_parts//\//\\/}/" "$module_prop" 2>/dev/null
+}
+
 run_user_scripts() {
     [ -d "$SCRIPTS_DIR" ] || return
     for script in "$SCRIPTS_DIR"/*.sh; do
@@ -308,5 +378,6 @@ apply_process_priority_config
 apply_protect_config
 apply_lmk_config
 apply_kswapd_config
+update_module_description
 
 exit 0

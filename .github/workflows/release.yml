@@ -34,6 +34,7 @@ jobs:
             log=$(git log --pretty=format:"- %s" --no-merges -20 | grep -v "^- bump:" | grep -v "^- update:")
           fi
           [ -z "$log" ] && log="- 版本更新"
+          : > changelog.md
           printf "# Corona %s\n\n%s\n" "${{ steps.version.outputs.version }}" "$log" > changelog.md
 
       - name: Build zip
@@ -54,7 +55,10 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add update.json changelog.md
-          git diff --cached --quiet || (git commit -m "update: ${{ steps.version.outputs.version }}" && git push)
+          if ! git diff --cached --quiet; then
+            git commit -m "update: ${{ steps.version.outputs.version }}"
+            git push
+          fi
 
       - name: Create Release
         env:

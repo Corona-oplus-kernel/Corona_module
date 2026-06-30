@@ -1312,7 +1312,8 @@ class CoronaAddon {
         if (battDesign && parseInt(battDesign) > 0) document.getElementById('battery-capacity').textContent = `${Math.round(parseInt(battDesign) / 1000)} mAh`;
     }
     async detectZramAlgorithms() {
-        const algRaw = await this.exec('cat /sys/block/zram0/comp_algorithm 2>/dev/null');
+        const zramBlock = this.getZramBlockName(this.state.zramPath);
+        const algRaw = zramBlock ? await this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`) : '';
         if (algRaw) {
             this.algorithms = algRaw.replace(/\[|\]/g, '').split(/\s+/).filter(a => a.length > 0).map(a => a.replace(/^kernel:/, ''));
             this.algorithms = [...new Set(this.algorithms)];
@@ -1327,6 +1328,22 @@ class CoronaAddon {
         const prefixed = `kernel:${algorithm}`;
         if (this.isCoronaKernel && algRaw && algRaw.includes(prefixed)) return prefixed;
         return algorithm;
+    }
+    getZramBlockName(zramPath) {
+        const raw = String(zramPath || '').replace('/dev/block/', '').replace('/dev/', '').trim();
+        return raw.replace(/[^a-zA-Z0-9_.-].*$/, '');
+    }
+    async getActiveSwapInfo(devicePath) {
+        const swaps = await this.exec('cat /proc/swaps 2>/dev/null');
+        if (!swaps) return null;
+        const lines = swaps.split('\n').slice(1);
+        for (const line of lines) {
+            const parts = line.trim().split(/\s+/);
+            if (parts[0] === devicePath) {
+                return { device: parts[0], type: parts[1], size: parts[2], used: parts[3], priority: parts[4] };
+            }
+        }
+        return null;
     }
     async detectCpuClusters() {
         this.cpuClusterInfo = { little: 0, mid: 0, big: 0, prime: 0 };
@@ -1574,21 +1591,24 @@ class CoronaAddon {
         await this.loadZramStatus();
     }
     async loadZramStatus() {
-        const zramBlock = this.state.zramPath.replace('/dev/block/', '').replace('/dev/', '');
-        const [algRaw, disksize, swappiness] = await Promise.all([
-            this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`),
-            this.exec(`cat /sys/block/${zramBlock}/disksize 2>/dev/null`),
-            this.exec('cat /proc/sys/vm/swappiness 2>/dev/null')
+        const zramBlock = this.getZramBlockName(this.state.zramPath);
+        const [algRaw, disksize, swappiness, swapInfo] = await Promise.all([
+            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`) : '',
+            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/disksize 2>/dev/null`) : '',
+            this.exec('cat /proc/sys/vm/swappiness 2>/dev/null'),
+            this.getActiveSwapInfo(this.state.zramPath)
         ]);
         const currentAlg = algRaw.match(/\[([^\]]+)\]/)?.[1] || algRaw.split(' ')[0] || '--';
         const sizeGB = disksize ? (parseInt(disksize) / 1024 / 1024 / 1024).toFixed(1) : '0';
         document.getElementById('zram-current-alg').textContent = currentAlg;
         document.getElementById('zram-current-size').textContent = `${sizeGB} GB`;
         document.getElementById('zram-current-swappiness').textContent = swappiness.trim() || '--';
+        const isActive = !!swapInfo;
+        const priorityOk = swapInfo?.priority === '32758';
         const statusEl = document.getElementById('zram-status');
-        if (statusEl) statusEl.textContent = parseInt(disksize) > 0 ? currentAlg.toUpperCase() : '未启用';
+        if (statusEl) statusEl.textContent = isActive ? (priorityOk ? currentAlg.toUpperCase() : `${currentAlg.toUpperCase()} (prio ${swapInfo.priority})`) : '未启用';
         const memBadge = document.getElementById('memory-compression-badge');
-        if (memBadge) memBadge.textContent = parseInt(disksize) > 0 ? `ZRAM: ${currentAlg.toUpperCase()}` : '未配置';
+        if (memBadge) memBadge.textContent = isActive ? (priorityOk ? `ZRAM: ${currentAlg.toUpperCase()}` : `ZRAM: ${currentAlg.toUpperCase()} prio ${swapInfo.priority}`) : '未配置';
         const pathDisplay = document.getElementById('zram-current-path');
         if (pathDisplay) pathDisplay.textContent = this.state.zramPath;
     }
@@ -1603,7 +1623,12 @@ class CoronaAddon {
       return this.withLock('zram', async () => {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
         const zramDev = this.state.zramPath;
-        const zramBlock = zramDev.replace('/dev/block/', '').replace('/dev/', '');
+        const zramBlock = this.getZramBlockName(zramDev);
+        if (!zramBlock) {
+            if (manageLoading) this.showLoading(false);
+            this.showToast('ZRAM 设备路径无效');
+            return;
+        }
         if (manageLoading) {
             this.showLoading(true);
             await this.sleep(0);
@@ -1617,7 +1642,13 @@ class CoronaAddon {
         }
         await this.exec(`echo "${sizeBytes}" > /sys/block/${zramBlock}/disksize`);
         await this.exec(`mkswap ${zramDev}`);
-        await this.exec(`swapon ${zramDev} -p 32758 2>/dev/null || swapon ${zramDev}`);
+        await this.exec(`swapon ${zramDev} -p 32758 2>/dev/null`);
+        const swapInfo = await this.getActiveSwapInfo(zramDev);
+        if (!swapInfo || swapInfo.priority !== '32758') {
+            if (manageLoading) this.showLoading(false);
+            this.showToast(`ZRAM 启用失败${swapInfo ? `（优先级: ${swapInfo.priority}）` : ''}`);
+            return;
+        }
         await this.exec(`echo "${this.state.swappiness}" > /proc/sys/vm/swappiness`);
         const config = `enabled=1\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
         await this.writeConfig('zram.conf', config);
@@ -1853,7 +1884,8 @@ class CoronaAddon {
     async updateModuleDescription() {
         const descParts = [];
         if (this.state.zramEnabled) {
-            const algRaw = await this.exec('cat /sys/block/zram0/comp_algorithm 2>/dev/null');
+            const zramBlock = this.getZramBlockName(this.state.zramPath);
+            const algRaw = zramBlock ? await this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`) : '';
             const currentAlg = algRaw.match(/\[([^\]]+)\]/)?.[1] || algRaw.split(' ')[0] || this.state.algorithm;
             descParts.push(`ZRAM:${currentAlg}`);
         } else { descParts.push(`ZRAM:关闭`); }
@@ -2753,14 +2785,8 @@ class CoronaAddon {
         const memInfo = await this.exec('cat /proc/meminfo | grep MemTotal');
         const memKb = parseInt(memInfo.replace(/[^0-9]/g, '')) || 8000000;
         const sdkVersion = parseInt(await this.exec('getprop ro.build.version.sdk')) || 30;
-        const isXiaomi = (await this.exec('getprop ro.miui.ui.version.name')).trim() !== '';
         const isOplus = (await this.exec('find /proc -maxdepth 1 -name "oplus*" 2>/dev/null | head -1')).trim() !== '';
         if (name === 'lmk') {
-            if (isXiaomi) {
-                await this.exec('resetprop persist.sys.minfree_6g "16384,20480,32768,131072,262144,384000"');
-                await this.exec('resetprop persist.sys.minfree_8g "16384,20480,32768,131072,384000,524288"');
-                await this.exec('resetprop persist.sys.minfree_12g "16384,20480,131072,384000,524288,819200"');
-            }
             if (sdkVersion > 28) {
                 let levels = '4096:0,5120:100,8192:200,32768:250,65536:900,96000:950';
                 if (memKb > 8388608) levels = '4096:0,5120:100,32768:200,96000:250,131072:900,204800:950';
@@ -2776,7 +2802,6 @@ class CoronaAddon {
         } else if (name === 'reclaim') {
             await this.exec('echo off > /sys/kernel/mm/damon/admin/kdamonds/0/state 2>/dev/null');
             await this.exec('echo 0 > /sys/module/process_reclaim/parameters/enable_process_reclaim 2>/dev/null');
-            await this.exec('echo 0 > /sys/kernel/mi_reclaim/enable 2>/dev/null');
             if (isOplus) {
                 await this.exec('echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null');
                 await this.exec('dumpsys osensemanager proc debug feature 0 2>/dev/null');
@@ -2793,7 +2818,7 @@ class CoronaAddon {
             if (memKb > 8388608) {
                 await this.exec('mkdir -p /dev/memcg/system/active_fg');
                 await this.exec('echo 0 > /dev/memcg/system/active_fg/memory.swappiness 2>/dev/null');
-                const apps = ['com.android.systemui', 'com.miui.home', 'com.android.launcher', 'surfaceflinger', 'system_server'];
+                const apps = ['com.android.systemui', 'com.android.launcher', 'surfaceflinger', 'system_server'];
                 for (const app of apps) {
                     const pid = await this.exec(`pidof ${app} 2>/dev/null | head -n1`);
                     if (pid.trim()) await this.exec(`echo ${pid.trim()} > /dev/memcg/system/active_fg/cgroup.procs 2>/dev/null`);
