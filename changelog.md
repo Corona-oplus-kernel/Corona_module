@@ -1,4 +1,4 @@
-# Corona v4.2.1
+# Corona v4.2.2
 
-- fix: preserve settings across Corona updates
-- hyw
+- 更新版本号
+- fix: LRU特性检测在UI初始化之后执行导致无法显示; 工作流打包排除无用文件
