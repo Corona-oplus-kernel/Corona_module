@@ -3687,15 +3687,22 @@ body.theme-dark .module-card {
     border-color: rgba(255, 255, 255, 0.08);
 }
 
-.card-visibility-section {
-    margin-top: 16px;
+.card-visibility-settings-section {
+    margin-top: 12px;
 }
 .card-visibility-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
     cursor: pointer;
     padding: 4px 0;
+}
+.card-visibility-heading-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
 }
 .card-visibility-header .expand-icon {
     font-size: 12px;
@@ -3703,21 +3710,15 @@ body.theme-dark .module-card {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: inline-block;
     transform: rotate(90deg);
+    flex-shrink: 0;
 }
 .card-visibility-header.expanded .expand-icon {
     transform: rotate(270deg);
 }
-.card-visibility-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-sub);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-.card-visibility-list {
+.card-visibility-switches {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
     overflow: hidden;
     max-height: 0;
     opacity: 0;
@@ -3726,25 +3727,35 @@ body.theme-dark .module-card {
                 opacity 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
                 margin-top 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
-.card-visibility-list.expanded {
-    max-height: 520px;
+.card-visibility-switches.expanded {
+    max-height: 720px;
     opacity: 1;
     margin-top: 12px;
 }
-.card-visibility-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 14px;
-    background: rgba(0, 0, 0, 0.03);
-    border-radius: 10px;
+.card-visibility-switch-container {
+    margin-bottom: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
 }
-.card-visibility-name {
-    font-size: 14px;
-    color: var(--text-main);
+.card-visibility-switch-container.disabled {
+    opacity: 0.52;
 }
-body.theme-dark .card-visibility-item {
-    background: rgba(255, 255, 255, 0.05);
+.card-visibility-switch-container.disabled .switch-info {
+    pointer-events: none;
+}
+.card-visibility-switch-container.disabled .switch {
+    cursor: not-allowed;
+}
+.card-visibility-switch-container.disabled .switch .slider {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+.card-visibility-switch-container.disabled .switch .slider:before {
+    background-color: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+body.theme-dark .card-visibility-switch-container.disabled .switch .slider {
+    background-color: rgba(255, 255, 255, 0.10);
 }
 
 #page-settings .sub-card {

@@ -917,6 +917,107 @@
                             <span class="slider"></span>
                         </label>
                     </div>
+                    <div class="setting-section card-visibility-settings-section">
+                        <div class="card-visibility-header" id="card-visibility-toggle">
+                            <div class="card-visibility-heading-row">
+                                <span class="section-label">模块卡片显示</span>
+                                <span class="section-desc">关闭后仅隐藏配置页卡片，不影响模块功能和已保存参数</span>
+                            </div>
+                            <span class="expand-icon">❯</span>
+                        </div>
+                        <div class="card-visibility-switches" id="card-visibility-list">
+                            <div class="switch-container card-visibility-switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">内存压缩</span>
+                                    <span class="switch-desc">ZRAM / Swap / LRU / VM 参数</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="memory-compression" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container card-visibility-switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">LE9EC 内存保护</span>
+                                    <span class="switch-desc">内存保护与页面缓存控制</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="le9ec" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container card-visibility-switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">IO 调度器</span>
+                                    <span class="switch-desc">磁盘调度器与预读取设置</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="io-scheduler" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container card-visibility-switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">CPU 调频器</span>
+                                    <span class="switch-desc">CPU 调频策略与核心状态</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="cpu-governor" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container card-visibility-switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">进程优先级</span>
+                                    <span class="switch-desc">进程 nice 与 I/O 优先级规则</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="process-priority" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container card-visibility-switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">TCP 拥塞算法</span>
+                                    <span class="switch-desc">网络拥塞控制与实时状态</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="tcp" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container card-visibility-switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">自定义脚本</span>
+                                    <span class="switch-desc">管理附加脚本与开机执行项</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="custom-scripts" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container card-visibility-switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">系统优化</span>
+                                    <span class="switch-desc">系统级调优与附加优化项</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="system-opt" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container card-visibility-switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">Corona 内核优化</span>
+                                    <span class="switch-desc">内核增强模块与附加开关</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="corona-kernel" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                     <div class="setting-section snapshot-section">
                         <div class="section-header-row">
                             <div>
