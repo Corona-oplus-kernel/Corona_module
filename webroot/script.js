@@ -768,26 +768,84 @@ class CoronaAddon {
         const toggle = document.getElementById('card-visibility-toggle');
         const list = document.getElementById('card-visibility-list');
         if (toggle && list) {
+            list.classList.remove('expanded');
+            toggle.classList.remove('expanded');
             toggle.addEventListener('click', () => {
                 const isExpanded = list.classList.contains('expanded');
                 list.classList.toggle('expanded', !isExpanded);
                 toggle.classList.toggle('expanded', !isExpanded);
             });
         }
+        const appSettingsCard = document.querySelector('.module-card[data-card-key="app-settings"]');
+        if (appSettingsCard) appSettingsCard.classList.remove('card-hidden');
         const savedVisibility = localStorage.getItem('corona_card_visibility');
         let visibility = savedVisibility ? (() => { try { return JSON.parse(savedVisibility); } catch (e) { return {}; } })() : {};
+        if (!visibility || typeof visibility !== 'object' || Array.isArray(visibility)) visibility = {};
+        if (visibility['app-settings'] === false) {
+            delete visibility['app-settings'];
+            localStorage.setItem('corona_card_visibility', JSON.stringify(visibility));
+        }
         const switches = document.querySelectorAll('.card-visibility-switch');
         switches.forEach(sw => {
             const cardKey = sw.dataset.card;
+            if (!cardKey || cardKey === 'app-settings') {
+                this.setCardVisibilityOptionState(sw, false);
+                sw.checked = true;
+                return;
+            }
             const card = document.querySelector(`.module-card[data-card-key="${cardKey}"]`);
             const isVisible = visibility[cardKey] !== false;
-            sw.checked = isVisible;
+            this.setCardVisibilityOptionState(sw, this.isCardVisibilityOptionAvailable(card), { forceChecked: isVisible });
             if (card) card.classList.toggle('card-hidden', !isVisible);
             sw.addEventListener('change', () => {
                 visibility[cardKey] = sw.checked;
                 localStorage.setItem('corona_card_visibility', JSON.stringify(visibility));
                 if (card) card.classList.toggle('card-hidden', !sw.checked);
+                if (appSettingsCard) appSettingsCard.classList.remove('card-hidden');
+                this.refreshSettingsSectionMarkers();
             });
+        });
+        this.refreshCardVisibilityAvailability();
+    }
+    isCardVisibilityOptionAvailable(card) {
+        if (!card) return false;
+        return card.style.display !== 'none';
+    }
+    setCardVisibilityOptionState(input, enabled, options = {}) {
+        if (!input) return;
+        input.disabled = !enabled;
+        const container = input.closest('.card-visibility-switch-container');
+        if (container) container.classList.toggle('disabled', !enabled);
+        if (options.forceChecked !== undefined) input.checked = !!options.forceChecked;
+    }
+    isSettingsCardVisible(card) {
+        if (!card) return false;
+        return getComputedStyle(card).display !== 'none';
+    }
+    refreshCardVisibilityAvailability() {
+        document.querySelectorAll('.card-visibility-switch').forEach(sw => {
+            const cardKey = sw.dataset.card;
+            if (!cardKey || cardKey === 'app-settings') return;
+            const card = document.querySelector(`.module-card[data-card-key="${cardKey}"]`);
+            const available = this.isCardVisibilityOptionAvailable(card);
+            this.setCardVisibilityOptionState(sw, available, { forceChecked: available ? sw.checked : false });
+        });
+        this.refreshSettingsSectionMarkers();
+    }
+    refreshSettingsSectionMarkers() {
+        document.querySelectorAll('.section-marker-settings').forEach(marker => {
+            let hasVisibleCard = false;
+            let sibling = marker.nextElementSibling;
+            while (sibling) {
+                if (sibling.classList.contains('section-marker-settings')) break;
+                if (sibling.classList.contains('module-card') && sibling.dataset.cardKey === 'app-settings') break;
+                if (sibling.classList.contains('module-card') && sibling.dataset.cardKey && this.isSettingsCardVisible(sibling)) {
+                    hasVisibleCard = true;
+                    break;
+                }
+                sibling = sibling.nextElementSibling;
+            }
+            marker.hidden = !hasVisibleCard;
         });
     }
     initSubCards() {
@@ -1473,7 +1531,11 @@ class CoronaAddon {
     async loadLe9ecConfig() {
         const exists = await this.exec('cat /proc/sys/vm/anon_min_kbytes 2>/dev/null');
         this.le9ecSupported = !!exists;
-        if (!exists) { document.getElementById('le9ec-card').style.display = 'none'; return; }
+        if (!exists) {
+            document.getElementById('le9ec-card').style.display = 'none';
+            this.refreshCardVisibilityAvailability();
+            return;
+        }
         const config = await this.exec(`cat ${this.configDir}/le9ec.conf 2>/dev/null`);
         if (config) {
             const enabledMatch = config.match(/enabled=(\d)/);
@@ -3618,6 +3680,7 @@ Swap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的
         if (!this.isCoronaKernel) {
             const card = document.getElementById('corona-kernel-card');
             if (card) card.style.display = 'none';
+            this.refreshCardVisibilityAvailability();
             return;
         }
         if (!this.coronaKernelPresent) {
