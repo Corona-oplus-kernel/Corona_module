@@ -2668,6 +2668,29 @@ body.theme-dark #xinran-overlay .detail-card {
     text-align: center;
 }
 
+.snapshot-section {
+    margin-top: 12px;
+}
+
+.snapshot-list-container {
+    margin-top: 12px;
+    margin-bottom: 0;
+}
+
+.snapshot-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.snapshot-item-meta span {
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(52, 130, 255, 0.08);
+}
+
 .tile-desc {
     font-size: 13px;
     color: var(--text-sub);

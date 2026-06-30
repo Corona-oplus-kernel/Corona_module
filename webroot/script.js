@@ -6,6 +6,7 @@ class CoronaAddon {
         this.runtimeConfig = { swapPath: '' };
         this.algorithms = [];
         this.readaheadOptions = [128, 256, 384, 512, 768, 1024, 2048, 4096];
+        this.snapshotConfigFiles = ['zram.conf', 'le9ec.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'tcp.conf', 'process_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf'];
         this.state = {
             algorithm: 'lz4',
             zramSize: 8,
@@ -64,6 +65,7 @@ class CoronaAddon {
         this.settingsUiInitialized = false;
         this.settingsDataLoaded = false;
         this.settingsInitPromise = null;
+        this.parameterSnapshots = [];
         this.dom = {};
         this.initDOMCache();
         this.init();
@@ -366,6 +368,196 @@ class CoronaAddon {
         toggle.addEventListener('change', () => {
             this.setPopupAnimationEnabled(toggle.checked, true);
             this.showToast(`弹窗动画已${toggle.checked ? '开启' : '关闭'}`);
+        });
+    }
+    initSnapshots() {
+        const saveBtn = document.getElementById('snapshot-save-btn');
+        if (saveBtn) saveBtn.addEventListener('click', () => this.createParameterSnapshot());
+        this.renderParameterSnapshots();
+    }
+    async loadParameterSnapshots() {
+        const path = `${this.configDir}/parameter_snapshots.b64`;
+        const base64Data = await this.exec(`cat ${this.shellQuote(path)} 2>/dev/null`);
+        this.parameterSnapshots = [];
+        if (base64Data && base64Data.trim()) {
+            try {
+                const json = decodeURIComponent(escape(atob(base64Data.trim())));
+                const parsed = JSON.parse(json);
+                const rawSnapshots = Array.isArray(parsed)
+                    ? parsed
+                    : (parsed && Array.isArray(parsed.snapshots) ? parsed.snapshots : []);
+                this.parameterSnapshots = rawSnapshots
+                    .filter(item => item && typeof item === 'object' && !Array.isArray(item))
+                    .map(item => {
+                        const files = item.files && typeof item.files === 'object' && !Array.isArray(item.files)
+                            ? item.files
+                            : {};
+                        return {
+                            id: String(item.id || `snapshot_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
+                            name: String(item.name || '未命名快照'),
+                            createdAt: item.createdAt || new Date().toISOString(),
+                            files,
+                            meta: item.meta && typeof item.meta === 'object' && !Array.isArray(item.meta)
+                                ? item.meta
+                                : { includedCount: Object.keys(files).length }
+                        };
+                    })
+                    .filter(item => Object.keys(item.files).length > 0)
+                    .slice(0, 20);
+            } catch (e) {
+                this.parameterSnapshots = [];
+            }
+        }
+        this.renderParameterSnapshots();
+        this.updateSnapshotStatus();
+    }
+    async saveParameterSnapshots() {
+        const path = `${this.configDir}/parameter_snapshots.b64`;
+        const payload = { version: 1, snapshots: this.parameterSnapshots };
+        const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+        await this.exec(`echo '${base64Data}' > ${this.shellQuote(path)}`);
+    }
+    updateSnapshotStatus(message = '') {
+        const status = document.getElementById('snapshot-status');
+        if (!status) return;
+        if (message) {
+            status.textContent = message;
+            return;
+        }
+        status.textContent = this.parameterSnapshots.length > 0
+            ? `共 ${this.parameterSnapshots.length} 个快照；当前仅恢复配置状态，不会自动全量立即应用。`
+            : '当前仅保存配置状态，恢复后不会自动全量立即应用。';
+    }
+    formatSnapshotTime(timestamp) {
+        const d = new Date(timestamp);
+        if (Number.isNaN(d.getTime())) return '时间未知';
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+    renderParameterSnapshots() {
+        const container = document.getElementById('snapshot-list');
+        if (!container) return;
+        const snapshots = Array.isArray(this.parameterSnapshots) ? this.parameterSnapshots : [];
+        if (snapshots.length === 0) {
+            container.innerHTML = '<div class="scripts-empty">暂无参数快照</div>';
+            return;
+        }
+        container.innerHTML = snapshots.map(snapshot => `
+            <div class="script-item" data-snapshot-id="${this.escapeHtml(snapshot.id || '')}">
+                <div class="script-info">
+                    <div class="script-header">
+                        <span class="script-name">${this.escapeHtml(snapshot.name || '未命名快照')}</span>
+                    </div>
+                    <div class="snapshot-item-meta">
+                        <span>${this.escapeHtml(this.formatSnapshotTime(snapshot.createdAt))}</span>
+                        <span>${Object.keys(snapshot.files || {}).length} 个配置</span>
+                    </div>
+                </div>
+                <div class="script-actions">
+                    <button class="script-action-btn toggle" data-action="restore" data-snapshot-id="${this.escapeHtml(snapshot.id || '')}" title="恢复">↺</button>
+                    <button class="script-action-btn delete" data-action="delete" data-snapshot-id="${this.escapeHtml(snapshot.id || '')}" title="删除">✕</button>
+                </div>
+            </div>
+        `).join('');
+        container.querySelectorAll('[data-action="restore"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.restoreParameterSnapshot(btn.dataset.snapshotId);
+            });
+        });
+        container.querySelectorAll('[data-action="delete"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteParameterSnapshot(btn.dataset.snapshotId);
+            });
+        });
+    }
+    async collectSnapshotFiles() {
+        const entries = await Promise.all(this.snapshotConfigFiles.map(async (filename) => {
+            const content = await this.exec(`cat ${this.shellQuote(`${this.configDir}/${filename}`)} 2>/dev/null`);
+            return content && content.trim() ? [filename, content.trim()] : null;
+        }));
+        return Object.fromEntries(entries.filter(Boolean));
+    }
+    async createParameterSnapshot() {
+        return this.withLock('parameter-snapshots', async () => {
+            const files = await this.collectSnapshotFiles();
+            const filenames = Object.keys(files);
+            if (filenames.length === 0) {
+                this.showToast('当前没有可保存的配置');
+                return false;
+            }
+            const name = `快照 ${this.parameterSnapshots.length + 1}`;
+            const confirmed = await this.confirmChangePreview('保存快照', {
+                summary: `即将保存参数快照 ${name}。`,
+                configs: filenames.map(filename => ({ filename, content: files[filename] })),
+                notes: ['仅保存配置文件内容，不会立即改动当前运行状态。']
+            });
+            if (!confirmed) return false;
+            this.parameterSnapshots = [{
+                id: `snapshot_${Date.now()}`,
+                name,
+                createdAt: new Date().toISOString(),
+                files,
+                meta: { includedCount: filenames.length }
+            }, ...this.parameterSnapshots].slice(0, 20);
+            await this.saveParameterSnapshots();
+            this.renderParameterSnapshots();
+            this.updateSnapshotStatus();
+            this.showToast('参数快照已保存');
+            return true;
+        });
+    }
+    async reloadSnapshotTargets() {
+        await this.loadAllConfigs();
+        await this.loadSwapConfig();
+        await this.loadVmConfig();
+        await this.loadKernelFeaturesConfig();
+        await this.loadCoronaKernelConfig();
+    }
+    async restoreParameterSnapshot(snapshotId) {
+        return this.withLock('parameter-snapshots', async () => {
+            const snapshot = this.parameterSnapshots.find(item => item.id === snapshotId);
+            if (!snapshot) {
+                this.showToast('快照不存在');
+                return false;
+            }
+            const files = snapshot.files || {};
+            const filenames = Object.keys(files);
+            if (filenames.length === 0) {
+                this.showToast('该快照没有可恢复内容');
+                return false;
+            }
+            const confirmed = await this.confirmChangePreview('恢复快照', {
+                summary: `即将恢复参数快照 ${snapshot.name || '未命名快照'}。`,
+                configs: filenames.map(filename => ({ filename, content: files[filename] })),
+                notes: ['本次只恢复配置状态；部分立即生效项如需完全体现，仍可能需要手动应用或重启。']
+            });
+            if (!confirmed) return false;
+            this.showLoading(true);
+            try {
+                for (const filename of filenames) {
+                    await this.writeConfig(filename, files[filename]);
+                }
+                await this.reloadSnapshotTargets();
+            } finally {
+                this.showLoading(false);
+            }
+            this.showToast('参数快照已恢复');
+            return true;
+        });
+    }
+    async deleteParameterSnapshot(snapshotId) {
+        return this.withLock('parameter-snapshots', async () => {
+            const snapshot = this.parameterSnapshots.find(item => item.id === snapshotId);
+            if (!snapshot) return false;
+            const confirmed = await this.showConfirm(`确定要删除快照 "${snapshot.name || '未命名快照'}" 吗？`, '删除快照');
+            if (!confirmed) return false;
+            this.parameterSnapshots = this.parameterSnapshots.filter(item => item.id !== snapshotId);
+            await this.saveParameterSnapshots();
+            this.renderParameterSnapshots();
+            this.updateSnapshotStatus();
+            this.showToast('参数快照已删除');
+            return true;
         });
     }
     initChart() {
@@ -1640,6 +1832,7 @@ class CoronaAddon {
                 this.initExpandableCards();
                 this.initThemeSelector();
                 this.initPopupAnimationToggle();
+                this.initSnapshots();
                 this.initSliderProgress();
                 this.initSwapSettings();
                 this.initVmSettings();
@@ -1654,7 +1847,8 @@ class CoronaAddon {
                 await Promise.all([
                     this.loadAllConfigs(),
                     this.loadDualCellConfig(),
-                    this.detectKernelFeatures()
+                    this.detectKernelFeatures(),
+                    this.loadParameterSnapshots()
                 ]);
                 this.initKernelFeatures();
                 await Promise.all([
