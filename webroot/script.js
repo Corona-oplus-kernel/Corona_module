@@ -22,7 +22,7 @@ class CoronaAddon {
             le9ecCleanLow: 0,
             le9ecCleanMin: 524288,
             dualCell: false,
-            theme: 'auto',
+            theme: 'gold',
             swapEnabled: false,
             swapSize: 2048,
             swapPriority: 0,
@@ -123,10 +123,11 @@ class CoronaAddon {
         const max = parseFloat(slider.max) || 100;
         const val = parseFloat(slider.value) || 0;
         const percent = ((val - min) / (max - min)) * 100;
+        const styles = getComputedStyle(document.body);
         const isDark = document.body.classList.contains('theme-dark');
         const isPurple = slider.closest('.priority-nice-slider-container');
-        const filledColor = isPurple ? 'rgba(156, 39, 176, 0.8)' : 'rgba(52, 130, 255, 0.8)';
-        const emptyColor = isDark ? 'rgba(255, 255, 255, 0.15)' : (isPurple ? 'rgba(156, 39, 176, 0.12)' : 'rgba(52, 130, 255, 0.12)');
+        const filledColor = isPurple ? 'rgba(156, 39, 176, 0.8)' : (styles.getPropertyValue('--primary').trim() || 'rgba(52, 130, 255, 0.8)');
+        const emptyColor = isDark ? 'rgba(255, 255, 255, 0.15)' : (isPurple ? 'rgba(156, 39, 176, 0.12)' : (styles.getPropertyValue('--primary-dim').trim() || 'rgba(52, 130, 255, 0.12)'));
         slider.style.background = `linear-gradient(to right, ${filledColor} 0%, ${filledColor} ${percent}%, ${emptyColor} ${percent}%, ${emptyColor} 100%)`;
     }
     initSliderProgress() {
@@ -237,17 +238,19 @@ class CoronaAddon {
     }
     async ensureConfigDir() { await this.exec(`mkdir -p ${this.shellQuote(this.configDir)}`); }
     initTheme() {
-        const savedTheme = localStorage.getItem('corona_theme') || 'auto';
-        this.state.theme = savedTheme;
-        this.applyTheme(savedTheme);
+        const savedTheme = localStorage.getItem('corona_theme') || 'light';
+        const normalizedTheme = savedTheme === 'auto' ? 'light' : savedTheme;
+        this.state.theme = normalizedTheme;
+        if (normalizedTheme !== savedTheme) {
+            localStorage.setItem('corona_theme', normalizedTheme);
+        }
+        this.applyTheme(normalizedTheme);
     }
     applyTheme(theme) {
         const body = document.body;
-        const newThemeClass = theme === 'auto' 
-            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'theme-dark' : 'theme-light')
-            : `theme-${theme}`;
-        body.classList.remove('theme-light', 'theme-dark');
-        body.classList.add(newThemeClass);
+        const normalizedTheme = theme === 'auto' ? 'light' : theme;
+        body.classList.remove('theme-light', 'theme-dark', 'theme-gold');
+        body.classList.add(`theme-${normalizedTheme}`);
         document.querySelectorAll('.range-slider').forEach(slider => this.updateSliderProgress(slider));
     }
     initThemeSelector() {
@@ -263,7 +266,6 @@ class CoronaAddon {
                 this.showToast(`主题已切换: ${opt.querySelector('span').textContent}`);
             });
         });
-        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (this.state.theme === 'auto') { this.applyTheme('auto'); } });
     }
     initChart() {
         this.chartCanvas = document.getElementById('history-chart');
@@ -312,7 +314,9 @@ class CoronaAddon {
         const styles = getComputedStyle(document.body);
         const textMain = styles.getPropertyValue('--text-main').trim() || '#1A1A1A';
         const textSub = styles.getPropertyValue('--text-sub').trim() || '#6E6E6E';
-        let data = [], maxVal = 100, unit = '%', color1 = '#3482FF', color2 = 'rgba(52, 130, 255, 0.2)', label = 'CPU 使用率';
+        const primaryColor = styles.getPropertyValue('--primary').trim() || '#3482FF';
+        const primaryDim = styles.getPropertyValue('--primary-dim').trim() || 'rgba(52, 130, 255, 0.2)';
+        let data = [], maxVal = 100, unit = '%', color1 = primaryColor, color2 = primaryDim, label = 'CPU 使用率';
         if (this.chartType === 'cpu') { data = this.historyData.cpu.map(d => d.value); label = 'CPU 使用率'; }
         else if (this.chartType === 'mem') { data = this.historyData.mem.map(d => d.value); label = '内存使用率'; color1 = '#00C853'; color2 = 'rgba(0, 200, 83, 0.2)'; }
         else if (this.chartType === 'temp') {
@@ -578,14 +582,12 @@ class CoronaAddon {
     }
     initHomeCardClicks() {
         document.getElementById('cpu-card').addEventListener('click', async () => {
-            this.switchPage('settings');
-            await this.ensureSettingsPageReady();
+            await this.switchPage('settings');
             const cpuCard = document.getElementById('cpu-governor-card');
             if (cpuCard) cpuCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
         });
         document.getElementById('swap-card').addEventListener('click', async () => {
-            this.switchPage('settings');
-            await this.ensureSettingsPageReady();
+            await this.switchPage('settings');
             const zramCard = document.getElementById('zram-card');
             if (zramCard) zramCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
@@ -1158,7 +1160,7 @@ class CoronaAddon {
         else { this.switchPage('home'); setTimeout(animateToTarget, 150); }
     }
     bindAllEvents() {
-        document.querySelectorAll('.tab-item').forEach(tab => { tab.addEventListener('click', (e) => this.switchPage(e.currentTarget.dataset.page)); });
+        document.querySelectorAll('.tab-item').forEach(tab => { tab.addEventListener('click', async (e) => { await this.switchPage(e.currentTarget.dataset.page); }); });
         document.getElementById('zram-switch').addEventListener('change', async (e) => { this.state.zramEnabled = e.target.checked; this.toggleZramSettings(e.target.checked); await this.saveZramConfig(); });
         document.getElementById('zram-size-slider').addEventListener('input', (e) => { this.state.zramSize = parseFloat(e.target.value); document.getElementById('zram-size-value').textContent = `${this.state.zramSize.toFixed(2)} GB`; });
         document.getElementById('zram-size-slider').addEventListener('change', async (e) => { this.state.zramSize = parseFloat(e.target.value); await this.saveZramConfig(); });
@@ -1174,6 +1176,7 @@ class CoronaAddon {
         document.getElementById('le9ec-clean-min-slider').addEventListener('change', (e) => { this.state.le9ecCleanMin = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(); else this.saveLe9ecConfig(); });
     }
     toggleLe9ecSettings(show) { const settings = document.getElementById('le9ec-settings'); if (show) { settings.classList.remove('hidden'); this.loadLe9ecStatus(); } else { settings.classList.add('hidden'); } }
+    bindSettingsOverscrollGuard() {}
     async loadLe9ecConfig() {
         const exists = await this.exec('cat /proc/sys/vm/anon_min_kbytes 2>/dev/null');
         this.le9ecSupported = !!exists;
@@ -1223,22 +1226,44 @@ class CoronaAddon {
         setTimeout(() => this.loadLe9ecStatus(), 500);
     }
     toggleZramSettings(show) { const settings = document.getElementById('zram-settings'); if (show) { settings.classList.remove('hidden'); this.loadZramStatus(); } else { settings.classList.add('hidden'); } }
-    switchPage(pageName) {
+    async switchPage(pageName) {
         const pages = document.querySelectorAll('.page');
         const tabs = document.querySelectorAll('.tab-item');
         const slider = document.getElementById('tab-slider');
         const currentActive = document.querySelector('.page.active');
         const targetPage = document.getElementById(`page-${pageName}`);
-        if (currentActive === targetPage) return;
+        if (!targetPage || currentActive === targetPage) return;
+        if (pageName === 'settings' && (!this.settingsUiInitialized || !this.settingsDataLoaded)) {
+            await this.ensureSettingsPageReady();
+        }
         pages.forEach(p => p.classList.remove('left', 'right'));
-        if (pageName === 'settings') { currentActive.classList.add('left'); slider.classList.add('right'); }
-        else { currentActive.classList.add('right'); slider.classList.remove('right'); }
-        currentActive.classList.remove('active');
+        if (currentActive) {
+            if (pageName === 'settings') { currentActive.classList.add('left'); slider.classList.add('right'); }
+            else { currentActive.classList.add('right'); slider.classList.remove('right'); }
+            currentActive.classList.remove('active');
+        }
         targetPage.classList.add('active');
         tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.page === pageName));
-        if (pageName === 'settings') {
-            this.ensureSettingsPageReady();
-        }
+        requestAnimationFrame(() => {
+            const scroller = document.querySelector('.container');
+            if (scroller) scroller.scrollTo({ top: 0, behavior: 'auto' });
+            requestAnimationFrame(() => {
+                const activeScroller = document.querySelector('.container');
+                if (activeScroller) activeScroller.scrollTo({ top: 0, behavior: 'auto' });
+            });
+            const activeTitle = pageName === 'settings' ? document.getElementById('corona-title-settings') : document.getElementById('corona-title');
+            if (activeTitle) {
+                activeTitle.style.opacity = '1';
+                activeTitle.style.transform = 'translateY(0)';
+            }
+            const activeOverline = targetPage.querySelector('.title-overline');
+            if (activeOverline) {
+                activeOverline.style.opacity = '0.92';
+                activeOverline.style.transform = 'translateY(0)';
+            }
+            const floatingHeader = document.getElementById('floating-header');
+            if (floatingHeader) floatingHeader.classList.remove('visible', 'overlay-hidden');
+        });
         if (pageName === 'home' && this.pendingChartDraw) {
             requestAnimationFrame(() => this.drawChart());
             this.pendingChartDraw = false;
@@ -1433,6 +1458,9 @@ class CoronaAddon {
         const floatingTitle = floatingHeader ? floatingHeader.querySelector('.floating-header-title') : null;
         if (title && floatingTitle) floatingTitle.textContent = title.textContent;
         if (floatingHeader) floatingHeader.classList.remove('visible', 'overlay-hidden');
+        if (title) title.style.opacity = '1';
+        const settingsTitle = document.getElementById('corona-title-settings');
+        if (settingsTitle) settingsTitle.style.opacity = '1';
     }
     scheduleDeferredInit() {
         if (this.deferredHomeReady) return;
@@ -1490,6 +1518,12 @@ class CoronaAddon {
             await this.settingsInitPromise;
         } finally {
             this.settingsInitPromise = null;
+            if (document.getElementById('page-settings')?.classList.contains('active')) {
+                requestAnimationFrame(() => {
+                    const scroller = document.querySelector('.container');
+                    if (scroller) scroller.scrollTo({ top: 0, behavior: 'auto' });
+                });
+            }
             if (!silent) this.showLoading(false);
         }
     }
@@ -1918,7 +1952,8 @@ class CoronaAddon {
         const text = el ? el.querySelector('.loading-text') : null;
         if (!el) return;
         if (show) {
-            document.body.classList.add('init-lock');
+            document.body.classList.remove('app-ready');
+            document.body.classList.add('init-lock', 'app-booting');
             el.classList.add('init-mode');
             if (text) text.textContent = '正在初始化，请稍候...';
             el.classList.add('show');
@@ -1926,7 +1961,8 @@ class CoronaAddon {
             el.classList.remove('init-mode');
             if (text) text.textContent = '处理中...';
             el.classList.remove('show');
-            document.body.classList.remove('init-lock');
+            document.body.classList.remove('init-lock', 'app-booting');
+            document.body.classList.add('app-ready');
         }
     }
     showUnsupportedDevice(brand) {
@@ -2832,29 +2868,29 @@ class CoronaAddon {
         const floatingHeader = document.getElementById('floating-header');
         const coronaTitle = document.getElementById('corona-title');
         const coronaTitleSettings = document.getElementById('corona-title-settings');
+        const titleOverlines = document.querySelectorAll('.title-overline');
         let headerShown = false;
-        let lastScrollY = 0;
+        const scroller = document.querySelector('.container') || window;
         const handleScroll = () => {
-            const scrollY = window.scrollY;
             const activePage = document.querySelector('.page.active');
             let currentTitle = coronaTitle;
             if (activePage && activePage.id === 'page-settings') {
                 currentTitle = coronaTitleSettings;
             }
-            if (!currentTitle) return;
+            if (!currentTitle || !floatingHeader) return;
             const titleRect = currentTitle.getBoundingClientRect();
             const titleBottom = titleRect.bottom;
-            const triggerPoint = 20;
-            const fadeStart = 60;
-            const fadeEnd = triggerPoint + 5;
-            if (titleBottom > fadeStart) {
-                currentTitle.style.opacity = '1';
-            } else if (titleBottom > fadeEnd) {
-                const progress = (titleBottom - fadeEnd) / (fadeStart - fadeEnd);
-                currentTitle.style.opacity = String(progress);
-            } else {
-                currentTitle.style.opacity = '0';
-            }
+            const triggerPoint = 26;
+            const fadeStart = 78;
+            const fadeEnd = 34;
+            const progress = Math.max(0, Math.min(1, (titleBottom - fadeEnd) / (fadeStart - fadeEnd)));
+            currentTitle.style.opacity = String(progress);
+            currentTitle.style.transform = `translateY(${(1 - progress) * -5}px)`;
+            titleOverlines.forEach(el => {
+                const sameBlock = el.parentElement && el.parentElement.contains(currentTitle);
+                el.style.opacity = sameBlock ? String(Math.max(0.18, progress)) : el.style.opacity;
+                el.style.transform = sameBlock ? `translateY(${(1 - progress) * -4}px)` : el.style.transform;
+            });
             if (titleBottom <= triggerPoint && !headerShown) {
                 headerShown = true;
                 floatingHeader.classList.add('visible');
@@ -2862,9 +2898,22 @@ class CoronaAddon {
                 headerShown = false;
                 floatingHeader.classList.remove('visible');
             }
-            lastScrollY = scrollY;
+            const scrollTop = scroller === window ? window.scrollY : scroller.scrollTop;
+            if (scrollTop <= 4 || (activePage && activePage.getBoundingClientRect().top >= -2) || titleRect.top >= 8) {
+                currentTitle.style.opacity = '1';
+                currentTitle.style.transform = 'translateY(0)';
+                titleOverlines.forEach(el => {
+                    if (el.parentElement && el.parentElement.contains(currentTitle)) {
+                        el.style.opacity = '0.92';
+                        el.style.transform = 'translateY(0)';
+                    }
+                });
+                floatingHeader.classList.remove('visible', 'overlay-hidden');
+                headerShown = false;
+            }
         };
-        window.addEventListener('scroll', rafThrottle(handleScroll), { passive: true });
+        scroller.addEventListener('scroll', rafThrottle(handleScroll), { passive: true });
+        window.addEventListener('resize', rafThrottle(handleScroll), { passive: true });
         handleScroll();
     }
     initModuleIntro() {

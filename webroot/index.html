@@ -14,7 +14,12 @@
     <div class="container">
         <div class="page active" id="page-home">
             <div class="corona-title-container">
+                <div class="title-overline">CORONA MEMORY CONTROL</div>
                 <h1 class="corona-title" id="corona-title">Corona</h1>
+            </div>
+            <div class="page-lead">
+                <span class="page-lead-kicker">设备状态</span>
+                <span class="page-lead-copy">实时查看内存、温度与系统信息</span>
             </div>
             <div class="banner-image">
                 <img src="images/001.png" alt="Banner" loading="lazy" decoding="async">
@@ -50,6 +55,7 @@
                     </div>
                 </div>
             </div>
+            <div class="section-marker"><span>运行状态</span></div>
             <div class="card card-clickable" id="swap-card">
                 <div class="card-title">交换分区 / ZRAM ></div>
                 <div class="info-list">
@@ -142,8 +148,14 @@
         </div>
         <div class="page" id="page-settings">
             <div class="corona-title-container">
+                <div class="title-overline">CORONA MEMORY CONTROL</div>
                 <h1 class="corona-title" id="corona-title-settings">Corona</h1>
             </div>
+            <div class="page-lead settings-lead">
+                <span class="page-lead-kicker">模块设置</span>
+                <span class="page-lead-copy">调整内存、调度和模块功能</span>
+            </div>
+            <div class="section-marker section-marker-settings"><span>内存设置</span></div>
             <div class="module-card" id="memory-compression-card" data-card-key="memory-compression">
                 <div class="module-card-header">
                     <div class="module-card-info">
@@ -413,6 +425,7 @@
                     </div>
                 </div>
             </div>
+            <div class="section-marker section-marker-settings"><span>系统调度</span></div>
             <div class="module-card" id="le9ec-card" data-card-key="le9ec">
                 <div class="module-card-header">
                     <div class="module-card-info">
@@ -534,6 +547,7 @@
                     </div>
                 </div>
             </div>
+            <div class="section-marker section-marker-settings"><span>进程与网络设置</span></div>
             <div class="module-card" id="process-priority-card" data-card-key="process-priority">
                 <div class="module-card-header">
                     <div class="module-card-info">
@@ -572,6 +586,7 @@
                     <div class="option-list" id="tcp-list"></div>
                 </div>
             </div>
+            <div class="section-marker section-marker-settings"><span>其他设置</span></div>
             <div class="module-card" id="custom-scripts-card" data-card-key="custom-scripts">
                 <div class="module-card-header">
                     <div class="module-card-info">
@@ -879,17 +894,17 @@
                 </div>
                 <div id="app-settings-content" class="module-card-content hidden">
                     <div class="theme-options" id="theme-options">
-                        <div class="theme-option selected" data-theme="auto">
-                            <div class="theme-preview auto-preview"></div>
-                            <span>跟随系统</span>
-                        </div>
-                        <div class="theme-option" data-theme="light">
+                        <div class="theme-option selected" data-theme="light">
                             <div class="theme-preview light-preview"></div>
                             <span>浅色模式</span>
                         </div>
                         <div class="theme-option" data-theme="dark">
                             <div class="theme-preview dark-preview"></div>
                             <span>深色模式</span>
+                        </div>
+                        <div class="theme-option" data-theme="gold">
+                            <div class="theme-preview gold-preview"></div>
+                            <span>纸韵主题</span>
                         </div>
                     </div>
                     <div class="card-visibility-section">
