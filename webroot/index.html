@@ -917,6 +917,21 @@
                             <span class="slider"></span>
                         </label>
                     </div>
+                    <div class="setting-section snapshot-section">
+                        <div class="section-header-row">
+                            <div>
+                                <span class="section-label">参数快照</span>
+                                <span class="section-desc">保存当前参数组合，后续可快速恢复</span>
+                            </div>
+                        </div>
+                        <div class="backup-actions">
+                            <button class="action-btn" id="snapshot-save-btn">保存当前快照</button>
+                        </div>
+                        <div class="backup-info" id="snapshot-status">当前仅保存配置状态，恢复后不会自动全量立即应用。</div>
+                        <div class="scripts-list-container snapshot-list-container" id="snapshot-list">
+                            <div class="scripts-empty">暂无参数快照</div>
+                        </div>
+                    </div>
                     <div class="setting-section update-section">
                         <div class="section-header-row">
                             <div>
