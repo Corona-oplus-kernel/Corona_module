@@ -894,7 +894,7 @@ body.theme-gold .progress-fill::after {
     -webkit-appearance: none;
     width: 22px;
     height: 22px;
-    background: linear-gradient(180deg, #D9C09A 0%, var(--primary) 100%);
+    background: var(--primary);
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 2px 6px rgba(95, 72, 40, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.24);
@@ -1119,9 +1119,9 @@ body.theme-gold .tab-item.active {
     bottom: 100px;
     left: 50%;
     transform: translateX(-50%) translateY(20px);
-    background: linear-gradient(135deg, 
-        rgba(0, 0, 0, 0.9) 0%, 
-        rgba(20, 20, 20, 0.85) 50%, 
+    background: linear-gradient(135deg,
+        rgba(0, 0, 0, 0.9) 0%,
+        rgba(20, 20, 20, 0.85) 50%,
         rgba(10, 10, 10, 0.9) 100%);
     backdrop-filter: blur(6px);
     color: #fff;
