@@ -3911,7 +3911,7 @@ body.theme-gold #page-settings .lru-setting {
     border: none !important;
 }
 
-.option-item {
+body.theme-gold .option-item {
     background: rgba(0, 0, 0, 0.04) !important;
     border: 1.5px solid transparent !important;
     box-shadow: none !important;
