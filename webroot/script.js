@@ -845,7 +845,7 @@ class CoronaAddon {
                 }
                 sibling = sibling.nextElementSibling;
             }
-            marker.hidden = !hasVisibleCard;
+            marker.style.display = hasVisibleCard ? '' : 'none';
         });
     }
     initSubCards() {
