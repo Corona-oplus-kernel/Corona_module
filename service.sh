@@ -30,6 +30,8 @@ get_system_info() {
 apply_io_config() {
     [ ! -f "$CONFIG_DIR/io_scheduler.conf" ] && return
     io_conf="$CONFIG_DIR/io_scheduler.conf"
+    enabled=$(get_conf_value "$io_conf" enabled)
+    [ -n "$enabled" ] && [ "$enabled" != "1" ] && return
     scheduler=$(get_conf_value "$io_conf" scheduler)
     readahead=$(get_conf_value "$io_conf" readahead)
     nr_requests=$(get_conf_value "$io_conf" nr_requests)
@@ -53,12 +55,16 @@ apply_io_config() {
 
 apply_cpu_governor_config() {
     [ ! -f "$CONFIG_DIR/cpu_governor.conf" ] && return
+    enabled=$(get_conf_value "$CONFIG_DIR/cpu_governor.conf" enabled)
+    [ -n "$enabled" ] && [ "$enabled" != "1" ] && return
     governor=$(grep "^governor=" "$CONFIG_DIR/cpu_governor.conf" | cut -d'=' -f2)
     [ -n "$governor" ] && for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo "$governor" > "$f" 2>/dev/null; done
 }
 
 apply_cpu_hotplug_config() {
     [ ! -f "$CONFIG_DIR/cpu_hotplug.conf" ] && return
+    enabled=$(get_conf_value "$CONFIG_DIR/cpu_governor.conf" enabled)
+    [ -n "$enabled" ] && [ "$enabled" != "1" ] && return
     while IFS='=' read -r cpu state; do
         [ -n "$cpu" ] && [ -n "$state" ] && {
             cpu_num=$(echo "$cpu" | sed 's/cpu//')
@@ -69,6 +75,8 @@ apply_cpu_hotplug_config() {
 
 apply_tcp_config() {
     [ ! -f "$CONFIG_DIR/tcp.conf" ] && return
+    enabled=$(get_conf_value "$CONFIG_DIR/tcp.conf" enabled)
+    [ -n "$enabled" ] && [ "$enabled" != "1" ] && return
     congestion=$(grep "^congestion=" "$CONFIG_DIR/tcp.conf" | cut -d'=' -f2)
     [ -n "$congestion" ] && echo "$congestion" > /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null
 }
@@ -202,6 +210,8 @@ apply_swap_config() {
 
 apply_vm_config() {
     [ ! -f "$CONFIG_DIR/vm.conf" ] && return
+    enabled=$(get_conf_value "$CONFIG_DIR/vm.conf" enabled)
+    [ -n "$enabled" ] && [ "$enabled" != "1" ] && return
     watermark=$(get_conf_value "$CONFIG_DIR/vm.conf" watermark_scale_factor)
     extra_free=$(get_conf_value "$CONFIG_DIR/vm.conf" extra_free_kbytes)
     dirty_ratio=$(get_conf_value "$CONFIG_DIR/vm.conf" dirty_ratio)
@@ -316,7 +326,7 @@ update_module_description() {
         desc_parts="ZRAM:关闭"
     fi
 
-    if [ -f "$CONFIG_DIR/io_scheduler.conf" ]; then
+    if [ -f "$CONFIG_DIR/io_scheduler.conf" ] && [ "$(get_conf_value "$CONFIG_DIR/io_scheduler.conf" enabled)" != "0" ]; then
         scheduler="$(get_conf_value "$CONFIG_DIR/io_scheduler.conf" scheduler)"
     else
         scheduler=""
@@ -330,7 +340,11 @@ update_module_description() {
         [ -n "$current_scheduler" ] && desc_parts="$desc_parts | IO:${current_scheduler}" || desc_parts="$desc_parts | IO:--"
     fi
 
-    governor="$(get_conf_value "$CONFIG_DIR/cpu_governor.conf" governor)"
+    if [ "$(get_conf_value "$CONFIG_DIR/cpu_governor.conf" enabled)" = "0" ]; then
+        governor=""
+    else
+        governor="$(get_conf_value "$CONFIG_DIR/cpu_governor.conf" governor)"
+    fi
     if [ -n "$governor" ]; then
         desc_parts="$desc_parts | CPU:${governor}"
     else
@@ -338,7 +352,11 @@ update_module_description() {
         [ -n "$current_governor" ] && desc_parts="$desc_parts | CPU:${current_governor}" || desc_parts="$desc_parts | CPU:--"
     fi
 
-    congestion="$(get_conf_value "$CONFIG_DIR/tcp.conf" congestion)"
+    if [ "$(get_conf_value "$CONFIG_DIR/tcp.conf" enabled)" = "0" ]; then
+        congestion=""
+    else
+        congestion="$(get_conf_value "$CONFIG_DIR/tcp.conf" congestion)"
+    fi
     if [ -n "$congestion" ]; then
         desc_parts="$desc_parts | TCP:${congestion}"
     else

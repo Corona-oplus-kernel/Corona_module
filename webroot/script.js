@@ -9,20 +9,23 @@ class CoronaAddon {
         this.ioNrRequestsOptions = [64, 128, 256, 512, 1024, 2048];
         this.ioRqAffinityOptions = [0, 1, 2];
         this.ioNomergesOptions = [0, 1, 2];
-        this.snapshotConfigFiles = ['zram.conf', 'le9ec.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'tcp.conf', 'process_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf'];
+        this.snapshotConfigFiles = ['zram.conf', 'le9ec.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'process_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf'];
         this.state = {
             algorithm: 'lz4',
             zramSize: 8,
             swappiness: 100,
             zramWriteback: 'default',
             zramPath: '/dev/block/zram0',
+            ioEnabled: false,
             ioScheduler: null,
             readahead: 512,
             ioNrRequests: 128,
             ioRqAffinity: 1,
             ioNomerges: 0,
             ioIostats: false,
+            tcpEnabled: false,
             tcp: null,
+            cpuEnabled: false,
             cpuGovernor: null,
             zramEnabled: false,
             le9ecEnabled: false,
@@ -37,6 +40,7 @@ class CoronaAddon {
             swapSize: 2048,
             swapPriority: 0,
             swapPath: '',
+            vmEnabled: false,
             watermarkScale: 100,
             extraFreeKbytes: 0,
             dirtyRatio: 20,
@@ -93,6 +97,25 @@ class CoronaAddon {
         ids.forEach(id => { this.dom[id] = document.getElementById(id); });
     }
     $(id) { return this.dom[id] || (this.dom[id] = document.getElementById(id)); }
+    parseEnabledFlag(content, defaultValue = false) {
+        if (!content) return defaultValue;
+        const match = String(content).match(/^enabled=(\d)/m);
+        return match ? match[1] === '1' : defaultValue;
+    }
+    parseCpuHotplugConfig(content) {
+        const saved = {};
+        String(content || '').split('\n').forEach(line => {
+            const match = line.match(/^(cpu\d+)=(0|1)$/);
+            if (match) saved[match[1]] = match[2] === '1';
+        });
+        return saved;
+    }
+    async saveDisabledConfig(filename, content, toastText) {
+        await this.writeConfig(filename, content);
+        await this.updateModuleDescription();
+        if (toastText) this.showToast(toastText);
+        return true;
+    }
     async init() {
         this.showInitOverlay(true);
         try {
@@ -1566,6 +1589,31 @@ class CoronaAddon {
         document.getElementById('le9ec-clean-low-slider').addEventListener('change', (e) => { this.state.le9ecCleanLow = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(); else this.saveLe9ecConfig(); });
         document.getElementById('le9ec-clean-min-slider').addEventListener('input', (e) => { this.state.le9ecCleanMin = parseInt(e.target.value) * 1024; document.getElementById('le9ec-clean-min-value').textContent = `${e.target.value} MB`; });
         document.getElementById('le9ec-clean-min-slider').addEventListener('change', (e) => { this.state.le9ecCleanMin = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(); else this.saveLe9ecConfig(); });
+        document.getElementById('io-switch')?.addEventListener('change', async (e) => {
+            this.state.ioEnabled = e.target.checked;
+            await this.applyIOConfigImmediate('io', true);
+            const el = document.getElementById('io-current');
+            if (el && !this.state.ioEnabled) el.textContent = '已禁用';
+        });
+        document.getElementById('cpu-switch')?.addEventListener('change', async (e) => {
+            this.state.cpuEnabled = e.target.checked;
+            await this.applyCpuGovernorImmediate(true);
+            if (this.state.cpuEnabled) await this.applyCpuHotplugConfigImmediate();
+            const el = document.getElementById('cpu-gov-current');
+            if (el && !this.state.cpuEnabled) el.textContent = '已禁用';
+        });
+        document.getElementById('tcp-switch')?.addEventListener('change', async (e) => {
+            this.state.tcpEnabled = e.target.checked;
+            await this.applyTcpImmediate(true);
+            const el = document.getElementById('tcp-current');
+            if (el && !this.state.tcpEnabled) el.textContent = '已禁用';
+        });
+        document.getElementById('vm-switch')?.addEventListener('change', async (e) => {
+            this.state.vmEnabled = e.target.checked;
+            await this.applyVmConfig(true);
+            const el = document.getElementById('vm-status');
+            if (el) el.textContent = this.state.vmEnabled ? '已修改' : '已禁用';
+        });
     }
     toggleLe9ecSettings(show) { const settings = document.getElementById('le9ec-settings'); if (show) { settings.classList.remove('hidden'); this.loadLe9ecStatus(); } else { settings.classList.add('hidden'); } }
     bindSettingsOverscrollGuard() {}
@@ -1768,7 +1816,7 @@ class CoronaAddon {
         return values;
     }
     buildIOConfig() {
-        const lines = [];
+        const lines = [`enabled=${this.state.ioEnabled ? '1' : '0'}`];
         if (this.state.ioScheduler) lines.push(`scheduler=${this.state.ioScheduler}`);
         lines.push(`readahead=${this.state.readahead}`);
         lines.push(`nr_requests=${this.state.ioNrRequests}`);
@@ -1809,6 +1857,9 @@ class CoronaAddon {
                 onCancel: () => this.loadIOConfig()
             });
             if (!confirmed) return false;
+        }
+        if (!this.state.ioEnabled) {
+            return this.saveDisabledConfig('io_scheduler.conf', config, 'I/O 配置已保存（禁用状态）');
         }
         const quotedScheduler = schedCmd ? this.shellQuote(schedCmd) : '';
         await this.exec(`for d in /sys/block/*; do b=$(basename "$d"); case "$b" in loop*|ram*|zram*|dm-*) continue ;; esac; q="$d/queue"; [ -d "$q" ] || continue; [ -n ${this.shellQuote(schedCmd ? '1' : '')} ] && [ -f "$q/scheduler" ] && echo ${quotedScheduler || "''"} > "$q/scheduler" 2>/dev/null; [ -f "$q/read_ahead_kb" ] && echo ${this.state.readahead} > "$q/read_ahead_kb" 2>/dev/null; [ -f "$q/nr_requests" ] && echo ${this.state.ioNrRequests} > "$q/nr_requests" 2>/dev/null; [ -f "$q/rq_affinity" ] && echo ${this.state.ioRqAffinity} > "$q/rq_affinity" 2>/dev/null; [ -f "$q/nomerges" ] && echo ${this.state.ioNomerges} > "$q/nomerges" 2>/dev/null; [ -f "$q/iostats" ] && echo ${this.state.ioIostats ? 1 : 0} > "$q/iostats" 2>/dev/null; done`);
@@ -2308,6 +2359,9 @@ class CoronaAddon {
         const iostats = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/iostats 2>/dev/null`) : '';
         const conf = await this.exec(`cat ${this.configDir}/io_scheduler.conf 2>/dev/null`);
         const saved = this.parseIoConfig(conf);
+        this.state.ioEnabled = this.parseEnabledFlag(conf, !!conf);
+        const ioSwitch = document.getElementById('io-switch');
+        if (ioSwitch) ioSwitch.checked = this.state.ioEnabled;
         const availableSchedulers = [];
         let currentScheduler = '';
         if (schedulerRaw) {
@@ -2342,7 +2396,7 @@ class CoronaAddon {
             });
         }
         const currentEl = document.getElementById('io-current');
-        if (currentEl) currentEl.textContent = currentScheduler || '--';
+        if (currentEl) currentEl.textContent = this.state.ioEnabled ? (currentScheduler || '--') : '已禁用';
         const iostatsContainer = document.getElementById('io-iostats-container');
         if (iostatsContainer) iostatsContainer.style.display = preferred && iostats !== '' ? '' : 'none';
         const iostatsSwitch = document.getElementById('io-iostats-switch');
@@ -2358,6 +2412,9 @@ class CoronaAddon {
         const governorRaw = await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors 2>/dev/null');
         const currentGovernor = await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null');
         const conf = await this.exec(`cat ${this.configDir}/cpu_governor.conf 2>/dev/null`);
+        this.state.cpuEnabled = this.parseEnabledFlag(conf, !!conf);
+        const cpuSwitch = document.getElementById('cpu-switch');
+        if (cpuSwitch) cpuSwitch.checked = this.state.cpuEnabled;
         const availableGovernors = governorRaw.split(/\s+/).filter(g => g);
         let resolved = currentGovernor.trim();
         if (conf) {
@@ -2378,11 +2435,11 @@ class CoronaAddon {
             });
         }
         const currentEl = document.getElementById('cpu-gov-current');
-        if (currentEl) currentEl.textContent = this.state.cpuGovernor || '--';
+        if (currentEl) currentEl.textContent = this.state.cpuEnabled ? (this.state.cpuGovernor || '--') : '已禁用';
     }
     async applyCpuGovernorImmediate(skipPreview = false) {
       return this.withLock('governor', async () => {
-        const config = `governor=${this.state.cpuGovernor}`;
+        const config = `enabled=${this.state.cpuEnabled ? '1' : '0'}\ngovernor=${this.state.cpuGovernor}`;
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将应用 CPU 调频器。',
@@ -2392,6 +2449,9 @@ class CoronaAddon {
                 onCancel: () => this.loadCpuGovernorConfig()
             });
             if (!confirmed) return false;
+        }
+        if (!this.state.cpuEnabled) {
+            return this.saveDisabledConfig('cpu_governor.conf', config, 'CPU 配置已保存（禁用状态）');
         }
         await this.exec(`for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo "${this.state.cpuGovernor}" > "$f" 2>/dev/null; done`);
         const readback = (await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null')).trim();
@@ -2410,6 +2470,9 @@ class CoronaAddon {
         const tcpRaw = await this.exec('cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null');
         const currentTcp = await this.exec('cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null');
         const conf = await this.exec(`cat ${this.configDir}/tcp.conf 2>/dev/null`);
+        this.state.tcpEnabled = this.parseEnabledFlag(conf, !!conf);
+        const tcpSwitch = document.getElementById('tcp-switch');
+        if (tcpSwitch) tcpSwitch.checked = this.state.tcpEnabled;
         const availableTcp = tcpRaw.split(/\s+/).filter(t => t);
         let resolved = currentTcp.trim();
         if (conf) {
@@ -2427,11 +2490,11 @@ class CoronaAddon {
                 await this.applyTcpImmediate();
             });
         });
-        document.getElementById('tcp-current').textContent = this.state.tcp || '--';
+        document.getElementById('tcp-current').textContent = this.state.tcpEnabled ? (this.state.tcp || '--') : '已禁用';
     }
     async applyTcpImmediate(skipPreview = false) {
       return this.withLock('tcp', async () => {
-        const config = `congestion=${this.state.tcp}`;
+        const config = `enabled=${this.state.tcpEnabled ? '1' : '0'}\ncongestion=${this.state.tcp}`;
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将应用 TCP 拥塞算法。',
@@ -2441,6 +2504,9 @@ class CoronaAddon {
                 onCancel: () => this.loadTCPConfig()
             });
             if (!confirmed) return false;
+        }
+        if (!this.state.tcpEnabled) {
+            return this.saveDisabledConfig('tcp.conf', config, 'TCP 配置已保存（禁用状态）');
         }
         const ok = await this.writeAndVerifySysfs(this.state.tcp, '/proc/sys/net/ipv4/tcp_congestion_control', 'TCP 拥塞算法');
         await this.writeConfig('tcp.conf', config);
@@ -2454,6 +2520,8 @@ class CoronaAddon {
         const cpuCount = parseInt(await this.exec('ls -d /sys/devices/system/cpu/cpu[0-9]* 2>/dev/null | wc -l')) || 8;
         const totalCores = this.getTotalCoreCount();
         const maxCores = totalCores > 0 ? totalCores : cpuCount;
+        const hotplugConf = await this.exec(`cat ${this.configDir}/cpu_hotplug.conf 2>/dev/null`);
+        const savedStates = this.parseCpuHotplugConfig(hotplugConf);
         this.cpuCores = [];
         const seenIds = new Set();
         for (let i = 0; i < cpuCount && this.cpuCores.length < maxCores; i++) {
@@ -2465,7 +2533,9 @@ class CoronaAddon {
             ]);
             if (!maxFreq && !stat) continue;
             seenIds.add(i);
-            this.cpuCores.push({ id: i, online: i === 0 ? true : online === '1', locked: i === 0, maxFreq: maxFreq ? parseInt(maxFreq) : 0, load: '--' });
+            const savedOnline = savedStates[`cpu${i}`];
+            const effectiveOnline = i === 0 ? true : (!this.state.cpuEnabled && typeof savedOnline === 'boolean' ? savedOnline : online === '1');
+            this.cpuCores.push({ id: i, online: effectiveOnline, locked: i === 0, maxFreq: maxFreq ? parseInt(maxFreq) : 0, load: '--' });
             const freqs = await this.exec(`cat /sys/devices/system/cpu/cpu${i}/cpufreq/scaling_available_frequencies 2>/dev/null`);
             if (freqs) this.cpuFreqsPerCore[i] = freqs.split(/\s+/).filter(f => f).map(Number).sort((a, b) => a - b);
         }
@@ -2490,6 +2560,15 @@ class CoronaAddon {
                     writes: [{ path: `/sys/devices/system/cpu/cpu${cpuId}/online`, value: newState }]
                 });
                 if (!confirmed) return;
+                if (!this.state.cpuEnabled) {
+                    core.online = !core.online;
+                    item.className = `cpu-core ${core.online ? 'online' : 'offline'}`;
+                    document.getElementById(`cpu-load-${cpuId}`).textContent = core.online ? '--' : 'OFF';
+                    await this.saveCpuHotplugConfig();
+                    await this.updateModuleDescription();
+                    this.showToast(`CPU${cpuId} 配置已保存（禁用状态）`);
+                    return;
+                }
                 await this.exec(`echo ${newState} > /sys/devices/system/cpu/cpu${cpuId}/online`);
                 core.online = !core.online;
                 item.className = `cpu-core ${core.online ? 'online' : 'offline'}`;
@@ -2537,6 +2616,12 @@ class CoronaAddon {
         const config = this.cpuCores.map(c => `cpu${c.id}=${c.online ? '1' : '0'}`).join('\n');
         await this.writeConfig('cpu_hotplug.conf', config);
     }
+    async applyCpuHotplugConfigImmediate() {
+        const writes = this.cpuCores.filter(core => core.id !== 0).map(core => this.exec(`echo ${core.online ? '1' : '0'} > /sys/devices/system/cpu/cpu${core.id}/online 2>/dev/null`));
+        if (writes.length > 0) await Promise.all(writes);
+        await this.saveCpuHotplugConfig();
+        return true;
+    }
     async updateModuleDescription() {
         const descParts = [];
         if (this.state.zramEnabled) {
@@ -2545,16 +2630,16 @@ class CoronaAddon {
             const currentAlg = algRaw.match(/\[([^\]]+)\]/)?.[1] || algRaw.split(' ')[0] || this.state.algorithm;
             descParts.push(`ZRAM:${currentAlg}`);
         } else { descParts.push(`ZRAM:关闭`); }
-        if (this.state.ioScheduler) { descParts.push(`IO:${this.state.ioScheduler}`); }
+        if (this.state.ioEnabled && this.state.ioScheduler) { descParts.push(`IO:${this.state.ioScheduler}`); }
         else {
             const preferred = await this.getPreferredBlockDevice();
             const schedulerRaw = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/scheduler 2>/dev/null`) : '';
             if (schedulerRaw) { const current = schedulerRaw.match(/\[([^\]]+)\]/)?.[1] || schedulerRaw.split(' ')[0]; if (current) descParts.push(`IO:${current}`); else descParts.push(`IO:--`); }
             else { descParts.push(`IO:--`); }
         }
-        if (this.state.cpuGovernor) { descParts.push(`CPU:${this.state.cpuGovernor}`); }
+        if (this.state.cpuEnabled && this.state.cpuGovernor) { descParts.push(`CPU:${this.state.cpuGovernor}`); }
         else { const current = await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null'); if (current) descParts.push(`CPU:${current.trim()}`); else descParts.push(`CPU:--`); }
-        if (this.state.tcp) { descParts.push(`TCP:${this.state.tcp}`); }
+        if (this.state.tcpEnabled && this.state.tcp) { descParts.push(`TCP:${this.state.tcp}`); }
         else { const current = await this.exec('cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null'); if (current) descParts.push(`TCP:${current.trim()}`); else descParts.push(`TCP:--`); }
         if (this.le9ecSupported && this.state.le9ecEnabled) { descParts.push(`LE9EC:开启`); }
         const desc = descParts.join(' | ');
@@ -3116,6 +3201,11 @@ class CoronaAddon {
     }
     async loadVmConfig() {
         const config = await this.exec(`cat ${this.configDir}/vm.conf 2>/dev/null`);
+        this.state.vmEnabled = this.parseEnabledFlag(config, !!config);
+        const vmSwitch = document.getElementById('vm-switch');
+        if (vmSwitch) vmSwitch.checked = this.state.vmEnabled;
+        const vmStatus = document.getElementById('vm-status');
+        if (vmStatus) vmStatus.textContent = this.state.vmEnabled ? (config ? '已修改' : '默认') : '已禁用';
         if (config) {
             const watermarkMatch = config.match(/watermark_scale_factor=(\d+)/);
             const extraFreeMatch = config.match(/extra_free_kbytes=(\d+)/);
@@ -3137,7 +3227,7 @@ class CoronaAddon {
     }
     async applyVmConfig(skipPreview = false) {
       return this.withLock('vm', async () => {
-        const config = `watermark_scale_factor=${this.state.watermarkScale}\nextra_free_kbytes=${this.state.extraFreeKbytes}\ndirty_ratio=${this.state.dirtyRatio}\ndirty_background_ratio=${this.state.dirtyBgRatio}\nvfs_cache_pressure=${this.state.vfsCachePressure}`;
+        const config = `enabled=${this.state.vmEnabled ? '1' : '0'}\nwatermark_scale_factor=${this.state.watermarkScale}\nextra_free_kbytes=${this.state.extraFreeKbytes}\ndirty_ratio=${this.state.dirtyRatio}\ndirty_background_ratio=${this.state.dirtyBgRatio}\nvfs_cache_pressure=${this.state.vfsCachePressure}`;
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将应用虚拟内存参数。',
@@ -3154,6 +3244,9 @@ class CoronaAddon {
             });
             if (!confirmed) return false;
         }
+        if (!this.state.vmEnabled) {
+            return this.saveDisabledConfig('vm.conf', config, 'VM 配置已保存（禁用状态）');
+        }
         this.showLoading(true);
         await this.writeConfig('vm.conf', config);
         await Promise.all([
@@ -3166,7 +3259,7 @@ class CoronaAddon {
         this.showLoading(false);
         this.showToast('VM 参数已应用');
         const vmStatus = document.getElementById('vm-status');
-        if (vmStatus) vmStatus.textContent = '已修改';
+        if (vmStatus) vmStatus.textContent = this.state.vmEnabled ? '已修改' : '已禁用';
         return true;
       });
     }
