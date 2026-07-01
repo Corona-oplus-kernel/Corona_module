@@ -366,6 +366,16 @@
                             <span class="expand-icon">❯</span>
                         </div>
                         <div id="vm-content" class="sub-expandable-content">
+                            <div class="switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label">启用 VM 配置</span>
+                                    <span class="switch-desc">关闭后仅保存虚拟内存参数，不会立即写入，也不会在开机时自动应用</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="vm-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
                             <div class="setting-section">
                                 <span class="section-label">内存回收水位线 (watermark_scale_factor)</span>
                                 <div class="slider-container">
@@ -516,6 +526,16 @@
                     </div>
                 </div>
                 <div id="io-scheduler-content" class="module-card-content hidden">
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">启用 IO 配置</span>
+                            <span class="switch-desc">关闭后仅保存参数，不会立即写入，也不会在开机时自动应用</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="io-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
                     <div class="setting-section io-scheduler-options-section">
                         <span class="section-desc">决定块设备请求的派发策略，影响顺序读写、混合负载下的吞吐与延迟表现</span>
                         <div class="option-list" id="io-scheduler-list"></div>
@@ -587,6 +607,16 @@
                     </div>
                 </div>
                 <div id="cpu-governor-content" class="module-card-content hidden">
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">启用 CPU 配置</span>
+                            <span class="switch-desc">关闭后仅保存调频器与核心状态，不会立即写入，也不会在开机时自动应用</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="cpu-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
                     <div class="option-list" id="cpu-governor-list"></div>
                     <div class="setting-section">
                         <div class="section-header">
@@ -633,6 +663,16 @@
                     </div>
                 </div>
                 <div id="tcp-content" class="module-card-content hidden">
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">启用网络配置</span>
+                            <span class="switch-desc">关闭后仅保存拥塞控制参数，不会立即写入，也不会在开机时自动应用</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="tcp-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
                     <div class="option-list" id="tcp-list"></div>
                 </div>
             </div>
