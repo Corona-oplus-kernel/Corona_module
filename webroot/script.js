@@ -34,8 +34,9 @@ class CoronaAddon {
             le9ecCleanMin: 524288,
             dualCell: false,
             theme: 'gold',
-            popupAnimation: false,
+            changePreviewEnabled: true,
             showSettingDescriptions: true,
+            showCategoryConfigToggles: true,
             swapEnabled: false,
             swapSize: 2048,
             swapPriority: 0,
@@ -130,8 +131,9 @@ class CoronaAddon {
             await this.loadRuntimeConfig();
             this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
             this.initTheme();
-            this.initPopupAnimationPreference();
+            this.initChangePreviewPreference();
             this.initSettingDescriptionPreference();
+            this.initCategoryConfigVisibilityPreference();
             this.bindAllEvents();
             await this.loadDeviceInfo();
             await this.loadModuleVersion();
@@ -312,6 +314,7 @@ class CoronaAddon {
         return sections.filter(Boolean).join('\n\n');
     }
     async confirmChangePreview(title, preview, options = {}) {
+        if (!this.state.changePreviewEnabled) return true;
         const confirmed = await this.showConfirm(
             this.buildChangePreview(preview),
             title,
@@ -358,18 +361,17 @@ class CoronaAddon {
         }
         this.applyTheme(normalizedTheme);
     }
-    initPopupAnimationPreference() {
-        const saved = localStorage.getItem('corona_popup_animation');
-        this.setPopupAnimationEnabled(saved === null ? true : saved === '1');
+    initChangePreviewPreference() {
+        const saved = localStorage.getItem('corona_change_preview');
+        this.setChangePreviewEnabled(saved === null ? true : saved === '1');
     }
-    setPopupAnimationEnabled(enabled, persist = false) {
+    setChangePreviewEnabled(enabled, persist = false) {
         const normalized = !!enabled;
-        this.state.popupAnimation = normalized;
-        document.body.classList.toggle('popup-animations-enabled', normalized);
+        this.state.changePreviewEnabled = normalized;
         if (persist) {
-            localStorage.setItem('corona_popup_animation', normalized ? '1' : '0');
+            localStorage.setItem('corona_change_preview', normalized ? '1' : '0');
         }
-        const toggle = document.getElementById('popup-animation-switch');
+        const toggle = document.getElementById('change-preview-switch');
         if (toggle) toggle.checked = normalized;
     }
     initSettingDescriptionPreference() {
@@ -384,6 +386,20 @@ class CoronaAddon {
             localStorage.setItem('corona_setting_descriptions', normalized ? '1' : '0');
         }
         const toggle = document.getElementById('setting-descriptions-switch');
+        if (toggle) toggle.checked = normalized;
+    }
+    initCategoryConfigVisibilityPreference() {
+        const saved = localStorage.getItem('corona_category_config_toggles');
+        this.setCategoryConfigVisibility(saved === null ? true : saved === '1');
+    }
+    setCategoryConfigVisibility(enabled, persist = false) {
+        const normalized = !!enabled;
+        this.state.showCategoryConfigToggles = normalized;
+        document.querySelectorAll('.category-config-toggle').forEach(item => item.classList.toggle('hidden', !normalized));
+        if (persist) {
+            localStorage.setItem('corona_category_config_toggles', normalized ? '1' : '0');
+        }
+        const toggle = document.getElementById('category-config-visibility-switch');
         if (toggle) toggle.checked = normalized;
     }
     applyTheme(theme) {
@@ -407,13 +423,13 @@ class CoronaAddon {
             });
         });
     }
-    initPopupAnimationToggle() {
-        const toggle = document.getElementById('popup-animation-switch');
+    initChangePreviewToggle() {
+        const toggle = document.getElementById('change-preview-switch');
         if (!toggle) return;
-        toggle.checked = !!this.state.popupAnimation;
+        toggle.checked = !!this.state.changePreviewEnabled;
         toggle.addEventListener('change', () => {
-            this.setPopupAnimationEnabled(toggle.checked, true);
-            this.showToast(`弹窗动画已${toggle.checked ? '开启' : '关闭'}`);
+            this.setChangePreviewEnabled(toggle.checked, true);
+            this.showToast(`变更预览已${toggle.checked ? '开启' : '关闭'}`);
         });
     }
     initSettingDescriptionToggle() {
@@ -423,6 +439,15 @@ class CoronaAddon {
         toggle.addEventListener('change', () => {
             this.setSettingDescriptionsEnabled(toggle.checked, true);
             this.showToast(`设置说明已${toggle.checked ? '显示' : '隐藏'}`);
+        });
+    }
+    initCategoryConfigVisibilityToggle() {
+        const toggle = document.getElementById('category-config-visibility-switch');
+        if (!toggle) return;
+        this.setCategoryConfigVisibility(this.state.showCategoryConfigToggles);
+        toggle.addEventListener('change', () => {
+            this.setCategoryConfigVisibility(toggle.checked, true);
+            this.showToast(`分类配置已${toggle.checked ? '显示' : '隐藏'}`);
         });
     }
     initSnapshots() {
@@ -2083,8 +2108,9 @@ class CoronaAddon {
                 this.initPerformanceMode();
                 this.initExpandableCards();
                 this.initThemeSelector();
-                this.initPopupAnimationToggle();
+                this.initChangePreviewToggle();
                 this.initSettingDescriptionToggle();
+                this.initCategoryConfigVisibilityToggle();
                 this.initSnapshots();
                 this.initSliderProgress();
                 this.initSwapSettings();
