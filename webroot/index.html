@@ -366,7 +366,7 @@
                             <span class="expand-icon">❯</span>
                         </div>
                         <div id="vm-content" class="sub-expandable-content">
-                            <div class="switch-container">
+                            <div class="switch-container category-config-toggle">
                                 <div class="switch-info">
                                     <span class="switch-label">启用 VM 配置</span>
                                     <span class="switch-desc">关闭后仅保存虚拟内存参数，不会立即写入，也不会在开机时自动应用</span>
@@ -526,7 +526,7 @@
                     </div>
                 </div>
                 <div id="io-scheduler-content" class="module-card-content hidden">
-                    <div class="switch-container">
+                    <div class="switch-container category-config-toggle">
                         <div class="switch-info">
                             <span class="switch-label">启用 IO 配置</span>
                             <span class="switch-desc">关闭后仅保存参数，不会立即写入，也不会在开机时自动应用</span>
@@ -607,7 +607,7 @@
                     </div>
                 </div>
                 <div id="cpu-governor-content" class="module-card-content hidden">
-                    <div class="switch-container">
+                    <div class="switch-container category-config-toggle">
                         <div class="switch-info">
                             <span class="switch-label">启用 CPU 配置</span>
                             <span class="switch-desc">关闭后仅保存调频器与核心状态，不会立即写入，也不会在开机时自动应用</span>
@@ -663,7 +663,7 @@
                     </div>
                 </div>
                 <div id="tcp-content" class="module-card-content hidden">
-                    <div class="switch-container">
+                    <div class="switch-container category-config-toggle">
                         <div class="switch-info">
                             <span class="switch-label">启用网络配置</span>
                             <span class="switch-desc">关闭后仅保存拥塞控制参数，不会立即写入，也不会在开机时自动应用</span>
@@ -999,11 +999,11 @@
                     </div>
                     <div class="switch-container ui-pref-switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">弹窗动画</span>
-                            <span class="switch-desc">为确认框和介绍弹窗启用额外动效</span>
+                            <span class="switch-label">变更预览</span>
+                            <span class="switch-desc">关闭后跳过变更预览，直接应用设置</span>
                         </div>
                         <label class="switch">
-                            <input type="checkbox" id="popup-animation-switch">
+                            <input type="checkbox" id="change-preview-switch">
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -1014,6 +1014,16 @@
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="setting-descriptions-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="switch-container ui-pref-switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">显示分类配置</span>
+                            <span class="switch-desc">关闭后隐藏各分类配置的启用开关，不影响模块功能和已保存参数</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="category-config-visibility-switch">
                             <span class="slider"></span>
                         </label>
                     </div>
