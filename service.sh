@@ -29,11 +29,26 @@ get_system_info() {
 
 apply_io_config() {
     [ ! -f "$CONFIG_DIR/io_scheduler.conf" ] && return
-    scheduler=$(grep "^scheduler=" "$CONFIG_DIR/io_scheduler.conf" | cut -d'=' -f2)
-    readahead=$(grep "^readahead=" "$CONFIG_DIR/io_scheduler.conf" | cut -d'=' -f2)
+    io_conf="$CONFIG_DIR/io_scheduler.conf"
+    scheduler=$(get_conf_value "$io_conf" scheduler)
+    readahead=$(get_conf_value "$io_conf" readahead)
+    nr_requests=$(get_conf_value "$io_conf" nr_requests)
+    rq_affinity=$(get_conf_value "$io_conf" rq_affinity)
+    nomerges=$(get_conf_value "$io_conf" nomerges)
+    iostats=$(get_conf_value "$io_conf" iostats)
     [ "$isCoronaKernel" = "1" ] && [ -n "$scheduler" ] && scheduler="kernel:$scheduler"
-    [ -n "$scheduler" ] && for f in /sys/block/*/queue/scheduler; do echo "$scheduler" > "$f" 2>/dev/null; done
-    [ -n "$readahead" ] && for f in /sys/block/*/queue/read_ahead_kb; do echo "$readahead" > "$f" 2>/dev/null; done
+    for queue_dir in /sys/block/*/queue; do
+        [ -d "$queue_dir" ] || continue
+        case "${queue_dir%/queue}" in
+            /sys/block/loop*|/sys/block/ram*|/sys/block/zram*|/sys/block/dm-*) continue ;;
+        esac
+        [ -n "$scheduler" ] && [ -f "$queue_dir/scheduler" ] && echo "$scheduler" > "$queue_dir/scheduler" 2>/dev/null
+        [ -n "$readahead" ] && [ -f "$queue_dir/read_ahead_kb" ] && echo "$readahead" > "$queue_dir/read_ahead_kb" 2>/dev/null
+        [ -n "$nr_requests" ] && [ -f "$queue_dir/nr_requests" ] && echo "$nr_requests" > "$queue_dir/nr_requests" 2>/dev/null
+        [ -n "$rq_affinity" ] && [ -f "$queue_dir/rq_affinity" ] && echo "$rq_affinity" > "$queue_dir/rq_affinity" 2>/dev/null
+        [ -n "$nomerges" ] && [ -f "$queue_dir/nomerges" ] && echo "$nomerges" > "$queue_dir/nomerges" 2>/dev/null
+        [ -n "$iostats" ] && [ -f "$queue_dir/iostats" ] && echo "$iostats" > "$queue_dir/iostats" 2>/dev/null
+    done
 }
 
 apply_cpu_governor_config() {

@@ -6,6 +6,9 @@ class CoronaAddon {
         this.runtimeConfig = { swapPath: '' };
         this.algorithms = [];
         this.readaheadOptions = [128, 256, 384, 512, 768, 1024, 2048, 4096];
+        this.ioNrRequestsOptions = [64, 128, 256, 512, 1024, 2048];
+        this.ioRqAffinityOptions = [0, 1, 2];
+        this.ioNomergesOptions = [0, 1, 2];
         this.snapshotConfigFiles = ['zram.conf', 'le9ec.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'tcp.conf', 'process_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf'];
         this.state = {
             algorithm: 'lz4',
@@ -15,6 +18,10 @@ class CoronaAddon {
             zramPath: '/dev/block/zram0',
             ioScheduler: null,
             readahead: 512,
+            ioNrRequests: 128,
+            ioRqAffinity: 1,
+            ioNomerges: 0,
+            ioIostats: false,
             tcp: null,
             cpuGovernor: null,
             zramEnabled: false,
@@ -25,6 +32,7 @@ class CoronaAddon {
             dualCell: false,
             theme: 'gold',
             popupAnimation: false,
+            showSettingDescriptions: true,
             swapEnabled: false,
             swapSize: 2048,
             swapPriority: 0,
@@ -100,6 +108,7 @@ class CoronaAddon {
             this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
             this.initTheme();
             this.initPopupAnimationPreference();
+            this.initSettingDescriptionPreference();
             this.bindAllEvents();
             await this.loadDeviceInfo();
             await this.loadModuleVersion();
@@ -340,6 +349,20 @@ class CoronaAddon {
         const toggle = document.getElementById('popup-animation-switch');
         if (toggle) toggle.checked = normalized;
     }
+    initSettingDescriptionPreference() {
+        const saved = localStorage.getItem('corona_setting_descriptions');
+        this.setSettingDescriptionsEnabled(saved === null ? true : saved === '1');
+    }
+    setSettingDescriptionsEnabled(enabled, persist = false) {
+        const normalized = !!enabled;
+        this.state.showSettingDescriptions = normalized;
+        document.body.classList.toggle('setting-descriptions-hidden', !normalized);
+        if (persist) {
+            localStorage.setItem('corona_setting_descriptions', normalized ? '1' : '0');
+        }
+        const toggle = document.getElementById('setting-descriptions-switch');
+        if (toggle) toggle.checked = normalized;
+    }
     applyTheme(theme) {
         const body = document.body;
         const normalizedTheme = theme === 'auto' ? 'light' : theme;
@@ -368,6 +391,15 @@ class CoronaAddon {
         toggle.addEventListener('change', () => {
             this.setPopupAnimationEnabled(toggle.checked, true);
             this.showToast(`弹窗动画已${toggle.checked ? '开启' : '关闭'}`);
+        });
+    }
+    initSettingDescriptionToggle() {
+        const toggle = document.getElementById('setting-descriptions-switch');
+        if (!toggle) return;
+        toggle.checked = !!this.state.showSettingDescriptions;
+        toggle.addEventListener('change', () => {
+            this.setSettingDescriptionsEnabled(toggle.checked, true);
+            this.showToast(`设置说明已${toggle.checked ? '显示' : '隐藏'}`);
         });
     }
     initSnapshots() {
@@ -929,6 +961,15 @@ class CoronaAddon {
             content.classList.remove('expanded');
             toggle.classList.remove('expanded');
             if (icon) icon.classList.remove('expanded');
+        });
+    }
+    refreshExpandedContentHeight(contentId) {
+        const content = document.getElementById(contentId);
+        if (!content || !content.classList.contains('expanded')) return;
+        if (content.style.maxHeight === 'none') return;
+        requestAnimationFrame(() => {
+            if (!content.classList.contains('expanded')) return;
+            content.style.maxHeight = content.scrollHeight + 'px';
         });
     }
     initHomeCardClicks() {
@@ -1660,7 +1701,7 @@ class CoronaAddon {
             this.pendingChartDraw = false;
         }
     }
-    renderStaticOptions() { this.renderAlgorithmOptions(); this.renderReadaheadOptions(); }
+    renderStaticOptions() { this.renderAlgorithmOptions(); this.renderReadaheadOptions(); this.renderIOAdvancedOptions(); }
     renderAlgorithmOptions() {
         const container = document.getElementById('algorithm-list');
         container.innerHTML = this.algorithms.map(alg => `<div class="option-item ${alg === this.state.algorithm ? 'selected' : ''}" data-value="${alg}">${alg}</div>`).join('');
@@ -1675,31 +1716,129 @@ class CoronaAddon {
             item.addEventListener('click', async (e) => { container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.readahead = parseInt(e.currentTarget.dataset.value); await this.applyReadaheadImmediate(); });
         });
     }
-    async applyReadaheadImmediate(skipPreview = false) {
-        let scheduler = this.state.ioScheduler;
-        if (!scheduler) {
-            const current = await this.exec(`cat ${this.configDir}/io_scheduler.conf 2>/dev/null`);
-            const match = current.match(/^scheduler=(.*)$/m);
-            if (match) scheduler = match[1].trim();
+    renderDiscreteOptions(containerId, values, currentValue, formatter, onSelect) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = values.map(value => `<div class="option-item ${value === currentValue ? 'selected' : ''}" data-value="${value}">${formatter ? formatter(value) : value}</div>`).join('');
+        container.querySelectorAll('.option-item').forEach(item => {
+            item.addEventListener('click', async (e) => {
+                container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
+                e.currentTarget.classList.add('selected');
+                await onSelect(e.currentTarget.dataset.value);
+            });
+        });
+    }
+    renderIOAdvancedOptions() {
+        const ensureValues = (values, fallback) => Array.isArray(values) && values.length > 0 ? values : fallback;
+        this.ioNrRequestsOptions = ensureValues(this.ioNrRequestsOptions, [64, 128, 256, 512, 1024, 2048]);
+        this.ioRqAffinityOptions = ensureValues(this.ioRqAffinityOptions, [0, 1, 2]);
+        this.ioNomergesOptions = ensureValues(this.ioNomergesOptions, [0, 1, 2]);
+        this.renderDiscreteOptions('io-nr-requests-list', this.ioNrRequestsOptions, this.state.ioNrRequests, null, async (value) => {
+            this.state.ioNrRequests = parseInt(value);
+            await this.applyIOConfigImmediate('nr_requests');
+        });
+        this.renderDiscreteOptions('io-rq-affinity-list', this.ioRqAffinityOptions, this.state.ioRqAffinity, null, async (value) => {
+            this.state.ioRqAffinity = parseInt(value);
+            await this.applyIOConfigImmediate('rq_affinity');
+        });
+        this.renderDiscreteOptions('io-nomerges-list', this.ioNomergesOptions, this.state.ioNomerges, null, async (value) => {
+            this.state.ioNomerges = parseInt(value);
+            await this.applyIOConfigImmediate('nomerges');
+        });
+        const iostatsSwitch = document.getElementById('io-iostats-switch');
+        if (iostatsSwitch && !iostatsSwitch.dataset.bound) {
+            iostatsSwitch.dataset.bound = '1';
+            iostatsSwitch.addEventListener('change', async (e) => {
+                this.state.ioIostats = e.target.checked;
+                await this.applyIOConfigImmediate('iostats');
+            });
         }
+    }
+    async getPreferredBlockDevice() {
+        const device = (await this.exec("for d in /sys/block/*; do b=$(basename \"$d\"); case \"$b\" in loop*|ram*|zram*|dm-*) continue ;; esac; [ -d \"$d/queue\" ] || continue; echo \"$b\"; break; done")).trim();
+        return device || '';
+    }
+    parseIoConfig(content) {
+        const values = {};
+        String(content || '').split('\n').forEach(line => {
+            const idx = line.indexOf('=');
+            if (idx <= 0) return;
+            values[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+        });
+        return values;
+    }
+    buildIOConfig() {
         const lines = [];
-        if (scheduler) lines.push(`scheduler=${scheduler}`);
+        if (this.state.ioScheduler) lines.push(`scheduler=${this.state.ioScheduler}`);
         lines.push(`readahead=${this.state.readahead}`);
-        const config = lines.join('\n');
+        lines.push(`nr_requests=${this.state.ioNrRequests}`);
+        lines.push(`rq_affinity=${this.state.ioRqAffinity}`);
+        lines.push(`nomerges=${this.state.ioNomerges}`);
+        lines.push(`iostats=${this.state.ioIostats ? '1' : '0'}`);
+        return lines.join('\n');
+    }
+    buildIOWritePlan() {
+        const writes = [];
+        if (this.state.ioScheduler) writes.push({ path: '/sys/block/*/queue/scheduler', value: this.isCoronaKernel ? `kernel:${this.state.ioScheduler}` : this.state.ioScheduler });
+        writes.push({ path: '/sys/block/*/queue/read_ahead_kb', value: String(this.state.readahead) });
+        writes.push({ path: '/sys/block/*/queue/nr_requests', value: String(this.state.ioNrRequests) });
+        writes.push({ path: '/sys/block/*/queue/rq_affinity', value: String(this.state.ioRqAffinity) });
+        writes.push({ path: '/sys/block/*/queue/nomerges', value: String(this.state.ioNomerges) });
+        writes.push({ path: '/sys/block/*/queue/iostats', value: this.state.ioIostats ? '1' : '0' });
+        return writes;
+    }
+    async applyIOConfigImmediate(changedField = 'io', skipPreview = false) {
+      return this.withLock('io', async () => {
+        const schedCmd = this.state.ioScheduler ? (this.isCoronaKernel ? `kernel:${this.state.ioScheduler}` : this.state.ioScheduler) : '';
+        const config = this.buildIOConfig();
         if (!skipPreview) {
+            const labels = {
+                scheduler: 'I/O 调度器',
+                readahead: '预读取大小',
+                nr_requests: 'nr_requests',
+                rq_affinity: 'rq_affinity',
+                nomerges: 'nomerges',
+                iostats: 'iostats',
+                io: 'I/O 高级参数'
+            };
             const confirmed = await this.confirmChangePreview('变更预览', {
-                summary: '即将应用预读取大小。',
+                summary: `即将应用 ${labels[changedField] || 'I/O 设置'}。`,
                 configs: [{ filename: 'io_scheduler.conf', content: config }],
-                writes: [{ path: '/sys/block/*/queue/read_ahead_kb', value: String(this.state.readahead) }]
+                writes: this.buildIOWritePlan()
             }, {
                 onCancel: () => this.loadIOConfig()
             });
             if (!confirmed) return false;
         }
-        await this.exec(`for f in /sys/block/*/queue/read_ahead_kb; do echo ${this.state.readahead} > "$f" 2>/dev/null; done`);
+        const quotedScheduler = schedCmd ? this.shellQuote(schedCmd) : '';
+        await this.exec(`for d in /sys/block/*; do b=$(basename "$d"); case "$b" in loop*|ram*|zram*|dm-*) continue ;; esac; q="$d/queue"; [ -d "$q" ] || continue; [ -n ${this.shellQuote(schedCmd ? '1' : '')} ] && [ -f "$q/scheduler" ] && echo ${quotedScheduler || "''"} > "$q/scheduler" 2>/dev/null; [ -f "$q/read_ahead_kb" ] && echo ${this.state.readahead} > "$q/read_ahead_kb" 2>/dev/null; [ -f "$q/nr_requests" ] && echo ${this.state.ioNrRequests} > "$q/nr_requests" 2>/dev/null; [ -f "$q/rq_affinity" ] && echo ${this.state.ioRqAffinity} > "$q/rq_affinity" 2>/dev/null; [ -f "$q/nomerges" ] && echo ${this.state.ioNomerges} > "$q/nomerges" 2>/dev/null; [ -f "$q/iostats" ] && echo ${this.state.ioIostats ? 1 : 0} > "$q/iostats" 2>/dev/null; done`);
         await this.writeConfig('io_scheduler.conf', config);
-        this.showToast(`预读取大小: ${this.state.readahead} KB`);
+        await this.updateModuleDescription();
+        const preferred = await this.getPreferredBlockDevice();
+        const schedulerPath = preferred ? `/sys/block/${preferred}/queue/scheduler` : '';
+        const readbackRaw = schedulerPath ? (await this.exec(`cat ${schedulerPath} 2>/dev/null`)).trim() : '';
+        const active = readbackRaw.match(/\[([^\]]+)\]/)?.[1] || '';
+        const currentEl = document.getElementById('io-current');
+        if (currentEl) currentEl.textContent = active || this.state.ioScheduler || '--';
+        if (changedField === 'scheduler' && active && active !== this.state.ioScheduler) {
+            this.showToast(`I/O 调度器写入未生效（当前: ${active}）`);
+            return false;
+        }
+        const toastMap = {
+            scheduler: `I/O 调度器: ${this.state.ioScheduler}`,
+            readahead: `预读取大小: ${this.state.readahead} KB`,
+            nr_requests: `nr_requests: ${this.state.ioNrRequests}`,
+            rq_affinity: `rq_affinity: ${this.state.ioRqAffinity}`,
+            nomerges: `nomerges: ${this.state.ioNomerges}`,
+            iostats: `iostats: ${this.state.ioIostats ? '开启' : '关闭'}`,
+            io: 'I/O 设置已应用'
+        };
+        this.showToast(toastMap[changedField] || 'I/O 设置已应用');
         return true;
+      });
+    }
+    async applyReadaheadImmediate(skipPreview = false) {
+        return this.applyIOConfigImmediate('readahead', skipPreview);
     }
     async loadDeviceInfo() {
         const [brand, marketName, model, socModel, hardware, chipname, androidVersion, sdk, kernelVersion, battDesign] = await Promise.all([
@@ -1894,6 +2033,7 @@ class CoronaAddon {
                 this.initExpandableCards();
                 this.initThemeSelector();
                 this.initPopupAnimationToggle();
+                this.initSettingDescriptionToggle();
                 this.initSnapshots();
                 this.initSliderProgress();
                 this.initSwapSettings();
@@ -2159,9 +2299,15 @@ class CoronaAddon {
       });
     }
     async loadIOConfig() {
-        const schedulerRaw = await this.exec('cat /sys/block/sda/queue/scheduler 2>/dev/null || cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null');
-        const readahead = await this.exec('cat /sys/block/sda/queue/read_ahead_kb 2>/dev/null || cat /sys/block/mmcblk0/queue/read_ahead_kb 2>/dev/null');
+        const preferred = await this.getPreferredBlockDevice();
+        const schedulerRaw = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/scheduler 2>/dev/null`) : '';
+        const readahead = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/read_ahead_kb 2>/dev/null`) : '';
+        const nrRequests = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/nr_requests 2>/dev/null`) : '';
+        const rqAffinity = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/rq_affinity 2>/dev/null`) : '';
+        const nomerges = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/nomerges 2>/dev/null`) : '';
+        const iostats = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/iostats 2>/dev/null`) : '';
         const conf = await this.exec(`cat ${this.configDir}/io_scheduler.conf 2>/dev/null`);
+        const saved = this.parseIoConfig(conf);
         const availableSchedulers = [];
         let currentScheduler = '';
         if (schedulerRaw) {
@@ -2171,14 +2317,18 @@ class CoronaAddon {
                 if (!availableSchedulers.includes(s)) availableSchedulers.push(s);
             });
         }
-        if (conf) {
-            const sm = conf.match(/scheduler=(\S+)/);
-            const rm = conf.match(/readahead=(\d+)/);
-            if (sm && availableSchedulers.includes(sm[1])) currentScheduler = sm[1];
-            if (rm) this.state.readahead = parseInt(rm[1]);
-        }
+        if (saved.scheduler && availableSchedulers.includes(saved.scheduler)) currentScheduler = saved.scheduler;
         this.state.ioScheduler = currentScheduler;
-        if (!this.state.readahead && readahead) this.state.readahead = parseInt(readahead);
+        const pickIoValue = (...values) => values.find(value => value !== undefined && value !== null && value !== '');
+        const resolvedReadahead = parseInt(pickIoValue(saved.readahead, readahead, this.state.readahead));
+        const resolvedNrRequests = parseInt(pickIoValue(saved.nr_requests, nrRequests, this.state.ioNrRequests));
+        const resolvedRqAffinity = parseInt(pickIoValue(saved.rq_affinity, rqAffinity, this.state.ioRqAffinity));
+        const resolvedNomerges = parseInt(pickIoValue(saved.nomerges, nomerges, this.state.ioNomerges));
+        this.state.readahead = Number.isFinite(resolvedReadahead) ? resolvedReadahead : this.state.readahead;
+        this.state.ioNrRequests = Number.isFinite(resolvedNrRequests) ? resolvedNrRequests : this.state.ioNrRequests;
+        this.state.ioRqAffinity = Number.isFinite(resolvedRqAffinity) ? resolvedRqAffinity : this.state.ioRqAffinity;
+        this.state.ioNomerges = Number.isFinite(resolvedNomerges) ? resolvedNomerges : this.state.ioNomerges;
+        this.state.ioIostats = pickIoValue(saved.iostats, iostats, this.state.ioIostats ? '1' : '0') === '1';
         const container = document.getElementById('io-scheduler-list');
         if (container) {
             container.innerHTML = availableSchedulers.map(s => `<div class="option-item ${s === currentScheduler ? 'selected' : ''}" data-value="${s}">${s}</div>`).join('');
@@ -2193,36 +2343,16 @@ class CoronaAddon {
         }
         const currentEl = document.getElementById('io-current');
         if (currentEl) currentEl.textContent = currentScheduler || '--';
+        const iostatsContainer = document.getElementById('io-iostats-container');
+        if (iostatsContainer) iostatsContainer.style.display = preferred && iostats !== '' ? '' : 'none';
+        const iostatsSwitch = document.getElementById('io-iostats-switch');
+        if (iostatsSwitch) iostatsSwitch.checked = this.state.ioIostats;
         this.renderReadaheadOptions();
+        this.renderIOAdvancedOptions();
+        this.refreshExpandedContentHeight('io-scheduler-content');
     }
     async applyIOSchedulerImmediate(skipPreview = false) {
-      return this.withLock('io', async () => {
-        const schedCmd = this.isCoronaKernel ? `kernel:${this.state.ioScheduler}` : this.state.ioScheduler;
-        const config = `scheduler=${this.state.ioScheduler}\nreadahead=${this.state.readahead}`;
-        if (!skipPreview) {
-            const confirmed = await this.confirmChangePreview('变更预览', {
-                summary: '即将应用 I/O 调度器设置。',
-                configs: [{ filename: 'io_scheduler.conf', content: config }],
-                writes: [{ path: '/sys/block/*/queue/scheduler', value: schedCmd }]
-            }, {
-                onCancel: () => this.loadIOConfig()
-            });
-            if (!confirmed) return false;
-        }
-        await this.exec(`for f in /sys/block/*/queue/scheduler; do echo "${schedCmd}" > "$f" 2>/dev/null; done`);
-        const readbackRaw = (await this.exec('cat /sys/block/sda/queue/scheduler 2>/dev/null || cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null')).trim();
-        const active = readbackRaw.match(/\[([^\]]+)\]/)?.[1] || '';
-        await this.writeConfig('io_scheduler.conf', config);
-        await this.updateModuleDescription();
-        const currentEl = document.getElementById('io-current');
-        if (currentEl) currentEl.textContent = active || this.state.ioScheduler;
-        if (active && active !== this.state.ioScheduler) {
-            this.showToast(`I/O 调度器写入未生效（当前: ${active}）`);
-        } else {
-            this.showToast(`I/O 调度器: ${this.state.ioScheduler}`);
-        }
-        return true;
-      });
+        return this.applyIOConfigImmediate('scheduler', skipPreview);
     }
     async loadCpuGovernorConfig() {
         const governorRaw = await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors 2>/dev/null');
@@ -2417,7 +2547,8 @@ class CoronaAddon {
         } else { descParts.push(`ZRAM:关闭`); }
         if (this.state.ioScheduler) { descParts.push(`IO:${this.state.ioScheduler}`); }
         else {
-            const schedulerRaw = await this.exec('cat /sys/block/sda/queue/scheduler 2>/dev/null || cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null');
+            const preferred = await this.getPreferredBlockDevice();
+            const schedulerRaw = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/scheduler 2>/dev/null`) : '';
             if (schedulerRaw) { const current = schedulerRaw.match(/\[([^\]]+)\]/)?.[1] || schedulerRaw.split(' ')[0]; if (current) descParts.push(`IO:${current}`); else descParts.push(`IO:--`); }
             else { descParts.push(`IO:--`); }
         }

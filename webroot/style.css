@@ -29,9 +29,9 @@ body.theme-gold {
     --primary: #8C6737;
     --primary-dim: rgba(140, 103, 55, 0.12);
     --primary-light: rgba(140, 103, 55, 0.08);
-    --accent: #B98D4B;
-    --warning: #B67A33;
-    --danger: #C45C45;
+    --accent: #8C6737;
+    --warning: #8C6737;
+    --danger: #8C6737;
     --text-main: #241A11;
     --text-sub: #66523D;
     --text-dim: #9A8262;
@@ -43,6 +43,9 @@ body.theme-gold {
         radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.32) 0%, transparent 34%),
         radial-gradient(circle at 78% 24%, rgba(176, 143, 90, 0.06) 0%, transparent 40%),
         radial-gradient(circle at 58% 78%, rgba(132, 104, 61, 0.05) 0%, transparent 38%);
+    --gold-unified-color: #8C6737;
+    --gold-unified-light: rgba(140, 103, 55, 0.12);
+    --gold-unified-strong: rgba(140, 103, 55, 0.22);
 }
 
 * {
@@ -870,6 +873,52 @@ body.theme-gold .progress-fill::after {
     margin-bottom: 8px;
 }
 
+body.setting-descriptions-hidden .section-desc,
+body.setting-descriptions-hidden .switch-desc,
+body.setting-descriptions-hidden .priority-desc,
+body.setting-descriptions-hidden .scripts-desc,
+body.setting-descriptions-hidden .action-desc,
+body.setting-descriptions-hidden .setting-hint,
+body.setting-descriptions-hidden .backup-info,
+body.setting-descriptions-hidden .module-card-desc {
+    display: none;
+}
+
+body.setting-descriptions-hidden .io-scheduler-options-section {
+    margin-bottom: 8px;
+}
+
+.io-advanced-group {
+    margin-top: 20px;
+    padding: 16px 14px 14px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.io-advanced-group-header {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.io-advanced-group .setting-section:first-child .section-label {
+    margin-top: 0;
+}
+
+.io-advanced-group .setting-section:last-child {
+    margin-bottom: 0;
+}
+
+body.theme-gold .io-advanced-group {
+    border-color: rgba(140, 103, 55, 0.12);
+    background: rgba(140, 103, 55, 0.04);
+}
+
+body.theme-gold .io-advanced-group-header {
+    border-bottom-color: rgba(140, 103, 55, 0.12);
+}
+
 .section-header {
     display: flex;
     justify-content: space-between;
@@ -1015,6 +1064,16 @@ body.theme-gold .progress-fill::after {
     color: var(--accent);
 }
 
+body.theme-gold .cpu-core.online {
+    background: var(--gold-unified-light);
+    border-color: var(--gold-unified-strong);
+}
+
+body.theme-gold .cpu-core.online .cpu-core-load,
+body.theme-gold .cpu-core.online .cpu-core-id {
+    color: var(--gold-unified-color);
+}
+
 .cpu-core.offline {
     background: rgba(244, 67, 54, 0.08);
     border-color: rgba(244, 67, 54, 0.25);
@@ -1026,13 +1085,20 @@ body.theme-gold .progress-fill::after {
 }
 
 .cpu-cluster-badge {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: var(--primary-dim);
+    color: var(--primary);
     padding: 4px 12px;
     border-radius: 12px;
     font-size: 12px;
     font-weight: 600;
     font-family: 'SF Mono', monospace;
+    border: 1px solid transparent;
+}
+
+body.theme-gold .cpu-cluster-badge {
+    background: var(--gold-unified-light);
+    color: var(--gold-unified-color);
+    border-color: var(--gold-unified-strong);
 }
 
 .tab-bar-container {
@@ -1252,10 +1318,16 @@ body.theme-gold .tab-item.active {
 .author-name {
     font-size: 16px;
     font-weight: 600;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+}
+
+body.theme-gold .author-name {
+    background: none;
+    color: var(--gold-unified-color);
+    -webkit-text-fill-color: currentColor;
 }
 
 .detail-overlay {
@@ -1800,6 +1872,14 @@ body.theme-dark #xinran-overlay .detail-card {
     box-shadow: 0 1px 4px rgba(30, 136, 229, 0.3);
 }
 
+body.theme-gold .cpu-brand-badge.snapdragon,
+body.theme-gold .cpu-brand-badge.mediatek {
+    background: var(--gold-unified-light);
+    color: var(--gold-unified-color);
+    box-shadow: none;
+    border: 1px solid var(--gold-unified-strong);
+}
+
 .cpu-brand-badge.hidden {
     display: none;
 }
@@ -1839,6 +1919,10 @@ body.theme-dark #xinran-overlay .detail-card {
     color: var(--text-sub);
     flex-shrink: 0;
     white-space: nowrap;
+}
+
+body.theme-gold #cpu-card .info-secondary {
+    color: var(--gold-unified-color);
 }
 
 .mem-tuning-desc {
@@ -2059,6 +2143,11 @@ body.theme-dark #xinran-overlay .detail-card {
     justify-content: center;
     gap: 8px;
     background: linear-gradient(135deg, #9C27B0, #BA68C8);
+}
+
+body.theme-gold .priority-add-btn {
+    background: var(--gold-unified-color);
+    box-shadow: 0 4px 10px var(--gold-unified-light), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .priority-process-card {
@@ -3636,6 +3725,12 @@ body.theme-dark .script-tag {
     font-size: 12px;
     color: var(--text-sub);
     margin-bottom: 4px;
+}
+
+body.setting-descriptions-hidden .switch-info,
+body.setting-descriptions-hidden .card-visibility-heading-row > div,
+body.setting-descriptions-hidden .section-header-row > div {
+    padding-right: 12px;
 }
 .module-card-badge {
     display: inline-block;
