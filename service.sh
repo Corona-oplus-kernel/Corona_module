@@ -324,7 +324,17 @@ update_module_description() {
         [ -z "$current_alg" ] && current_alg="--"
         desc_parts="ZRAM:${current_alg}"
     else
-        desc_parts="ZRAM:关闭"
+        current_zram=$(awk 'NR > 1 && ($1 ~ /^\/dev\/block\/zram/ || $1 ~ /^\/dev\/zram/) { print $1; exit }' /proc/swaps 2>/dev/null)
+        if [ -n "$current_zram" ]; then
+            current_zram_block=${current_zram#/dev/block/}
+            current_zram_block=${current_zram_block#/dev/}
+            scheduler_raw=$(cat "/sys/block/$current_zram_block/comp_algorithm" 2>/dev/null)
+            current_alg=$(echo "$scheduler_raw" | sed -n 's/.*\[\([^]]*\)\].*/\1/p')
+            [ -z "$current_alg" ] && current_alg=$(echo "$scheduler_raw" | awk '{print $1}')
+            [ -n "$current_alg" ] && desc_parts="ZRAM:${current_alg}" || desc_parts="ZRAM:默认"
+        else
+            desc_parts="ZRAM:关闭"
+        fi
     fi
 
     if [ -f "$CONFIG_DIR/io_scheduler.conf" ] && [ "$(get_conf_value "$CONFIG_DIR/io_scheduler.conf" enabled)" != "0" ]; then
