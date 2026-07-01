@@ -270,7 +270,7 @@ body.monet-decoration .bg-decoration::before {
 
 .page.left {
     display: flex;
-    position: absolute;
+    position: fixed;
     transform: translateX(-26px) translateY(0) translateZ(0);
     opacity: 0;
     z-index: 1;
@@ -278,7 +278,7 @@ body.monet-decoration .bg-decoration::before {
 
 .page.right {
     display: flex;
-    position: absolute;
+    position: fixed;
     transform: translateX(26px) translateY(0) translateZ(0);
     opacity: 0;
     z-index: 1;
@@ -1280,9 +1280,6 @@ body.theme-gold .tab-item.active {
     .container {
         padding-bottom: 0;
     }
-    .card-author {
-        margin-bottom: calc(85px + env(safe-area-inset-bottom));
-    }
     #app-settings-card {
         margin-bottom: 0;
     }
@@ -1291,7 +1288,6 @@ body.theme-gold .tab-item.active {
 .card-author {
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-    margin-bottom: 85px;
     padding: 14px 20px;
 }
 
@@ -4371,36 +4367,46 @@ body.app-ready .tab-bar-container { animation: none; }
     align-content: flex-start;
 }
 
+#page-home,
 #page-settings {
     overflow: visible;
     padding-bottom: 0;
     overflow-anchor: none;
 }
 
+#page-home::after,
 #page-settings::after {
     content: '· END OF SETTINGS ·';
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: calc(var(--nav-height) + 18px);
+    display: block;
+    flex: 0 0 auto;
     width: 100%;
-    margin-top: 8px;
-    border-top: 1px solid rgba(117, 93, 60, 0.10);
+    text-align: center;
+    margin-top: 24px;
+    padding-top: 24px;
+    padding-bottom: 24px;
+    box-sizing: border-box;
+    background-image:
+        linear-gradient(to right, rgba(117, 93, 60, 0.16) 0%, rgba(117, 93, 60, 0.16) 100%),
+        linear-gradient(180deg, rgba(248, 243, 234, 0) 0%, rgba(248, 243, 234, 0.14) 52%, rgba(244, 238, 226, 0) 100%);
+    background-repeat: no-repeat, no-repeat;
+    background-position: top center, top center;
+    background-size: 100% 1px, 100% 100%;
     color: var(--text-dim);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.28em;
     text-transform: uppercase;
-    background: linear-gradient(180deg, rgba(248, 243, 234, 0) 0%, rgba(248, 243, 234, 0.14) 52%, rgba(244, 238, 226, 0) 100%);
 }
 
+#page-home::after {
+    content: '· END OF HOME ·';
+}
+
+body.theme-dark #page-home::after,
 body.theme-dark #page-settings::after {
-    border-top-color: rgba(255, 255, 255, 0.08);
-    background: linear-gradient(180deg, rgba(20, 20, 24, 0) 0%, rgba(20, 20, 24, 0.12) 52%, rgba(14, 14, 18, 0) 100%);
-}
-
-#page-settings > .module-card:last-of-type {
-    margin-bottom: 0;
+    background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.14) 100%),
+        linear-gradient(180deg, rgba(20, 20, 24, 0) 0%, rgba(20, 20, 24, 0.12) 52%, rgba(14, 14, 18, 0) 100%);
 }
 
 #app-settings-content.expanded {
