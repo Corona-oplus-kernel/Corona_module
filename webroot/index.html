@@ -516,10 +516,44 @@
                     </div>
                 </div>
                 <div id="io-scheduler-content" class="module-card-content hidden">
+                    <div class="setting-section">
+                        <span class="section-label">I/O 调度器</span>
+                        <span class="section-desc">决定块设备请求的派发策略，影响顺序读写、混合负载下的吞吐与延迟表现</span>
+                    </div>
                     <div class="option-list" id="io-scheduler-list"></div>
                     <div class="setting-section">
                         <span class="section-label">预读取大小 (KB)</span>
+                        <span class="section-desc">提前读取连续数据，顺序读取更积极，但过大也会增加无效缓存占用</span>
                         <div class="option-grid cols-4" id="readahead-list"></div>
+                    </div>
+                    <div class="setting-section">
+                        <span class="section-label">高级队列参数</span>
+                        <span class="section-desc">对检测到的真实块设备批量写入通用 queue 节点</span>
+                    </div>
+                    <div class="setting-section">
+                        <span class="section-label">nr_requests</span>
+                        <span class="section-desc">限制队列可挂起的请求数量，值更大更偏吞吐，值更小更偏响应</span>
+                        <div class="option-grid cols-4" id="io-nr-requests-list"></div>
+                    </div>
+                    <div class="setting-section">
+                        <span class="section-label">rq_affinity</span>
+                        <span class="section-desc">控制请求完成回调尽量回到提交它的 CPU，常用于平衡延迟与 CPU 本地性</span>
+                        <div class="option-grid cols-4" id="io-rq-affinity-list"></div>
+                    </div>
+                    <div class="setting-section">
+                        <span class="section-label">nomerges</span>
+                        <span class="section-desc">控制块层请求合并强度，减少合并更直接，保留合并更省队列开销</span>
+                        <div class="option-grid cols-4" id="io-nomerges-list"></div>
+                    </div>
+                    <div class="switch-container" id="io-iostats-container">
+                        <div class="switch-info">
+                            <span class="switch-label">iostats</span>
+                            <span class="switch-desc">统计块层 I/O 活动，方便观察负载变化；关闭可减少少量统计开销</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="io-iostats-switch">
+                            <span class="slider"></span>
+                        </label>
                     </div>
                 </div>
             </div>
