@@ -16,6 +16,7 @@ get_conf_value() { [ -f "$1" ] && grep -m1 "^$2=" "$1" | cut -d'=' -f2-; }
 
 wait_until_boot_complete() { until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 5; done; }
 wait_until_login() { until [ -d "/data/data/android" ]; do sleep 5; done; }
+has_mm_sys_entry() { [ -f /odm/etc/init.oplus.mm-sys.sh ]; }
 
 get_system_info() {
     mem_total_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
@@ -385,15 +386,17 @@ wait_until_login
 get_system_info
 mkdir -p "$CONFIG_DIR"
 
-apply_zram_config
 apply_swap_config
-apply_vm_config
-apply_kernel_features_config
-apply_le9ec_config
-apply_lmk_config
-apply_reclaim_config
-apply_kswapd_config
-apply_corona_kernel_config
+if ! has_mm_sys_entry; then
+    apply_zram_config
+    apply_vm_config
+    apply_kernel_features_config
+    apply_le9ec_config
+    apply_lmk_config
+    apply_reclaim_config
+    apply_kswapd_config
+    apply_corona_kernel_config
+fi
 apply_io_config
 apply_cpu_governor_config
 apply_cpu_hotplug_config
@@ -409,8 +412,10 @@ apply_io_config
 apply_cpu_governor_config
 apply_process_priority_config
 apply_protect_config
-apply_lmk_config
-apply_kswapd_config
+if ! has_mm_sys_entry; then
+    apply_lmk_config
+    apply_kswapd_config
+fi
 update_module_description
 
 exit 0
