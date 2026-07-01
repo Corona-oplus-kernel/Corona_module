@@ -59,6 +59,12 @@ get_active_zram_algorithm() {
   echo "$alg_raw" | awk '{print $1}'
 }
 
+run_default_nandswap_main() {
+  local script=/product/bin/init.oplus.nandswap.sh
+  [ -r "$script" ] || return 1
+  /system/bin/sh -c '. "$1"; main' sh "$script"
+}
+
 write_zram_swappiness() {
   local corona_swappiness="$1"
   [ -n "$corona_swappiness" ] || return
@@ -148,19 +154,30 @@ write_hybridswap_errcode() {
 init_zram() {
   local magic=32758
   local corona_zram_enabled=$(corona_get zram.conf enabled)
-  [ "$corona_zram_enabled" = "1" ] || {
+  if [ "$corona_zram_enabled" != "1" ]; then
+    run_default_nandswap_main
     return
-  }
+  fi
+
+  if [ "$(getprop sys.oplus.nandswap.init)" != "true" ]; then
+    run_default_nandswap_main || return
+  fi
+
+  local current_path=$(normalize_zram_path "") || return
+  local zram_block=$(get_zram_block "$current_path") || return
+  local current_size=$(/system/bin/cat "/sys/block/$zram_block/disksize" 2>/dev/null | tr -d ' \n')
+  local current_algorithm=$(get_active_zram_algorithm "$zram_block")
 
   local corona_size=$(corona_get zram.conf size)
-  [ -n "$corona_size" ] || {
-    return
-  }
-
   local comp_algorithm=$(corona_get zram.conf algorithm)
   local corona_writeback=$(corona_get zram.conf zram_writeback)
   local corona_swappiness=$(corona_get zram.conf swappiness)
   local requested_path=$(corona_get zram.conf zram_path)
+  local zram_size="$current_size"
+
+  [ -n "$corona_size" ] && zram_size="$corona_size"
+  [ -n "$comp_algorithm" ] || comp_algorithm="$current_algorithm"
+
   local zram_path=$(normalize_zram_path "$requested_path") || {
     return
   }
@@ -174,9 +191,10 @@ init_zram() {
   fi
 
   if [ "$(getprop sys.oplus.nandswap.init)" = "true" ] && \
-     zram_matches_config "$zram_path" "$corona_size" "$comp_algorithm" "$corona_writeback" "$magic"; then
+     zram_matches_config "$zram_path" "$zram_size" "$comp_algorithm" "$corona_writeback" "$magic"; then
+    :
   else
-    configure_zram_device "$zram_path" "$corona_size" "$comp_algorithm" "$corona_writeback" "$magic" || {
+    configure_zram_device "$zram_path" "$zram_size" "$comp_algorithm" "$corona_writeback" "$magic" || {
       return
     }
   fi
@@ -187,6 +205,8 @@ init_zram() {
 
 apply_corona_vm_config() {
   [ ! -f "$CORONA_CONFIG/vm.conf" ] && return
+  local enabled=$(corona_get vm.conf enabled)
+  [ -n "$enabled" ] && [ "$enabled" != "1" ] && return
   local watermark=$(corona_get vm.conf watermark_scale_factor)
   local extra_free=$(corona_get vm.conf extra_free_kbytes)
   local dirty_ratio=$(corona_get vm.conf dirty_ratio)
