@@ -60,7 +60,6 @@ class CoronaAddon {
         this.memCleanRunning = false;
         this.easterEgg = { clickCount: 0, clickTimer: null, authorClickCount: 0, authorClickTimer: null, xinranClickCount: 0, xinranClickTimer: null, currentCard: 'thanks', isOverlayOpen: false };
         this.deviceImageState = { rotation: 0, scale: 1, isRotating: false, isDragging: false, currentScale: 1, rotateCount: 0, isInfiniteRotating: false, spinClickCount: 0, noDeceleration: false };
-        this.cpuMaxFreqs = [];
         this.cpuFreqsPerCore = {};
         this.historyData = { cpu: [], mem: [], cpuTemp: [], batteryTemp: [] };
         this.chartType = 'cpu';
@@ -2214,13 +2213,57 @@ class CoronaAddon {
         document.getElementById('swap-progress').style.width = `${percent}%`;
     }
     async loadAllConfigs() {
-        await Promise.all([ this.loadZramConfig(), this.loadLe9ecConfig(), this.loadIOConfig(), this.loadCpuGovernorConfig(), this.loadTCPConfig(), this.loadCpuCores(), this.loadPerformanceModeConfig() ]);
-        await Promise.all([ this.loadZramStatus(), this.loadSwapStatus() ]);
+        await Promise.all([ this.loadZramConfig(), this.loadLe9ecConfig(), this.loadIOConfig(), this.loadCpuGovernorConfig(), this.loadTCPConfig(), this.loadCpuCores(), this.loadPerformanceModeConfig(), this.loadSwapStatus() ]);
         await this.updateModuleDescription();
         this.updateClusterBadge();
         document.querySelectorAll('.range-slider').forEach(slider => this.updateSliderProgress(slider));
     }
     updateClusterBadge() { const badge = document.getElementById('cpu-cluster-badge'); if (badge) { badge.textContent = this.formatClusterInfo() || '--'; } }
+    async detectActiveZramPath() {
+        const activePath = (await this.exec(`awk 'NR > 1 && ($1 ~ /^\/dev\/block\/zram/ || $1 ~ /^\/dev\/zram/) { print $1; exit }' /proc/swaps 2>/dev/null`)).trim();
+        if (activePath) {
+            this.state.zramPath = activePath;
+            const pathInput = document.getElementById('zram-path-input');
+            if (pathInput) pathInput.value = activePath;
+        }
+        return activePath;
+    }
+    updateZramModeHint(mode, runtimeInfo = null) {
+        const hintEl = document.getElementById('zram-mode-hint');
+        const descEl = document.getElementById('zram-switch-desc');
+        if (!hintEl) return;
+        if (mode === 'module') {
+            hintEl.textContent = '当前由模块配置接管；保存配置会在开机时由 mm-sys 应用。';
+            if (descEl) descEl.textContent = '按模块配置覆盖系统默认 ZRAM';
+            return;
+        }
+        if (mode === 'system' && runtimeInfo?.isActive) {
+            hintEl.textContent = '当前跟随系统默认内存策略；未启用模块覆盖。';
+            if (descEl) descEl.textContent = '开启后改为使用模块配置覆盖系统默认';
+            return;
+        }
+        hintEl.textContent = '当前未启用 ZRAM；开启后将写入模块配置。';
+        if (descEl) descEl.textContent = '压缩内存块，扩展可用RAM';
+    }
+    syncZramControlsFromRuntime(runtimeInfo) {
+        if (!runtimeInfo) return;
+        if (runtimeInfo.currentAlg && runtimeInfo.currentAlg !== '--') this.state.algorithm = runtimeInfo.currentAlg;
+        if (runtimeInfo.sizeBytes > 0) this.state.zramSize = runtimeInfo.sizeBytes / 1024 / 1024 / 1024;
+        if (Number.isFinite(runtimeInfo.swappinessValue)) this.state.swappiness = runtimeInfo.swappinessValue;
+        const sizeSlider = document.getElementById('zram-size-slider');
+        if (sizeSlider) {
+            sizeSlider.value = this.state.zramSize;
+            this.updateSliderProgress(sizeSlider);
+        }
+        document.getElementById('zram-size-value').textContent = `${this.state.zramSize.toFixed(2)} GB`;
+        const swSlider = document.getElementById('swappiness-slider');
+        if (swSlider) {
+            swSlider.value = this.state.swappiness;
+            this.updateSliderProgress(swSlider);
+        }
+        document.getElementById('swappiness-value').textContent = this.state.swappiness;
+        this.renderAlgorithmOptions();
+    }
     async loadZramConfig() {
         const config = await this.exec(`cat ${this.configDir}/zram.conf 2>/dev/null`);
         if (config) {
@@ -2244,30 +2287,40 @@ class CoronaAddon {
                 const pathInput = document.getElementById('zram-path-input');
                 if (pathInput) pathInput.value = this.state.zramPath;
             }
+        } else {
+            this.state.zramEnabled = false;
+            const sw = document.getElementById('zram-switch');
+            if (sw) sw.checked = false;
+            this.toggleZramSettings(false);
         }
         await this.loadZramStatus();
     }
     async loadZramStatus() {
-        const zramBlock = this.getZramBlockName(this.state.zramPath);
+        const detectedPath = await this.detectActiveZramPath();
+        const zramPath = detectedPath || this.state.zramPath;
+        const zramBlock = this.getZramBlockName(zramPath);
         const [algRaw, disksize, swappiness, swapInfo] = await Promise.all([
             zramBlock ? this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`) : '',
             zramBlock ? this.exec(`cat /sys/block/${zramBlock}/disksize 2>/dev/null`) : '',
             this.exec('cat /proc/sys/vm/swappiness 2>/dev/null'),
-            this.getActiveSwapInfo(this.state.zramPath)
+            this.getActiveSwapInfo(zramPath)
         ]);
         const currentAlg = algRaw.match(/\[([^\]]+)\]/)?.[1] || algRaw.split(' ')[0] || '--';
         const sizeGB = disksize ? (parseInt(disksize) / 1024 / 1024 / 1024).toFixed(1) : '0';
+        const swappinessValue = parseInt((swappiness || '').trim(), 10);
         document.getElementById('zram-current-alg').textContent = currentAlg;
         document.getElementById('zram-current-size').textContent = `${sizeGB} GB`;
         document.getElementById('zram-current-swappiness').textContent = swappiness.trim() || '--';
         const isActive = !!swapInfo;
-        const priorityOk = swapInfo?.priority === '32758';
+        const runtimeInfo = { currentAlg, sizeBytes: parseInt(disksize || '0', 10) || 0, swappinessValue, isActive, path: zramPath };
         const statusEl = document.getElementById('zram-status');
-        if (statusEl) statusEl.textContent = isActive ? (priorityOk ? currentAlg.toUpperCase() : `${currentAlg.toUpperCase()} (prio ${swapInfo.priority})`) : '未启用';
+        if (!this.state.zramEnabled) this.syncZramControlsFromRuntime(runtimeInfo);
+        if (statusEl) statusEl.textContent = isActive ? (this.state.zramEnabled ? `模块:${currentAlg.toUpperCase()}` : `系统:${currentAlg.toUpperCase()}`) : '未启用';
         const memBadge = document.getElementById('memory-compression-badge');
-        if (memBadge) memBadge.textContent = isActive ? (priorityOk ? `ZRAM: ${currentAlg.toUpperCase()}` : `ZRAM: ${currentAlg.toUpperCase()} prio ${swapInfo.priority}`) : '未配置';
+        if (memBadge) memBadge.textContent = isActive ? (this.state.zramEnabled ? `ZRAM: 模块接管` : `ZRAM: 系统默认`) : '未配置';
         const pathDisplay = document.getElementById('zram-current-path');
-        if (pathDisplay) pathDisplay.textContent = this.state.zramPath;
+        if (pathDisplay) pathDisplay.textContent = zramPath;
+        this.updateZramModeHint(this.state.zramEnabled ? 'module' : (isActive ? 'system' : 'off'), runtimeInfo);
     }
     async saveZramConfig(skipPreview = false) {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
