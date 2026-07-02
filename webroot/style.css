@@ -4979,3 +4979,45 @@ body.theme-dark .app-policy-row {
 .thread-rule-section.active .thread-rule-section-title {
     color: rgba(34,52,88,0.98);
 }
+
+
+.rollback-animate {
+    animation: rollbackPulse .28s cubic-bezier(.2,.7,.2,1);
+}
+
+.rollback-animate-soft {
+    animation: rollbackSoftPulse .3s cubic-bezier(.2,.7,.2,1);
+}
+
+@keyframes rollbackPulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 rgba(52,130,255,0);
+        filter: saturate(1);
+    }
+    35% {
+        transform: scale(1.02);
+        box-shadow: 0 0 0 6px rgba(52,130,255,0.08);
+        filter: saturate(1.08);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 rgba(52,130,255,0);
+        filter: saturate(1);
+    }
+}
+
+@keyframes rollbackSoftPulse {
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+    40% {
+        transform: scale(1.01);
+        filter: brightness(1.06);
+    }
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+}
