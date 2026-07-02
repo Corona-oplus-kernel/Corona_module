@@ -4771,3 +4771,23 @@ body.theme-dark .app-policy-row {
     padding: 12px 14px;
     font-size: 14px;
 }
+
+
+.compact-switch-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mini-switch-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+.mini-switch-row input {
+    width: 16px;
+    height: 16px;
+}
