@@ -162,10 +162,12 @@ class CoronaAddon {
         return true;
     }
     async init() {
+        await this.resolvePaths();
+        await this.ensureFeatureScript('settings-ui');
+        await this.ensureFeatureScript('home-ui');
         this.showInitOverlay(true, this.t('initDefault'));
         try {
             this.updateInitOverlayMessage(this.t('initResolve'));
-            await this.resolvePaths();
             const brand = (await this.exec('getprop ro.product.brand')).toLowerCase();
             const manufacturer = (await this.exec('getprop ro.product.manufacturer')).toLowerCase();
             const allowedBrands = new Set(['oneplus', 'oplus', 'oppo', 'realme']);
