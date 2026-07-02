@@ -1,8 +1,9 @@
-(function () {
-  const proto = window.CoronaWebUI && window.CoronaWebUI.prototype;
-  if (!proto) return;
+(function() {
+  if (typeof CoronaAddon === "undefined") return;
+  window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
+  if (window.CoronaFeatureScripts["memory-opt"]) return;
 
-  proto.initSystemOpt = function () {
+  CoronaAddon.prototype.initSystemOpt = function () {
     const switches = ['lmk', 'device-config', 'reclaim', 'kswapd', 'protect', 'fstrim'];
     switches.forEach((name) => {
       const sw = document.getElementById(`${name}-switch`);
@@ -14,7 +15,7 @@
     this.loadSystemOptConfig();
   };
 
-  proto.loadSystemOptConfig = async function () {
+  CoronaAddon.prototype.loadSystemOptConfig = async function () {
     const configs = {
       lmk: { file: 'lmk.conf', switch: 'lmk-switch' },
       device: { file: 'device.conf', switch: 'device-config-switch' },
@@ -37,7 +38,7 @@
     if (badge) badge.textContent = enabledCount > 0 ? `${enabledCount}项已启用` : '未配置';
   };
 
-  proto.saveAndApplySystemOpt = async function (name, skipPreview = false) {
+  CoronaAddon.prototype.saveAndApplySystemOpt = async function (name, skipPreview = false) {
     const switchMap = {
       'lmk': 'lmk-switch',
       'device-config': 'device-config-switch',
@@ -96,7 +97,7 @@
     return true;
   };
 
-  proto.applySystemOptNow = async function (name) {
+  CoronaAddon.prototype.applySystemOptNow = async function (name) {
     const memInfo = await this.exec('cat /proc/meminfo | grep MemTotal');
     const memKb = parseInt(memInfo.replace(/[^0-9]/g, '')) || 8000000;
     const sdkVersion = parseInt(await this.exec('getprop ro.build.version.sdk')) || 30;
@@ -143,4 +144,5 @@
       await this.exec('sm fstrim 2>/dev/null');
     }
   };
+  window.CoronaFeatureScripts["memory-opt"] = true;
 })();
