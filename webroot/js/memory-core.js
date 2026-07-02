@@ -404,7 +404,6 @@
                 if (priorityThreadReady && typeof this.initPerformanceMode === 'function') this.initPerformanceMode();
                 if (typeof this.initExpandableCards === 'function') this.initExpandableCards();
                 if (typeof this.initThemeSelector === 'function') this.initThemeSelector();
-                if (typeof this.initLanguageToggle === 'function') this.initLanguageToggle();
                 if (typeof this.initChangePreviewToggle === 'function') this.initChangePreviewToggle();
                 if (typeof this.initSettingDescriptionToggle === 'function') this.initSettingDescriptionToggle();
                 if (typeof this.initCategoryConfigVisibilityToggle === 'function') this.initCategoryConfigVisibilityToggle();
