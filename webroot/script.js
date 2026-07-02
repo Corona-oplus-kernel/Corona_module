@@ -4222,7 +4222,9 @@ CoronaAddon.prototype.renderAppPolicySummary = function() {
     const manageBtn = document.getElementById('app-policy-manage-btn');
     if (switchMonitor) switchMonitor.checked = !!this.appPolicy.monitorEnabled;
     if (switchNotify) switchNotify.checked = !!this.appPolicy.notifyEnabled;
-    if (manageBtn) manageBtn.innerHTML = `应用列表 <span id="app-policy-manage-count">${configuredCount}</span>`;
+    if (manageBtn) manageBtn.innerHTML = configuredCount > 0
+        ? `应用列表 <span id="app-policy-manage-count">${configuredCount}</span>`
+        : '应用列表';
     const pairs = [
         ['app-policy-manage-count', configuredCount]
     ];
@@ -4369,6 +4371,11 @@ CoronaAddon.prototype.getAppPolicyTags = function(pkg) {
     if (this.priorityRules && this.priorityRules[pkg]) return ['优先级'];
     return [];
 };
+CoronaAddon.prototype.renderAppPolicyLoadingState = function(message = '正在读取应用列表...') {
+    const list = document.getElementById('app-policy-list');
+    if (!list) return;
+    list.innerHTML = `<div class="app-policy-loading-state"><div class="loading-spinner"></div><span class="loading-text">${this.escapeHtml(message)}</span></div>`;
+};
 CoronaAddon.prototype.openAppPolicyOverlay = async function(mode) {
     this.ensureAppPolicyState();
     this.currentAppPolicyMode = mode;
@@ -4376,10 +4383,14 @@ CoronaAddon.prototype.openAppPolicyOverlay = async function(mode) {
     const titleMap = { manage: '应用列表' };
     const title = document.getElementById('app-policy-title');
     if (title) title.textContent = titleMap[mode] || '选择应用';
-    const list = document.getElementById('app-policy-list');
-    if (list) list.innerHTML = '<div class="priority-loading">正在读取应用列表...</div>';
     this.showOverlay('app-policy-overlay');
-    this.loadInstalledApps().then(() => this.renderAppPolicyList());
+    this.renderAppPolicyLoadingState();
+    try {
+        await this.loadInstalledApps();
+        this.renderAppPolicyList();
+    } catch (error) {
+        this.renderAppPolicyLoadingState('读取应用列表失败');
+    }
 };
 CoronaAddon.prototype.renderAppPolicyTags = function(pkg) {
     const tags = this.getAppPolicyTags(pkg).map(tag => `<span class="app-policy-tag">${this.escapeHtml(tag)}</span>`).join('');

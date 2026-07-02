@@ -4517,6 +4517,26 @@ body.app-ready .corona-title {
     max-height: 78vh;
 }
 
+.app-policy-loading-state {
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+}
+
+.app-policy-loading-state .loading-spinner {
+    width: 30px;
+    height: 30px;
+    border-width: 3px;
+}
+
+.app-policy-loading-state .loading-text {
+    font-size: 13px;
+    color: var(--text-sub);
+}
+
 .app-policy-row {
     display: flex;
     align-items: center;
