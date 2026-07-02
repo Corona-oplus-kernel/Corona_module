@@ -355,6 +355,9 @@
             let appPolicyReady = false;
             let priorityThreadReady = false;
             let memoryOptReady = false;
+            let customScriptsReady = false;
+            let coronaKernelReady = false;
+            let le9ecReady = false;
             try {
                 await this.ensureFeatureScript('app-policy');
                 appPolicyReady = true;
@@ -373,25 +376,46 @@
             } catch (e) {
                 console.error('ensureFeatureScript(memory-opt) failed', e);
             }
+            try {
+                await this.ensureFeatureScript('custom-scripts');
+                customScriptsReady = true;
+            } catch (e) {
+                console.error('ensureFeatureScript(custom-scripts) failed', e);
+            }
+            try {
+                await this.ensureFeatureScript('corona-kernel');
+                coronaKernelReady = true;
+            } catch (e) {
+                console.error('ensureFeatureScript(corona-kernel) failed', e);
+            }
+            try {
+                await this.ensureFeatureScript('le9ec');
+                le9ecReady = true;
+            } catch (e) {
+                console.error('ensureFeatureScript(le9ec) failed', e);
+            }
             if (!this.settingsUiInitialized) {
-                this.renderStaticOptions();
+                if (typeof this.renderStaticOptions === 'function') this.renderStaticOptions();
                 if (priorityThreadReady && typeof this.initPerformanceMode === 'function') this.initPerformanceMode();
-                this.initExpandableCards();
-                this.initThemeSelector();
-                this.initLanguageToggle();
-                this.initChangePreviewToggle();
-                this.initSettingDescriptionToggle();
-                this.initCategoryConfigVisibilityToggle();
-                this.initSnapshots();
-                this.initSliderProgress();
-                this.initSwapSettings();
-                this.initVmSettings();
-                this.initZramWriteback();
-                this.initZramPath();
-                this.initCustomScripts();
+                if (typeof this.initExpandableCards === 'function') this.initExpandableCards();
+                if (typeof this.initThemeSelector === 'function') this.initThemeSelector();
+                if (typeof this.initLanguageToggle === 'function') this.initLanguageToggle();
+                if (typeof this.initChangePreviewToggle === 'function') this.initChangePreviewToggle();
+                if (typeof this.initSettingDescriptionToggle === 'function') this.initSettingDescriptionToggle();
+                if (typeof this.initCategoryConfigVisibilityToggle === 'function') this.initCategoryConfigVisibilityToggle();
+                if (typeof this.initSnapshots === 'function') this.initSnapshots();
+                if (typeof this.initSliderProgress === 'function') this.initSliderProgress();
+                if (typeof this.initSwapSettings === 'function') this.initSwapSettings();
+                if (typeof this.initVmSettings === 'function') this.initVmSettings();
+                if (typeof this.initZramWriteback === 'function') this.initZramWriteback();
+                if (typeof this.initZramPath === 'function') this.initZramPath();
+                if (customScriptsReady && typeof this.initCustomScripts === 'function') this.initCustomScripts();
                 if (memoryOptReady && typeof this.initSystemOpt === 'function') this.initSystemOpt();
                 if (appPolicyReady && typeof this.initAppPolicy === 'function') this.initAppPolicy();
-                this.initCoronaKernel();
+                if (coronaKernelReady && typeof this.initCoronaKernel === 'function') this.initCoronaKernel();
+                if (le9ecReady && typeof this.loadLe9ecConfig === 'function' && !this.le9ecSupported) {
+                    // noop: allow later status/config loading to probe support without blocking init
+                }
                 this.settingsUiInitialized = true;
             }
             if (!this.settingsDataLoaded) {
