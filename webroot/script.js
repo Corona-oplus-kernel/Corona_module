@@ -128,6 +128,7 @@ class CoronaAddon {
             }
             await this.ensureConfigDir();
             await this.loadRuntimeConfig();
+            await this.loadAppMetaCache();
             this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
             this.initTheme();
             this.initChangePreviewPreference();
@@ -145,6 +146,7 @@ class CoronaAddon {
                 this.initStaticHeader();
             }
             this.initModuleIntro();
+            await this.ensureSettingsPageReady(true);
             await Promise.all([
                 this.updateRealtimeData(true)
             ]);
@@ -248,6 +250,35 @@ class CoronaAddon {
         }
         if (!this.runtimeConfig.swapPath) this.runtimeConfig.swapPath = `${this.modDir}/swapfile.img`;
         if (!this.state.swapPath) this.state.swapPath = this.runtimeConfig.swapPath;
+    }
+    async loadAppMetaCache() {
+        this.ensureAppPolicyState();
+        const path = `${this.configDir}/app_meta_cache.b64`;
+        const raw = await this.exec(`cat ${this.shellQuote(path)} 2>/dev/null`);
+        this.appMetaCache = {};
+        if (!raw) return;
+        try {
+            const json = decodeURIComponent(escape(atob(raw.trim())));
+            const parsed = JSON.parse(json);
+            const version = parsed && typeof parsed === 'object' ? parsed.__version : 0;
+            const source = parsed && typeof parsed === 'object' && parsed.apps ? parsed.apps : parsed;
+            if (version !== 6 || !source || typeof source !== 'object' || Array.isArray(source)) return;
+            Object.entries(source).forEach(([pkg, meta]) => {
+                if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return;
+                const next = { ...meta };
+                if (!next.label || next.label === pkg) delete next.label;
+                this.appMetaCache[pkg] = next;
+            });
+        } catch (e) {
+            this.appMetaCache = {};
+        }
+    }
+    async saveAppMetaCache() {
+        this.ensureAppPolicyState();
+        const path = `${this.configDir}/app_meta_cache.b64`;
+        const payload = JSON.stringify({ __version: 6, apps: this.appMetaCache || {} });
+        const base64Data = btoa(unescape(encodeURIComponent(payload)));
+        await this.exec(`echo '${base64Data}' > ${this.shellQuote(path)}`);
     }
     showConfirm(message, title = '确认', options = {}) {
         return new Promise((resolve) => {
@@ -767,7 +798,7 @@ class CoronaAddon {
             { toggle: 'le9ec-toggle', content: 'le9ec-content', onExpand: () => this.loadLe9ecStatus() },
             { toggle: 'io-scheduler-toggle', content: 'io-scheduler-content', onExpand: null },
             { toggle: 'cpu-governor-toggle', content: 'cpu-governor-content', onExpand: null },
-            { toggle: 'process-priority-toggle', content: 'process-priority-content', onExpand: null },
+            { toggle: 'app-policy-toggle', content: 'app-policy-content', onExpand: () => { this.renderAppPolicySummary(); this.renderPriorityRules(); } },
             { toggle: 'tcp-toggle', content: 'tcp-content', onExpand: null },
             { toggle: 'custom-scripts-toggle', content: 'custom-scripts-content', onExpand: null },
             { toggle: 'system-opt-toggle', content: 'system-opt-content', onExpand: null },
@@ -2089,6 +2120,7 @@ class CoronaAddon {
                 this.initDeviceImageInteraction();
                 this.initScrollEffect();
                 await this.ensureSettingsPageReady(true);
+                this.prewarmAppPolicyData().catch(() => {});
             } catch (e) {}
         };
         if (typeof window.requestIdleCallback === 'function') {
@@ -2118,6 +2150,7 @@ class CoronaAddon {
                 this.initZramPath();
                 this.initCustomScripts();
                 this.initSystemOpt();
+                this.initAppPolicy();
                 this.initCoronaKernel();
                 this.settingsUiInitialized = true;
             }
@@ -2126,7 +2159,8 @@ class CoronaAddon {
                     this.loadAllConfigs(),
                     this.loadDualCellConfig(),
                     this.detectKernelFeatures(),
-                    this.loadParameterSnapshots()
+                    this.loadParameterSnapshots(),
+                    this.loadAppRulesConfig()
                 ]);
                 this.initKernelFeatures();
                 await Promise.all([
@@ -2818,7 +2852,8 @@ class CoronaAddon {
     async loadPerformanceModeConfig() { await this.loadPriorityConfig(); }
     initProcessPriority() {
         this.priorityRules = {}; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4;
-        document.getElementById('priority-add-btn').addEventListener('click', () => this.showPriorityProcessSelector());
+        const priorityAddBtn = document.getElementById('priority-add-btn');
+        if (priorityAddBtn) priorityAddBtn.addEventListener('click', () => this.openAppPolicyOverlay('manage'));
         document.getElementById('priority-cancel-btn').addEventListener('click', () => this.hideOverlay('priority-setting-overlay'));
         document.getElementById('priority-save-btn').addEventListener('click', () => this.savePriorityRule());
         document.getElementById('priority-process-search').addEventListener('input', (e) => { this.filterPriorityProcessList(e.target.value); });
@@ -2847,7 +2882,7 @@ class CoronaAddon {
         container.innerHTML = ruleNames.map(name => { const rule = this.priorityRules[name]; const initial = name.charAt(0).toUpperCase(); return `<div class="priority-rule-item" data-process="${name}"><div class="priority-rule-icon">${initial}</div><div class="priority-rule-info"><div class="priority-rule-name">${name}</div><div class="priority-rule-values">nice: ${rule.nice} | I/O: ${ioClassNames[rule.ioClass] || '尽力'}</div></div><div class="priority-rule-actions"><button class="priority-rule-btn edit" data-action="edit" data-name="${name}">✎</button><button class="priority-rule-btn delete" data-action="delete" data-name="${name}">✕</button></div></div>`; }).join('');
         container.querySelectorAll('.priority-rule-btn').forEach(btn => { btn.addEventListener('click', (e) => { e.stopPropagation(); const action = btn.dataset.action; const name = btn.dataset.name; if (action === 'edit') this.editPriorityRule(name); else if (action === 'delete') this.deletePriorityRule(name); }); });
     }
-    updatePriorityCount() { document.getElementById('priority-count').textContent = `${Object.keys(this.priorityRules).length} 条`; }
+    updatePriorityCount() { const countText = `${Object.keys(this.priorityRules).length} 条`; const appBadge = document.getElementById('app-policy-badge'); if (appBadge && appBadge.textContent === '--') appBadge.textContent = countText; const priorityCount = document.getElementById('priority-count'); if (priorityCount) priorityCount.textContent = countText; }
     async showPriorityProcessSelector() { this.showOverlay('priority-process-overlay'); document.getElementById('priority-process-search').value = ''; document.getElementById('priority-process-list').innerHTML = '<div class="priority-loading">加载中...</div>'; await this.loadPriorityProcessList(); }
     async loadPriorityProcessList() {
         const psOutput = await this.exec(`ps -Ao pid,args 2>/dev/null | tail -n +2`);
@@ -2919,11 +2954,20 @@ class CoronaAddon {
         this.hideOverlay('priority-setting-overlay');
         this.renderPriorityRules();
         this.updatePriorityCount();
+        this.updateAppPolicyRow(this.selectedPriorityProcess);
+        this.reorderAppPolicyRow(this.selectedPriorityProcess);
+        this.renderAppPolicySummary();
         if (appliedCount > 0) { this.showToast(`已设置 ${this.selectedPriorityProcess}: nice=${this.selectedNice}, I/O=${ioClassNames[this.selectedIoClass]}`); }
         else { this.showToast(`已保存规则，进程启动时生效`); }
         return true;
     }
     async savePriorityConfig() {
+        const processName = this.selectedPriorityProcess;
+        const rule = processName ? this.priorityRules[processName] : null;
+        if (processName && rule) {
+            await this.exec(this.getAppPolicyScript('priority-set', this.shellQuote(processName), String(rule.nice), String(rule.ioClass), String(rule.ioLevel)));
+            return;
+        }
         const configContent = this.serializePriorityRules();
         await this.writeConfig('process_priority.conf', configContent);
     }
@@ -2944,7 +2988,7 @@ class CoronaAddon {
         return appliedCount;
     }
     async editPriorityRule(processName) { this.selectedPriorityProcess = processName; this.showPrioritySetting(); }
-    async deletePriorityRule(processName) { const confirmed = await this.showConfirm(`确定要删除 ${processName} 的优先级规则吗？`, '删除规则'); if (!confirmed) return; delete this.priorityRules[processName]; await this.savePriorityConfig(); this.renderPriorityRules(); this.updatePriorityCount(); this.showToast(`已删除 ${processName} 的优先级规则`); }
+    async deletePriorityRule(processName) { const confirmed = await this.showConfirm(`确定要删除 ${processName} 的优先级规则吗？`, '删除规则'); if (!confirmed) return; delete this.priorityRules[processName]; this.selectedPriorityProcess = processName; await this.exec(this.getAppPolicyScript('priority-del', this.shellQuote(processName))); this.renderPriorityRules(); this.updatePriorityCount(); this.updateAppPolicyRow(processName); this.renderAppPolicySummary(); this.showToast(`已删除 ${processName} 的优先级规则`); }
     async applyAllPriorityRules() { const promises = Object.keys(this.priorityRules).map(name => this.applyPriorityRule(name)); await Promise.all(promises); }
     async detectKernelFeatures() {
         const [lruGen, thp, ksm, compaction] = await Promise.all([
@@ -4115,6 +4159,506 @@ Swap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的
         await this.writeConfig('corona_kernel.conf', lines.join('\n'));
     }
 }
+
+CoronaAddon.prototype.ensureAppPolicyState = function() {
+    if (!this.appPolicy) {
+        this.appPolicy = { monitorEnabled: false, notifyEnabled: true, whitelist: [], blacklist: [], protect: [], profiles: [] };
+    }
+    if (!Array.isArray(this.installedApps)) this.installedApps = [];
+    if (!this.appIconCache) this.appIconCache = {};
+    if (!this.currentAppPolicyMode) this.currentAppPolicyMode = 'whitelist';
+};
+CoronaAddon.prototype.getAppPolicyScript = function(...args) {
+    const parts = [`sh ${this.shellQuote(`${this.modDir}/app_policy.sh`)}`];
+    args.filter(Boolean).forEach(arg => parts.push(arg));
+    return parts.join(' ');
+};
+CoronaAddon.prototype.parseAppRulesConfig = function(content) {
+    this.ensureAppPolicyState();
+    const next = { monitorEnabled: false, notifyEnabled: true, whitelist: [], protect: [], profiles: [] };
+    String(content || '').split('\n').forEach(line => {
+        const idx = line.indexOf('=');
+        if (idx <= 0) return;
+        const key = line.slice(0, idx).trim();
+        const value = line.slice(idx + 1).trim();
+        if (key === 'monitor_enabled') next.monitorEnabled = value === '1';
+        if (key === 'notify_enabled') next.notifyEnabled = value !== '0';
+        if (key === 'whitelist') next.whitelist = value ? value.split(',').filter(Boolean) : [];
+        if (key === 'protect') next.protect = value ? value.split(',').filter(Boolean) : [];
+        if (key === 'profiles') next.profiles = value ? value.split(',').filter(Boolean) : [];
+    });
+    next.whitelist = [...new Set(next.whitelist)];
+    next.protect = [...new Set(next.protect)];
+    next.profiles = [...new Set(next.profiles)];
+    this.appPolicy = next;
+};
+CoronaAddon.prototype.buildAppRulesConfig = function() {
+    this.ensureAppPolicyState();
+    const lines = [
+        `monitor_enabled=${this.appPolicy.monitorEnabled ? '1' : '0'}`,
+        `notify_enabled=${this.appPolicy.notifyEnabled ? '1' : '0'}`
+    ];
+    return lines.join('\n');
+};
+CoronaAddon.prototype.renderAppPolicySummary = function() {
+    this.ensureAppPolicyState();
+    const wl = this.appPolicy.whitelist.length;
+    const pr = this.appPolicy.protect.length;
+    const pf = this.appPolicy.profiles.length;
+    const pt = Object.keys(this.priorityRules || {}).length;
+    const configuredCount = new Set([...(this.appPolicy.whitelist || []), ...(this.appPolicy.protect || []), ...(this.appPolicy.profiles || []), ...Object.keys(this.priorityRules || {})]).size;
+    const badge = document.getElementById('app-policy-badge');
+    if (badge) badge.textContent = `白${wl} 保${pr} 预${pf} 优${pt}`;
+    const status = document.getElementById('app-policy-status');
+    if (status) status.textContent = this.appPolicy.monitorEnabled
+        ? `自动切换已开启；当前白名单 ${wl} 个，保护 ${pr} 个，应用预设 ${pf} 个，优先级 ${pt} 个。`
+        : `自动切换未开启；当前白名单 ${wl} 个，保护 ${pr} 个，应用预设 ${pf} 个，优先级 ${pt} 个。`;
+    const switchMonitor = document.getElementById('app-monitor-switch');
+    const switchNotify = document.getElementById('app-notify-switch');
+    const manageBtn = document.getElementById('app-policy-manage-btn');
+    if (switchMonitor) switchMonitor.checked = !!this.appPolicy.monitorEnabled;
+    if (switchNotify) switchNotify.checked = !!this.appPolicy.notifyEnabled;
+    if (manageBtn) manageBtn.innerHTML = `应用列表 <span id="app-policy-manage-count">${configuredCount}</span>`;
+    const pairs = [
+        ['app-policy-manage-count', configuredCount]
+    ];
+    pairs.forEach(([id, count]) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(count);
+    });
+};
+CoronaAddon.prototype.loadAppRulesConfig = async function() {
+    this.ensureAppPolicyState();
+    const content = await this.exec(this.getAppPolicyScript('dump-rules'));
+    this.parseAppRulesConfig(content);
+    this.renderAppPolicySummary();
+};
+CoronaAddon.prototype.syncAppPolicyDaemon = async function() {
+    const shouldRun = !!this.appPolicy.monitorEnabled || (this.appPolicy.protect || []).length > 0;
+    const pidFile = `${this.modDir}/.app_policy_daemon.pid`;
+    if (shouldRun) {
+        await this.exec(`${this.getAppPolicyScript('daemon')} >/dev/null 2>&1 &`);
+        return;
+    }
+    const pid = (await this.exec(`cat ${this.shellQuote(pidFile)} 2>/dev/null`)).trim();
+    if (pid) await this.exec(`kill ${pid} 2>/dev/null`);
+    await this.exec(`rm -f ${this.shellQuote(pidFile)} ${this.shellQuote(`${this.modDir}/.app_policy_state`)}`);
+    await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --apply-runtime-config >/dev/null 2>&1`);
+};
+CoronaAddon.prototype.scheduleAppPolicySync = function() {
+    if (this.appPolicySyncTimer) clearTimeout(this.appPolicySyncTimer);
+    this.appPolicySyncTimer = setTimeout(() => {
+        this.syncAppPolicyDaemon().catch(() => {});
+        this.appPolicySyncTimer = null;
+    }, 120);
+};
+CoronaAddon.prototype.saveAppRulesConfig = async function(showToastText = '', options = {}) {
+    await this.writeConfig('app_rules.conf', this.buildAppRulesConfig());
+    if (options.syncNow) {
+        await this.syncAppPolicyDaemon();
+    } else {
+        this.scheduleAppPolicySync();
+    }
+    this.renderAppPolicySummary();
+    if (showToastText) this.showToast(showToastText);
+};
+CoronaAddon.prototype.persistAppRulesSoon = function(showToastText = '') {
+    if (showToastText) this.showToast(showToastText);
+    this.renderAppPolicySummary();
+    if (this.appRulesPersistTimer) clearTimeout(this.appRulesPersistTimer);
+    this.appRulesPersistTimer = setTimeout(() => {
+        this.saveAppRulesConfig('', { syncNow: false }).catch(() => {});
+        this.appRulesPersistTimer = null;
+    }, 180);
+};
+CoronaAddon.prototype.initAppPolicy = function() {
+    this.ensureAppPolicyState();
+    const monitorSwitch = document.getElementById('app-monitor-switch');
+    const notifySwitch = document.getElementById('app-notify-switch');
+    if (monitorSwitch && !monitorSwitch.dataset.bound) {
+        monitorSwitch.dataset.bound = '1';
+        monitorSwitch.addEventListener('change', async () => {
+            this.appPolicy.monitorEnabled = monitorSwitch.checked;
+            await this.saveAppRulesConfig(`应用预设自动切换已${monitorSwitch.checked ? '开启' : '关闭'}`);
+        });
+    }
+    if (notifySwitch && !notifySwitch.dataset.bound) {
+        notifySwitch.dataset.bound = '1';
+        notifySwitch.addEventListener('change', async () => {
+            this.appPolicy.notifyEnabled = notifySwitch.checked;
+            await this.saveAppRulesConfig(`切换通知已${notifySwitch.checked ? '开启' : '关闭'}`);
+        });
+    }
+    const buttons = {
+        'app-policy-manage-btn': 'manage'
+    };
+    Object.entries(buttons).forEach(([id, mode]) => {
+        const btn = document.getElementById(id);
+        if (btn && !btn.dataset.bound) {
+            btn.dataset.bound = '1';
+            btn.addEventListener('click', () => this.openAppPolicyOverlay(mode));
+        }
+    });
+    const search = document.getElementById('app-policy-search');
+    if (search && !search.dataset.bound) {
+        search.dataset.bound = '1';
+        search.addEventListener('input', () => this.renderAppPolicyList());
+    }
+    ['app-policy-overlay', 'app-profile-overlay'].forEach(id => {
+        const overlay = document.getElementById(id);
+        if (overlay && !overlay.dataset.bound) {
+            overlay.dataset.bound = '1';
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) this.hideOverlay(id);
+            });
+        }
+    });
+};
+CoronaAddon.prototype.loadInstalledApps = async function(force = false) {
+    this.ensureAppPolicyState();
+    if (!force && this.installedApps.length > 0) return this.installedApps;
+    const output = await this.exec(this.getAppPolicyScript('list-meta'));
+    const apps = [];
+    let cacheChanged = false;
+    String(output || '').split('\n').forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        const parts = trimmed.split('|');
+        const pkg = (parts[0] || '').trim();
+        const componentName = (parts[1] || '').trim();
+        const fetchedLabel = (parts[2] || '').trim();
+        if (!pkg) return;
+        const cached = (this.appMetaCache && this.appMetaCache[pkg]) || {};
+        const label = fetchedLabel && fetchedLabel !== pkg ? fetchedLabel : (cached.label && cached.label !== pkg ? cached.label : this.humanizePackageName(pkg));
+        apps.push({ packageName: pkg, componentName, label, labelLoaded: !!label, iconPath: '', iconReady: false });
+        const nextCache = { ...cached, label, componentName };
+        if (JSON.stringify(nextCache) !== JSON.stringify(cached)) {
+            this.appMetaCache[pkg] = nextCache;
+            cacheChanged = true;
+        }
+    });
+    apps.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN-u-co-pinyin') || a.packageName.localeCompare(b.packageName));
+    this.installedApps = apps;
+    if (cacheChanged) await this.saveAppMetaCache();
+    return apps;
+};
+CoronaAddon.prototype.prewarmAppPolicyData = async function() {
+    this.ensureAppPolicyState();
+    if (this.appPolicyPrewarmPromise) return this.appPolicyPrewarmPromise;
+    this.appPolicyPrewarmPromise = (async () => {
+        await this.loadInstalledApps(true);
+    })();
+    try {
+        await this.appPolicyPrewarmPromise;
+    } finally {
+        this.appPolicyPrewarmDone = true;
+    }
+};
+CoronaAddon.prototype.humanizePackageName = function(pkg) {
+    const parts = String(pkg || '').split('.').filter(Boolean);
+    if (parts.length === 0) return pkg || '--';
+    const generic = new Set(['com', 'org', 'net', 'android', 'app', 'cn']);
+    const core = parts.filter(part => !generic.has(part.toLowerCase()));
+    let picked = core.slice(-2);
+    if (picked.length === 0) picked = parts.slice(-1);
+    return picked.map(part => part.replace(/[_-]+/g, ' ').replace(/\w/g, c => c.toUpperCase())).join(' ');
+};
+CoronaAddon.prototype.getAppPolicyTags = function(pkg) {
+    const tags = [];
+    if (this.appPolicy.whitelist.includes(pkg)) tags.push('白名单');
+    if (this.appPolicy.protect.includes(pkg)) tags.push('保护');
+    if (this.appPolicy.profiles.includes(pkg)) tags.push('预设');
+    if (this.priorityRules && this.priorityRules[pkg]) tags.push('优先级');
+    return tags;
+};
+CoronaAddon.prototype.getFallbackAppIcon = function(label = '?') {
+    const text = this.escapeHtml(String(label || '?').trim().slice(0, 1).toUpperCase() || '?');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect rx="24" width="96" height="96" fill="#dfe8ff"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="44" font-family="sans-serif" fill="#3482ff">${text}</text></svg>`;
+    return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+};
+CoronaAddon.prototype.loadAppIcon = async function(pkg, label, img) {
+    this.ensureAppPolicyState();
+    if (!img) return;
+    img.classList.add('app-policy-icon-loading');
+    const app = (this.installedApps || []).find(item => item.packageName === pkg);
+    if (this.appIconCache[pkg]) {
+        img.src = this.appIconCache[pkg];
+        img.classList.remove('app-policy-icon-loading');
+        return;
+    }
+    img.src = this.getFallbackAppIcon(label);
+    img.classList.remove('app-policy-icon-loading');
+    const componentArg = app?.componentName ? this.shellQuote(app.componentName) : '';
+    this.exec(this.getAppPolicyScript('icon', this.shellQuote(pkg), componentArg)).then(iconData => {
+        const value = String(iconData || '').trim();
+        if (!value) return;
+        this.appIconCache[pkg] = value;
+        img.src = value;
+    }).catch(() => {});
+};
+CoronaAddon.prototype.loadAppLabel = async function(pkg) {
+    const app = (this.installedApps || []).find(item => item.packageName === pkg);
+    if (app && app.labelLoaded) return app.label;
+    const componentName = app?.componentName || '';
+    let label = (await this.exec(this.getAppPolicyScript('label', this.shellQuote(pkg), componentName ? this.shellQuote(componentName) : ''))).trim();
+    if (!label || label === pkg) label = this.humanizePackageName(pkg);
+    if (app) {
+        app.label = label;
+        app.labelLoaded = true;
+    }
+    if (!this.appMetaCache[pkg]) this.appMetaCache[pkg] = {};
+    this.appMetaCache[pkg].label = label;
+    const selectorPkg = String(pkg).replace(/"/g, '\"');
+    const row = document.querySelector(`.app-policy-row[data-pkg="${selectorPkg}"]`);
+    if (row) {
+        row.dataset.label = label;
+        const nameEl = row.querySelector('.app-policy-name');
+        if (nameEl) nameEl.textContent = label;
+        const img = row.querySelector('.app-policy-icon');
+        if (img && img.src.includes('data:image/svg+xml')) this.loadAppIcon(pkg, label, img);
+    }
+    return label;
+};
+CoronaAddon.prototype.primeVisibleAppMetadata = function(limit = 24) {
+    const rows = Array.from(document.querySelectorAll('.app-policy-row')).slice(0, limit);
+    rows.forEach((row, index) => {
+        const pkg = row.dataset.pkg;
+        const label = row.dataset.label || pkg;
+        const img = row.querySelector('.app-policy-icon');
+        setTimeout(() => {
+            this.loadAppLabel(pkg);
+            this.loadAppIcon(pkg, label, img);
+        }, index * 35);
+    });
+};
+CoronaAddon.prototype.openAppPolicyOverlay = async function(mode) {
+    this.ensureAppPolicyState();
+    this.currentAppPolicyMode = mode;
+    this.appPolicyRenderLimit = 60;
+    const titleMap = { manage: '应用列表' };
+    const title = document.getElementById('app-policy-title');
+    if (title) title.textContent = titleMap[mode] || '选择应用';
+    const list = document.getElementById('app-policy-list');
+    if (list) list.innerHTML = '<div class="priority-loading">正在读取应用列表...</div>';
+    this.showOverlay('app-policy-overlay');
+    this.loadInstalledApps().then(() => this.renderAppPolicyList());
+};
+CoronaAddon.prototype.renderAppPolicyTags = function(pkg) {
+    const tags = this.getAppPolicyTags(pkg).map(tag => `<span class="app-policy-tag">${this.escapeHtml(tag)}</span>`).join('');
+    return tags || '<span class="app-policy-tag">未配置</span>';
+};
+CoronaAddon.prototype.updateAppPolicyRow = function(pkg) {
+    const safePkg = String(pkg).replace(/"/g, '\"');
+    const row = document.querySelector(`.app-policy-row[data-pkg="${safePkg}"]`);
+    if (!row) return;
+    const active = this.appPolicy.whitelist.includes(pkg) || this.appPolicy.protect.includes(pkg) || this.appPolicy.profiles.includes(pkg) || !!this.priorityRules?.[pkg];
+    row.classList.toggle('active', active);
+    const tagsEl = row.querySelector('.app-policy-tags');
+    if (tagsEl) tagsEl.innerHTML = this.renderAppPolicyTags(pkg);
+};
+CoronaAddon.prototype.renderAppPolicyList = function() {
+    this.ensureAppPolicyState();
+    const list = document.getElementById('app-policy-list');
+    if (!list) return;
+    const keyword = (document.getElementById('app-policy-search')?.value || '').trim().toLowerCase();
+    const apps = this.installedApps
+        .filter(app => !keyword || app.label.toLowerCase().includes(keyword) || app.packageName.toLowerCase().includes(keyword))
+        .sort((a, b) => {
+            const aActive = this.appPolicy.whitelist.includes(a.packageName) || this.appPolicy.protect.includes(a.packageName) || this.appPolicy.profiles.includes(a.packageName) || !!this.priorityRules?.[a.packageName];
+            const bActive = this.appPolicy.whitelist.includes(b.packageName) || this.appPolicy.protect.includes(b.packageName) || this.appPolicy.profiles.includes(b.packageName) || !!this.priorityRules?.[b.packageName];
+            if (aActive !== bActive) return aActive ? -1 : 1;
+            return a.label.localeCompare(b.label, 'zh-Hans-CN-u-co-pinyin') || a.packageName.localeCompare(b.packageName);
+        });
+    if (apps.length === 0) {
+        list.innerHTML = '<div class="priority-empty">没有匹配的应用</div>';
+        return;
+    }
+    const mode = this.currentAppPolicyMode;
+    const visibleApps = apps;
+    const isActive = (pkg) => {
+        if (mode === 'manage') return this.appPolicy.whitelist.includes(pkg) || this.appPolicy.protect.includes(pkg) || this.appPolicy.profiles.includes(pkg) || !!this.priorityRules?.[pkg];
+        return false;
+    };
+    list.innerHTML = visibleApps.map(app => {
+        const tags = this.renderAppPolicyTags(app.packageName);
+        return `<div class="app-policy-row ${isActive(app.packageName) ? 'active' : ''}" data-pkg="${this.escapeHtml(app.packageName)}" data-label="${this.escapeHtml(app.label)}"><img class="freeze-app-icon app-policy-icon" data-pkg="${this.escapeHtml(app.packageName)}" alt="${this.escapeHtml(app.label)}"><div class="app-policy-info"><div class="app-policy-name">${this.escapeHtml(app.label)}</div><div class="app-policy-package">${this.escapeHtml(app.packageName)}</div><div class="app-policy-tags">${tags}</div></div><div class="app-policy-check">✓</div></div>`;
+    }).join('');
+    list.querySelectorAll('.app-policy-row').forEach(row => {
+        row.addEventListener('click', async () => {
+            const pkg = row.dataset.pkg;
+            await this.openAppProfilePicker(pkg, row.dataset.label || pkg);
+        });
+    });
+    list.querySelectorAll('.app-policy-icon').forEach(img => {
+        const row = img.closest('.app-policy-row');
+        img.src = this.getFallbackAppIcon(row?.dataset.label || img.dataset.pkg);
+    });
+    this.primeVisibleAppMetadata(32);
+};
+CoronaAddon.prototype.reorderAppPolicyRow = function(pkg) {
+    const list = document.getElementById('app-policy-list');
+    const safePkg = String(pkg).replace(/"/g, '\"');
+    const row = document.querySelector(`.app-policy-row[data-pkg="${safePkg}"]`);
+    if (!list || !row) return;
+    const active = this.appPolicy.whitelist.includes(pkg) || this.appPolicy.protect.includes(pkg) || this.appPolicy.profiles.includes(pkg) || !!this.priorityRules?.[pkg];
+    if (active) list.prepend(row);
+};
+CoronaAddon.prototype.toggleAppPolicyPackage = async function(mode, pkg) {
+    this.ensureAppPolicyState();
+    const key = mode;
+    const set = new Set(this.appPolicy[key] || []);
+    const adding = !set.has(pkg);
+    if (adding) set.add(pkg); else set.delete(pkg);
+    this.appPolicy[key] = [...set];
+    const label = key === 'whitelist' ? '白名单' : key === 'protect' ? '保护列表' : '列表';
+    this.updateAppPolicyRow(pkg);
+    this.reorderAppPolicyRow(pkg);
+    this.renderAppPolicySummary();
+    this.showToast(`${pkg} 已${adding ? '加入' : '移出'}${label}`);
+    this.exec(this.getAppPolicyScript('list-set', key, adding ? 'add' : 'del', this.shellQuote(pkg))).catch(() => {});
+    this.scheduleAppPolicySync();
+};
+CoronaAddon.prototype.openAppProfilePicker = async function(pkg, label) {
+    this.ensureAppPolicyState();
+    this.selectedAppProfilePackage = pkg;
+    this.selectedAppProfileLabel = label || pkg;
+    const title = document.getElementById('app-profile-title');
+    if (title) title.textContent = label || pkg;
+    this.renderAppProfileChoices();
+    this.showOverlay('app-profile-overlay');
+};
+CoronaAddon.prototype.renderAppProfileChoices = function() {
+    const container = document.getElementById('app-profile-options');
+    if (!container) return;
+    const snapshots = Array.isArray(this.parameterSnapshots) ? this.parameterSnapshots : [];
+    const pkg = this.selectedAppProfilePackage;
+    const inWhitelist = this.appPolicy.whitelist.includes(pkg);
+    const inProtect = this.appPolicy.protect.includes(pkg);
+    const hasProfile = this.appPolicy.profiles.includes(pkg);
+    const priorityRule = this.priorityRules?.[pkg] || null;
+    const actionOptions = [
+        `<div class="doze-preset" data-mode="toggle-whitelist"><div class="doze-preset-name">${inWhitelist ? '移出白名单' : '加入白名单'}</div><div class="doze-preset-desc">紧急回收时跳过这个应用</div></div>`,
+        `<div class="doze-preset" data-mode="toggle-protect"><div class="doze-preset-name">${inProtect ? '取消保护进程' : '加入保护进程'}</div><div class="doze-preset-desc">尝试持续保活并迁入受保护内存组</div></div>`,
+        `<div class="doze-preset" data-mode="priority"><div class="doze-preset-name">${priorityRule ? '调整优先级策略' : '设置优先级策略'}</div><div class="doze-preset-desc">nice ${priorityRule?.nice ?? 0} · I/O ${priorityRule ? `${priorityRule.ioClass}/${priorityRule.ioLevel}` : '2/4'}</div></div>`,
+        `<div class="doze-preset" data-mode="current"><div class="doze-preset-name">${hasProfile ? '覆盖应用预设' : '使用当前配置创建预设'}</div><div class="doze-preset-desc">将当前 config 下的已保存参数写入该应用独立预设目录</div></div>`
+    ];
+    const clearOption = hasProfile ? `<div class="doze-preset" data-mode="clear"><div class="doze-preset-name">清除应用预设</div><div class="doze-preset-desc">删除该应用的独立预设，下次切回默认配置</div></div>` : '';
+    const snapshotOptions = snapshots.map(snapshot => `<div class="doze-preset" data-mode="snapshot" data-snapshot-id="${this.escapeHtml(snapshot.id || '')}"><div class="doze-preset-name">套用快照：${this.escapeHtml(snapshot.name || '未命名快照')}</div><div class="doze-preset-desc">${this.escapeHtml(this.formatSnapshotTime(snapshot.createdAt))} · ${Object.keys(snapshot.files || {}).length} 个配置</div></div>`).join('');
+    container.innerHTML = actionOptions.join('') + snapshotOptions + clearOption;
+    container.querySelectorAll('.doze-preset').forEach(item => {
+        item.addEventListener('click', async () => {
+            const mode = item.dataset.mode;
+            if (mode === 'toggle-whitelist') await this.toggleAppPolicyPackage('whitelist', this.selectedAppProfilePackage);
+            if (mode === 'toggle-protect') await this.toggleAppPolicyPackage('protect', this.selectedAppProfilePackage);
+            if (mode === 'priority') { this.selectedPriorityProcess = this.selectedAppProfilePackage; this.hideOverlay('app-profile-overlay'); this.showPrioritySetting(); return; }
+            if (mode === 'current') await this.setAppProfileFromCurrentConfig(this.selectedAppProfilePackage);
+            if (mode === 'snapshot') await this.setAppProfileFromSnapshot(this.selectedAppProfilePackage, item.dataset.snapshotId);
+            if (mode === 'clear') await this.clearAppProfile(this.selectedAppProfilePackage);
+            this.hideOverlay('app-profile-overlay');
+            this.renderAppPolicySummary();
+            this.updateAppPolicyRow(this.selectedAppProfilePackage);
+        });
+    });
+};
+CoronaAddon.prototype.writeProfileFiles = async function(pkg, files) {
+    const dir = `${this.configDir}/app_profiles/${pkg}`;
+    await this.exec(`rm -rf ${this.shellQuote(dir)} && mkdir -p ${this.shellQuote(dir)}`);
+    for (const [filename, content] of Object.entries(files || {})) {
+        const b64 = btoa(unescape(encodeURIComponent(String(content))));
+        await this.exec(`echo '${b64}' | base64 -d > ${this.shellQuote(`${dir}/${filename}`)}`);
+    }
+    await this.exec(`cp ${this.shellQuote(`${this.configDir}/runtime.conf`)} ${this.shellQuote(`${dir}/runtime.conf`)} 2>/dev/null`);
+    if (!this.appPolicy.profiles.includes(pkg)) this.appPolicy.profiles.push(pkg);
+    this.appPolicy.profiles = [...new Set(this.appPolicy.profiles)];
+    this.updateAppPolicyRow(pkg);
+    this.reorderAppPolicyRow(pkg);
+    this.renderAppPolicySummary();
+    this.showToast('应用预设已保存');
+    this.exec(this.getAppPolicyScript('list-set', 'profiles', 'add', this.shellQuote(pkg))).catch(() => {});
+    this.scheduleAppPolicySync();
+};
+CoronaAddon.prototype.copyCurrentConfigToProfile = async function(pkg) {
+    const dir = `${this.configDir}/app_profiles/${pkg}`;
+    const names = ['zram.conf','le9ec.conf','io_scheduler.conf','cpu_governor.conf','cpu_hotplug.conf','tcp.conf','process_priority.conf','swap.conf','vm.conf','kernel.conf','corona_kernel.conf'];
+    const copyCmd = names.map(name => `[ -f ${this.shellQuote(`${this.configDir}/${name}`)} ] && cp ${this.shellQuote(`${this.configDir}/${name}`)} ${this.shellQuote(`${dir}/${name}`)} 2>/dev/null`).join('; ');
+    await this.exec(`rm -rf ${this.shellQuote(dir)} && mkdir -p ${this.shellQuote(dir)}; ${copyCmd}; cp ${this.shellQuote(`${this.configDir}/runtime.conf`)} ${this.shellQuote(`${dir}/runtime.conf`)} 2>/dev/null`);
+    if (!this.appPolicy.profiles.includes(pkg)) this.appPolicy.profiles.push(pkg);
+    this.appPolicy.profiles = [...new Set(this.appPolicy.profiles)];
+    this.updateAppPolicyRow(pkg);
+    this.reorderAppPolicyRow(pkg);
+    this.renderAppPolicySummary();
+    this.showToast('应用预设已保存');
+    this.exec(this.getAppPolicyScript('list-set', 'profiles', 'add', this.shellQuote(pkg))).catch(() => {});
+    this.scheduleAppPolicySync();
+};
+CoronaAddon.prototype.setAppProfileFromCurrentConfig = async function(pkg) {
+    const files = await this.collectSnapshotFiles();
+    if (!files || Object.keys(files).length === 0) {
+        this.showToast('当前没有可保存为预设的配置');
+        return;
+    }
+    await this.copyCurrentConfigToProfile(pkg);
+};
+CoronaAddon.prototype.setAppProfileFromSnapshot = async function(pkg, snapshotId) {
+    const snapshot = (this.parameterSnapshots || []).find(item => item.id === snapshotId);
+    if (!snapshot || !snapshot.files || Object.keys(snapshot.files).length === 0) {
+        this.showToast('快照不存在或为空');
+        return;
+    }
+    await this.writeProfileFiles(pkg, snapshot.files);
+};
+CoronaAddon.prototype.clearAppProfile = async function(pkg) {
+    await this.exec(`rm -rf ${this.shellQuote(`${this.configDir}/app_profiles/${pkg}`)}`);
+    this.appPolicy.profiles = this.appPolicy.profiles.filter(item => item !== pkg);
+    await this.saveAppRulesConfig('应用预设已清除');
+    this.updateAppPolicyRow(pkg);
+};
+CoronaAddon.prototype.runMemClean = async function(mode) {
+    this.memCleanRunning = true;
+    const section = document.getElementById('memclean-section');
+    const progress = document.getElementById('memclean-progress');
+    const resultDiv = document.getElementById('memclean-result');
+    const fill = document.getElementById('memclean-fill');
+    const percent = document.getElementById('memclean-percent');
+    const status = document.getElementById('memclean-status');
+    const resultContent = document.getElementById('memclean-result-content');
+    section.classList.add('memclean-running');
+    progress.classList.remove('hidden');
+    resultDiv.classList.add('hidden');
+    fill.style.width = '0%';
+    percent.textContent = '0%';
+    status.textContent = '准备中...';
+    const modeNames = { 'drop-caches': '清理缓存', 'drop-all': '深度清理', compact: '内存整理', 'kill-bg': '清理后台', 'emergency-reclaim': '紧急回收', 'full-clean': '紧急回收' };
+    const modeName = modeNames[mode] || mode;
+    fill.style.width = '30%';
+    percent.textContent = '30%';
+    status.textContent = '正在执行系统回收...';
+    const raw = await this.exec(this.getAppPolicyScript('memclean', mode));
+    fill.style.width = '85%';
+    percent.textContent = '85%';
+    status.textContent = '整理结果...';
+    const info = {};
+    String(raw || '').split('\n').forEach(line => {
+        const idx = line.indexOf('=');
+        if (idx > 0) info[line.slice(0, idx)] = line.slice(idx + 1);
+    });
+    const before = (parseInt(info.before_kb || '0', 10) || 0) * 1024;
+    const after = (parseInt(info.after_kb || '0', 10) || 0) * 1024;
+    const freed = (parseInt(info.freed_kb || '0', 10) || 0) * 1024;
+    const killed = String(info.killed || '').trim();
+    fill.style.width = '100%';
+    percent.textContent = '100%';
+    status.textContent = '清理完成';
+    resultContent.innerHTML = `<div class="result-item"><span>清理前可用</span><span>${this.formatBytes(before)}</span></div><div class="result-item"><span>清理后可用</span><span>${this.formatBytes(after)}</span></div><div class="result-item result-highlight"><span>已释放内存</span><span>${this.formatBytes(freed)}</span></div>${killed ? `<div class="result-item"><span>处理应用</span><span>${this.escapeHtml(killed)}</span></div>` : ''}`;
+    resultDiv.classList.remove('hidden');
+    this.sendNotification('Corona 内存清理', `${modeName}完成，释放了 ${this.formatBytes(freed)}`);
+    await this.sleep(800);
+    progress.classList.add('hidden');
+    section.classList.remove('memclean-running');
+    this.memCleanRunning = false;
+    this.showToast(`${modeName} 完成`);
+};
+
 function rafThrottle(fn) {
     let scheduled = false;
     let lastArgs = null;
