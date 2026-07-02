@@ -2672,6 +2672,12 @@ body.theme-gold .priority-add-btn {
     border-color: var(--primary);
 }
 
+.doze-preset.disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
 .doze-preset-name {
     font-size: 15px;
     font-weight: 600;

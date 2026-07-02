@@ -185,6 +185,33 @@ get_foreground_package() {
     [ -n "$pkg" ] && echo "$pkg"
 }
 
+humanize_package_name() {
+    pkg="$1"
+    printf '%s' "$pkg" | awk -F'.' '
+        {
+            n=0
+            for (i=1; i<=NF; i++) {
+                part=$i
+                low=tolower(part)
+                if (low=="com" || low=="org" || low=="net" || low=="android" || low=="app" || low=="cn") continue
+                keep[++n]=part
+            }
+            if (n==0) {
+                print $NF
+                next
+            }
+            start=n>1 ? n-1 : n
+            out=""
+            for (i=start; i<=n; i++) {
+                gsub(/[_-]+/, " ", keep[i])
+                if (length(keep[i])>0) keep[i]=toupper(substr(keep[i],1,1)) substr(keep[i],2)
+                out = out (out=="" ? "" : " ") keep[i]
+            }
+            print out
+        }
+    '
+}
+
 get_package_label() {
     pkg="$1"
     label=$(dumpsys package "$pkg" 2>/dev/null | sed -n 's/^[[:space:]]*application-label://p' | head -n1)
@@ -207,12 +234,13 @@ output_label() {
 }
 
 list_apps() {
-    pm list packages -3 2>/dev/null | cut -d: -f2 | sort -u | while IFS= read -r pkg; do
-        [ -n "$pkg" ] || continue
-        component=$(resolve_launcher_component "$pkg")
-        [ -n "$component" ] || continue
-        printf '%s|%s\n' "$pkg" "$component"
-    done
+    user_file=$(mktemp)
+    launch_file=$(mktemp)
+    pm list packages -3 2>/dev/null | cut -d: -f2 | sort -u > "$user_file"
+    cmd package query-activities -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --brief 2>/dev/null |
+        awk '/^[[:space:]]+[A-Za-z0-9_.-]+\// { gsub(/^[[:space:]]+/, "", $1); comp=$1; split(comp, a, "/"); if (a[1] != "" && !seen[a[1]]++) print a[1] "|" comp } /^[A-Za-z0-9_.-]+\// { comp=$1; split(comp, a, "/"); if (a[1] != "" && !seen[a[1]]++) print a[1] "|" comp }' > "$launch_file"
+    awk -F'|' 'NR==FNR { user[$1]=1; next } user[$1] { print $0 }' "$user_file" "$launch_file"
+    rm -f "$user_file" "$launch_file"
 }
 
 list_zip_entries() {
@@ -296,12 +324,27 @@ output_icon_file() {
 }
 
 output_app_meta() {
-    list_apps | while IFS='|' read -r pkg component; do
-        [ -n "$pkg" ] || continue
-        component=$(printf '%s' "$component" | sed 's/[[:space:]]*$//')
-        label=$(output_label "$pkg" "$component")
-        printf '%s|%s|%s\n' "$pkg" "$component" "$label"
-    done
+    payload=$(list_apps)
+    [ -n "$payload" ] || return 0
+    batch=$(run_launcher_meta label-batch "$payload")
+    if [ -n "$batch" ]; then
+        printf '%s
+' "$payload" | while IFS='|' read -r pkg component; do
+            [ -n "$pkg" ] || continue
+            label=$(printf '%s
+' "$batch" | awk -F'|' -v key="$pkg" '$1 == key { print substr($0, index($0, "|") + 1); exit }')
+            [ -n "$label" ] || label=$(humanize_package_name "$pkg")
+            printf '%s|%s|%s\n' "$pkg" "$component" "$label"
+        done
+    else
+        printf '%s
+' "$payload" | while IFS='|' read -r pkg component; do
+            [ -n "$pkg" ] || continue
+            component=$(printf '%s' "$component" | sed 's/[[:space:]]*$//')
+            label=$(output_label "$pkg" "$component")
+            printf '%s|%s|%s\n' "$pkg" "$component" "$label"
+        done
+    fi
 }
 
 is_package_running() {
@@ -455,6 +498,12 @@ case "$1" in
     priority-get) serialize_priority_rule "$2" ;;
     priority-set) set_priority_rule "$2" "$3" "$4" "$5" ;;
     priority-del) delete_priority_rule "$2" ;;
+    label-batch)
+        printf '%s' "$2" | tr ',' '\n' | while IFS= read -r pkg; do
+            [ -n "$pkg" ] || continue
+            label=$(output_label "$pkg")
+            printf '%s|%s\n' "$pkg" "$label"
+        done ;;
     label) output_label "$2" "$3" ;;
     icon) output_icon "$2" "$3" ;;
     icon-file) output_icon_file "$2" "$3" ;;
