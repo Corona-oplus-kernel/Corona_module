@@ -1352,19 +1352,25 @@
             <div class="detail-header">
                 <span class="detail-title" id="thread-rule-title">线程规则</span>
                             </div>
-            <div class="thread-rule-section">
-                <div class="thread-rule-section-title">现有规则</div>
-                <div class="priority-process-list" id="thread-rule-list">
-                    <div class="priority-loading">加载中...</div>
+            <div class="thread-rule-section active" data-panel="rules">
+                <button class="thread-rule-section-title" data-panel-toggle="rules"><span>现有规则</span><span class="thread-rule-section-arrow">⌄</span></button>
+                <div class="thread-rule-section-body" data-panel-body="rules">
+                    <div class="priority-process-list" id="thread-rule-list">
+                        <div class="priority-loading">加载中...</div>
+                    </div>
                 </div>
             </div>
-            <div class="thread-rule-section">
-                <div class="thread-rule-section-title">常用线程</div>
-                <div class="thread-chip-list" id="thread-rule-common-list"></div>
+            <div class="thread-rule-section" data-panel="common">
+                <button class="thread-rule-section-title" data-panel-toggle="common"><span>常用线程模式</span><span class="thread-rule-section-arrow">⌄</span></button>
+                <div class="thread-rule-section-body" data-panel-body="common">
+                    <div class="thread-chip-list thread-chip-grid" id="thread-rule-common-list"></div>
+                </div>
             </div>
-            <div class="thread-rule-section">
-                <div class="thread-rule-section-title">当前运行线程</div>
-                <div class="thread-chip-list" id="thread-rule-live-list"><div class="priority-loading">正在读取...</div></div>
+            <div class="thread-rule-section" data-panel="live">
+                <button class="thread-rule-section-title" data-panel-toggle="live"><span>当前运行线程</span><span class="thread-rule-section-arrow">⌄</span></button>
+                <div class="thread-rule-section-body" data-panel-body="live">
+                    <div class="thread-chip-list thread-chip-grid" id="thread-rule-live-list"><div class="priority-empty">展开后读取</div></div>
+                </div>
             </div>
         </div>
     </div>
