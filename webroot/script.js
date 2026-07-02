@@ -4206,11 +4206,17 @@ CoronaAddon.prototype.renderAppPolicySummary = function() {
     const pt = Object.keys(this.priorityRules || {}).length;
     const configuredCount = new Set([...(this.appPolicy.whitelist || []), ...(this.appPolicy.protect || []), ...(this.appPolicy.profiles || []), ...Object.keys(this.priorityRules || {})]).size;
     const badge = document.getElementById('app-policy-badge');
-    if (badge) badge.textContent = `白${wl} 保${pr} 预${pf} 优${pt}`;
+    if (badge) badge.textContent = configuredCount > 0 ? `${configuredCount} 个应用` : '未配置';
     const status = document.getElementById('app-policy-status');
-    if (status) status.textContent = this.appPolicy.monitorEnabled
-        ? `自动切换已开启；当前白名单 ${wl} 个，保护 ${pr} 个，应用预设 ${pf} 个，优先级 ${pt} 个。`
-        : `自动切换未开启；当前白名单 ${wl} 个，保护 ${pr} 个，应用预设 ${pf} 个，优先级 ${pt} 个。`;
+    if (status) {
+        if (configuredCount <= 0) {
+            status.textContent = '还没有配置任何应用策略';
+        } else if (this.appPolicy.monitorEnabled && pf > 0) {
+            status.textContent = `已配置 ${configuredCount} 个应用，应用预设自动切换已开启`;
+        } else {
+            status.textContent = `已配置 ${configuredCount} 个应用`;
+        }
+    }
     const switchMonitor = document.getElementById('app-monitor-switch');
     const switchNotify = document.getElementById('app-notify-switch');
     const manageBtn = document.getElementById('app-policy-manage-btn');
@@ -4357,12 +4363,11 @@ CoronaAddon.prototype.humanizePackageName = function(pkg) {
     return picked.map(part => part.replace(/[_-]+/g, ' ').replace(/\w/g, c => c.toUpperCase())).join(' ');
 };
 CoronaAddon.prototype.getAppPolicyTags = function(pkg) {
-    const tags = [];
-    if (this.appPolicy.whitelist.includes(pkg)) tags.push('白名单');
-    if (this.appPolicy.protect.includes(pkg)) tags.push('保护');
-    if (this.appPolicy.profiles.includes(pkg)) tags.push('预设');
-    if (this.priorityRules && this.priorityRules[pkg]) tags.push('优先级');
-    return tags;
+    if (this.appPolicy.profiles.includes(pkg)) return ['预设'];
+    if (this.appPolicy.protect.includes(pkg)) return ['保护'];
+    if (this.appPolicy.whitelist.includes(pkg)) return ['白名单'];
+    if (this.priorityRules && this.priorityRules[pkg]) return ['优先级'];
+    return [];
 };
 CoronaAddon.prototype.openAppPolicyOverlay = async function(mode) {
     this.ensureAppPolicyState();
@@ -4473,22 +4478,19 @@ CoronaAddon.prototype.renderAppProfileChoices = function() {
     const hasProfile = this.appPolicy.profiles.includes(pkg);
     const priorityRule = this.priorityRules?.[pkg] || null;
     const currentConfigCount = Number(this.currentProfileConfigCount || 0);
-    const currentDisabled = currentConfigCount <= 0;
     const actionOptions = [
         `<div class="doze-preset" data-mode="toggle-whitelist"><div class="doze-preset-name">${inWhitelist ? '移出白名单' : '加入白名单'}</div><div class="doze-preset-desc">紧急回收时跳过这个应用</div></div>`,
         `<div class="doze-preset" data-mode="toggle-protect"><div class="doze-preset-name">${inProtect ? '取消保护进程' : '加入保护进程'}</div><div class="doze-preset-desc">尝试持续保活并迁入受保护内存组</div></div>`,
-        `<div class="doze-preset" data-mode="priority"><div class="doze-preset-name">${priorityRule ? '调整优先级策略' : '设置优先级策略'}</div><div class="doze-preset-desc">nice ${priorityRule?.nice ?? 0} · I/O ${priorityRule ? `${priorityRule.ioClass}/${priorityRule.ioLevel}` : '2/4'}</div></div>`,
-        `<div class="doze-preset${currentDisabled ? ' disabled' : ''}" data-mode="current" ${currentDisabled ? 'data-disabled="1"' : ''}><div class="doze-preset-name">${hasProfile ? '覆盖应用预设' : '使用当前配置创建预设'}</div><div class="doze-preset-desc">${currentDisabled ? '当前没有可保存为预设的配置' : '将当前 config 下的已保存参数写入该应用独立预设目录'}</div></div>`
+        `<div class="doze-preset" data-mode="priority"><div class="doze-preset-name">${priorityRule ? '调整优先级策略' : '设置优先级策略'}</div><div class="doze-preset-desc">nice ${priorityRule?.nice ?? 0} · I/O ${priorityRule ? `${priorityRule.ioClass}/${priorityRule.ioLevel}` : '2/4'}</div></div>`
     ];
+    if (currentConfigCount > 0) {
+        actionOptions.push(`<div class="doze-preset" data-mode="current"><div class="doze-preset-name">${hasProfile ? '覆盖应用预设' : '使用当前配置创建预设'}</div><div class="doze-preset-desc">将当前 config 下的已保存参数写入该应用独立预设目录</div></div>`);
+    }
     const clearOption = hasProfile ? `<div class="doze-preset" data-mode="clear"><div class="doze-preset-name">清除应用预设</div><div class="doze-preset-desc">删除该应用的独立预设，下次切回默认配置</div></div>` : '';
     const snapshotOptions = snapshots.map(snapshot => `<div class="doze-preset" data-mode="snapshot" data-snapshot-id="${this.escapeHtml(snapshot.id || '')}"><div class="doze-preset-name">套用快照：${this.escapeHtml(snapshot.name || '未命名快照')}</div><div class="doze-preset-desc">${this.escapeHtml(this.formatSnapshotTime(snapshot.createdAt))} · ${Object.keys(snapshot.files || {}).length} 个配置</div></div>`).join('');
     container.innerHTML = actionOptions.join('') + snapshotOptions + clearOption;
     container.querySelectorAll('.doze-preset').forEach(item => {
         item.addEventListener('click', async () => {
-            if (item.dataset.disabled === '1') {
-                this.showToast('当前没有可用预设配置');
-                return;
-            }
             const mode = item.dataset.mode;
             if (mode === 'toggle-whitelist') await this.toggleAppPolicyPackage('whitelist', this.selectedAppProfilePackage);
             if (mode === 'toggle-protect') await this.toggleAppPolicyPackage('protect', this.selectedAppProfilePackage);
