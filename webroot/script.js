@@ -2849,9 +2849,9 @@ class CoronaAddon {
     }
     hideEasterEgg() { const overlay = document.getElementById('easter-egg-overlay'); overlay.classList.remove('show'); this.easterEgg.isOverlayOpen = false; setTimeout(() => { const card = document.getElementById('easter-egg-card'); card.style.transform = ''; card.style.transition = ''; }, 400); }
     initPerformanceMode() { this.initProcessPriority(); }
-    async loadPerformanceModeConfig() { await this.loadPriorityConfig(); }
+    async loadPerformanceModeConfig() { await this.loadPriorityConfig(); await this.loadThreadPriorityConfig(); }
     initProcessPriority() {
-        this.priorityRules = {}; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4;
+        this.priorityRules = {}; this.threadPriorityRules = []; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4; this.selectedThreadRuleKey = null; this.selectedThreadRulePackage = ''; this.selectedThreadRuleLabel = ''; this.selectedThreadPattern = ''; this.selectedThreadNice = 0; this.selectedThreadIoClass = 2; this.selectedThreadIoLevel = 4; this.selectedThreadAffinity = ''; this.selectedThreadSchedPolicy = 'normal'; this.selectedThreadRtPrio = 1;
         document.getElementById('priority-cancel-btn').addEventListener('click', () => this.hideOverlay('priority-setting-overlay'));
         document.getElementById('priority-save-btn').addEventListener('click', () => this.savePriorityRule());
         document.getElementById('priority-process-search').addEventListener('input', (e) => { this.filterPriorityProcessList(e.target.value); });
@@ -2861,6 +2861,7 @@ class CoronaAddon {
         const niceValue = document.getElementById('nice-slider-value');
         niceSlider.addEventListener('input', () => { this.selectedNice = parseInt(niceSlider.value); niceValue.textContent = this.selectedNice; this.updateSliderProgress(niceSlider); });
         document.querySelectorAll('.io-option').forEach(opt => { opt.addEventListener('click', () => { document.querySelectorAll('.io-option').forEach(o => o.classList.remove('selected')); opt.classList.add('selected'); this.selectedIoClass = parseInt(opt.dataset.class); this.selectedIoLevel = parseInt(opt.dataset.level); }); });
+        this.initThreadRuleUi();
     }
     async loadPriorityConfig() {
         const config = await this.exec(`cat ${this.configDir}/process_priority.conf 2>/dev/null`);
@@ -2871,6 +2872,7 @@ class CoronaAddon {
         }
         this.renderPriorityRules();
         this.updatePriorityCount();
+        await this.loadThreadPriorityConfig();
     }
     renderPriorityRules() {
         const container = document.getElementById('priority-rules-list');
@@ -3006,6 +3008,160 @@ class CoronaAddon {
         this.showToast(`已删除 ${processName} 的优先级规则`);
     }
     async applyAllPriorityRules() { const promises = Object.keys(this.priorityRules).map(name => this.applyPriorityRule(name)); await Promise.all(promises); }
+    initThreadRuleUi() {
+        document.getElementById('thread-rule-overlay')?.addEventListener('click', (e) => { if (e.target.id === 'thread-rule-overlay') this.hideOverlay('thread-rule-overlay'); });
+        document.getElementById('thread-rule-editor-overlay')?.addEventListener('click', (e) => { if (e.target.id === 'thread-rule-editor-overlay') this.hideOverlay('thread-rule-editor-overlay'); });
+        document.getElementById('thread-rule-add-btn')?.addEventListener('click', () => this.openThreadRuleEditor());
+        document.getElementById('thread-rule-cancel-btn')?.addEventListener('click', () => this.hideOverlay('thread-rule-editor-overlay'));
+        document.getElementById('thread-rule-save-btn')?.addEventListener('click', () => this.saveThreadRule());
+        const slider = document.getElementById('thread-nice-slider');
+        const value = document.getElementById('thread-nice-slider-value');
+        slider?.addEventListener('input', () => { this.selectedThreadNice = parseInt(slider.value, 10) || 0; value.textContent = this.selectedThreadNice; this.updateSliderProgress(slider); });
+        document.querySelectorAll('.thread-io-option').forEach(opt => { opt.addEventListener('click', () => { document.querySelectorAll('.thread-io-option').forEach(o => o.classList.remove('selected')); opt.classList.add('selected'); this.selectedThreadIoClass = parseInt(opt.dataset.class, 10); this.selectedThreadIoLevel = parseInt(opt.dataset.level, 10); }); });
+    }
+    getThreadRuleKey(pkg, pattern) { return `${pkg}|${pattern}`; }
+    getThreadRulesForPackage(pkg) { return (this.threadPriorityRules || []).filter(rule => rule.packageName === pkg); }
+    getThreadRulePackages() { return [...new Set((this.threadPriorityRules || []).map(rule => rule.packageName).filter(Boolean))]; }
+    serializeThreadPriorityRules(rules = this.threadPriorityRules || []) {
+        return (rules || []).map(rule => `${rule.packageName}|${rule.threadPattern}=${rule.nice}|${rule.ioClass}|${rule.ioLevel}|${rule.affinity || ''}|${rule.schedPolicy || 'normal'}|${rule.rtPrio ?? 1}`).join('\n');
+    }
+    async loadThreadPriorityConfig() {
+        const config = await this.exec(`cat ${this.configDir}/thread_priority.conf 2>/dev/null`);
+        this.threadPriorityRules = [];
+        if (config && config.trim()) {
+            config.trim().split('\n').forEach(line => {
+                if (!line || !line.includes('=')) return;
+                const idx = line.indexOf('=');
+                const target = line.slice(0, idx).trim();
+                const values = line.slice(idx + 1).trim();
+                const splitIndex = target.indexOf('|');
+                if (splitIndex <= 0) return;
+                const packageName = target.slice(0, splitIndex).trim();
+                const threadPattern = target.slice(splitIndex + 1).trim();
+                const parts = values.split('|');
+                const [nice, ioClass, ioLevel, affinity = '', schedPolicy = 'normal', rtPrio = '1'] = parts;
+                this.threadPriorityRules.push({ key: this.getThreadRuleKey(packageName, threadPattern), packageName, threadPattern, nice: parseInt(nice || '0', 10) || 0, ioClass: parseInt(ioClass || '2', 10) || 2, ioLevel: parseInt(ioLevel || '4', 10) || 4, affinity: String(affinity || '').trim(), schedPolicy: String(schedPolicy || 'normal').trim() || 'normal', rtPrio: parseInt(rtPrio || '1', 10) || 1 });
+            });
+        }
+        this.renderAppPolicySummary();
+    }
+    async saveThreadPriorityConfig() {
+        await this.writeConfig('thread_priority.conf', this.serializeThreadPriorityRules());
+    }
+    async applyThreadPriorityRulesNow() {
+        await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --apply-thread-priority >/dev/null 2>&1`);
+        await this.syncAppPolicyDaemon();
+    }
+    getCommonThreadPresets() { return ['RenderThread', 'MainThread', 'GameThread', 'GLThread', 'RHIThread', 'DAVA::RhiThread', 'Thread-*']; }
+    async loadLiveThreadSuggestions(pkg) {
+        const output = await this.exec(this.getAppPolicyScript('thread-list', this.shellQuote(pkg)));
+        return String(output || '').split('\n').map(item => item.trim()).filter(Boolean);
+    }
+    renderThreadChips(containerId, items, onPick) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const unique = [...new Set((items || []).filter(Boolean))];
+        if (unique.length === 0) { container.innerHTML = '<div class="priority-empty">暂无可用线程</div>'; return; }
+        container.innerHTML = unique.map(item => `<div class="thread-chip" data-value="${this.escapeHtml(item)}">${this.escapeHtml(item)}</div>`).join('');
+        container.querySelectorAll('.thread-chip').forEach(chip => chip.addEventListener('click', () => onPick(chip.dataset.value || '')));
+    }
+    renderThreadRuleList() {
+        const list = document.getElementById('thread-rule-list');
+        if (!list) return;
+        const rules = this.getThreadRulesForPackage(this.selectedThreadRulePackage);
+        if (rules.length === 0) {
+            list.innerHTML = '<div class="priority-empty">该应用还没有线程规则</div>';
+            return;
+        }
+        list.innerHTML = rules.map(rule => `<div class="thread-rule-item" data-key="${this.escapeHtml(rule.key)}"><div class="thread-rule-info"><div class="thread-rule-name">${this.escapeHtml(rule.threadPattern)}</div><div class="thread-rule-values">nice ${rule.nice} · I/O ${rule.ioClass}/${rule.ioLevel}${rule.affinity ? ` · 亲和性 ${this.escapeHtml(rule.affinity)}` : ''}${rule.schedPolicy && rule.schedPolicy !== 'normal' ? ` · ${this.escapeHtml(rule.schedPolicy)}(${rule.rtPrio})` : ''}</div></div><div class="thread-rule-actions"><button class="priority-rule-btn edit" data-action="edit" data-key="${this.escapeHtml(rule.key)}">✎</button><button class="priority-rule-btn delete" data-action="delete" data-key="${this.escapeHtml(rule.key)}">✕</button></div></div>`).join('');
+        list.querySelectorAll('.priority-rule-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); const key = btn.dataset.key; if (btn.dataset.action === 'edit') this.openThreadRuleEditor(key); else this.deleteThreadRule(key); }));
+    }
+    async openThreadRuleManager(pkg, label) {
+        this.selectedThreadRulePackage = pkg;
+        this.selectedThreadRuleLabel = label || pkg;
+        const title = document.getElementById('thread-rule-title');
+        if (title) title.textContent = `${label || pkg} · 线程规则`;
+        this.renderThreadRuleList();
+        this.renderThreadChips('thread-rule-common-list', this.getCommonThreadPresets(), (pattern) => this.openThreadRuleEditor(null, pattern));
+        const live = document.getElementById('thread-rule-live-list');
+        if (live) live.innerHTML = '<div class="priority-loading">正在读取...</div>';
+        this.showOverlay('thread-rule-overlay');
+        const liveThreads = await this.loadLiveThreadSuggestions(pkg);
+        this.renderThreadChips('thread-rule-live-list', liveThreads, (pattern) => this.openThreadRuleEditor(null, pattern));
+    }
+    openThreadRuleEditor(ruleKey = null, presetPattern = '') {
+        const existing = ruleKey ? (this.threadPriorityRules || []).find(item => item.key === ruleKey) : null;
+        this.selectedThreadRuleKey = ruleKey || null;
+        this.selectedThreadPattern = existing?.threadPattern || presetPattern || '';
+        this.selectedThreadNice = existing?.nice ?? 0;
+        this.selectedThreadIoClass = existing?.ioClass ?? 2;
+        this.selectedThreadIoLevel = existing?.ioLevel ?? 4;
+        this.selectedThreadAffinity = existing?.affinity || '';
+        this.selectedThreadSchedPolicy = existing?.schedPolicy || 'normal';
+        this.selectedThreadRtPrio = existing?.rtPrio ?? 1;
+        const title = document.getElementById('thread-rule-editor-title');
+        if (title) title.textContent = `${this.selectedThreadRuleLabel || this.selectedThreadRulePackage} · ${existing ? '编辑线程规则' : '新增线程规则'}`;
+        const appInfo = document.getElementById('thread-rule-selected-app');
+        if (appInfo) appInfo.innerHTML = `<span class="process-name">${this.escapeHtml(this.selectedThreadRulePackage)}</span>`;
+        const input = document.getElementById('thread-pattern-input');
+        const affinity = document.getElementById('thread-affinity-input');
+        const sched = document.getElementById('thread-sched-policy');
+        const rt = document.getElementById('thread-rt-prio');
+        const slider = document.getElementById('thread-nice-slider');
+        const sliderValue = document.getElementById('thread-nice-slider-value');
+        if (input) input.value = this.selectedThreadPattern;
+        if (affinity) affinity.value = this.selectedThreadAffinity;
+        if (sched) sched.value = this.selectedThreadSchedPolicy;
+        if (rt) rt.value = String(this.selectedThreadRtPrio);
+        if (slider) { slider.value = String(this.selectedThreadNice); this.updateSliderProgress(slider); }
+        if (sliderValue) sliderValue.textContent = String(this.selectedThreadNice);
+        document.querySelectorAll('.thread-io-option').forEach(opt => opt.classList.toggle('selected', parseInt(opt.dataset.class, 10) === this.selectedThreadIoClass));
+        this.showOverlay('thread-rule-editor-overlay');
+    }
+    async saveThreadRule() {
+        const threadPattern = (document.getElementById('thread-pattern-input')?.value || '').trim();
+        const affinity = (document.getElementById('thread-affinity-input')?.value || '').trim();
+        const schedPolicy = (document.getElementById('thread-sched-policy')?.value || 'normal').trim();
+        const rtPrio = parseInt(document.getElementById('thread-rt-prio')?.value || '1', 10) || 1;
+        if (!threadPattern) { this.showToast('请输入线程名或模式'); return false; }
+        const nextRule = { key: this.getThreadRuleKey(this.selectedThreadRulePackage, threadPattern), packageName: this.selectedThreadRulePackage, threadPattern, nice: this.selectedThreadNice, ioClass: this.selectedThreadIoClass, ioLevel: this.selectedThreadIoLevel, affinity, schedPolicy, rtPrio };
+        const nextRules = (this.threadPriorityRules || []).filter(rule => rule.key !== this.selectedThreadRuleKey && rule.key !== nextRule.key);
+        nextRules.push(nextRule);
+        const confirmed = await this.confirmChangePreview('变更预览', {
+            summary: `即将为 ${this.selectedThreadRulePackage} 保存线程规则 ${threadPattern}。`,
+            configs: [{ filename: 'thread_priority.conf', content: this.serializeThreadPriorityRules(nextRules) }],
+            actions: [affinity ? `对命中线程设置亲和性 ${affinity}` : '不修改线程亲和性', schedPolicy !== 'normal' ? `设置调度策略 ${schedPolicy} (rt=${rtPrio})` : '保持 normal 调度策略', `设置 nice=${this.selectedThreadNice} 与 I/O=${this.selectedThreadIoClass}/${this.selectedThreadIoLevel}`],
+            notes: ['规则会对命中的线程 TID 应用，不影响未匹配线程。']
+        });
+        if (!confirmed) return false;
+        this.threadPriorityRules = nextRules;
+        await this.saveThreadPriorityConfig();
+        await this.applyThreadPriorityRulesNow();
+        this.hideOverlay('thread-rule-editor-overlay');
+        this.renderThreadRuleList();
+        this.renderAppPolicySummary();
+        this.updateAppPolicyRow(this.selectedThreadRulePackage);
+        this.reorderAppPolicyRow(this.selectedThreadRulePackage);
+        this.showToast('线程规则已保存');
+        return true;
+    }
+    async deleteThreadRule(ruleKey) {
+        const nextRules = (this.threadPriorityRules || []).filter(rule => rule.key !== ruleKey);
+        const rule = (this.threadPriorityRules || []).find(item => item.key === ruleKey);
+        const confirmed = await this.confirmChangePreview('变更预览', {
+            summary: `即将删除线程规则 ${rule?.threadPattern || ruleKey}。`,
+            configs: [{ filename: 'thread_priority.conf', content: this.serializeThreadPriorityRules(nextRules) || '# empty' }],
+            notes: ['删除后不会再对匹配线程应用自定义亲和性与调度策略。']
+        });
+        if (!confirmed) return;
+        this.threadPriorityRules = nextRules;
+        await this.saveThreadPriorityConfig();
+        await this.applyThreadPriorityRulesNow();
+        this.renderThreadRuleList();
+        this.renderAppPolicySummary();
+        this.updateAppPolicyRow(this.selectedThreadRulePackage);
+        this.showToast('线程规则已删除');
+    }
     async detectKernelFeatures() {
         const [lruGen, thp, ksm, compaction] = await Promise.all([
             this.exec('cat /sys/kernel/mm/lru_gen/enabled 2>/dev/null'),
@@ -4242,7 +4398,8 @@ CoronaAddon.prototype.renderAppPolicySummary = function() {
     const pr = this.appPolicy.protect.length;
     const pf = this.appPolicy.profiles.length;
     const pt = Object.keys(this.priorityRules || {}).length;
-    const configuredCount = new Set([...(this.appPolicy.whitelist || []), ...(this.appPolicy.protect || []), ...(this.appPolicy.profiles || []), ...Object.keys(this.priorityRules || {})]).size;
+    const threadPackages = this.getThreadRulePackages();
+    const configuredCount = new Set([...(this.appPolicy.whitelist || []), ...(this.appPolicy.protect || []), ...(this.appPolicy.profiles || []), ...Object.keys(this.priorityRules || {}), ...threadPackages]).size;
     const badge = document.getElementById('app-policy-badge');
     if (badge) badge.textContent = configuredCount > 0 ? `${configuredCount} 个应用` : '未配置';
     const status = document.getElementById('app-policy-status');
@@ -4288,7 +4445,7 @@ CoronaAddon.prototype.loadAppRulesConfig = async function() {
     this.renderAppPolicySummary();
 };
 CoronaAddon.prototype.syncAppPolicyDaemon = async function() {
-    const shouldRun = !!this.appPolicy.monitorEnabled || (this.appPolicy.protect || []).length > 0;
+    const shouldRun = !!this.appPolicy.monitorEnabled || (this.appPolicy.protect || []).length > 0 || (this.appPolicy.profiles || []).length > 0 || this.getThreadRulePackages().length > 0;
     const pidFile = `${this.modDir}/.app_policy_daemon.pid`;
     if (shouldRun) {
         await this.exec(`${this.getAppPolicyScript('daemon')} >/dev/null 2>&1 &`);
@@ -4451,6 +4608,7 @@ CoronaAddon.prototype.hydrateAppPolicyIcons = function(container) {
 };
 CoronaAddon.prototype.getAppPolicyTags = function(pkg) {
     if (this.appPolicy.profiles.includes(pkg)) return ['预设'];
+    if (this.getThreadRulesForPackage(pkg).length > 0) return ['线程'];
     if (this.appPolicy.protect.includes(pkg)) return ['保护'];
     if (this.appPolicy.whitelist.includes(pkg)) return ['白名单'];
     if (this.priorityRules && this.priorityRules[pkg]) return ['优先级'];
@@ -4492,7 +4650,7 @@ CoronaAddon.prototype.updateAppPolicyRow = function(pkg) {
     const safePkg = String(pkg).replace(/"/g, '\"');
     const row = document.querySelector(`.app-policy-row[data-pkg="${safePkg}"]`);
     if (!row) return;
-    const active = this.appPolicy.whitelist.includes(pkg) || this.appPolicy.protect.includes(pkg) || this.appPolicy.profiles.includes(pkg) || !!this.priorityRules?.[pkg];
+    const active = this.appPolicy.whitelist.includes(pkg) || this.appPolicy.protect.includes(pkg) || this.appPolicy.profiles.includes(pkg) || !!this.priorityRules?.[pkg] || this.getThreadRulesForPackage(pkg).length > 0;
     row.classList.toggle('active', active);
     const tagsEl = row.querySelector('.app-policy-tags');
     if (tagsEl) tagsEl.innerHTML = this.renderAppPolicyTags(pkg);
@@ -4505,8 +4663,8 @@ CoronaAddon.prototype.renderAppPolicyList = function() {
     const apps = this.installedApps
         .filter(app => !keyword || app.label.toLowerCase().includes(keyword) || app.packageName.toLowerCase().includes(keyword))
         .sort((a, b) => {
-            const aActive = this.appPolicy.whitelist.includes(a.packageName) || this.appPolicy.protect.includes(a.packageName) || this.appPolicy.profiles.includes(a.packageName) || !!this.priorityRules?.[a.packageName];
-            const bActive = this.appPolicy.whitelist.includes(b.packageName) || this.appPolicy.protect.includes(b.packageName) || this.appPolicy.profiles.includes(b.packageName) || !!this.priorityRules?.[b.packageName];
+            const aActive = this.appPolicy.whitelist.includes(a.packageName) || this.appPolicy.protect.includes(a.packageName) || this.appPolicy.profiles.includes(a.packageName) || !!this.priorityRules?.[a.packageName] || this.getThreadRulesForPackage(a.packageName).length > 0;
+            const bActive = this.appPolicy.whitelist.includes(b.packageName) || this.appPolicy.protect.includes(b.packageName) || this.appPolicy.profiles.includes(b.packageName) || !!this.priorityRules?.[b.packageName] || this.getThreadRulesForPackage(b.packageName).length > 0;
             if (aActive !== bActive) return aActive ? -1 : 1;
             return a.label.localeCompare(b.label, 'zh-Hans-CN-u-co-pinyin') || a.packageName.localeCompare(b.packageName);
         });
@@ -4517,7 +4675,7 @@ CoronaAddon.prototype.renderAppPolicyList = function() {
     const mode = this.currentAppPolicyMode;
     const visibleApps = apps;
     const isActive = (pkg) => {
-        if (mode === 'manage') return this.appPolicy.whitelist.includes(pkg) || this.appPolicy.protect.includes(pkg) || this.appPolicy.profiles.includes(pkg) || !!this.priorityRules?.[pkg];
+        if (mode === 'manage') return this.appPolicy.whitelist.includes(pkg) || this.appPolicy.protect.includes(pkg) || this.appPolicy.profiles.includes(pkg) || !!this.priorityRules?.[pkg] || this.getThreadRulesForPackage(pkg).length > 0;
         return false;
     };
     list.innerHTML = visibleApps.map(app => {
@@ -4537,7 +4695,7 @@ CoronaAddon.prototype.reorderAppPolicyRow = function(pkg) {
     const safePkg = String(pkg).replace(/"/g, '\"');
     const row = document.querySelector(`.app-policy-row[data-pkg="${safePkg}"]`);
     if (!list || !row) return;
-    const active = this.appPolicy.whitelist.includes(pkg) || this.appPolicy.protect.includes(pkg) || this.appPolicy.profiles.includes(pkg) || !!this.priorityRules?.[pkg];
+    const active = this.appPolicy.whitelist.includes(pkg) || this.appPolicy.protect.includes(pkg) || this.appPolicy.profiles.includes(pkg) || !!this.priorityRules?.[pkg] || this.getThreadRulesForPackage(pkg).length > 0;
     if (active) list.prepend(row);
 };
 CoronaAddon.prototype.toggleAppPolicyPackage = async function(mode, pkg) {
@@ -4595,6 +4753,7 @@ CoronaAddon.prototype.renderAppProfileChoices = function() {
     const actionOptions = [
         `<div class="doze-preset" data-mode="toggle-whitelist"><div class="doze-preset-name">${inWhitelist ? '移出白名单' : '加入白名单'}</div><div class="doze-preset-desc">紧急回收时跳过这个应用</div></div>`,
         `<div class="doze-preset" data-mode="toggle-protect"><div class="doze-preset-name">${inProtect ? '取消保护进程' : '加入保护进程'}</div><div class="doze-preset-desc">尝试持续保活并迁入受保护内存组</div></div>`,
+        `<div class="doze-preset" data-mode="threads"><div class="doze-preset-name">管理线程规则</div><div class="doze-preset-desc">自定义线程亲和性、调度策略与优先级</div></div>`,
         `<div class="doze-preset" data-mode="priority"><div class="doze-preset-name">${priorityRule ? '调整优先级策略' : '设置优先级策略'}</div><div class="doze-preset-desc">nice ${priorityRule?.nice ?? 0} · I/O ${priorityRule ? `${priorityRule.ioClass}/${priorityRule.ioLevel}` : '2/4'}</div></div>`
     ];
     if (currentConfigCount > 0) {
@@ -4608,6 +4767,11 @@ CoronaAddon.prototype.renderAppProfileChoices = function() {
             const mode = item.dataset.mode;
             if (mode === 'toggle-whitelist') await this.toggleAppPolicyPackage('whitelist', this.selectedAppProfilePackage);
             if (mode === 'toggle-protect') await this.toggleAppPolicyPackage('protect', this.selectedAppProfilePackage);
+            if (mode === 'threads') {
+                this.hideOverlay('app-profile-overlay');
+                await this.openThreadRuleManager(this.selectedAppProfilePackage, this.selectedAppProfileLabel || this.selectedAppProfilePackage);
+                return;
+            }
             if (mode === 'priority') {
                 this.selectedPriorityProcess = this.selectedAppProfilePackage;
                 this.hideOverlay('app-profile-overlay');
