@@ -172,9 +172,8 @@ class CoronaAddon {
         const percent = ((val - min) / (max - min)) * 100;
         const styles = getComputedStyle(document.body);
         const isDark = document.body.classList.contains('theme-dark');
-        const isPurple = slider.closest('.priority-nice-slider-container');
-        const filledColor = isPurple ? 'rgba(156, 39, 176, 0.8)' : (styles.getPropertyValue('--primary').trim() || 'rgba(52, 130, 255, 0.8)');
-        const emptyColor = isDark ? 'rgba(255, 255, 255, 0.15)' : (isPurple ? 'rgba(156, 39, 176, 0.12)' : (styles.getPropertyValue('--primary-dim').trim() || 'rgba(52, 130, 255, 0.12)'));
+        const filledColor = styles.getPropertyValue('--primary').trim() || 'rgba(52, 130, 255, 0.8)';
+        const emptyColor = isDark ? 'rgba(255, 255, 255, 0.15)' : (styles.getPropertyValue('--primary-dim').trim() || 'rgba(52, 130, 255, 0.12)');
         slider.style.background = `linear-gradient(to right, ${filledColor} 0%, ${filledColor} ${percent}%, ${emptyColor} ${percent}%, ${emptyColor} 100%)`;
     }
     initSliderProgress() {
@@ -601,6 +600,16 @@ class CoronaAddon {
                 this.applyTheme(this.state.theme);
                 this.showToast(`${this.t('themeSwitched')}: ${opt.querySelector('span').textContent}`);
             });
+        });
+    }
+    initLanguageToggle() {
+        const select = document.getElementById('language-select');
+        if (!select || select.dataset.bound) return;
+        select.dataset.bound = '1';
+        select.value = this.state.language || 'zh';
+        select.addEventListener('change', () => {
+            this.setLanguage(select.value, true);
+            this.showToast(`${this.t('languageLabel')}: ${select.options[select.selectedIndex]?.text || select.value}`);
         });
     }
     initChangePreviewToggle() {
@@ -3287,12 +3296,16 @@ class CoronaAddon {
         const next = panel || 'rules';
         if (this.threadPanelState === next && next !== 'live') return;
         this.threadPanelState = next;
-        document.querySelectorAll('[data-panel]').forEach(section => {
-            section.classList.toggle('active', section.dataset.panel === next);
+        if (this.threadPanelFrame) cancelAnimationFrame(this.threadPanelFrame);
+        this.threadPanelFrame = requestAnimationFrame(() => {
+            document.querySelectorAll('[data-panel]').forEach(section => {
+                section.classList.toggle('active', section.dataset.panel === next);
+            });
+            this.threadPanelFrame = null;
+            if (next === 'live') {
+                setTimeout(() => this.ensureLiveThreadSuggestions().catch(() => {}), 0);
+            }
         });
-        if (next === 'live') {
-            setTimeout(() => this.ensureLiveThreadSuggestions().catch(() => {}), 0);
-        }
     }
     async ensureLiveThreadSuggestions(force = false) {
         const pkg = this.selectedThreadRulePackage;
