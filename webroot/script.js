@@ -4364,6 +4364,35 @@ CoronaAddon.prototype.humanizePackageName = function(pkg) {
     if (picked.length === 0) picked = parts.slice(-1);
     return picked.map(part => part.replace(/[_-]+/g, ' ').replace(/\w/g, c => c.toUpperCase())).join(' ');
 };
+CoronaAddon.prototype.getAppPolicyIconText = function(label, pkg) {
+    const source = String(label || pkg || '?').trim();
+    return source ? source.charAt(0).toUpperCase() : '?';
+};
+CoronaAddon.prototype.getAppPolicyIconSource = function(pkg) {
+    return `ksu://icon/${encodeURIComponent(String(pkg || ''))}`;
+};
+CoronaAddon.prototype.renderAppPolicyIcon = function(app) {
+    const text = this.escapeHtml(this.getAppPolicyIconText(app.label, app.packageName));
+    const pkg = this.escapeHtml(app.packageName);
+    return `<div class="app-policy-icon-wrap"><img class="app-policy-icon" data-pkg="${pkg}" alt="" loading="lazy" decoding="async"><div class="app-policy-icon-fallback">${text}</div></div>`;
+};
+CoronaAddon.prototype.hydrateAppPolicyIcons = function(container) {
+    if (!container) return;
+    container.querySelectorAll('.app-policy-icon[data-pkg]').forEach(img => {
+        if (img.dataset.bound === '1') return;
+        img.dataset.bound = '1';
+        const fallback = img.nextElementSibling;
+        img.addEventListener('load', () => {
+            img.classList.add('loaded');
+            if (fallback) fallback.classList.remove('show');
+        });
+        img.addEventListener('error', () => {
+            img.classList.remove('loaded');
+            if (fallback) fallback.classList.add('show');
+        });
+        img.src = this.getAppPolicyIconSource(img.dataset.pkg || '');
+    });
+};
 CoronaAddon.prototype.getAppPolicyTags = function(pkg) {
     if (this.appPolicy.profiles.includes(pkg)) return ['预设'];
     if (this.appPolicy.protect.includes(pkg)) return ['保护'];
@@ -4430,8 +4459,9 @@ CoronaAddon.prototype.renderAppPolicyList = function() {
     };
     list.innerHTML = visibleApps.map(app => {
         const tags = this.renderAppPolicyTags(app.packageName);
-        return `<div class="app-policy-row ${isActive(app.packageName) ? 'active' : ''}" data-pkg="${this.escapeHtml(app.packageName)}" data-label="${this.escapeHtml(app.label)}"><div class="app-policy-info"><div class="app-policy-name">${this.escapeHtml(app.label)}</div><div class="app-policy-package">${this.escapeHtml(app.packageName)}</div><div class="app-policy-tags">${tags}</div></div><div class="app-policy-check">✓</div></div>`;
+        return `<div class="app-policy-row ${isActive(app.packageName) ? 'active' : ''}" data-pkg="${this.escapeHtml(app.packageName)}" data-label="${this.escapeHtml(app.label)}">${this.renderAppPolicyIcon(app)}<div class="app-policy-info"><div class="app-policy-name">${this.escapeHtml(app.label)}</div><div class="app-policy-package">${this.escapeHtml(app.packageName)}</div><div class="app-policy-tags">${tags}</div></div><div class="app-policy-check">✓</div></div>`;
     }).join('');
+    this.hydrateAppPolicyIcons(list);
     list.querySelectorAll('.app-policy-row').forEach(row => {
         row.addEventListener('click', async () => {
             const pkg = row.dataset.pkg;
