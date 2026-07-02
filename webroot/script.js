@@ -4222,9 +4222,19 @@ CoronaAddon.prototype.renderAppPolicySummary = function() {
     const manageBtn = document.getElementById('app-policy-manage-btn');
     if (switchMonitor) switchMonitor.checked = !!this.appPolicy.monitorEnabled;
     if (switchNotify) switchNotify.checked = !!this.appPolicy.notifyEnabled;
-    if (manageBtn) manageBtn.innerHTML = configuredCount > 0
-        ? `应用列表 <span id="app-policy-manage-count">${configuredCount}</span>`
-        : '应用列表';
+    if (manageBtn) {
+        if (this.appPolicyManageLoading) {
+            manageBtn.classList.add('is-loading');
+            manageBtn.disabled = true;
+            manageBtn.innerHTML = '<span class="btn-inline-spinner"></span><span>正在加载</span>';
+        } else {
+            manageBtn.classList.remove('is-loading');
+            manageBtn.disabled = false;
+            manageBtn.innerHTML = configuredCount > 0
+                ? `应用列表 <span id="app-policy-manage-count">${configuredCount}</span>`
+                : '应用列表';
+        }
+    }
     const pairs = [
         ['app-policy-manage-count', configuredCount]
     ];
@@ -4364,31 +4374,24 @@ CoronaAddon.prototype.humanizePackageName = function(pkg) {
     if (picked.length === 0) picked = parts.slice(-1);
     return picked.map(part => part.replace(/[_-]+/g, ' ').replace(/\w/g, c => c.toUpperCase())).join(' ');
 };
-CoronaAddon.prototype.getAppPolicyIconText = function(label, pkg) {
-    const source = String(label || pkg || '?').trim();
-    return source ? source.charAt(0).toUpperCase() : '?';
-};
 CoronaAddon.prototype.getAppPolicyIconSource = function(pkg) {
     return `ksu://icon/${encodeURIComponent(String(pkg || ''))}`;
 };
 CoronaAddon.prototype.renderAppPolicyIcon = function(app) {
-    const text = this.escapeHtml(this.getAppPolicyIconText(app.label, app.packageName));
     const pkg = this.escapeHtml(app.packageName);
-    return `<div class="app-policy-icon-wrap"><img class="app-policy-icon" data-pkg="${pkg}" alt="" loading="lazy" decoding="async"><div class="app-policy-icon-fallback">${text}</div></div>`;
+    return `<div class="app-policy-icon-wrap"><img class="app-policy-icon" data-pkg="${pkg}" alt="" loading="lazy" decoding="async"></div>`;
 };
 CoronaAddon.prototype.hydrateAppPolicyIcons = function(container) {
     if (!container) return;
     container.querySelectorAll('.app-policy-icon[data-pkg]').forEach(img => {
         if (img.dataset.bound === '1') return;
         img.dataset.bound = '1';
-        const fallback = img.nextElementSibling;
         img.addEventListener('load', () => {
             img.classList.add('loaded');
-            if (fallback) fallback.classList.remove('show');
         });
         img.addEventListener('error', () => {
             img.classList.remove('loaded');
-            if (fallback) fallback.classList.add('show');
+            img.closest('.app-policy-icon-wrap')?.classList.add('hidden');
         });
         img.src = this.getAppPolicyIconSource(img.dataset.pkg || '');
     });
@@ -4405,6 +4408,10 @@ CoronaAddon.prototype.renderAppPolicyLoadingState = function(message = '正在�
     if (!list) return;
     list.innerHTML = `<div class="app-policy-loading-state"><div class="loading-spinner"></div><span class="loading-text">${this.escapeHtml(message)}</span></div>`;
 };
+CoronaAddon.prototype.setAppPolicyManageLoading = function(loading) {
+    this.appPolicyManageLoading = !!loading;
+    this.renderAppPolicySummary();
+};
 CoronaAddon.prototype.openAppPolicyOverlay = async function(mode) {
     this.ensureAppPolicyState();
     this.currentAppPolicyMode = mode;
@@ -4412,6 +4419,7 @@ CoronaAddon.prototype.openAppPolicyOverlay = async function(mode) {
     const titleMap = { manage: '应用列表' };
     const title = document.getElementById('app-policy-title');
     if (title) title.textContent = titleMap[mode] || '选择应用';
+    this.setAppPolicyManageLoading(true);
     this.showOverlay('app-policy-overlay');
     this.renderAppPolicyLoadingState();
     try {
@@ -4419,6 +4427,8 @@ CoronaAddon.prototype.openAppPolicyOverlay = async function(mode) {
         this.renderAppPolicyList();
     } catch (error) {
         this.renderAppPolicyLoadingState('读取应用列表失败');
+    } finally {
+        this.setAppPolicyManageLoading(false);
     }
 };
 CoronaAddon.prototype.renderAppPolicyTags = function(pkg) {
