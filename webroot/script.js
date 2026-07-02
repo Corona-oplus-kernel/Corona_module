@@ -117,8 +117,9 @@ class CoronaAddon {
         return true;
     }
     async init() {
-        this.showInitOverlay(true);
+        this.showInitOverlay(true, '正在初始化，请稍候...');
         try {
+            this.updateInitOverlayMessage('正在解析模块环境...');
             await this.resolvePaths();
             const brand = (await this.exec('getprop ro.product.brand')).toLowerCase();
             const manufacturer = (await this.exec('getprop ro.product.manufacturer')).toLowerCase();
@@ -126,6 +127,7 @@ class CoronaAddon {
                 this.showUnsupportedDevice(brand || manufacturer);
                 return;
             }
+            this.updateInitOverlayMessage('正在准备配置...');
             await this.ensureConfigDir();
             await this.loadRuntimeConfig();
             await this.loadAppMetaCache();
@@ -135,6 +137,7 @@ class CoronaAddon {
             this.initSettingDescriptionPreference();
             this.initCategoryConfigVisibilityPreference();
             this.bindAllEvents();
+            this.updateInitOverlayMessage('正在加载设备信息...');
             await this.loadDeviceInfo();
             await this.loadModuleVersion();
             this.initDetailOverlays();
@@ -146,10 +149,12 @@ class CoronaAddon {
                 this.initStaticHeader();
             }
             this.initModuleIntro();
+            this.updateInitOverlayMessage('正在预加载配置页面...');
             await this.ensureSettingsPageReady(true);
-            await Promise.all([
-                this.updateRealtimeData(true)
-            ]);
+            this.updateInitOverlayMessage('正在获取实时状态...');
+            await this.updateRealtimeData(true);
+            this.updateInitOverlayMessage('正在预加载应用列表...');
+            await this.prewarmAppPolicyData(true);
             this.startRealtimeMonitor();
             this.scheduleDeferredInit();
         } finally {
@@ -2120,7 +2125,6 @@ class CoronaAddon {
                 this.initDeviceImageInteraction();
                 this.initScrollEffect();
                 await this.ensureSettingsPageReady(true);
-                this.prewarmAppPolicyData().catch(() => {});
             } catch (e) {}
         };
         if (typeof window.requestIdleCallback === 'function') {
@@ -2768,7 +2772,7 @@ class CoronaAddon {
     }
     sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
     showToast(message) { const toast = document.getElementById('toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500); }
-    showInitOverlay(show) {
+    showInitOverlay(show, message = '正在初始化，请稍候...') {
         const el = document.getElementById('loading');
         const text = el ? el.querySelector('.loading-text') : null;
         if (!el) return;
@@ -2776,7 +2780,7 @@ class CoronaAddon {
             document.body.classList.remove('app-ready');
             document.body.classList.add('init-lock', 'app-booting');
             el.classList.add('init-mode');
-            if (text) text.textContent = '正在初始化，请稍候...';
+            if (text) text.textContent = message;
             el.classList.add('show');
         } else {
             el.classList.remove('init-mode');
@@ -2785,6 +2789,10 @@ class CoronaAddon {
             document.body.classList.remove('init-lock', 'app-booting');
             document.body.classList.add('app-ready');
         }
+    }
+    updateInitOverlayMessage(message) {
+        const text = document.getElementById('loading')?.querySelector('.loading-text');
+        if (text) text.textContent = message || '正在初始化，请稍候...';
     }
     showUnsupportedDevice(brand) {
         document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;padding:24px;text-align:center;font-family:system-ui,sans-serif">
@@ -3022,6 +3030,34 @@ class CoronaAddon {
     getThreadRuleKey(pkg, pattern) { return `${pkg}|${pattern}`; }
     getThreadRulesForPackage(pkg) { return (this.threadPriorityRules || []).filter(rule => rule.packageName === pkg); }
     getThreadRulePackages() { return [...new Set((this.threadPriorityRules || []).map(rule => rule.packageName).filter(Boolean))]; }
+    parseThreadPriorityRuleLine(line) {
+        if (!line || !line.includes('=')) return null;
+        const idx = line.indexOf('=');
+        const target = line.slice(0, idx).trim();
+        const values = line.slice(idx + 1).trim();
+        const splitIndex = target.indexOf('|');
+        if (splitIndex <= 0) return null;
+        const packageName = target.slice(0, splitIndex).trim();
+        const threadPattern = target.slice(splitIndex + 1).trim();
+        const parts = values.split('|');
+        const [nice, ioClass, ioLevel, affinity = '', schedPolicy = 'normal', rtPrio = '1', cpuset = '', waltBoost = '0', waltPipeline = '0', uclampMin = '', uclampMax = ''] = parts;
+        return {
+            key: this.getThreadRuleKey(packageName, threadPattern),
+            packageName,
+            threadPattern,
+            nice: parseInt(nice || '0', 10) || 0,
+            ioClass: parseInt(ioClass || '2', 10) || 2,
+            ioLevel: parseInt(ioLevel || '4', 10) || 4,
+            affinity: String(affinity || '').trim(),
+            schedPolicy: String(schedPolicy || 'normal').trim() || 'normal',
+            rtPrio: parseInt(rtPrio || '1', 10) || 1,
+            cpuset: String(cpuset || '').trim(),
+            waltBoost: String(waltBoost || '0') === '1',
+            waltPipeline: String(waltPipeline || '0') === '1',
+            uclampMin: String(uclampMin || '').trim(),
+            uclampMax: String(uclampMax || '').trim()
+        };
+    }
     serializeThreadPriorityRules(rules = this.threadPriorityRules || []) {
         return (rules || []).map(rule => `${rule.packageName}|${rule.threadPattern}=${rule.nice}|${rule.ioClass}|${rule.ioLevel}|${rule.affinity || ''}|${rule.schedPolicy || 'normal'}|${rule.rtPrio ?? 1}|${rule.cpuset || ''}|${rule.waltBoost ? '1' : '0'}|${rule.waltPipeline ? '1' : '0'}|${rule.uclampMin ?? ''}|${rule.uclampMax ?? ''}`).join('\n');
     }
@@ -3030,17 +3066,8 @@ class CoronaAddon {
         this.threadPriorityRules = [];
         if (config && config.trim()) {
             config.trim().split('\n').forEach(line => {
-                if (!line || !line.includes('=')) return;
-                const idx = line.indexOf('=');
-                const target = line.slice(0, idx).trim();
-                const values = line.slice(idx + 1).trim();
-                const splitIndex = target.indexOf('|');
-                if (splitIndex <= 0) return;
-                const packageName = target.slice(0, splitIndex).trim();
-                const threadPattern = target.slice(splitIndex + 1).trim();
-                const parts = values.split('|');
-                const [nice, ioClass, ioLevel, affinity = '', schedPolicy = 'normal', rtPrio = '1', cpuset = '', waltBoost = '0', waltPipeline = '0', uclampMin = '', uclampMax = ''] = parts;
-                this.threadPriorityRules.push({ key: this.getThreadRuleKey(packageName, threadPattern), packageName, threadPattern, nice: parseInt(nice || '0', 10) || 0, ioClass: parseInt(ioClass || '2', 10) || 2, ioLevel: parseInt(ioLevel || '4', 10) || 4, affinity: String(affinity || '').trim(), schedPolicy: String(schedPolicy || 'normal').trim() || 'normal', rtPrio: parseInt(rtPrio || '1', 10) || 1, cpuset: String(cpuset || '').trim(), waltBoost: String(waltBoost || '0') === '1', waltPipeline: String(waltPipeline || '0') === '1', uclampMin: String(uclampMin || '').trim(), uclampMax: String(uclampMax || '').trim() });
+                const parsedRule = this.parseThreadPriorityRuleLine(line);
+                if (parsedRule) this.threadPriorityRules.push(parsedRule);
             });
         }
         this.renderAppPolicySummary();
@@ -3076,11 +3103,14 @@ class CoronaAddon {
     }
     setActiveThreadPanel(panel) {
         const next = panel || 'rules';
+        if (this.threadPanelState === next && next !== 'live') return;
         this.threadPanelState = next;
         document.querySelectorAll('[data-panel]').forEach(section => {
             section.classList.toggle('active', section.dataset.panel === next);
         });
-        if (next === 'live') this.ensureLiveThreadSuggestions();
+        if (next === 'live') {
+            setTimeout(() => this.ensureLiveThreadSuggestions().catch(() => {}), 0);
+        }
     }
     async ensureLiveThreadSuggestions(force = false) {
         const pkg = this.selectedThreadRulePackage;
@@ -3155,39 +3185,75 @@ class CoronaAddon {
         this.renderThreadModePresets(this.selectedThreadModePreset);
         this.showOverlay('thread-rule-editor-overlay');
     }
+    collectThreadRuleEditorState() {
+        return {
+            threadPattern: (document.getElementById('thread-pattern-input')?.value || '').trim(),
+            affinity: (document.getElementById('thread-affinity-input')?.value || '').trim(),
+            cpuset: (document.getElementById('thread-cpuset-group')?.value || '').trim(),
+            uclampMin: (document.getElementById('thread-uclamp-min')?.value || '').trim(),
+            uclampMax: (document.getElementById('thread-uclamp-max')?.value || '').trim(),
+            schedPolicy: (document.getElementById('thread-sched-policy')?.value || 'normal').trim(),
+            rtPrio: parseInt(document.getElementById('thread-rt-prio')?.value || '1', 10) || 1,
+            waltBoost: !!document.getElementById('thread-walt-boost')?.checked,
+            waltPipeline: !!document.getElementById('thread-walt-pipeline')?.checked
+        };
+    }
+    buildThreadRulePreviewActions(rule) {
+        return [
+            rule.affinity ? `对命中线程设置亲和性 ${rule.affinity}` : '不修改线程亲和性',
+            rule.cpuset ? `将命中线程迁入 cpuset ${rule.cpuset}` : '不调整 cpuset 分组',
+            rule.uclampMin !== '' ? `设置 uclamp.min=${rule.uclampMin}` : '不设置 uclamp.min',
+            rule.uclampMax !== '' ? `设置 uclamp.max=${rule.uclampMax}` : '不设置 uclamp.max',
+            rule.schedPolicy !== 'normal' ? `设置调度策略 ${rule.schedPolicy} (rt=${rule.rtPrio})` : '保持 normal 调度策略',
+            rule.waltBoost ? '启用 WALT per-task boost 并关闭 task_reduce_affinity' : '不启用 WALT per-task boost',
+            rule.waltPipeline ? '启用 WALT pipeline special' : '不启用 WALT pipeline special',
+            `设置 nice=${rule.nice} 与 I/O=${rule.ioClass}/${rule.ioLevel}`
+        ];
+    }
+    reopenThreadRuleManager(panel = 'rules') {
+        this.hideOverlay('thread-rule-editor-overlay');
+        this.showOverlay('thread-rule-overlay');
+        this.setActiveThreadPanel(panel);
+    }
+    refreshThreadRulePackageState(packageName, { reorder = false } = {}) {
+        this.renderThreadRuleList();
+        this.renderAppPolicySummary();
+        this.updateAppPolicyRow(packageName);
+        if (reorder) this.reorderAppPolicyRow(packageName);
+    }
     async saveThreadRule() {
-        const threadPattern = (document.getElementById('thread-pattern-input')?.value || '').trim();
-        const affinity = (document.getElementById('thread-affinity-input')?.value || '').trim();
-        const cpuset = (document.getElementById('thread-cpuset-group')?.value || '').trim();
-        const uclampMin = (document.getElementById('thread-uclamp-min')?.value || '').trim();
-        const uclampMax = (document.getElementById('thread-uclamp-max')?.value || '').trim();
-        const schedPolicy = (document.getElementById('thread-sched-policy')?.value || 'normal').trim();
-        const rtPrio = parseInt(document.getElementById('thread-rt-prio')?.value || '1', 10) || 1;
-        const waltBoost = !!document.getElementById('thread-walt-boost')?.checked;
-        const waltPipeline = !!document.getElementById('thread-walt-pipeline')?.checked;
-        if (!threadPattern) { this.showToast('请输入线程名或模式'); return false; }
-        const nextRule = { key: this.getThreadRuleKey(this.selectedThreadRulePackage, threadPattern), packageName: this.selectedThreadRulePackage, threadPattern, nice: this.selectedThreadNice, ioClass: this.selectedThreadIoClass, ioLevel: this.selectedThreadIoLevel, affinity, cpuset, uclampMin, uclampMax, schedPolicy, rtPrio, waltBoost, waltPipeline };
+        const editorState = this.collectThreadRuleEditorState();
+        if (!editorState.threadPattern) { this.showToast('请输入线程名或模式'); return false; }
+        const nextRule = {
+            key: this.getThreadRuleKey(this.selectedThreadRulePackage, editorState.threadPattern),
+            packageName: this.selectedThreadRulePackage,
+            threadPattern: editorState.threadPattern,
+            nice: this.selectedThreadNice,
+            ioClass: this.selectedThreadIoClass,
+            ioLevel: this.selectedThreadIoLevel,
+            affinity: editorState.affinity,
+            cpuset: editorState.cpuset,
+            uclampMin: editorState.uclampMin,
+            uclampMax: editorState.uclampMax,
+            schedPolicy: editorState.schedPolicy,
+            rtPrio: editorState.rtPrio,
+            waltBoost: editorState.waltBoost,
+            waltPipeline: editorState.waltPipeline
+        };
         const nextRules = (this.threadPriorityRules || []).filter(rule => rule.key !== this.selectedThreadRuleKey && rule.key !== nextRule.key);
         nextRules.push(nextRule);
         const confirmed = await this.confirmChangePreview('变更预览', {
-            summary: `即将为 ${this.selectedThreadRulePackage} 保存线程规则 ${threadPattern}。`,
+            summary: `即将为 ${this.selectedThreadRulePackage} 保存线程规则 ${editorState.threadPattern}。`,
             configs: [{ filename: 'thread_priority.conf', content: this.serializeThreadPriorityRules(nextRules) }],
-            actions: [affinity ? `对命中线程设置亲和性 ${affinity}` : '不修改线程亲和性', cpuset ? `将命中线程迁入 cpuset ${cpuset}` : '不调整 cpuset 分组', uclampMin !== '' ? `设置 uclamp.min=${uclampMin}` : '不设置 uclamp.min', uclampMax !== '' ? `设置 uclamp.max=${uclampMax}` : '不设置 uclamp.max', schedPolicy !== 'normal' ? `设置调度策略 ${schedPolicy} (rt=${rtPrio})` : '保持 normal 调度策略', waltBoost ? '启用 WALT per-task boost 并关闭 task_reduce_affinity' : '不启用 WALT per-task boost', waltPipeline ? '启用 WALT pipeline special' : '不启用 WALT pipeline special', `设置 nice=${this.selectedThreadNice} 与 I/O=${this.selectedThreadIoClass}/${this.selectedThreadIoLevel}`],
+            actions: this.buildThreadRulePreviewActions(nextRule),
             notes: ['规则会对命中的线程 TID 应用，不影响未匹配线程。']
         });
         if (!confirmed) return false;
         this.threadPriorityRules = nextRules;
         await this.saveThreadPriorityConfig();
         await this.applyThreadPriorityRulesNow();
-        this.hideOverlay('thread-rule-editor-overlay');
-        this.showOverlay('thread-rule-overlay');
-        this.setActiveThreadPanel('rules');
-        this.showOverlay('thread-rule-overlay');
-        this.setActiveThreadPanel('rules');
-        this.renderThreadRuleList();
-        this.renderAppPolicySummary();
-        this.updateAppPolicyRow(this.selectedThreadRulePackage);
-        this.reorderAppPolicyRow(this.selectedThreadRulePackage);
+        this.reopenThreadRuleManager('rules');
+        this.refreshThreadRulePackageState(this.selectedThreadRulePackage, { reorder: true });
         this.showToast('线程规则已保存');
         return true;
     }
@@ -3203,11 +3269,8 @@ class CoronaAddon {
         this.threadPriorityRules = nextRules;
         await this.saveThreadPriorityConfig();
         await this.applyThreadPriorityRulesNow();
-        this.showOverlay('thread-rule-overlay');
-        this.setActiveThreadPanel('rules');
-        this.renderThreadRuleList();
-        this.renderAppPolicySummary();
-        this.updateAppPolicyRow(this.selectedThreadRulePackage);
+        this.reopenThreadRuleManager('rules');
+        this.refreshThreadRulePackageState(this.selectedThreadRulePackage);
         this.showToast('线程规则已删除');
     }
     async detectKernelFeatures() {
@@ -4619,12 +4682,30 @@ CoronaAddon.prototype.loadInstalledApps = async function(force = false) {
     if (cacheChanged) await this.saveAppMetaCache();
     return apps;
 };
-CoronaAddon.prototype.prewarmAppPolicyData = async function() {
+CoronaAddon.prototype.prewarmAppPolicyData = async function(force = false) {
     this.ensureAppPolicyState();
     if (this.appPolicyPrewarmPromise) return this.appPolicyPrewarmPromise;
-    this.appPolicyPrewarmPromise = Promise.resolve();
-    this.appPolicyPrewarmDone = true;
-    return this.appPolicyPrewarmPromise;
+    this.appPolicyPrewarmPromise = (async () => {
+        let apps = [];
+        let lastError = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            try {
+                apps = await this.loadInstalledApps(force || attempt > 0);
+                if (apps.length > 0) break;
+            } catch (error) {
+                lastError = error;
+            }
+            await this.sleep(220);
+        }
+        if (lastError && apps.length === 0) throw lastError;
+        this.appPolicyPrewarmDone = apps.length > 0;
+        return apps;
+    })();
+    try {
+        return await this.appPolicyPrewarmPromise;
+    } finally {
+        this.appPolicyPrewarmPromise = null;
+    }
 };
 CoronaAddon.prototype.humanizePackageName = function(pkg) {
     const parts = String(pkg || '').split('.').filter(Boolean);
