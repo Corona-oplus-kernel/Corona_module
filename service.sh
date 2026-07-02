@@ -4,6 +4,7 @@ CONFIG_DIR=${CORONA_CONFIG_DIR:-"$MODDIR/config"}
 RUNTIME_CONF="$CONFIG_DIR/runtime.conf"
 SCRIPTS_DIR="$MODDIR/scripts.d"
 APP_POLICY_SH="$MODDIR/app_policy.sh"
+THREAD_PRIORITY_FILE="$CONFIG_DIR/thread_priority.conf"
 
 BRAND=$(getprop ro.product.brand | tr '[:upper:]' '[:lower:]')
 MANUFACTURER=$(getprop ro.product.manufacturer | tr '[:upper:]' '[:lower:]')
@@ -102,6 +103,54 @@ apply_process_priority_config() {
             done
         }
     done < "$CONFIG_DIR/process_priority.conf"
+}
+
+package_pids_for_name() {
+    target="$1"
+    for d in /proc/[0-9]*; do
+        [ -r "$d/cmdline" ] || continue
+        cmdline=$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null)
+        case "$cmdline" in
+            "$target"*|*" $target"*|*"$target:"*|*"$target/"*) basename "$d" ;;
+        esac
+    done | sort -u
+}
+
+thread_name_matches() {
+    thread_name="$1"
+    thread_pattern="$2"
+    case "$thread_pattern" in
+        *'*'*|*'?'*|*'['*) case "$thread_name" in $thread_pattern) return 0 ;; esac ;;
+        *) [ "$thread_name" = "$thread_pattern" ] && return 0 ;;
+    esac
+    return 1
+}
+
+apply_thread_priority_config() {
+    [ ! -f "$THREAD_PRIORITY_FILE" ] && return
+    while IFS='=' read -r target values; do
+        case "$target" in ''|'#'*) continue ;; esac
+        [ -n "$values" ] || continue
+        package_name=$(printf '%s' "$target" | cut -d'|' -f1)
+        thread_pattern=$(printf '%s' "$target" | cut -d'|' -f2-)
+        [ -n "$package_name" ] && [ -n "$thread_pattern" ] || continue
+        nice_val=$(echo "$values" | cut -d',' -f1)
+        io_class=$(echo "$values" | cut -d',' -f2)
+        io_level=$(echo "$values" | cut -d',' -f3)
+        for pid in $(package_pids_for_name "$package_name"); do
+            [ -d "/proc/$pid/task" ] || continue
+            for task_dir in /proc/$pid/task/[0-9]*; do
+                [ -r "$task_dir/comm" ] || continue
+                tid=${task_dir##*/}
+                thread_name=$(cat "$task_dir/comm" 2>/dev/null)
+                thread_name_matches "$thread_name" "$thread_pattern" || continue
+                [ -n "$nice_val" ] && renice -n "$nice_val" -p "$tid" 2>/dev/null
+                if [ -n "$io_class" ] && [ -n "$io_level" ]; then
+                    ionice -c "$io_class" -n "$io_level" -p "$tid" 2>/dev/null
+                fi
+            done
+        done
+    done < "$THREAD_PRIORITY_FILE"
 }
 
 apply_device_config() {
@@ -398,12 +447,14 @@ should_start_app_policy() {
     rules_file="$MODDIR/config/app_rules.conf"
     protect_file="$MODDIR/config/app_protect.list"
     profiles_file="$MODDIR/config/app_profiles.list"
+    thread_file="$MODDIR/config/thread_priority.conf"
     monitor_enabled=$(get_conf_value "$rules_file" monitor_enabled)
     protect_apps=$(cat "$protect_file" 2>/dev/null | awk 'NF {print; exit}')
     profile_apps=$(cat "$profiles_file" 2>/dev/null | awk 'NF {print; exit}')
     [ "$monitor_enabled" = "1" ] && return 0
     [ -n "$protect_apps" ] && return 0
     [ -n "$profile_apps" ] && return 0
+    [ -f "$thread_file" ] && awk 'NF && $0 !~ /^#/ { found=1; exit } END { exit found ? 0 : 1 }' "$thread_file" 2>/dev/null && return 0
     return 1
 }
 
@@ -435,6 +486,7 @@ apply_runtime_configs() {
     apply_cpu_hotplug_config
     apply_tcp_config
     apply_process_priority_config
+    apply_thread_priority_config
     apply_device_config
     apply_protect_config
 }
@@ -442,6 +494,11 @@ apply_runtime_configs() {
 if [ "$1" = "--apply-runtime-config" ]; then
     apply_runtime_configs
     [ "$CORONA_SKIP_DESCRIPTION" = "1" ] || update_module_description
+    exit 0
+fi
+
+if [ "$1" = "--apply-thread-priority" ]; then
+    apply_thread_priority_config
     exit 0
 fi
 

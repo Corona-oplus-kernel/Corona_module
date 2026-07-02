@@ -9,7 +9,7 @@ class CoronaAddon {
         this.ioNrRequestsOptions = [64, 128, 256, 512, 1024, 2048];
         this.ioRqAffinityOptions = [0, 1, 2];
         this.ioNomergesOptions = [0, 1, 2];
-        this.snapshotConfigFiles = ['zram.conf', 'le9ec.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'process_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf'];
+        this.snapshotConfigFiles = ['zram.conf', 'le9ec.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'process_priority.conf', 'thread_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf'];
         this.state = {
             algorithm: 'lz4',
             zramSize: 8,
@@ -4643,7 +4643,7 @@ CoronaAddon.prototype.writeProfileFiles = async function(pkg, files) {
 };
 CoronaAddon.prototype.copyCurrentConfigToProfile = async function(pkg) {
     const dir = `${this.configDir}/app_profiles/${pkg}`;
-    const names = ['zram.conf','le9ec.conf','io_scheduler.conf','cpu_governor.conf','cpu_hotplug.conf','tcp.conf','process_priority.conf','swap.conf','vm.conf','kernel.conf','corona_kernel.conf'];
+    const names = ['zram.conf','le9ec.conf','io_scheduler.conf','cpu_governor.conf','cpu_hotplug.conf','tcp.conf','process_priority.conf','thread_priority.conf','swap.conf','vm.conf','kernel.conf','corona_kernel.conf'];
     const copyCmd = names.map(name => `[ -f ${this.shellQuote(`${this.configDir}/${name}`)} ] && cp ${this.shellQuote(`${this.configDir}/${name}`)} ${this.shellQuote(`${dir}/${name}`)} 2>/dev/null`).join('; ');
     await this.exec(`rm -rf ${this.shellQuote(dir)} && mkdir -p ${this.shellQuote(dir)}; ${copyCmd}; cp ${this.shellQuote(`${this.configDir}/runtime.conf`)} ${this.shellQuote(`${dir}/runtime.conf`)} 2>/dev/null`);
     if (!this.appPolicy.profiles.includes(pkg)) this.appPolicy.profiles.push(pkg);
@@ -4705,6 +4705,30 @@ CoronaAddon.prototype.clearAppProfile = async function(pkg) {
     this.updateAppPolicyRow(pkg);
 };
 CoronaAddon.prototype.runMemClean = async function(mode) {
+    const modeNames = { 'drop-caches': '清理缓存', 'drop-all': '深度清理', compact: '内存整理', 'kill-bg': '清理后台', 'emergency-reclaim': '紧急回收', 'full-clean': '紧急回收' };
+    const modeActions = {
+        'drop-caches': ['执行 `echo 3 > /proc/sys/vm/drop_caches`'],
+        'drop-all': ['执行 `drop_caches`', '执行 `compact_memory`'],
+        compact: ['执行 `echo 1 > /proc/sys/vm/compact_memory`'],
+        'kill-bg': ['尝试停止第三方后台应用', '跳过白名单与保护进程名单'],
+        'emergency-reclaim': ['执行 `drop_caches`', '执行 `compact_memory`', '尝试停止第三方后台应用', '跳过白名单与保护进程名单'],
+        'full-clean': ['执行 `drop_caches`', '执行 `compact_memory`', '尝试停止第三方后台应用', '跳过白名单与保护进程名单']
+    };
+    const modeNotes = {
+        'drop-caches': ['不会修改已保存配置，仅影响当前系统缓存。'],
+        'drop-all': ['不会修改已保存配置，仅影响当前系统缓存与内存整理状态。'],
+        compact: ['不会修改已保存配置，仅触发一次内存整理。'],
+        'kill-bg': ['可能导致部分后台应用被重新启动。'],
+        'emergency-reclaim': ['这是高强度回收操作，适合临时腾内存。'],
+        'full-clean': ['这是高强度回收操作，适合临时腾内存。']
+    };
+    const modeName = modeNames[mode] || mode;
+    const confirmed = await this.confirmChangePreview('变更预览', {
+        summary: `即将执行${modeName}。`,
+        actions: modeActions[mode] || [`执行 ${modeName}`],
+        notes: modeNotes[mode] || ['不会修改已保存配置。']
+    }, { okText: '继续执行' });
+    if (!confirmed) return;
     this.memCleanRunning = true;
     const section = document.getElementById('memclean-section');
     const progress = document.getElementById('memclean-progress');
@@ -4719,8 +4743,6 @@ CoronaAddon.prototype.runMemClean = async function(mode) {
     fill.style.width = '0%';
     percent.textContent = '0%';
     status.textContent = '准备中...';
-    const modeNames = { 'drop-caches': '清理缓存', 'drop-all': '深度清理', compact: '内存整理', 'kill-bg': '清理后台', 'emergency-reclaim': '紧急回收', 'full-clean': '紧急回收' };
-    const modeName = modeNames[mode] || mode;
     fill.style.width = '30%';
     percent.textContent = '30%';
     status.textContent = '正在执行系统回收...';
