@@ -3018,6 +3018,14 @@ class CoronaAddon {
         const card = document.getElementById('easter-egg-card');
         if (!overlay || !card) return;
         if (banner) { banner.addEventListener('click', () => { this.easterEgg.clickCount++; if (this.easterEgg.clickTimer) { clearTimeout(this.easterEgg.clickTimer); } this.easterEgg.clickTimer = setTimeout(() => { this.easterEgg.clickCount = 0; }, 500); if (this.easterEgg.clickCount >= 1) { this.easterEgg.clickCount = 0; this.showEasterEgg(); } }); }
+        const authorLinkBtn = document.getElementById('author-link-btn');
+        if (authorLinkBtn && !authorLinkBtn.dataset.bound) {
+            authorLinkBtn.dataset.bound = '1';
+            authorLinkBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openExternalUrl('https://github.com/wswzgdg');
+            });
+        }
         if (authorCard) { authorCard.addEventListener('click', () => { this.easterEgg.authorClickCount = (this.easterEgg.authorClickCount || 0) + 1; if (this.easterEgg.authorClickTimer) { clearTimeout(this.easterEgg.authorClickTimer); } this.easterEgg.authorClickTimer = setTimeout(() => { this.easterEgg.authorClickCount = 0; }, 500); if (this.easterEgg.authorClickCount >= 1) { this.easterEgg.authorClickCount = 0; this.showCreditsCard(); } }); }
         let cardTouchStartX = 0, cardTouchStartY = 0, cardOffsetX = 0, cardOffsetY = 0;
         card.addEventListener('touchstart', (e) => { const touch = e.touches[0]; cardTouchStartX = touch.clientX; cardTouchStartY = touch.clientY; card.style.transition = 'none'; }, { passive: true });
@@ -3026,14 +3034,37 @@ class CoronaAddon {
         overlay.addEventListener('click', (e) => { if (e.target === overlay) { this.hideEasterEgg(); } });
     }
     showEasterEgg() { const overlay = document.getElementById('easter-egg-overlay'); const content = document.getElementById('easter-egg-content'); this.easterEgg.currentCard = 'thanks'; this.easterEgg.isOverlayOpen = true; content.innerHTML = `<div class="rainbow-text">感谢使用<span class="corona-c-rainbow">C</span>orona模块</div><div class="rainbow-text ciallo">Ciallo~(∠・ω< )⌒★</div>`; overlay.classList.add('show'); }
+    openExternalUrl(url) {
+        if (!url) return;
+        try {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        } catch (error) {
+            try {
+                window.location.href = url;
+            } catch (_) {}
+        }
+    }
+    buildCreditEntry(name, url = '') {
+        const safeName = this.escapeHtml(name);
+        const safeUrl = this.escapeHtml(url);
+        const link = url ? `<button class="credit-link-btn" data-url="${safeUrl}" aria-label="打开 ${safeName} 的主页">&gt;</button>` : '';
+        return `<div class="rainbow-text credit-entry"><span class="credit-name-text">${safeName}</span>${link}</div>`;
+    }
     showCreditsCard() {
         const overlay = document.getElementById('easter-egg-overlay');
         const content = document.getElementById('easter-egg-content');
         this.easterEgg.currentCard = 'credits';
         this.easterEgg.isOverlayOpen = true;
         this.easterEgg.xinranClickCount = 0;
-        content.innerHTML = `<div class="rainbow-text credit-name" id="xinran-credit">致谢爱人❤️然(≧ω≦)/</div><div class="credits-section"><div class="rainbow-text credits-title">模块制作感谢名单</div><div class="rainbow-text credit-name">Cloud_Yun</div><div class="rainbow-text credit-name">穆远星</div><div class="rainbow-text credit-name">嘟嘟Ski</div><div class="rainbow-text credit-name">Kanata</div></div>`;
+        content.innerHTML = `<div class="rainbow-text credit-entry" id="xinran-credit-wrap"><span class="credit-name-text" id="xinran-credit">致谢爱人❤️然(≧ω≦)/</span><button class="credit-link-btn" data-url="https://github.com/Winkmoon" aria-label="打开然的主页">&gt;</button></div><div class="credits-section"><div class="rainbow-text credits-title">模块制作感谢名单</div>${this.buildCreditEntry('Cloud_Yun', 'https://github.com/yspbwx2010')}${this.buildCreditEntry('穆远星', 'https://github.com/MuYuanXing')}${this.buildCreditEntry('嘟嘟Ski')}${this.buildCreditEntry('Kanata')}</div>`;
         overlay.classList.add('show');
+        content.querySelectorAll('.credit-link-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const url = btn.dataset.url || '';
+                if (url) this.openExternalUrl(url);
+            });
+        });
         const xinranEl = document.getElementById('xinran-credit');
         if (xinranEl) {
             const self = this;

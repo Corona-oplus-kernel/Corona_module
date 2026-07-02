@@ -1305,6 +1305,15 @@ body.theme-gold .tab-item.active {
     align-items: center;
 }
 
+.author-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-left: auto;
+    text-align: right;
+}
+
 .author-label {
     font-size: 14px;
     color: var(--text-sub);
@@ -5116,4 +5125,57 @@ body.theme-gold #app-profile-overlay .priority-search:focus {
         transform: scale(1);
         filter: brightness(1);
     }
+}
+
+
+.author-link-btn,
+.credit-link-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    color: color-mix(in srgb, var(--primary) 76%, var(--text-sub));
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform .12s ease, color .12s ease, opacity .12s ease;
+    flex-shrink: 0;
+    padding: 0 2px;
+    min-width: 10px;
+    height: auto;
+}
+
+.author-link-btn:hover,
+.credit-link-btn:hover {
+    color: var(--primary);
+    transform: translateX(1px);
+}
+
+.author-link-btn:active,
+.credit-link-btn:active {
+    transform: translateX(1px) scale(0.98);
+}
+
+.credit-link-btn.disabled {
+    opacity: .34;
+    cursor: default;
+}
+
+.author-row {
+    gap: 6px;
+    justify-content: flex-start;
+    padding-right: 0;
+}
+
+.credit-entry {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.credit-name-text {
+    display: inline-block;
 }
