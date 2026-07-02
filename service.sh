@@ -155,6 +155,27 @@ apply_cpuset_to_tid() {
     echo "$tid" > "$tasks_file" 2>/dev/null
 }
 
+apply_uclamp_to_tid() {
+    tid="$1"
+    uclamp_min="$2"
+    uclamp_max="$3"
+    cpuctl_group="$4"
+    if [ -w /proc/oplus_qos_sched/qos_task_uclamp ] && { [ -n "$uclamp_min" ] || [ -n "$uclamp_max" ]; }; then
+        min_val=${uclamp_min:-0}
+        max_val=${uclamp_max:-1024}
+        printf '%s %s %s
+' "$tid" "$min_val" "$max_val" > /proc/oplus_qos_sched/qos_task_uclamp 2>/dev/null && return 0
+    fi
+    [ -n "$cpuctl_group" ] || return 0
+    tasks_file="/dev/cpuctl/$cpuctl_group/tasks"
+    min_file="/dev/cpuctl/$cpuctl_group/cpu.uclamp.min"
+    max_file="/dev/cpuctl/$cpuctl_group/cpu.uclamp.max"
+    [ -f "$tasks_file" ] || return 0
+    [ -n "$uclamp_min" ] && [ -f "$min_file" ] && echo "$uclamp_min" > "$min_file" 2>/dev/null
+    [ -n "$uclamp_max" ] && [ -f "$max_file" ] && echo "$uclamp_max" > "$max_file" 2>/dev/null
+    echo "$tid" > "$tasks_file" 2>/dev/null
+}
+
 set_walt_knob() {
     path="$1"
     value="$2"
@@ -183,7 +204,7 @@ apply_thread_priority_config() {
         package_name=$(printf '%s' "$target" | cut -d'|' -f1)
         thread_pattern=$(printf '%s' "$target" | cut -d'|' -f2-)
         [ -n "$package_name" ] && [ -n "$thread_pattern" ] || continue
-        IFS='|' read -r nice_val io_class io_level affinity_mask sched_policy rt_prio cpuset_group walt_boost walt_pipeline <<EOF
+        IFS='|' read -r nice_val io_class io_level affinity_mask sched_policy rt_prio cpuset_group walt_boost walt_pipeline uclamp_min uclamp_max <<EOF
 $values
 EOF
         [ "$walt_boost" = "1" ] && walt_per_task_boost=1 && walt_reduce_affinity=1
@@ -201,6 +222,7 @@ EOF
                 fi
                 [ -n "$affinity_mask" ] && taskset -pc "$affinity_mask" "$tid" >/dev/null 2>&1
                 apply_cpuset_to_tid "$tid" "$cpuset_group"
+                apply_uclamp_to_tid "$tid" "$uclamp_min" "$uclamp_max" "$cpuset_group"
                 apply_sched_policy_to_tid "$tid" "$sched_policy" "$rt_prio"
             done
         done
