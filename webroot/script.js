@@ -2833,7 +2833,7 @@ class CoronaAddon {
         this.easterEgg.currentCard = 'credits';
         this.easterEgg.isOverlayOpen = true;
         this.easterEgg.xinranClickCount = 0;
-        content.innerHTML = `<div class="rainbow-text credit-name" id="xinran-credit">致谢爱人❤️然(≧ω≦)/</div><div class="credits-section"><div class="rainbow-text credits-title">模块制作感谢名单</div><div class="rainbow-text credit-name">Cloud_Yun</div><div class="rainbow-text credit-name">穆远星</div><div class="rainbow-text credit-name">scene附加模块2（嘟嘟Ski）</div></div>`;
+        content.innerHTML = `<div class="rainbow-text credit-name" id="xinran-credit">致谢爱人❤️然(≧ω≦)/</div><div class="credits-section"><div class="rainbow-text credits-title">模块制作感谢名单</div><div class="rainbow-text credit-name">Cloud_Yun</div><div class="rainbow-text credit-name">穆远星</div><div class="rainbow-text credit-name">嘟嘟Ski</div><div class="rainbow-text credit-name">Kanata</div></div>`;
         overlay.classList.add('show');
         const xinranEl = document.getElementById('xinran-credit');
         if (xinranEl) {
@@ -2851,7 +2851,7 @@ class CoronaAddon {
     initPerformanceMode() { this.initProcessPriority(); }
     async loadPerformanceModeConfig() { await this.loadPriorityConfig(); await this.loadThreadPriorityConfig(); }
     initProcessPriority() {
-        this.priorityRules = {}; this.threadPriorityRules = []; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4; this.selectedThreadRuleKey = null; this.selectedThreadRulePackage = ''; this.selectedThreadRuleLabel = ''; this.selectedThreadPattern = ''; this.selectedThreadNice = 0; this.selectedThreadIoClass = 2; this.selectedThreadIoLevel = 4; this.selectedThreadAffinity = ''; this.selectedThreadCpuset = ''; this.selectedThreadUclampMin = ''; this.selectedThreadUclampMax = ''; this.selectedThreadSchedPolicy = 'normal'; this.selectedThreadRtPrio = 1; this.selectedThreadWaltBoost = false; this.selectedThreadWaltPipeline = false; this.threadSuggestionCache = Object.create(null); this.threadPanelState = 'rules'; this.threadSuggestionLoading = false;
+        this.priorityRules = {}; this.threadPriorityRules = []; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4; this.selectedThreadRuleKey = null; this.selectedThreadRulePackage = ''; this.selectedThreadRuleLabel = ''; this.selectedThreadPattern = ''; this.selectedThreadNice = 0; this.selectedThreadIoClass = 2; this.selectedThreadIoLevel = 4; this.selectedThreadAffinity = ''; this.selectedThreadCpuset = ''; this.selectedThreadUclampMin = ''; this.selectedThreadUclampMax = ''; this.selectedThreadSchedPolicy = 'normal'; this.selectedThreadRtPrio = 1; this.selectedThreadWaltBoost = false; this.selectedThreadWaltPipeline = false; this.threadSuggestionCache = Object.create(null); this.threadPanelState = 'rules'; this.threadSuggestionLoading = false; this.selectedThreadModePreset = 'custom';
         document.getElementById('priority-cancel-btn').addEventListener('click', () => this.hideOverlay('priority-setting-overlay'));
         document.getElementById('priority-save-btn').addEventListener('click', () => this.savePriorityRule());
         document.getElementById('priority-process-search').addEventListener('input', (e) => { this.filterPriorityProcessList(e.target.value); });
@@ -3053,6 +3053,10 @@ class CoronaAddon {
         await this.syncAppPolicyDaemon();
     }
     getCommonThreadPresets() { return [{ pattern: 'RenderThread', label: '渲染线程', desc: 'UI / 渲染提交' }, { pattern: 'MainThread', label: '主线程', desc: '应用主循环' }, { pattern: 'GameThread', label: '游戏线程', desc: '游戏主逻辑' }, { pattern: 'GLThread', label: '图形线程', desc: 'OpenGL 提交' }, { pattern: 'RHIThread', label: 'RHI 线程', desc: '渲染硬件接口' }, { pattern: 'DAVA::RhiThread', label: 'DAVA 渲染线程', desc: 'DAVA 引擎' }, { pattern: 'Thread-*', label: '通用工作线程', desc: '匹配 Thread-*' }]; }
+    getThreadModePresets() { return [{ key: 'daily', label: '日用省电', desc: '偏保守，适合轻应用与低功耗', values: { nice: 2, ioClass: 3, ioLevel: 7, affinity: '', cpuset: 'background', uclampMin: '0', uclampMax: '256', schedPolicy: 'idle', rtPrio: 1, waltBoost: false, waltPipeline: false } }, { key: 'balanced', label: '均衡调度', desc: '响应与功耗平衡，适合日常常驻', values: { nice: 0, ioClass: 2, ioLevel: 4, affinity: '', cpuset: 'foreground', uclampMin: '128', uclampMax: '512', schedPolicy: 'normal', rtPrio: 1, waltBoost: false, waltPipeline: false } }, { key: 'render', label: '渲染优先', desc: '偏重渲染与交互线程，适合 UI / RenderThread', values: { nice: -6, ioClass: 2, ioLevel: 2, affinity: '4-7', cpuset: 'top-app', uclampMin: '256', uclampMax: '768', schedPolicy: 'fifo', rtPrio: 2, waltBoost: true, waltPipeline: true } }, { key: 'extreme', label: '极限性能', desc: '高性能高功耗，适合重负载游戏线程', values: { nice: -10, ioClass: 1, ioLevel: 0, affinity: '4-7', cpuset: 'top-app', uclampMin: '512', uclampMax: '1024', schedPolicy: 'rr', rtPrio: 4, waltBoost: true, waltPipeline: true } }, { key: 'custom', label: '自定义规则', desc: '保持当前填写内容，自由调整所有参数', values: null }]; }
+    renderThreadModePresets(activeKey = 'custom') { const container = document.getElementById('thread-mode-list'); if (!container) return; const presets = this.getThreadModePresets(); container.innerHTML = presets.map(item => `<div class="thread-mode-chip ${item.key === activeKey ? 'active' : ''}" data-key="${this.escapeHtml(item.key)}"><div class="thread-mode-name">${this.escapeHtml(item.label)}</div><div class="thread-mode-desc">${this.escapeHtml(item.desc)}</div></div>`).join(''); container.querySelectorAll('.thread-mode-chip').forEach(chip => chip.addEventListener('click', () => this.applyThreadModePreset(chip.dataset.key || 'custom'))); }
+    applyThreadModePreset(key) { const preset = this.getThreadModePresets().find(item => item.key === key); this.selectedThreadModePreset = key || 'custom'; if (!preset) return; if (preset.values) { const values = preset.values; this.selectedThreadNice = values.nice; this.selectedThreadIoClass = values.ioClass; this.selectedThreadIoLevel = values.ioLevel; this.selectedThreadAffinity = values.affinity; this.selectedThreadCpuset = values.cpuset; this.selectedThreadUclampMin = values.uclampMin; this.selectedThreadUclampMax = values.uclampMax; this.selectedThreadSchedPolicy = values.schedPolicy; this.selectedThreadRtPrio = values.rtPrio; this.selectedThreadWaltBoost = values.waltBoost; this.selectedThreadWaltPipeline = values.waltPipeline; this.syncThreadRuleEditorFields(); } this.renderThreadModePresets(this.selectedThreadModePreset); }
+    syncThreadRuleEditorFields() { const affinity = document.getElementById('thread-affinity-input'); const cpuset = document.getElementById('thread-cpuset-group'); const uclampMin = document.getElementById('thread-uclamp-min'); const uclampMax = document.getElementById('thread-uclamp-max'); const sched = document.getElementById('thread-sched-policy'); const rt = document.getElementById('thread-rt-prio'); const waltBoost = document.getElementById('thread-walt-boost'); const waltPipeline = document.getElementById('thread-walt-pipeline'); const slider = document.getElementById('thread-nice-slider'); const sliderValue = document.getElementById('thread-nice-slider-value'); if (affinity) affinity.value = this.selectedThreadAffinity; if (cpuset) cpuset.value = this.selectedThreadCpuset; if (uclampMin) uclampMin.value = this.selectedThreadUclampMin; if (uclampMax) uclampMax.value = this.selectedThreadUclampMax; if (sched) sched.value = this.selectedThreadSchedPolicy; if (rt) rt.value = String(this.selectedThreadRtPrio); if (waltBoost) waltBoost.checked = this.selectedThreadWaltBoost; if (waltPipeline) waltPipeline.checked = this.selectedThreadWaltPipeline; if (slider) { slider.value = String(this.selectedThreadNice); this.updateSliderProgress(slider); } if (sliderValue) sliderValue.textContent = String(this.selectedThreadNice); document.querySelectorAll('.thread-io-option').forEach(opt => opt.classList.toggle('selected', parseInt(opt.dataset.class, 10) === this.selectedThreadIoClass)); }
     async loadLiveThreadSuggestions(pkg, force = false) {
         const key = String(pkg || '').trim();
         if (!force && this.threadSuggestionCache && Array.isArray(this.threadSuggestionCache[key])) return this.threadSuggestionCache[key];
@@ -3145,28 +3149,10 @@ class CoronaAddon {
         const appInfo = document.getElementById('thread-rule-selected-app');
         if (appInfo) appInfo.innerHTML = `<span class="process-name">${this.escapeHtml(this.selectedThreadRulePackage)}</span>`;
         const input = document.getElementById('thread-pattern-input');
-        const affinity = document.getElementById('thread-affinity-input');
-        const cpuset = document.getElementById('thread-cpuset-group');
-        const uclampMin = document.getElementById('thread-uclamp-min');
-        const uclampMax = document.getElementById('thread-uclamp-max');
-        const sched = document.getElementById('thread-sched-policy');
-        const rt = document.getElementById('thread-rt-prio');
-        const waltBoost = document.getElementById('thread-walt-boost');
-        const waltPipeline = document.getElementById('thread-walt-pipeline');
-        const slider = document.getElementById('thread-nice-slider');
-        const sliderValue = document.getElementById('thread-nice-slider-value');
         if (input) input.value = this.selectedThreadPattern;
-        if (affinity) affinity.value = this.selectedThreadAffinity;
-        if (cpuset) cpuset.value = this.selectedThreadCpuset;
-        if (uclampMin) uclampMin.value = this.selectedThreadUclampMin;
-        if (uclampMax) uclampMax.value = this.selectedThreadUclampMax;
-        if (sched) sched.value = this.selectedThreadSchedPolicy;
-        if (rt) rt.value = String(this.selectedThreadRtPrio);
-        if (waltBoost) waltBoost.checked = this.selectedThreadWaltBoost;
-        if (waltPipeline) waltPipeline.checked = this.selectedThreadWaltPipeline;
-        if (slider) { slider.value = String(this.selectedThreadNice); this.updateSliderProgress(slider); }
-        if (sliderValue) sliderValue.textContent = String(this.selectedThreadNice);
-        document.querySelectorAll('.thread-io-option').forEach(opt => opt.classList.toggle('selected', parseInt(opt.dataset.class, 10) === this.selectedThreadIoClass));
+        this.selectedThreadModePreset = existing ? 'custom' : (presetPattern ? 'custom' : 'balanced');
+        this.syncThreadRuleEditorFields();
+        this.renderThreadModePresets(this.selectedThreadModePreset);
         this.showOverlay('thread-rule-editor-overlay');
     }
     async saveThreadRule() {
