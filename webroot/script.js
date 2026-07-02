@@ -179,7 +179,7 @@ class CoronaAddon {
     async exec(cmd) {
         return new Promise((resolve) => {
             const callbackId = `cb_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
-            const timeout = setTimeout(() => { delete window[callbackId]; resolve(''); }, 8000);
+            const timeout = setTimeout(() => { delete window[callbackId]; resolve(''); }, 12000);
             window[callbackId] = (code, stdout, stderr) => { clearTimeout(timeout); delete window[callbackId]; resolve(stdout ? stdout.trim() : ''); };
             try { ksu.exec(cmd, '{}', callbackId); } catch (e) { clearTimeout(timeout); delete window[callbackId]; resolve(''); }
         });
@@ -262,7 +262,7 @@ class CoronaAddon {
             const parsed = JSON.parse(json);
             const version = parsed && typeof parsed === 'object' ? parsed.__version : 0;
             const source = parsed && typeof parsed === 'object' && parsed.apps ? parsed.apps : parsed;
-            if (version !== 6 || !source || typeof source !== 'object' || Array.isArray(source)) return;
+            if (version !== 9 || !source || typeof source !== 'object' || Array.isArray(source)) return;
             Object.entries(source).forEach(([pkg, meta]) => {
                 if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return;
                 const next = { ...meta };
@@ -276,7 +276,7 @@ class CoronaAddon {
     async saveAppMetaCache() {
         this.ensureAppPolicyState();
         const path = `${this.configDir}/app_meta_cache.b64`;
-        const payload = JSON.stringify({ __version: 6, apps: this.appMetaCache || {} });
+        const payload = JSON.stringify({ __version: 9, apps: this.appMetaCache || {} });
         const base64Data = btoa(unescape(encodeURIComponent(payload)));
         await this.exec(`echo '${base64Data}' > ${this.shellQuote(path)}`);
     }
@@ -798,7 +798,7 @@ class CoronaAddon {
             { toggle: 'le9ec-toggle', content: 'le9ec-content', onExpand: () => this.loadLe9ecStatus() },
             { toggle: 'io-scheduler-toggle', content: 'io-scheduler-content', onExpand: null },
             { toggle: 'cpu-governor-toggle', content: 'cpu-governor-content', onExpand: null },
-            { toggle: 'app-policy-toggle', content: 'app-policy-content', onExpand: () => { this.renderAppPolicySummary(); this.renderPriorityRules(); } },
+            { toggle: 'app-policy-toggle', content: 'app-policy-content', onExpand: () => { this.renderAppPolicySummary(); } },
             { toggle: 'tcp-toggle', content: 'tcp-content', onExpand: null },
             { toggle: 'custom-scripts-toggle', content: 'custom-scripts-content', onExpand: null },
             { toggle: 'system-opt-toggle', content: 'system-opt-content', onExpand: null },
@@ -2852,8 +2852,6 @@ class CoronaAddon {
     async loadPerformanceModeConfig() { await this.loadPriorityConfig(); }
     initProcessPriority() {
         this.priorityRules = {}; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4;
-        const priorityAddBtn = document.getElementById('priority-add-btn');
-        if (priorityAddBtn) priorityAddBtn.addEventListener('click', () => this.openAppPolicyOverlay('manage'));
         document.getElementById('priority-cancel-btn').addEventListener('click', () => this.hideOverlay('priority-setting-overlay'));
         document.getElementById('priority-save-btn').addEventListener('click', () => this.savePriorityRule());
         document.getElementById('priority-process-search').addEventListener('input', (e) => { this.filterPriorityProcessList(e.target.value); });
@@ -2876,13 +2874,14 @@ class CoronaAddon {
     }
     renderPriorityRules() {
         const container = document.getElementById('priority-rules-list');
-        const ruleNames = Object.keys(this.priorityRules);
+        if (!container) return;
+        const ruleNames = Object.keys(this.priorityRules || {});
         if (ruleNames.length === 0) { container.innerHTML = '<div class="priority-empty">暂无优先级规则</div>'; return; }
         const ioClassNames = { 1: '实时', 2: '尽力', 3: '空闲' };
         container.innerHTML = ruleNames.map(name => { const rule = this.priorityRules[name]; const initial = name.charAt(0).toUpperCase(); return `<div class="priority-rule-item" data-process="${name}"><div class="priority-rule-icon">${initial}</div><div class="priority-rule-info"><div class="priority-rule-name">${name}</div><div class="priority-rule-values">nice: ${rule.nice} | I/O: ${ioClassNames[rule.ioClass] || '尽力'}</div></div><div class="priority-rule-actions"><button class="priority-rule-btn edit" data-action="edit" data-name="${name}">✎</button><button class="priority-rule-btn delete" data-action="delete" data-name="${name}">✕</button></div></div>`; }).join('');
         container.querySelectorAll('.priority-rule-btn').forEach(btn => { btn.addEventListener('click', (e) => { e.stopPropagation(); const action = btn.dataset.action; const name = btn.dataset.name; if (action === 'edit') this.editPriorityRule(name); else if (action === 'delete') this.deletePriorityRule(name); }); });
     }
-    updatePriorityCount() { const countText = `${Object.keys(this.priorityRules).length} 条`; const appBadge = document.getElementById('app-policy-badge'); if (appBadge && appBadge.textContent === '--') appBadge.textContent = countText; const priorityCount = document.getElementById('priority-count'); if (priorityCount) priorityCount.textContent = countText; }
+    updatePriorityCount() { return Object.keys(this.priorityRules).length; }
     async showPriorityProcessSelector() { this.showOverlay('priority-process-overlay'); document.getElementById('priority-process-search').value = ''; document.getElementById('priority-process-list').innerHTML = '<div class="priority-loading">加载中...</div>'; await this.loadPriorityProcessList(); }
     async loadPriorityProcessList() {
         const psOutput = await this.exec(`ps -Ao pid,args 2>/dev/null | tail -n +2`);
@@ -4165,7 +4164,6 @@ CoronaAddon.prototype.ensureAppPolicyState = function() {
         this.appPolicy = { monitorEnabled: false, notifyEnabled: true, whitelist: [], blacklist: [], protect: [], profiles: [] };
     }
     if (!Array.isArray(this.installedApps)) this.installedApps = [];
-    if (!this.appIconCache) this.appIconCache = {};
     if (!this.currentAppPolicyMode) this.currentAppPolicyMode = 'whitelist';
 };
 CoronaAddon.prototype.getAppPolicyScript = function(...args) {
@@ -4330,7 +4328,7 @@ CoronaAddon.prototype.loadInstalledApps = async function(force = false) {
         if (!pkg) return;
         const cached = (this.appMetaCache && this.appMetaCache[pkg]) || {};
         const label = fetchedLabel && fetchedLabel !== pkg ? fetchedLabel : (cached.label && cached.label !== pkg ? cached.label : this.humanizePackageName(pkg));
-        apps.push({ packageName: pkg, componentName, label, labelLoaded: !!label, iconPath: '', iconReady: false });
+        apps.push({ packageName: pkg, componentName, label, labelLoaded: true });
         const nextCache = { ...cached, label, componentName };
         if (JSON.stringify(nextCache) !== JSON.stringify(cached)) {
             this.appMetaCache[pkg] = nextCache;
@@ -4345,14 +4343,9 @@ CoronaAddon.prototype.loadInstalledApps = async function(force = false) {
 CoronaAddon.prototype.prewarmAppPolicyData = async function() {
     this.ensureAppPolicyState();
     if (this.appPolicyPrewarmPromise) return this.appPolicyPrewarmPromise;
-    this.appPolicyPrewarmPromise = (async () => {
-        await this.loadInstalledApps(true);
-    })();
-    try {
-        await this.appPolicyPrewarmPromise;
-    } finally {
-        this.appPolicyPrewarmDone = true;
-    }
+    this.appPolicyPrewarmPromise = Promise.resolve();
+    this.appPolicyPrewarmDone = true;
+    return this.appPolicyPrewarmPromise;
 };
 CoronaAddon.prototype.humanizePackageName = function(pkg) {
     const parts = String(pkg || '').split('.').filter(Boolean);
@@ -4370,66 +4363,6 @@ CoronaAddon.prototype.getAppPolicyTags = function(pkg) {
     if (this.appPolicy.profiles.includes(pkg)) tags.push('预设');
     if (this.priorityRules && this.priorityRules[pkg]) tags.push('优先级');
     return tags;
-};
-CoronaAddon.prototype.getFallbackAppIcon = function(label = '?') {
-    const text = this.escapeHtml(String(label || '?').trim().slice(0, 1).toUpperCase() || '?');
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect rx="24" width="96" height="96" fill="#dfe8ff"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="44" font-family="sans-serif" fill="#3482ff">${text}</text></svg>`;
-    return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
-};
-CoronaAddon.prototype.loadAppIcon = async function(pkg, label, img) {
-    this.ensureAppPolicyState();
-    if (!img) return;
-    img.classList.add('app-policy-icon-loading');
-    const app = (this.installedApps || []).find(item => item.packageName === pkg);
-    if (this.appIconCache[pkg]) {
-        img.src = this.appIconCache[pkg];
-        img.classList.remove('app-policy-icon-loading');
-        return;
-    }
-    img.src = this.getFallbackAppIcon(label);
-    img.classList.remove('app-policy-icon-loading');
-    const componentArg = app?.componentName ? this.shellQuote(app.componentName) : '';
-    this.exec(this.getAppPolicyScript('icon', this.shellQuote(pkg), componentArg)).then(iconData => {
-        const value = String(iconData || '').trim();
-        if (!value) return;
-        this.appIconCache[pkg] = value;
-        img.src = value;
-    }).catch(() => {});
-};
-CoronaAddon.prototype.loadAppLabel = async function(pkg) {
-    const app = (this.installedApps || []).find(item => item.packageName === pkg);
-    if (app && app.labelLoaded) return app.label;
-    const componentName = app?.componentName || '';
-    let label = (await this.exec(this.getAppPolicyScript('label', this.shellQuote(pkg), componentName ? this.shellQuote(componentName) : ''))).trim();
-    if (!label || label === pkg) label = this.humanizePackageName(pkg);
-    if (app) {
-        app.label = label;
-        app.labelLoaded = true;
-    }
-    if (!this.appMetaCache[pkg]) this.appMetaCache[pkg] = {};
-    this.appMetaCache[pkg].label = label;
-    const selectorPkg = String(pkg).replace(/"/g, '\"');
-    const row = document.querySelector(`.app-policy-row[data-pkg="${selectorPkg}"]`);
-    if (row) {
-        row.dataset.label = label;
-        const nameEl = row.querySelector('.app-policy-name');
-        if (nameEl) nameEl.textContent = label;
-        const img = row.querySelector('.app-policy-icon');
-        if (img && img.src.includes('data:image/svg+xml')) this.loadAppIcon(pkg, label, img);
-    }
-    return label;
-};
-CoronaAddon.prototype.primeVisibleAppMetadata = function(limit = 24) {
-    const rows = Array.from(document.querySelectorAll('.app-policy-row')).slice(0, limit);
-    rows.forEach((row, index) => {
-        const pkg = row.dataset.pkg;
-        const label = row.dataset.label || pkg;
-        const img = row.querySelector('.app-policy-icon');
-        setTimeout(() => {
-            this.loadAppLabel(pkg);
-            this.loadAppIcon(pkg, label, img);
-        }, index * 35);
-    });
 };
 CoronaAddon.prototype.openAppPolicyOverlay = async function(mode) {
     this.ensureAppPolicyState();
@@ -4481,7 +4414,7 @@ CoronaAddon.prototype.renderAppPolicyList = function() {
     };
     list.innerHTML = visibleApps.map(app => {
         const tags = this.renderAppPolicyTags(app.packageName);
-        return `<div class="app-policy-row ${isActive(app.packageName) ? 'active' : ''}" data-pkg="${this.escapeHtml(app.packageName)}" data-label="${this.escapeHtml(app.label)}"><img class="freeze-app-icon app-policy-icon" data-pkg="${this.escapeHtml(app.packageName)}" alt="${this.escapeHtml(app.label)}"><div class="app-policy-info"><div class="app-policy-name">${this.escapeHtml(app.label)}</div><div class="app-policy-package">${this.escapeHtml(app.packageName)}</div><div class="app-policy-tags">${tags}</div></div><div class="app-policy-check">✓</div></div>`;
+        return `<div class="app-policy-row ${isActive(app.packageName) ? 'active' : ''}" data-pkg="${this.escapeHtml(app.packageName)}" data-label="${this.escapeHtml(app.label)}"><div class="app-policy-info"><div class="app-policy-name">${this.escapeHtml(app.label)}</div><div class="app-policy-package">${this.escapeHtml(app.packageName)}</div><div class="app-policy-tags">${tags}</div></div><div class="app-policy-check">✓</div></div>`;
     }).join('');
     list.querySelectorAll('.app-policy-row').forEach(row => {
         row.addEventListener('click', async () => {
@@ -4489,11 +4422,6 @@ CoronaAddon.prototype.renderAppPolicyList = function() {
             await this.openAppProfilePicker(pkg, row.dataset.label || pkg);
         });
     });
-    list.querySelectorAll('.app-policy-icon').forEach(img => {
-        const row = img.closest('.app-policy-row');
-        img.src = this.getFallbackAppIcon(row?.dataset.label || img.dataset.pkg);
-    });
-    this.primeVisibleAppMetadata(32);
 };
 CoronaAddon.prototype.reorderAppPolicyRow = function(pkg) {
     const list = document.getElementById('app-policy-list');
@@ -4518,10 +4446,18 @@ CoronaAddon.prototype.toggleAppPolicyPackage = async function(mode, pkg) {
     this.exec(this.getAppPolicyScript('list-set', key, adding ? 'add' : 'del', this.shellQuote(pkg))).catch(() => {});
     this.scheduleAppPolicySync();
 };
+CoronaAddon.prototype.estimateCurrentProfileConfigCount = async function() {
+    const names = this.snapshotConfigFiles || [];
+    if (!Array.isArray(names) || names.length === 0) return 0;
+    const checks = names.map(name => `[ -s ${this.shellQuote(`${this.configDir}/${name}`)} ] && echo 1`).join('; ');
+    const output = await this.exec(`/system/bin/sh -c ${this.shellQuote(checks)}`);
+    return String(output || '').split('\n').filter(Boolean).length;
+};
 CoronaAddon.prototype.openAppProfilePicker = async function(pkg, label) {
     this.ensureAppPolicyState();
     this.selectedAppProfilePackage = pkg;
     this.selectedAppProfileLabel = label || pkg;
+    this.currentProfileConfigCount = await this.estimateCurrentProfileConfigCount();
     const title = document.getElementById('app-profile-title');
     if (title) title.textContent = label || pkg;
     this.renderAppProfileChoices();
@@ -4536,21 +4472,33 @@ CoronaAddon.prototype.renderAppProfileChoices = function() {
     const inProtect = this.appPolicy.protect.includes(pkg);
     const hasProfile = this.appPolicy.profiles.includes(pkg);
     const priorityRule = this.priorityRules?.[pkg] || null;
+    const currentConfigCount = Number(this.currentProfileConfigCount || 0);
+    const currentDisabled = currentConfigCount <= 0;
     const actionOptions = [
         `<div class="doze-preset" data-mode="toggle-whitelist"><div class="doze-preset-name">${inWhitelist ? '移出白名单' : '加入白名单'}</div><div class="doze-preset-desc">紧急回收时跳过这个应用</div></div>`,
         `<div class="doze-preset" data-mode="toggle-protect"><div class="doze-preset-name">${inProtect ? '取消保护进程' : '加入保护进程'}</div><div class="doze-preset-desc">尝试持续保活并迁入受保护内存组</div></div>`,
         `<div class="doze-preset" data-mode="priority"><div class="doze-preset-name">${priorityRule ? '调整优先级策略' : '设置优先级策略'}</div><div class="doze-preset-desc">nice ${priorityRule?.nice ?? 0} · I/O ${priorityRule ? `${priorityRule.ioClass}/${priorityRule.ioLevel}` : '2/4'}</div></div>`,
-        `<div class="doze-preset" data-mode="current"><div class="doze-preset-name">${hasProfile ? '覆盖应用预设' : '使用当前配置创建预设'}</div><div class="doze-preset-desc">将当前 config 下的已保存参数写入该应用独立预设目录</div></div>`
+        `<div class="doze-preset${currentDisabled ? ' disabled' : ''}" data-mode="current" ${currentDisabled ? 'data-disabled="1"' : ''}><div class="doze-preset-name">${hasProfile ? '覆盖应用预设' : '使用当前配置创建预设'}</div><div class="doze-preset-desc">${currentDisabled ? '当前没有可保存为预设的配置' : '将当前 config 下的已保存参数写入该应用独立预设目录'}</div></div>`
     ];
     const clearOption = hasProfile ? `<div class="doze-preset" data-mode="clear"><div class="doze-preset-name">清除应用预设</div><div class="doze-preset-desc">删除该应用的独立预设，下次切回默认配置</div></div>` : '';
     const snapshotOptions = snapshots.map(snapshot => `<div class="doze-preset" data-mode="snapshot" data-snapshot-id="${this.escapeHtml(snapshot.id || '')}"><div class="doze-preset-name">套用快照：${this.escapeHtml(snapshot.name || '未命名快照')}</div><div class="doze-preset-desc">${this.escapeHtml(this.formatSnapshotTime(snapshot.createdAt))} · ${Object.keys(snapshot.files || {}).length} 个配置</div></div>`).join('');
     container.innerHTML = actionOptions.join('') + snapshotOptions + clearOption;
     container.querySelectorAll('.doze-preset').forEach(item => {
         item.addEventListener('click', async () => {
+            if (item.dataset.disabled === '1') {
+                this.showToast('当前没有可用预设配置');
+                return;
+            }
             const mode = item.dataset.mode;
             if (mode === 'toggle-whitelist') await this.toggleAppPolicyPackage('whitelist', this.selectedAppProfilePackage);
             if (mode === 'toggle-protect') await this.toggleAppPolicyPackage('protect', this.selectedAppProfilePackage);
-            if (mode === 'priority') { this.selectedPriorityProcess = this.selectedAppProfilePackage; this.hideOverlay('app-profile-overlay'); this.showPrioritySetting(); return; }
+            if (mode === 'priority') {
+                this.selectedPriorityProcess = this.selectedAppProfilePackage;
+                this.hideOverlay('app-profile-overlay');
+                this.hideOverlay('app-policy-overlay');
+                requestAnimationFrame(() => requestAnimationFrame(() => this.showPrioritySetting()));
+                return;
+            }
             if (mode === 'current') await this.setAppProfileFromCurrentConfig(this.selectedAppProfilePackage);
             if (mode === 'snapshot') await this.setAppProfileFromSnapshot(this.selectedAppProfilePackage, item.dataset.snapshotId);
             if (mode === 'clear') await this.clearAppProfile(this.selectedAppProfilePackage);

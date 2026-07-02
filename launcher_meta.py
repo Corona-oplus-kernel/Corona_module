@@ -107,6 +107,17 @@ def query_label(pkg: str, component: str = '') -> str:
     return query_icons_label(pkg, component) or query_launcher_label(pkg, component)
 
 
+def query_labels_batch(items):
+    result = []
+    for item in items:
+        pkg = item[0] if len(item) > 0 else ''
+        component = item[1] if len(item) > 1 else ''
+        if not pkg:
+            continue
+        result.append((pkg, query_label(pkg, component)))
+    return result
+
+
 def query_icon_blob(pkg: str, component: str):
     if not os.path.exists(ICONS_DB):
         return None
@@ -190,3 +201,15 @@ if __name__ == '__main__':
     elif cmd == 'icon-data':
         component = sys.argv[3] if len(sys.argv) > 3 else ''
         print(icon_data_uri(pkg, component), end='')
+    elif cmd == 'label-batch':
+        raw = sys.argv[2] if len(sys.argv) > 2 else ''
+        items = []
+        for line in raw.split('\n'):
+            if not line.strip():
+                continue
+            parts = line.split('|', 1)
+            package_name = parts[0].strip()
+            component_name = parts[1].strip() if len(parts) > 1 else ''
+            items.append((package_name, component_name))
+        for package_name, label in query_labels_batch(items):
+            print(f'{package_name}|{label}')
