@@ -360,8 +360,11 @@ class CoronaAddon {
                 cancelText: options.cancelText || '取消'
             }
         );
-        if (!confirmed && typeof options.onCancel === 'function') {
-            await options.onCancel();
+        if (!confirmed) {
+            if (typeof options.onCancel === 'function') {
+                await options.onCancel();
+            }
+            this.playRollbackAnimation(options.rollbackTargets || null);
         }
         return confirmed;
     }
@@ -2772,6 +2775,42 @@ class CoronaAddon {
     }
     sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
     showToast(message) { const toast = document.getElementById('toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500); }
+    isRollbackAnimVisible(el) {
+        if (!el) return false;
+        return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+    }
+    collectRollbackAnimationTargets(explicitTargets = null) {
+        if (explicitTargets && explicitTargets.length) {
+            return explicitTargets.flatMap(target => {
+                if (!target) return [];
+                if (typeof target === 'string') return Array.from(document.querySelectorAll(target));
+                return [target];
+            }).filter(el => this.isRollbackAnimVisible(el));
+        }
+        const selectors = [
+            '.option-item.selected',
+            '.io-option.selected',
+            '.thread-mode-chip.active',
+            '.thread-rule-section.active',
+            '.algorithm-option.selected',
+            '.switch input:checked + .slider',
+            '.switch input:not(:checked) + .slider',
+            '.range-slider',
+            'select.thread-rule-select',
+            '#app-policy-content .summary-chip.active'
+        ];
+        return Array.from(document.querySelectorAll(selectors.join(','))).filter(el => this.isRollbackAnimVisible(el));
+    }
+    playRollbackAnimation(targets = null) {
+        const elements = this.collectRollbackAnimationTargets(targets);
+        elements.forEach(el => {
+            const node = el.matches('.range-slider') ? (el.closest('.priority-nice-slider-container, .slider-container') || el) : el;
+            node.classList.remove('rollback-animate', 'rollback-animate-soft');
+            void node.offsetWidth;
+            node.classList.add(node.matches('.switch .slider, .priority-nice-slider-container, .slider-container') ? 'rollback-animate-soft' : 'rollback-animate');
+            setTimeout(() => node.classList.remove('rollback-animate', 'rollback-animate-soft'), 340);
+        });
+    }
     showInitOverlay(show, message = '正在初始化，请稍候...') {
         const el = document.getElementById('loading');
         const text = el ? el.querySelector('.loading-text') : null;
