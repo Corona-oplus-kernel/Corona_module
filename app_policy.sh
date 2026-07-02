@@ -39,5 +39,6 @@ case "$1" in
     protect-once) apply_protection_once ;;
     daemon) monitor_daemon ;;
     foreground) get_foreground_package ;;
+    thread-list) list_package_threads "$2" ;;
     *) exit 1 ;;
 esac

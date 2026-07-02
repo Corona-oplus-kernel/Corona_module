@@ -96,6 +96,31 @@ killed=%s
 ' "$before" "$after" "$freed" "$foreground_pkg" "$killed"
 }
 
+
+package_pids_for_name() {
+    target="$1"
+    for d in /proc/[0-9]*; do
+        [ -r "$d/cmdline" ] || continue
+        cmdline=$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null)
+        case "$cmdline" in
+            "$target"*|*" $target"*|*"$target:"*|*"$target/"*) basename "$d" ;;
+        esac
+    done | sort -u
+}
+
+list_package_threads() {
+    pkg="$1"
+    for pid in $(package_pids_for_name "$pkg"); do
+        [ -d "/proc/$pid/task" ] || continue
+        for task_dir in /proc/$pid/task/[0-9]*; do
+            [ -r "$task_dir/comm" ] || continue
+            thread_name=$(cat "$task_dir/comm" 2>/dev/null)
+            [ -n "$thread_name" ] && printf '%s
+' "$thread_name"
+        done
+    done | awk 'NF && !seen[$0]++ { print $0 }' | sort
+}
+
 profile_exists() {
     pkg="$1"
     csv_contains "$pkg" "$profiles_csv" && return 0

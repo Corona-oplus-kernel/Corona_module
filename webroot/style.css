@@ -4683,3 +4683,91 @@ body.theme-dark .app-policy-row {
     background: rgba(30, 30, 35, 0.45);
     border-color: rgba(255, 255, 255, 0.08);
 }
+
+
+.thread-rule-card,
+.thread-rule-editor-card {
+    max-height: 82vh;
+}
+
+.thread-rule-section {
+    margin-top: 14px;
+}
+
+.thread-rule-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 8px;
+}
+
+.thread-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.thread-chip {
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.06);
+    color: var(--text-main);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.thread-rule-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.58);
+    border: 1px solid rgba(0,0,0,0.06);
+    margin-bottom: 10px;
+}
+
+.thread-rule-item:last-child {
+    margin-bottom: 0;
+}
+
+.thread-rule-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.thread-rule-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.thread-rule-values {
+    font-size: 12px;
+    color: var(--text-sub);
+    margin-top: 4px;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.thread-rule-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.thread-rule-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.thread-rule-select {
+    width: 100%;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.8);
+    color: var(--text-main);
+    padding: 12px 14px;
+    font-size: 14px;
+}

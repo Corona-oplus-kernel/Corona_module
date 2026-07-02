@@ -1346,6 +1346,89 @@
             <div class="doze-preset-list" id="app-profile-options"></div>
         </div>
     </div>
+
+    <div class="detail-overlay hidden no-close-btn" id="thread-rule-overlay">
+        <div class="detail-card priority-process-card thread-rule-card">
+            <div class="detail-header">
+                <span class="detail-title" id="thread-rule-title">线程规则</span>
+                <button class="priority-add-btn" id="thread-rule-add-btn">新增</button>
+            </div>
+            <div class="thread-rule-section">
+                <div class="thread-rule-section-title">现有规则</div>
+                <div class="priority-process-list" id="thread-rule-list">
+                    <div class="priority-loading">加载中...</div>
+                </div>
+            </div>
+            <div class="thread-rule-section">
+                <div class="thread-rule-section-title">常用线程</div>
+                <div class="thread-chip-list" id="thread-rule-common-list"></div>
+            </div>
+            <div class="thread-rule-section">
+                <div class="thread-rule-section-title">当前运行线程</div>
+                <div class="thread-chip-list" id="thread-rule-live-list"><div class="priority-loading">正在读取...</div></div>
+            </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden no-close-btn" id="thread-rule-editor-overlay">
+        <div class="detail-card priority-setting-card thread-rule-editor-card">
+            <div class="detail-header">
+                <span class="detail-title" id="thread-rule-editor-title">线程规则</span>
+            </div>
+            <div class="priority-process-info" id="thread-rule-selected-app">
+                <span class="process-name">--</span>
+            </div>
+            <div class="priority-setting-section">
+                <div class="priority-setting-label">线程名 / 模式</div>
+                <input type="text" id="thread-pattern-input" class="priority-search" placeholder="例如 RenderThread 或 Thread-*">
+                <div class="priority-setting-hint">支持通配符，如 `RenderThread`、`GLThread`、`Thread-*`</div>
+            </div>
+            <div class="priority-setting-section">
+                <div class="priority-setting-label">CPU 优先级 (nice)</div>
+                <div class="priority-nice-slider-container">
+                    <input type="range" class="range-slider priority-nice-slider" id="thread-nice-slider" min="-20" max="19" step="1" value="0">
+                    <div class="slider-labels">
+                        <span>-20 (最高)</span>
+                        <span class="slider-value" id="thread-nice-slider-value">0</span>
+                        <span>19 (最低)</span>
+                    </div>
+                </div>
+            </div>
+            <div class="priority-setting-section">
+                <div class="priority-setting-label">I/O 优先级</div>
+                <div class="priority-io-options" id="thread-io-options">
+                    <div class="io-option thread-io-option" data-class="1" data-level="0"><div class="io-class">实时</div><div class="io-desc">最高优先级</div></div>
+                    <div class="io-option thread-io-option selected" data-class="2" data-level="4"><div class="io-class">尽力</div><div class="io-desc">默认优先级</div></div>
+                    <div class="io-option thread-io-option" data-class="3" data-level="7"><div class="io-class">空闲</div><div class="io-desc">后台任务</div></div>
+                </div>
+            </div>
+            <div class="priority-setting-section thread-rule-grid">
+                <div>
+                    <div class="priority-setting-label">CPU 亲和性</div>
+                    <input type="text" id="thread-affinity-input" class="priority-search" placeholder="例如 0-3 或 4,6,7">
+                    <div class="priority-setting-hint">将使用 `taskset -pc` 绑定到指定核心</div>
+                </div>
+                <div>
+                    <div class="priority-setting-label">调度策略</div>
+                    <select id="thread-sched-policy" class="thread-rule-select">
+                        <option value="normal">normal</option>
+                        <option value="batch">batch</option>
+                        <option value="idle">idle</option>
+                        <option value="fifo">fifo</option>
+                        <option value="rr">rr</option>
+                    </select>
+                </div>
+            </div>
+            <div class="priority-setting-section">
+                <div class="priority-setting-label">实时优先级</div>
+                <input type="number" id="thread-rt-prio" class="priority-search" min="0" max="99" value="1" placeholder="1-99，仅 fifo/rr 有效">
+                <div class="priority-setting-hint">仅在 `fifo / rr` 调度策略下生效</div>
+            </div>
+            <div class="priority-actions">
+                <button class="action-btn priority-cancel-btn" id="thread-rule-cancel-btn">取消</button>
+                <button class="action-btn priority-save-btn" id="thread-rule-save-btn">保存规则</button>
+            </div>
+        </div>
+    </div>
     <div class="detail-overlay hidden" id="confirm-dialog-overlay">
         <div class="detail-content confirm-dialog">
             <div class="detail-header">
