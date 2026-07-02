@@ -166,6 +166,7 @@ class CoronaAddon {
         await this.ensureFeatureScript('settings-ui');
         await this.ensureFeatureScript('home-ui');
         await this.ensureFeatureScript('memory-core');
+        await this.ensureFeatureScript('app-policy');
         this.showInitOverlay(true, this.t('initDefault'));
         try {
             this.updateInitOverlayMessage(this.t('initResolve'));
@@ -199,8 +200,12 @@ class CoronaAddon {
                 this.initStaticHeader();
             }
             this.initModuleIntro();
+            this.updateInitOverlayMessage(this.t('initSettings'));
+            await this.ensureSettingsPageReady(true);
             this.updateInitOverlayMessage(this.t('initRealtime'));
-            await this.updateRealtimeData(true);
+            await this.awaitInitialRealtimeReady();
+            this.updateInitOverlayMessage(this.t('initApps'));
+            await this.prewarmAppPolicyData(true);
             this.startRealtimeMonitor();
             this.scheduleDeferredInit();
         } finally {
