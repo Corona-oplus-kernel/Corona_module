@@ -1408,6 +1408,21 @@
                     <div class="priority-setting-hint">将使用 `taskset -pc` 绑定到指定核心</div>
                 </div>
                 <div>
+                    <div class="priority-setting-label">Cpuset 分组</div>
+                    <select id="thread-cpuset-group" class="thread-rule-select">
+                        <option value="">不指定</option>
+                        <option value="top-app">top-app</option>
+                        <option value="foreground">foreground</option>
+                        <option value="foreground_window">foreground_window</option>
+                        <option value="oiface_fg+">oiface_fg+</option>
+                        <option value="oiface_fg">oiface_fg</option>
+                        <option value="background">background</option>
+                        <option value="system-background">system-background</option>
+                    </select>
+                </div>
+            </div>
+            <div class="priority-setting-section thread-rule-grid">
+                <div>
                     <div class="priority-setting-label">调度策略</div>
                     <select id="thread-sched-policy" class="thread-rule-select">
                         <option value="normal">normal</option>
@@ -1417,11 +1432,18 @@
                         <option value="rr">rr</option>
                     </select>
                 </div>
+                <div>
+                    <div class="priority-setting-label">实时优先级</div>
+                    <input type="number" id="thread-rt-prio" class="priority-search" min="0" max="99" value="1" placeholder="1-99，仅 fifo/rr 有效">
+                </div>
             </div>
             <div class="priority-setting-section">
-                <div class="priority-setting-label">实时优先级</div>
-                <input type="number" id="thread-rt-prio" class="priority-search" min="0" max="99" value="1" placeholder="1-99，仅 fifo/rr 有效">
-                <div class="priority-setting-hint">仅在 `fifo / rr` 调度策略下生效</div>
+                <div class="priority-setting-label">WALT 增强</div>
+                <div class="switch-list compact-switch-list">
+                    <label class="mini-switch-row"><input type="checkbox" id="thread-walt-boost"><span>Per-task boost</span></label>
+                    <label class="mini-switch-row"><input type="checkbox" id="thread-walt-pipeline"><span>Pipeline special</span></label>
+                </div>
+                <div class="priority-setting-hint">会尝试打开相关 WALT 节点，并关闭 `task_reduce_affinity`</div>
             </div>
             <div class="priority-actions">
                 <button class="action-btn priority-cancel-btn" id="thread-rule-cancel-btn">取消</button>

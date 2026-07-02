@@ -2851,7 +2851,7 @@ class CoronaAddon {
     initPerformanceMode() { this.initProcessPriority(); }
     async loadPerformanceModeConfig() { await this.loadPriorityConfig(); await this.loadThreadPriorityConfig(); }
     initProcessPriority() {
-        this.priorityRules = {}; this.threadPriorityRules = []; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4; this.selectedThreadRuleKey = null; this.selectedThreadRulePackage = ''; this.selectedThreadRuleLabel = ''; this.selectedThreadPattern = ''; this.selectedThreadNice = 0; this.selectedThreadIoClass = 2; this.selectedThreadIoLevel = 4; this.selectedThreadAffinity = ''; this.selectedThreadSchedPolicy = 'normal'; this.selectedThreadRtPrio = 1;
+        this.priorityRules = {}; this.threadPriorityRules = []; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4; this.selectedThreadRuleKey = null; this.selectedThreadRulePackage = ''; this.selectedThreadRuleLabel = ''; this.selectedThreadPattern = ''; this.selectedThreadNice = 0; this.selectedThreadIoClass = 2; this.selectedThreadIoLevel = 4; this.selectedThreadAffinity = ''; this.selectedThreadCpuset = ''; this.selectedThreadSchedPolicy = 'normal'; this.selectedThreadRtPrio = 1; this.selectedThreadWaltBoost = false; this.selectedThreadWaltPipeline = false;
         document.getElementById('priority-cancel-btn').addEventListener('click', () => this.hideOverlay('priority-setting-overlay'));
         document.getElementById('priority-save-btn').addEventListener('click', () => this.savePriorityRule());
         document.getElementById('priority-process-search').addEventListener('input', (e) => { this.filterPriorityProcessList(e.target.value); });
@@ -3023,7 +3023,7 @@ class CoronaAddon {
     getThreadRulesForPackage(pkg) { return (this.threadPriorityRules || []).filter(rule => rule.packageName === pkg); }
     getThreadRulePackages() { return [...new Set((this.threadPriorityRules || []).map(rule => rule.packageName).filter(Boolean))]; }
     serializeThreadPriorityRules(rules = this.threadPriorityRules || []) {
-        return (rules || []).map(rule => `${rule.packageName}|${rule.threadPattern}=${rule.nice}|${rule.ioClass}|${rule.ioLevel}|${rule.affinity || ''}|${rule.schedPolicy || 'normal'}|${rule.rtPrio ?? 1}`).join('\n');
+        return (rules || []).map(rule => `${rule.packageName}|${rule.threadPattern}=${rule.nice}|${rule.ioClass}|${rule.ioLevel}|${rule.affinity || ''}|${rule.schedPolicy || 'normal'}|${rule.rtPrio ?? 1}|${rule.cpuset || ''}|${rule.waltBoost ? '1' : '0'}|${rule.waltPipeline ? '1' : '0'}`).join('\n');
     }
     async loadThreadPriorityConfig() {
         const config = await this.exec(`cat ${this.configDir}/thread_priority.conf 2>/dev/null`);
@@ -3039,8 +3039,8 @@ class CoronaAddon {
                 const packageName = target.slice(0, splitIndex).trim();
                 const threadPattern = target.slice(splitIndex + 1).trim();
                 const parts = values.split('|');
-                const [nice, ioClass, ioLevel, affinity = '', schedPolicy = 'normal', rtPrio = '1'] = parts;
-                this.threadPriorityRules.push({ key: this.getThreadRuleKey(packageName, threadPattern), packageName, threadPattern, nice: parseInt(nice || '0', 10) || 0, ioClass: parseInt(ioClass || '2', 10) || 2, ioLevel: parseInt(ioLevel || '4', 10) || 4, affinity: String(affinity || '').trim(), schedPolicy: String(schedPolicy || 'normal').trim() || 'normal', rtPrio: parseInt(rtPrio || '1', 10) || 1 });
+                const [nice, ioClass, ioLevel, affinity = '', schedPolicy = 'normal', rtPrio = '1', cpuset = '', waltBoost = '0', waltPipeline = '0'] = parts;
+                this.threadPriorityRules.push({ key: this.getThreadRuleKey(packageName, threadPattern), packageName, threadPattern, nice: parseInt(nice || '0', 10) || 0, ioClass: parseInt(ioClass || '2', 10) || 2, ioLevel: parseInt(ioLevel || '4', 10) || 4, affinity: String(affinity || '').trim(), schedPolicy: String(schedPolicy || 'normal').trim() || 'normal', rtPrio: parseInt(rtPrio || '1', 10) || 1, cpuset: String(cpuset || '').trim(), waltBoost: String(waltBoost || '0') === '1', waltPipeline: String(waltPipeline || '0') === '1' });
             });
         }
         this.renderAppPolicySummary();
@@ -3073,7 +3073,7 @@ class CoronaAddon {
             list.innerHTML = '<div class="priority-empty">该应用还没有线程规则</div>';
             return;
         }
-        list.innerHTML = rules.map(rule => `<div class="thread-rule-item" data-key="${this.escapeHtml(rule.key)}"><div class="thread-rule-info"><div class="thread-rule-name">${this.escapeHtml(rule.threadPattern)}</div><div class="thread-rule-values">nice ${rule.nice} · I/O ${rule.ioClass}/${rule.ioLevel}${rule.affinity ? ` · 亲和性 ${this.escapeHtml(rule.affinity)}` : ''}${rule.schedPolicy && rule.schedPolicy !== 'normal' ? ` · ${this.escapeHtml(rule.schedPolicy)}(${rule.rtPrio})` : ''}</div></div><div class="thread-rule-actions"><button class="priority-rule-btn edit" data-action="edit" data-key="${this.escapeHtml(rule.key)}">✎</button><button class="priority-rule-btn delete" data-action="delete" data-key="${this.escapeHtml(rule.key)}">✕</button></div></div>`).join('');
+        list.innerHTML = rules.map(rule => `<div class="thread-rule-item" data-key="${this.escapeHtml(rule.key)}"><div class="thread-rule-info"><div class="thread-rule-name">${this.escapeHtml(rule.threadPattern)}</div><div class="thread-rule-values">nice ${rule.nice} · I/O ${rule.ioClass}/${rule.ioLevel}${rule.affinity ? ` · 亲和性 ${this.escapeHtml(rule.affinity)}` : ''}${rule.cpuset ? ` · cpuset ${this.escapeHtml(rule.cpuset)}` : ''}${rule.schedPolicy && rule.schedPolicy !== 'normal' ? ` · ${this.escapeHtml(rule.schedPolicy)}(${rule.rtPrio})` : ''}${rule.waltBoost ? ' · WALT boost' : ''}${rule.waltPipeline ? ' · pipeline' : ''}</div></div><div class="thread-rule-actions"><button class="priority-rule-btn edit" data-action="edit" data-key="${this.escapeHtml(rule.key)}">✎</button><button class="priority-rule-btn delete" data-action="delete" data-key="${this.escapeHtml(rule.key)}">✕</button></div></div>`).join('');
         list.querySelectorAll('.priority-rule-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); const key = btn.dataset.key; if (btn.dataset.action === 'edit') this.openThreadRuleEditor(key); else this.deleteThreadRule(key); }));
     }
     async openThreadRuleManager(pkg, label) {
@@ -3097,22 +3097,31 @@ class CoronaAddon {
         this.selectedThreadIoClass = existing?.ioClass ?? 2;
         this.selectedThreadIoLevel = existing?.ioLevel ?? 4;
         this.selectedThreadAffinity = existing?.affinity || '';
+        this.selectedThreadCpuset = existing?.cpuset || '';
         this.selectedThreadSchedPolicy = existing?.schedPolicy || 'normal';
         this.selectedThreadRtPrio = existing?.rtPrio ?? 1;
+        this.selectedThreadWaltBoost = !!existing?.waltBoost;
+        this.selectedThreadWaltPipeline = !!existing?.waltPipeline;
         const title = document.getElementById('thread-rule-editor-title');
         if (title) title.textContent = `${this.selectedThreadRuleLabel || this.selectedThreadRulePackage} · ${existing ? '编辑线程规则' : '新增线程规则'}`;
         const appInfo = document.getElementById('thread-rule-selected-app');
         if (appInfo) appInfo.innerHTML = `<span class="process-name">${this.escapeHtml(this.selectedThreadRulePackage)}</span>`;
         const input = document.getElementById('thread-pattern-input');
         const affinity = document.getElementById('thread-affinity-input');
+        const cpuset = document.getElementById('thread-cpuset-group');
         const sched = document.getElementById('thread-sched-policy');
         const rt = document.getElementById('thread-rt-prio');
+        const waltBoost = document.getElementById('thread-walt-boost');
+        const waltPipeline = document.getElementById('thread-walt-pipeline');
         const slider = document.getElementById('thread-nice-slider');
         const sliderValue = document.getElementById('thread-nice-slider-value');
         if (input) input.value = this.selectedThreadPattern;
         if (affinity) affinity.value = this.selectedThreadAffinity;
+        if (cpuset) cpuset.value = this.selectedThreadCpuset;
         if (sched) sched.value = this.selectedThreadSchedPolicy;
         if (rt) rt.value = String(this.selectedThreadRtPrio);
+        if (waltBoost) waltBoost.checked = this.selectedThreadWaltBoost;
+        if (waltPipeline) waltPipeline.checked = this.selectedThreadWaltPipeline;
         if (slider) { slider.value = String(this.selectedThreadNice); this.updateSliderProgress(slider); }
         if (sliderValue) sliderValue.textContent = String(this.selectedThreadNice);
         document.querySelectorAll('.thread-io-option').forEach(opt => opt.classList.toggle('selected', parseInt(opt.dataset.class, 10) === this.selectedThreadIoClass));
@@ -3121,16 +3130,19 @@ class CoronaAddon {
     async saveThreadRule() {
         const threadPattern = (document.getElementById('thread-pattern-input')?.value || '').trim();
         const affinity = (document.getElementById('thread-affinity-input')?.value || '').trim();
+        const cpuset = (document.getElementById('thread-cpuset-group')?.value || '').trim();
         const schedPolicy = (document.getElementById('thread-sched-policy')?.value || 'normal').trim();
         const rtPrio = parseInt(document.getElementById('thread-rt-prio')?.value || '1', 10) || 1;
+        const waltBoost = !!document.getElementById('thread-walt-boost')?.checked;
+        const waltPipeline = !!document.getElementById('thread-walt-pipeline')?.checked;
         if (!threadPattern) { this.showToast('请输入线程名或模式'); return false; }
-        const nextRule = { key: this.getThreadRuleKey(this.selectedThreadRulePackage, threadPattern), packageName: this.selectedThreadRulePackage, threadPattern, nice: this.selectedThreadNice, ioClass: this.selectedThreadIoClass, ioLevel: this.selectedThreadIoLevel, affinity, schedPolicy, rtPrio };
+        const nextRule = { key: this.getThreadRuleKey(this.selectedThreadRulePackage, threadPattern), packageName: this.selectedThreadRulePackage, threadPattern, nice: this.selectedThreadNice, ioClass: this.selectedThreadIoClass, ioLevel: this.selectedThreadIoLevel, affinity, cpuset, schedPolicy, rtPrio, waltBoost, waltPipeline };
         const nextRules = (this.threadPriorityRules || []).filter(rule => rule.key !== this.selectedThreadRuleKey && rule.key !== nextRule.key);
         nextRules.push(nextRule);
         const confirmed = await this.confirmChangePreview('变更预览', {
             summary: `即将为 ${this.selectedThreadRulePackage} 保存线程规则 ${threadPattern}。`,
             configs: [{ filename: 'thread_priority.conf', content: this.serializeThreadPriorityRules(nextRules) }],
-            actions: [affinity ? `对命中线程设置亲和性 ${affinity}` : '不修改线程亲和性', schedPolicy !== 'normal' ? `设置调度策略 ${schedPolicy} (rt=${rtPrio})` : '保持 normal 调度策略', `设置 nice=${this.selectedThreadNice} 与 I/O=${this.selectedThreadIoClass}/${this.selectedThreadIoLevel}`],
+            actions: [affinity ? `对命中线程设置亲和性 ${affinity}` : '不修改线程亲和性', cpuset ? `将命中线程迁入 cpuset ${cpuset}` : '不调整 cpuset 分组', schedPolicy !== 'normal' ? `设置调度策略 ${schedPolicy} (rt=${rtPrio})` : '保持 normal 调度策略', waltBoost ? '启用 WALT per-task boost 并关闭 task_reduce_affinity' : '不启用 WALT per-task boost', waltPipeline ? '启用 WALT pipeline special' : '不启用 WALT pipeline special', `设置 nice=${this.selectedThreadNice} 与 I/O=${this.selectedThreadIoClass}/${this.selectedThreadIoLevel}`],
             notes: ['规则会对命中的线程 TID 应用，不影响未匹配线程。']
         });
         if (!confirmed) return false;

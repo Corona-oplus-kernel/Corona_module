@@ -146,17 +146,48 @@ apply_sched_policy_to_tid() {
     esac
 }
 
+apply_cpuset_to_tid() {
+    tid="$1"
+    cpuset_group="$2"
+    [ -n "$cpuset_group" ] || return 0
+    tasks_file="/dev/cpuset/$cpuset_group/tasks"
+    [ -f "$tasks_file" ] || return 0
+    echo "$tid" > "$tasks_file" 2>/dev/null
+}
+
+set_walt_knob() {
+    path="$1"
+    value="$2"
+    [ -n "$value" ] || return 0
+    [ -f "$path" ] || return 0
+    echo "$value" > "$path" 2>/dev/null
+}
+
+apply_thread_walt_hints() {
+    enable_per_task_boost="$1"
+    enable_pipeline_special="$2"
+    disable_reduce_affinity="$3"
+    [ "$enable_per_task_boost" = "1" ] && set_walt_knob /proc/sys/walt/sched_per_task_boost 1
+    [ "$enable_pipeline_special" = "1" ] && set_walt_knob /proc/sys/walt/sched_pipeline_special 1
+    [ "$disable_reduce_affinity" = "1" ] && set_walt_knob /proc/sys/walt/task_reduce_affinity 0
+}
+
 apply_thread_priority_config() {
     [ ! -f "$THREAD_PRIORITY_FILE" ] && return
+    walt_per_task_boost=0
+    walt_pipeline_special=0
+    walt_reduce_affinity=0
     while IFS='=' read -r target values; do
         case "$target" in ''|'#'*) continue ;; esac
         [ -n "$values" ] || continue
         package_name=$(printf '%s' "$target" | cut -d'|' -f1)
         thread_pattern=$(printf '%s' "$target" | cut -d'|' -f2-)
         [ -n "$package_name" ] && [ -n "$thread_pattern" ] || continue
-        IFS='|' read -r nice_val io_class io_level affinity_mask sched_policy rt_prio <<EOF
+        IFS='|' read -r nice_val io_class io_level affinity_mask sched_policy rt_prio cpuset_group walt_boost walt_pipeline <<EOF
 $values
 EOF
+        [ "$walt_boost" = "1" ] && walt_per_task_boost=1 && walt_reduce_affinity=1
+        [ "$walt_pipeline" = "1" ] && walt_pipeline_special=1
         for pid in $(package_pids_for_name "$package_name"); do
             [ -d "/proc/$pid/task" ] || continue
             for task_dir in /proc/$pid/task/[0-9]*; do
@@ -169,10 +200,12 @@ EOF
                     ionice -c "$io_class" -n "$io_level" -p "$tid" 2>/dev/null
                 fi
                 [ -n "$affinity_mask" ] && taskset -pc "$affinity_mask" "$tid" >/dev/null 2>&1
+                apply_cpuset_to_tid "$tid" "$cpuset_group"
                 apply_sched_policy_to_tid "$tid" "$sched_policy" "$rt_prio"
             done
         done
     done < "$THREAD_PRIORITY_FILE"
+    apply_thread_walt_hints "$walt_per_task_boost" "$walt_pipeline_special" "$walt_reduce_affinity"
 }
 
 apply_device_config() {
