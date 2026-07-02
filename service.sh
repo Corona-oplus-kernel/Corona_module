@@ -20,6 +20,19 @@ wait_until_boot_complete() { until [ "$(getprop sys.boot_completed)" = "1" ]; do
 wait_until_login() { until [ -d "/data/data/android" ]; do sleep 5; done; }
 has_mm_sys_entry() { [ -f /odm/etc/init.oplus.mm-sys.sh ]; }
 
+should_trigger_official_nandswap() {
+    [ -f /product/bin/init.oplus.nandswap.sh ] || return 1
+    [ -f "$CONFIG_DIR/zram.conf" ] || return 1
+    [ "$(get_conf_value "$CONFIG_DIR/zram.conf" enabled)" = "1" ] || return 1
+    awk 'NR > 1 && $1 ~ /zram/ { found=1; exit } END { exit found ? 0 : 1 }' /proc/swaps 2>/dev/null && return 1
+    return 0
+}
+
+trigger_official_nandswap_once() {
+    should_trigger_official_nandswap || return 0
+    /system/bin/sh /product/bin/init.oplus.nandswap.sh boot_completed >/dev/null 2>&1
+}
+
 get_system_info() {
     mem_total_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
     sdk_version=$(getprop ro.build.version.sdk)
@@ -549,15 +562,14 @@ apply_runtime_configs() {
     mkdir -p "$CONFIG_DIR"
     apply_swap_config
     if ! has_mm_sys_entry; then
-        apply_zram_config
         apply_vm_config
         apply_kernel_features_config
-        apply_le9ec_config
         apply_lmk_config
         apply_reclaim_config
         apply_kswapd_config
-        apply_corona_kernel_config
     fi
+    apply_le9ec_config
+    apply_corona_kernel_config
     apply_io_config
     apply_cpu_governor_config
     apply_cpu_hotplug_config
@@ -581,12 +593,14 @@ fi
 
 wait_until_boot_complete
 wait_until_login
+trigger_official_nandswap_once
 apply_runtime_configs
 apply_fstrim_config
 run_user_scripts
 start_app_policy_daemon
 
 sleep 30
+trigger_official_nandswap_once
 apply_io_config
 apply_cpu_governor_config
 apply_process_priority_config

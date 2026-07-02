@@ -153,34 +153,45 @@ write_hybridswap_errcode() {
 
 init_zram() {
   local magic=32758
+  local zram_conf="$CORONA_CONFIG/zram.conf"
   local corona_zram_enabled=$(corona_get zram.conf enabled)
-  if [ "$corona_zram_enabled" != "1" ]; then
-    run_default_nandswap_main
+  [ "$corona_zram_enabled" = "1" ] || return
+
+  local has_size=0
+  local has_algorithm=0
+  local has_writeback=0
+  local has_swappiness=0
+  local has_path=0
+  [ -f "$zram_conf" ] && grep -q '^size=' "$zram_conf" && has_size=1
+  [ -f "$zram_conf" ] && grep -q '^algorithm=' "$zram_conf" && has_algorithm=1
+  [ -f "$zram_conf" ] && grep -q '^zram_writeback=' "$zram_conf" && has_writeback=1
+  [ -f "$zram_conf" ] && grep -q '^swappiness=' "$zram_conf" && has_swappiness=1
+  [ -f "$zram_conf" ] && grep -q '^zram_path=' "$zram_conf" && has_path=1
+
+  if [ "$has_size" -eq 0 ] && [ "$has_algorithm" -eq 0 ] && [ "$has_writeback" -eq 0 ] && [ "$has_swappiness" -eq 0 ] && [ "$has_path" -eq 0 ]; then
     return
   fi
 
-  if [ "$(getprop sys.oplus.nandswap.init)" != "true" ]; then
-    run_default_nandswap_main || return
-  fi
+  local requested_path=$(corona_get zram.conf zram_path)
+  local zram_path=$(normalize_zram_path "$requested_path")
+  [ -n "$zram_path" ] || zram_path=$(normalize_zram_path "")
+  [ -n "$zram_path" ] || return
+  local zram_block=$(get_zram_block "$zram_path") || return
 
-  local current_path=$(normalize_zram_path "") || return
-  local zram_block=$(get_zram_block "$current_path") || return
   local current_size=$(/system/bin/cat "/sys/block/$zram_block/disksize" 2>/dev/null | tr -d ' \n')
   local current_algorithm=$(get_active_zram_algorithm "$zram_block")
+  local current_priority=$(get_zram_priority "$zram_path")
+  [ -n "$current_priority" ] || current_priority="$magic"
 
   local corona_size=$(corona_get zram.conf size)
-  local comp_algorithm=$(corona_get zram.conf algorithm)
+  local corona_algorithm=$(corona_get zram.conf algorithm)
   local corona_writeback=$(corona_get zram.conf zram_writeback)
   local corona_swappiness=$(corona_get zram.conf swappiness)
-  local requested_path=$(corona_get zram.conf zram_path)
-  local zram_size="$current_size"
 
-  [ -n "$corona_size" ] && zram_size="$corona_size"
-  [ -n "$comp_algorithm" ] || comp_algorithm="$current_algorithm"
-
-  local zram_path=$(normalize_zram_path "$requested_path") || {
-    return
-  }
+  local target_size="$current_size"
+  local target_algorithm="$current_algorithm"
+  [ "$has_size" -eq 1 ] && [ -n "$corona_size" ] && target_size="$corona_size"
+  [ "$has_algorithm" -eq 1 ] && [ -n "$corona_algorithm" ] && target_algorithm="$corona_algorithm"
 
   if [[ ! -d /dev/memcg ]] || [[ ! -e /proc/oplus_mem/hybridswap_enable ]]; then
     write_hybridswap_errcode $HYB_ERR_UNSUPPORTED
@@ -190,19 +201,23 @@ init_zram() {
     setprop persist.sys.oplus.hybridswap_app_uid_memcg true
   fi
 
-  if [ "$(getprop sys.oplus.nandswap.init)" = "true" ] && \
-     zram_matches_config "$zram_path" "$zram_size" "$comp_algorithm" "$corona_writeback" "$magic"; then
-    :
-  else
-    configure_zram_device "$zram_path" "$zram_size" "$comp_algorithm" "$corona_writeback" "$magic" || {
-      return
-    }
+  if [ "$has_size" -eq 1 ] || [ "$has_algorithm" -eq 1 ] || [ "$has_writeback" -eq 1 ] || [ "$has_path" -eq 1 ]; then
+    /system/bin/swapoff "$zram_path" 2>/dev/null
+    echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
+    [ -n "$target_algorithm" ] && echo "$target_algorithm" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null
+    if [ "$has_writeback" -eq 1 ] && [ "$corona_writeback" = "false" ]; then
+      echo none > "/sys/block/$zram_block/backing_dev" 2>/dev/null
+      [ -f "/sys/block/$zram_block/hybridswap_loop_device" ] && echo none > "/sys/block/$zram_block/hybridswap_loop_device" 2>/dev/null
+      echo 1 > "/sys/block/$zram_block/writeback_limit_enable" 2>/dev/null
+      echo 0 > "/sys/block/$zram_block/writeback_limit" 2>/dev/null
+    fi
+    [ -n "$target_size" ] && echo "$target_size" > "/sys/block/$zram_block/disksize" 2>/dev/null
+    /system/bin/mkswap "$zram_path" 2>/dev/null || return
+    /system/bin/swapon "$zram_path" -p "$current_priority" 2>/dev/null || return
   fi
 
-  write_zram_swappiness "$corona_swappiness"
-  setprop sys.oplus.nandswap.init true
+  [ "$has_swappiness" -eq 1 ] && write_zram_swappiness "$corona_swappiness"
 }
-
 apply_corona_vm_config() {
   [ ! -f "$CORONA_CONFIG/vm.conf" ] && return
   local enabled=$(corona_get vm.conf enabled)
@@ -383,11 +398,9 @@ main() {
   init_zram
   apply_corona_vm_config
   apply_corona_kernel_features
-  apply_corona_le9ec
   apply_corona_lmk
   apply_corona_reclaim
   apply_corona_kswapd
-  apply_corona_kernel_modules
   configure_aizerofs_parameters
 }
 main "$@"
