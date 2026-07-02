@@ -43,10 +43,6 @@
         const saved = localStorage.getItem('corona_category_config_toggles');
         this.setCategoryConfigVisibility(saved === null ? true : saved === '1');
     },
-    initLanguagePreference() {
-        this.state.language = 'zh';
-        document.documentElement.lang = 'zh-CN';
-    },
     getTranslations() {
         return {
             zh: {
@@ -56,8 +52,6 @@
                 lightTheme: '浅色模式',
                 darkTheme: '深色模式',
                 goldTheme: '皇涩主题',
-                languageLabel: '界面语言',
-                languageDesc: '切换中文或 English 界面文案',
                 changePreview: '变更预览',
                 changePreviewDesc: '关闭后跳过变更预览，直接应用设置',
                 settingDescriptions: '设置说明',
@@ -82,194 +76,13 @@
                 initApps: '正在预加载应用列表...',
                 unsupportedTitle: '设备不支持',
                 unsupportedBody: '此模块仅支持 OnePlus / OPPO / realme / OPlus 设备',
-                homeKicker: '设备状态',
-                homeLead: '实时查看内存、温度与系统信息',
-                deviceModel: '设备型号',
-                processorArrow: '处理器 >',
-                memoryArrow: '运行内存 >',
-                swapZramArrow: '交换分区 / ZRAM >',
-                storageArrow: '储存空间 >',
-                batteryTempArrow: '电池 / 温度 >',
-                systemVersionArrow: '系统版本 >',
-                realtimeMonitor: '实时监控',
-                cpuChart: 'CPU',
-                memChart: '内存',
-                tempChart: '温度',
-                runtimeStatus: '运行状态',
-                memoryOptimization: '内存优化',
-                memoryCompression: '内存压缩',
-                memoryCompressionDesc: '管理 ZRAM、交换分区、内核内存行为',
-                ioScheduler: 'I/O 调度器',
-                ioSchedulerDesc: '调节块设备调度器与队列参数',
-                cpuGovernor: 'CPU 调速器',
-                cpuGovernorDesc: '切换 governor 与核心上下线策略',
-                tcpOptimization: 'TCP 优化',
-                tcpOptimizationDesc: '网络拥塞算法与传输相关调整',
-                processPriority: '进程优先级',
-                processPriorityDesc: '管理进程 / 线程优先级与调度策略',
-                appPolicy: '应用策略',
-                appPolicyDesc: '按应用管理白名单、预设和线程规则',
-                customScripts: '自定义脚本',
-                customScriptsDesc: '保存并执行你自己的开机脚本',
-                dangerZone: '危险操作',
-                dangerZoneDesc: '重置配置或执行高风险操作',
-                zramConfig: 'ZRAM 配置',
-                swapConfig: '交换分区配置',
-                kernelFeatures: '内核特性',
-                vmConfig: '虚拟内存',
-                applyZram: '应用 ZRAM',
-                cancel: '取消',
-                confirm: '确定',
-                saveRule: '保存规则',
-                addScript: '添加脚本',
-                scriptNamePlaceholder: '例如: 性能优化',
-                scriptCodePlaceholder: '#!/system/bin/sh\n# 在此输入Shell脚本代码\necho \'Hello Corona\'',
                 processing: '处理中...'
-            },
-            en: {
-                tabHome: 'Home',
-                tabSettings: 'Settings',
-                moduleSettings: 'Module Settings',
-                lightTheme: 'Light',
-                darkTheme: 'Dark',
-                goldTheme: 'Gold',
-                languageLabel: 'Language',
-                languageDesc: 'Switch UI text between Chinese and English',
-                changePreview: 'Change Preview',
-                changePreviewDesc: 'Skip preview and apply changes directly when disabled',
-                settingDescriptions: 'Setting Descriptions',
-                settingDescriptionsDesc: 'Show feature descriptions; keep only titles and controls when disabled',
-                categoryConfig: 'Show Category Toggles',
-                categoryConfigDesc: 'Hide category enable toggles only; saved settings remain unchanged',
-                cardVisibility: 'Module Cards',
-                cardVisibilityDesc: 'Hide config cards only; module behavior and saved values stay unchanged',
-                themeSwitched: 'Theme switched',
-                previewEnabled: 'Change preview enabled',
-                previewDisabled: 'Change preview disabled',
-                descriptionsShown: 'Setting descriptions shown',
-                descriptionsHidden: 'Setting descriptions hidden',
-                categoryShown: 'Category toggles shown',
-                categoryHidden: 'Category toggles hidden',
-                initDefault: 'Initializing, please wait...',
-                initResolve: 'Resolving module environment...',
-                initPrepare: 'Preparing configuration...',
-                initDevice: 'Loading device information...',
-                initSettings: 'Preloading settings page...',
-                initRealtime: 'Loading realtime status...',
-                initApps: 'Preloading app list...',
-                unsupportedTitle: 'Unsupported device',
-                unsupportedBody: 'This module supports OnePlus / OPPO / realme / OPlus devices only',
-                homeKicker: 'Device Status',
-                homeLead: 'Monitor memory, temperature and system status in real time',
-                deviceModel: 'Device Model',
-                processorArrow: 'Processor >',
-                memoryArrow: 'Memory >',
-                swapZramArrow: 'Swap / ZRAM >',
-                storageArrow: 'Storage >',
-                batteryTempArrow: 'Battery / Temp >',
-                systemVersionArrow: 'System Version >',
-                realtimeMonitor: 'Realtime Monitor',
-                cpuChart: 'CPU',
-                memChart: 'Memory',
-                tempChart: 'Temp',
-                runtimeStatus: 'Runtime Status',
-                memoryOptimization: 'Memory Optimization',
-                memoryCompression: 'Memory Compression',
-                memoryCompressionDesc: 'Manage ZRAM, swap and kernel memory behavior',
-                ioScheduler: 'I/O Scheduler',
-                ioSchedulerDesc: 'Tune block scheduler and queue parameters',
-                cpuGovernor: 'CPU Governor',
-                cpuGovernorDesc: 'Adjust governors and CPU online policies',
-                tcpOptimization: 'TCP Optimization',
-                tcpOptimizationDesc: 'Tweak congestion control and transport behavior',
-                processPriority: 'Process Priority',
-                processPriorityDesc: 'Manage process / thread priority and scheduling',
-                appPolicy: 'App Policy',
-                appPolicyDesc: 'Manage whitelist, profiles and thread rules per app',
-                customScripts: 'Custom Scripts',
-                customScriptsDesc: 'Save and run your own boot scripts',
-                dangerZone: 'Danger Zone',
-                dangerZoneDesc: 'Reset configs or run high-risk actions',
-                zramConfig: 'ZRAM Config',
-                swapConfig: 'Swap Config',
-                kernelFeatures: 'Kernel Features',
-                vmConfig: 'Virtual Memory',
-                applyZram: 'Apply ZRAM',
-                cancel: 'Cancel',
-                confirm: 'Confirm',
-                saveRule: 'Save Rule',
-                addScript: 'Add Script',
-                scriptNamePlaceholder: 'Example: Performance Tuning',
-                scriptCodePlaceholder: '#!/system/bin/sh\n# Write your shell script here\necho \'Hello Corona\'',
-                processing: 'Processing...'
             }
         };
     },
     t(key) {
         const fallback = this.getTranslations().zh || {};
         return fallback[key] || key;
-    },
-    setLanguage(language, persist = false) {
-        this.state.language = 'zh';
-        document.documentElement.lang = 'zh-CN';
-        this.applyTranslations();
-    },
-    getGlobalStaticTranslationMap() {
-        return [
-            ['.page-lead-kicker', 'homeKicker'],
-            ['.page-lead-copy', 'homeLead'],
-            ['#page-home .card-device .card-title', 'deviceModel'],
-            ['#cpu-card .card-title', 'processorArrow'],
-            ['#mem-card .card-title', 'memoryArrow'],
-            ['#swap-card .card-title', 'swapZramArrow'],
-            ['#storage-card .card-title', 'storageArrow'],
-            ['#battery-card .card-title', 'batteryTempArrow'],
-            ['#system-card .card-title', 'systemVersionArrow'],
-            ['#realtime-card .card-title', 'realtimeMonitor'],
-            ['#chart-cpu', 'cpuChart'],
-            ['#chart-mem', 'memChart'],
-            ['#chart-temp', 'tempChart'],
-            ['#page-home .section-marker span', 'runtimeStatus'],
-            ['#page-settings .section-marker span', 'memoryOptimization'],
-            ['#memory-compression-card .module-card-title', 'memoryCompression'],
-            ['#memory-compression-card .module-card-desc', 'memoryCompressionDesc'],
-            ['#io-scheduler-card .module-card-title', 'ioScheduler'],
-            ['#io-scheduler-card .module-card-desc', 'ioSchedulerDesc'],
-            ['#cpu-governor-card .module-card-title', 'cpuGovernor'],
-            ['#cpu-governor-card .module-card-desc', 'cpuGovernorDesc'],
-            ['#tcp-card .module-card-title', 'tcpOptimization'],
-            ['#tcp-card .module-card-desc', 'tcpOptimizationDesc'],
-            ['#process-priority-card .module-card-title', 'processPriority'],
-            ['#process-priority-card .module-card-desc', 'processPriorityDesc'],
-            ['#app-policy-card .module-card-title', 'appPolicy'],
-            ['#app-policy-card .module-card-desc', 'appPolicyDesc'],
-            ['#custom-scripts-card .module-card-title', 'customScripts'],
-            ['#custom-scripts-card .module-card-desc', 'customScriptsDesc'],
-            ['#danger-zone-card .module-card-title', 'dangerZone'],
-            ['#danger-zone-card .module-card-desc', 'dangerZoneDesc'],
-            ['#zram-toggle .sub-card-title', 'zramConfig'],
-            ['#swap-toggle .sub-card-title', 'swapConfig'],
-            ['#lru-toggle .sub-card-title', 'kernelFeatures'],
-            ['#vm-toggle .sub-card-title', 'vmConfig'],
-            ['#zram-apply-btn', 'applyZram'],
-            ['#thread-rule-cancel-btn', 'cancel'],
-            ['#thread-rule-save-btn', 'saveRule'],
-            ['#confirm-dialog-cancel', 'cancel'],
-            ['#confirm-dialog-ok', 'confirm'],
-            ['#script-edit-title', 'addScript'],
-            ['#script-name-input', 'scriptNamePlaceholder', 'placeholder'],
-            ['#script-code-input', 'scriptCodePlaceholder', 'placeholder']
-        ];
-    },
-    applyGlobalStaticTranslations() {
-        const setValue = (el, attr, value) => {
-            if (!el) return;
-            if (attr === 'textContent') el.textContent = value;
-            else el.setAttribute(attr, value);
-        };
-        this.getGlobalStaticTranslationMap().forEach(([selector, key, attr = 'textContent']) => {
-            document.querySelectorAll(selector).forEach(el => setValue(el, attr, this.t(key)));
-        });
     },
     applyTranslations() {
         const setText = (selector, value) => {
@@ -283,13 +96,6 @@
         if (themeLabels[0]) themeLabels[0].textContent = this.t('lightTheme');
         if (themeLabels[1]) themeLabels[1].textContent = this.t('darkTheme');
         if (themeLabels[2]) themeLabels[2].textContent = this.t('goldTheme');
-        setText('#language-switch-label', this.t('languageLabel'));
-        setText('#language-switch-desc', this.t('languageDesc'));
-        const langValue = document.getElementById('language-select-value');
-        if (langValue) langValue.textContent = this.state.language === 'en' ? 'English' : '中文';
-        const langOptions = document.querySelectorAll('#language-select-panel .language-picker-option');
-        if (langOptions[0]) langOptions[0].textContent = this.state.language === 'en' ? 'Chinese' : '中文';
-        if (langOptions[1]) langOptions[1].textContent = 'English';
         const prefRows = document.querySelectorAll('#app-settings-content .ui-pref-switch-container .switch-info');
         if (prefRows[1]) {
             const labels = prefRows[1].querySelectorAll('span');
@@ -316,7 +122,6 @@
         if (loadingText && !document.getElementById('loading')?.classList.contains('show')) {
             loadingText.textContent = this.t('processing');
         }
-        this.applyGlobalStaticTranslations();
     },
     setCategoryConfigVisibility(enabled, persist = false) {
         const normalized = !!enabled;
@@ -348,12 +153,6 @@
                 this.showToast(`${this.t('themeSwitched')}: ${opt.querySelector('span').textContent}`);
             });
         });
-    },
-    updateLanguagePickerState() {},
-    closeLanguagePicker() {},
-    initLanguageToggle() {
-        const picker = document.getElementById('language-picker');
-        if (picker) picker.style.display = 'none';
     },
     initChangePreviewToggle() {
         const toggle = document.getElementById('change-preview-switch');

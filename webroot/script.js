@@ -37,7 +37,6 @@ class CoronaAddon {
             changePreviewEnabled: true,
             showSettingDescriptions: true,
             showCategoryConfigToggles: true,
-            language: 'zh',
             swapEnabled: false,
             swapSize: 2048,
             swapPriority: 0,
@@ -183,7 +182,6 @@ class CoronaAddon {
             await this.loadAppMetaCache();
             this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
             this.initTheme();
-            this.initLanguagePreference();
             this.initChangePreviewPreference();
             this.initSettingDescriptionPreference();
             this.initCategoryConfigVisibilityPreference();
