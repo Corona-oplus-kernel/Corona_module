@@ -1012,10 +1012,16 @@
                             <span class="switch-label" id="language-switch-label">界面语言</span>
                             <span class="switch-desc" id="language-switch-desc">切换中文或 English 界面文案</span>
                         </div>
-                        <select id="language-select" class="thread-rule-select">
-                            <option value="zh">中文</option>
-                            <option value="en">English</option>
-                        </select>
+                        <div class="language-picker" id="language-picker">
+                            <button class="language-picker-trigger" id="language-select" type="button" aria-expanded="false">
+                                <span class="language-picker-value" id="language-select-value">中文</span>
+                                <span class="language-picker-arrow">›</span>
+                            </button>
+                            <div class="language-picker-panel" id="language-select-panel">
+                                <button class="language-picker-option" type="button" data-value="zh">中文</button>
+                                <button class="language-picker-option" type="button" data-value="en">English</button>
+                            </div>
+                        </div>
                     </div>
                     <div class="switch-container ui-pref-switch-container">
                         <div class="switch-info">
@@ -1174,7 +1180,9 @@
                     <div class="setting-section danger-section">
                         <span class="section-label">危险操作</span>
                         <div class="action-desc">清除所有配置并重启设备</div>
-                        <button class="action-btn action-btn-danger" id="reset-all-btn">一键重置</button>
+                        <button class="action-btn action-btn-danger reset-all-btn" id="reset-all-btn">
+                            <span class="reset-all-btn-text">一键重置</span>
+                        </button>
                     </div>
                 </div>
             </div>
