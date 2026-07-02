@@ -4496,7 +4496,10 @@ CoronaAddon.prototype.syncAppPolicyDaemon = async function() {
     const shouldRun = !!this.appPolicy.monitorEnabled || (this.appPolicy.protect || []).length > 0 || (this.appPolicy.profiles || []).length > 0 || this.getThreadRulePackages().length > 0;
     const pidFile = `${this.modDir}/.app_policy_daemon.pid`;
     if (shouldRun) {
-        await this.exec(`${this.getAppPolicyScript('daemon')} >/dev/null 2>&1 &`);
+        const runningPid = (await this.exec(this.getAppPolicyScript('daemon-status'))).trim();
+        if (!runningPid) {
+            await this.exec(`${this.getAppPolicyScript('daemon')} >/dev/null 2>&1 &`);
+        }
         return;
     }
     const pid = (await this.exec(`cat ${this.shellQuote(pidFile)} 2>/dev/null`)).trim();
