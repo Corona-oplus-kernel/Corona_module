@@ -4558,6 +4558,13 @@ body.app-ready .corona-title {
     background: var(--primary-dim);
 }
 
+.app-policy-icon-wrap {
+    width: 42px;
+    height: 42px;
+    position: relative;
+    flex-shrink: 0;
+}
+
 .app-policy-icon,
 .freeze-app-icon.app-policy-icon {
     width: 42px;
@@ -4569,6 +4576,32 @@ body.app-ready .corona-title {
     overflow: hidden;
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
     flex-shrink: 0;
+    opacity: 0;
+    transition: opacity .18s ease;
+    position: relative;
+    z-index: 1;
+}
+
+.app-policy-icon.loaded {
+    opacity: 1;
+}
+
+.app-policy-icon-fallback {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--text-main);
+    font-size: 15px;
+    font-weight: 700;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+.app-policy-icon-fallback.show {
+    z-index: 2;
 }
 
 .app-policy-icon-loading {
