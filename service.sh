@@ -1,8 +1,9 @@
 #!/system/bin/sh
 MODDIR=${0%/*}
-CONFIG_DIR="$MODDIR/config"
+CONFIG_DIR=${CORONA_CONFIG_DIR:-"$MODDIR/config"}
 RUNTIME_CONF="$CONFIG_DIR/runtime.conf"
 SCRIPTS_DIR="$MODDIR/scripts.d"
+APP_POLICY_SH="$MODDIR/app_policy.sh"
 
 BRAND=$(getprop ro.product.brand | tr '[:upper:]' '[:lower:]')
 MANUFACTURER=$(getprop ro.product.manufacturer | tr '[:upper:]' '[:lower:]')
@@ -127,6 +128,7 @@ apply_protect_config() {
             [ -n "$pid" ] && echo "$pid" > /dev/memcg/system/active_fg/cgroup.procs 2>/dev/null
         done
     }
+    [ -x "$APP_POLICY_SH" ] && CORONA_CONFIG_DIR="$MODDIR/config" sh "$APP_POLICY_SH" protect-once >/dev/null 2>&1
 }
 
 apply_fstrim_config() {
@@ -391,31 +393,64 @@ run_user_scripts() {
     done
 }
 
+should_start_app_policy() {
+    [ -x "$APP_POLICY_SH" ] || return 1
+    rules_file="$MODDIR/config/app_rules.conf"
+    protect_file="$MODDIR/config/app_protect.list"
+    profiles_file="$MODDIR/config/app_profiles.list"
+    monitor_enabled=$(get_conf_value "$rules_file" monitor_enabled)
+    protect_apps=$(cat "$protect_file" 2>/dev/null | awk 'NF {print; exit}')
+    profile_apps=$(cat "$profiles_file" 2>/dev/null | awk 'NF {print; exit}')
+    [ "$monitor_enabled" = "1" ] && return 0
+    [ -n "$protect_apps" ] && return 0
+    [ -n "$profile_apps" ] && return 0
+    return 1
+}
+
+start_app_policy_daemon() {
+    should_start_app_policy || return
+    if [ -f "$MODDIR/.app_policy_daemon.pid" ]; then
+        daemon_pid=$(cat "$MODDIR/.app_policy_daemon.pid" 2>/dev/null)
+        [ -n "$daemon_pid" ] && [ -d "/proc/$daemon_pid" ] && return
+    fi
+    sh "$APP_POLICY_SH" daemon >/dev/null 2>&1 &
+}
+
+apply_runtime_configs() {
+    get_system_info
+    mkdir -p "$CONFIG_DIR"
+    apply_swap_config
+    if ! has_mm_sys_entry; then
+        apply_zram_config
+        apply_vm_config
+        apply_kernel_features_config
+        apply_le9ec_config
+        apply_lmk_config
+        apply_reclaim_config
+        apply_kswapd_config
+        apply_corona_kernel_config
+    fi
+    apply_io_config
+    apply_cpu_governor_config
+    apply_cpu_hotplug_config
+    apply_tcp_config
+    apply_process_priority_config
+    apply_device_config
+    apply_protect_config
+}
+
+if [ "$1" = "--apply-runtime-config" ]; then
+    apply_runtime_configs
+    [ "$CORONA_SKIP_DESCRIPTION" = "1" ] || update_module_description
+    exit 0
+fi
+
 wait_until_boot_complete
 wait_until_login
-get_system_info
-mkdir -p "$CONFIG_DIR"
-
-apply_swap_config
-if ! has_mm_sys_entry; then
-    apply_zram_config
-    apply_vm_config
-    apply_kernel_features_config
-    apply_le9ec_config
-    apply_lmk_config
-    apply_reclaim_config
-    apply_kswapd_config
-    apply_corona_kernel_config
-fi
-apply_io_config
-apply_cpu_governor_config
-apply_cpu_hotplug_config
-apply_tcp_config
-apply_process_priority_config
-apply_device_config
-apply_protect_config
+apply_runtime_configs
 apply_fstrim_config
 run_user_scripts
+start_app_policy_daemon
 
 sleep 30
 apply_io_config
@@ -426,6 +461,7 @@ if ! has_mm_sys_entry; then
     apply_lmk_config
     apply_kswapd_config
 fi
+start_app_policy_daemon
 update_module_description
 
 exit 0

@@ -629,25 +629,39 @@
                 </div>
             </div>
             <div class="section-marker section-marker-settings"><span>进程与网络设置</span></div>
-            <div class="module-card" id="process-priority-card" data-card-key="process-priority">
+            <div class="module-card" id="app-policy-card" data-card-key="app-policy">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title" data-module="process-priority">进程优先级</div>
-                        <div class="module-card-desc">设置进程nice值和I/O优先级</div>
-                        <span class="module-card-badge" id="priority-count">0 条</span>
+                        <div class="module-card-title" data-module="app-policy">应用策略</div>
+                        <div class="module-card-desc">白名单 / 保护进程 / 应用预设 / 优先级</div>
+                        <span class="module-card-badge" id="app-policy-badge">--</span>
                     </div>
                     <div class="module-card-actions">
-                        <div class="module-card-expand" id="process-priority-toggle">
+                        <div class="module-card-expand" id="app-policy-toggle">
                             <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
                         </div>
                     </div>
                 </div>
-                <div id="process-priority-content" class="module-card-content hidden">
-                    <div class="priority-desc">为进程设置 nice 值和 I/O 优先级</div>
+                <div id="app-policy-content" class="module-card-content hidden">
+                    <div class="switch-container">
+                        <div class="switch-info">
+                            <span class="switch-label">应用预设自动切换</span>
+                            <span class="switch-desc">检测到前台打开指定应用后，自动套用独立预设；离开后恢复默认配置</span>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="app-monitor-switch">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="tile-actions">
+                        <button class="action-btn" id="app-policy-manage-btn">应用列表 <span id="app-policy-manage-count">0</span></button>
+                    </div>
+                    <div class="tile-status" id="app-policy-status">统一管理白名单、保护进程、应用预设与优先级；点击应用后再选择具体动作。</div>
+                    <div class="priority-desc" style="margin-top:14px;">已设置的应用优先级</div>
                     <div class="priority-rules-container" id="priority-rules-list">
                         <div class="priority-empty">暂无优先级规则</div>
                     </div>
-                    <button class="action-btn priority-add-btn" id="priority-add-btn"><span class="add-icon">+</span> 添加进程规则</button>
+                    <button class="action-btn priority-add-btn" id="priority-add-btn"><span class="add-icon">+</span> 从应用列表设置优先级</button>
                 </div>
             </div>
             <div class="module-card" id="tcp-card" data-card-key="tcp">
@@ -1231,9 +1245,9 @@
                             <div class="memclean-name">清理后台</div>
                             <div class="memclean-desc">终止后台应用</div>
                         </div>
-                        <div class="memclean-option" data-mode="full-clean">
-                            <div class="memclean-name">完全清理</div>
-                            <div class="memclean-desc">执行所有清理操作</div>
+                        <div class="memclean-option" data-mode="emergency-reclaim">
+                            <div class="memclean-name">紧急回收</div>
+                            <div class="memclean-desc">缓存回收 + 内存整理 + 后台清理</div>
                         </div>
                     </div>
                     <div class="memclean-progress-container hidden" id="memclean-progress">
@@ -1314,6 +1328,27 @@
                 <button class="action-btn priority-cancel-btn" id="priority-cancel-btn">取消</button>
                 <button class="action-btn priority-save-btn" id="priority-save-btn">保存规则</button>
             </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden no-close-btn" id="app-policy-overlay">
+        <div class="detail-card priority-process-card app-policy-detail-card">
+            <div class="detail-header">
+                <span class="detail-title" id="app-policy-title">选择应用</span>
+            </div>
+            <div class="priority-search-container">
+                <input type="text" class="priority-search" id="app-policy-search" placeholder="搜索应用名或包名...">
+            </div>
+            <div class="priority-process-list freeze-app-list-select" id="app-policy-list">
+                <div class="priority-loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden no-close-btn" id="app-profile-overlay">
+        <div class="detail-card app-profile-detail-card">
+            <div class="detail-header">
+                <span class="detail-title" id="app-profile-title">应用动作</span>
+            </div>
+            <div class="doze-preset-list" id="app-profile-options"></div>
         </div>
     </div>
     <div class="detail-overlay hidden" id="confirm-dialog-overlay">
