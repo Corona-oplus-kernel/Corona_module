@@ -1351,8 +1351,7 @@
         <div class="detail-card priority-process-card thread-rule-card">
             <div class="detail-header">
                 <span class="detail-title" id="thread-rule-title">线程规则</span>
-                <button class="priority-add-btn" id="thread-rule-add-btn">新增</button>
-            </div>
+                            </div>
             <div class="thread-rule-section">
                 <div class="thread-rule-section-title">现有规则</div>
                 <div class="priority-process-list" id="thread-rule-list">
@@ -1419,6 +1418,16 @@
                         <option value="background">background</option>
                         <option value="system-background">system-background</option>
                     </select>
+                </div>
+            </div>
+            <div class="priority-setting-section thread-rule-grid">
+                <div>
+                    <div class="priority-setting-label">uclamp.min</div>
+                    <input type="number" id="thread-uclamp-min" class="priority-search" min="0" max="1024" step="1" placeholder="0-1024">
+                </div>
+                <div>
+                    <div class="priority-setting-label">uclamp.max</div>
+                    <input type="number" id="thread-uclamp-max" class="priority-search" min="0" max="1024" step="1" placeholder="0-1024">
                 </div>
             </div>
             <div class="priority-setting-section thread-rule-grid">
