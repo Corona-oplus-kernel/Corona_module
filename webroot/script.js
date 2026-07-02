@@ -102,7 +102,8 @@ class CoronaAddon {
     getFeatureScriptPath(name) {
         const map = {
             'app-policy': 'js/app-policy.js',
-            'priority-thread': 'js/priority-thread.js'
+            'priority-thread': 'js/priority-thread.js',
+            'memory-opt': 'js/memory-opt.js'
         };
         return map[name] || '';
     }
@@ -1891,19 +1892,19 @@ class CoronaAddon {
     }
     bindAllEvents() {
         document.querySelectorAll('.tab-item').forEach(tab => { tab.addEventListener('click', async (e) => { await this.switchPage(e.currentTarget.dataset.page); }); });
-        document.getElementById('zram-switch').addEventListener('change', async (e) => { this.state.zramEnabled = e.target.checked; this.toggleZramSettings(e.target.checked); await this.saveZramConfig(); });
+        document.getElementById('zram-switch').addEventListener('change', async (e) => { this.state.zramEnabled = e.target.checked; this.toggleZramSettings(e.target.checked); await this.saveZramConfig('enabled'); });
         document.getElementById('zram-size-slider').addEventListener('input', (e) => { this.state.zramSize = parseFloat(e.target.value); document.getElementById('zram-size-value').textContent = `${this.state.zramSize.toFixed(2)} GB`; });
-        document.getElementById('zram-size-slider').addEventListener('change', async (e) => { this.state.zramSize = parseFloat(e.target.value); await this.saveZramConfig(); });
+        document.getElementById('zram-size-slider').addEventListener('change', async (e) => { this.state.zramSize = parseFloat(e.target.value); await this.saveZramConfig('size'); });
         document.getElementById('swappiness-slider').addEventListener('input', (e) => { this.state.swappiness = parseInt(e.target.value); document.getElementById('swappiness-value').textContent = this.state.swappiness; });
-        document.getElementById('swappiness-slider').addEventListener('change', async (e) => { this.state.swappiness = parseInt(e.target.value); if (this.state.zramEnabled) await this.applySwappinessImmediate(); else await this.saveZramConfig(); });
+        document.getElementById('swappiness-slider').addEventListener('change', async (e) => { this.state.swappiness = parseInt(e.target.value); if (this.state.zramEnabled) await this.applySwappinessImmediate(); else await this.saveZramConfig('swappiness'); });
         document.getElementById('zram-apply-btn').addEventListener('click', async (e) => { e.stopPropagation(); if (!this.state.zramEnabled) { this.showToast('ZRAM 未启用'); return; } await this.applyZramImmediate(); });
-        document.getElementById('le9ec-switch').addEventListener('change', async (e) => { this.state.le9ecEnabled = e.target.checked; this.toggleLe9ecSettings(e.target.checked); await this.saveLe9ecConfig(); });
+        document.getElementById('le9ec-switch').addEventListener('change', async (e) => { this.state.le9ecEnabled = e.target.checked; this.toggleLe9ecSettings(e.target.checked); await this.saveLe9ecConfig(['enabled']); });
         document.getElementById('le9ec-anon-slider').addEventListener('input', (e) => { this.state.le9ecAnon = parseInt(e.target.value) * 1024; document.getElementById('le9ec-anon-value').textContent = `${e.target.value} MB`; });
-        document.getElementById('le9ec-anon-slider').addEventListener('change', (e) => { this.state.le9ecAnon = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(); else this.saveLe9ecConfig(); });
+        document.getElementById('le9ec-anon-slider').addEventListener('change', (e) => { this.state.le9ecAnon = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(['anon_min']); else this.saveLe9ecConfig(['anon_min']); });
         document.getElementById('le9ec-clean-low-slider').addEventListener('input', (e) => { this.state.le9ecCleanLow = parseInt(e.target.value) * 1024; document.getElementById('le9ec-clean-low-value').textContent = `${e.target.value} MB`; });
-        document.getElementById('le9ec-clean-low-slider').addEventListener('change', (e) => { this.state.le9ecCleanLow = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(); else this.saveLe9ecConfig(); });
+        document.getElementById('le9ec-clean-low-slider').addEventListener('change', (e) => { this.state.le9ecCleanLow = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(['clean_low']); else this.saveLe9ecConfig(['clean_low']); });
         document.getElementById('le9ec-clean-min-slider').addEventListener('input', (e) => { this.state.le9ecCleanMin = parseInt(e.target.value) * 1024; document.getElementById('le9ec-clean-min-value').textContent = `${e.target.value} MB`; });
-        document.getElementById('le9ec-clean-min-slider').addEventListener('change', (e) => { this.state.le9ecCleanMin = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(); else this.saveLe9ecConfig(); });
+        document.getElementById('le9ec-clean-min-slider').addEventListener('change', (e) => { this.state.le9ecCleanMin = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(['clean_min']); else this.saveLe9ecConfig(['clean_min']); });
         document.getElementById('io-switch')?.addEventListener('change', async (e) => {
             this.state.ioEnabled = e.target.checked;
             await this.applyIOConfigImmediate('enabled', true);
@@ -1912,20 +1913,20 @@ class CoronaAddon {
         });
         document.getElementById('cpu-switch')?.addEventListener('change', async (e) => {
             this.state.cpuEnabled = e.target.checked;
-            await this.applyCpuGovernorImmediate(true);
+            await this.applyCpuGovernorImmediate('enabled', true);
             if (this.state.cpuEnabled) await this.applyCpuHotplugConfigImmediate();
             const el = document.getElementById('cpu-gov-current');
             if (el && !this.state.cpuEnabled) el.textContent = '已禁用';
         });
         document.getElementById('tcp-switch')?.addEventListener('change', async (e) => {
             this.state.tcpEnabled = e.target.checked;
-            await this.applyTcpImmediate(true);
+            await this.applyTcpImmediate('enabled', true);
             const el = document.getElementById('tcp-current');
             if (el && !this.state.tcpEnabled) el.textContent = '已禁用';
         });
         document.getElementById('vm-switch')?.addEventListener('change', async (e) => {
             this.state.vmEnabled = e.target.checked;
-            await this.applyVmConfig(true);
+            await this.applyVmConfig(['enabled'], true);
             const el = document.getElementById('vm-status');
             if (el) el.textContent = this.state.vmEnabled ? '已修改' : '已禁用';
         });
@@ -1966,42 +1967,55 @@ class CoronaAddon {
         const hasConfig = (anon && parseInt(anon) > 0) || (cleanLow && parseInt(cleanLow) > 0) || (cleanMin && parseInt(cleanMin) > 0);
         if (le9ecBadge) le9ecBadge.textContent = hasConfig ? '已启用' : '未启用';
     }
-    async saveLe9ecConfig(skipPreview = false) {
-        const config = `enabled=${this.state.le9ecEnabled ? '1' : '0'}\nanon_min=${this.state.le9ecAnon}\nclean_low=${this.state.le9ecCleanLow}\nclean_min=${this.state.le9ecCleanMin}`;
+    getLe9ecFieldUpdates(changedKeys = null) {
+        const keys = Array.isArray(changedKeys) ? changedKeys : (changedKeys ? [changedKeys] : ['enabled', 'anon_min', 'clean_low', 'clean_min']);
+        const updates = {};
+        if (keys.includes('enabled')) updates.enabled = this.state.le9ecEnabled ? '1' : '0';
+        if (keys.includes('anon_min')) updates.anon_min = String(this.state.le9ecAnon);
+        if (keys.includes('clean_low')) updates.clean_low = String(this.state.le9ecCleanLow);
+        if (keys.includes('clean_min')) updates.clean_min = String(this.state.le9ecCleanMin);
+        return { keys, updates };
+    }
+    async saveLe9ecConfig(changedKeys = null, skipPreview = false) {
+        const { keys, updates } = this.getLe9ecFieldUpdates(changedKeys);
+        const config = await this.buildMergedConfigContent('le9ec.conf', updates, ['enabled', 'anon_min', 'clean_low', 'clean_min']);
+        const writes = [];
+        if (this.state.le9ecEnabled) {
+            if (keys.includes('anon_min')) writes.push({ path: '/proc/sys/vm/anon_min_kbytes', value: String(this.state.le9ecAnon) });
+            if (keys.includes('clean_low')) writes.push({ path: '/proc/sys/vm/clean_low_kbytes', value: String(this.state.le9ecCleanLow) });
+            if (keys.includes('clean_min')) writes.push({ path: '/proc/sys/vm/clean_min_kbytes', value: String(this.state.le9ecCleanMin) });
+        }
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: this.state.le9ecEnabled ? '即将保存并应用 LE9EC 配置。' : '即将保存 LE9EC 配置。',
                 configs: [{ filename: 'le9ec.conf', content: config }],
-                writes: this.state.le9ecEnabled ? [
-                    { path: '/proc/sys/vm/anon_min_kbytes', value: String(this.state.le9ecAnon) },
-                    { path: '/proc/sys/vm/clean_low_kbytes', value: String(this.state.le9ecCleanLow) },
-                    { path: '/proc/sys/vm/clean_min_kbytes', value: String(this.state.le9ecCleanMin) }
-                ] : [],
+                writes,
                 notes: this.state.le9ecEnabled ? [] : ['当前为禁用状态，仅保存配置。']
             }, {
                 onCancel: () => this.loadLe9ecConfig()
             });
             if (!confirmed) return false;
         }
-        await this.writeConfig('le9ec.conf', config);
+        await this.mergeConfigFile('le9ec.conf', updates, ['enabled', 'anon_min', 'clean_low', 'clean_min']);
         if (this.state.le9ecEnabled) {
-            await this.applyLe9ecImmediate(true);
+            await this.applyLe9ecImmediate(keys, true);
         } else {
             this.showToast('LE9EC 配置已保存（禁用状态）');
             await this.updateModuleDescription();
         }
         return true;
     }
-    async applyLe9ecImmediate(skipPreview = false) {
+    async applyLe9ecImmediate(changedKeys = null, skipPreview = false) {
+        const { keys, updates } = this.getLe9ecFieldUpdates(changedKeys);
         if (!skipPreview) {
-            const config = `enabled=1\nanon_min=${this.state.le9ecAnon}\nclean_low=${this.state.le9ecCleanLow}\nclean_min=${this.state.le9ecCleanMin}`;
+            const config = await this.buildMergedConfigContent('le9ec.conf', updates, ['enabled', 'anon_min', 'clean_low', 'clean_min']);
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将应用 LE9EC 配置。',
                 configs: [{ filename: 'le9ec.conf', content: config }],
                 writes: [
-                    { path: '/proc/sys/vm/anon_min_kbytes', value: String(this.state.le9ecAnon) },
-                    { path: '/proc/sys/vm/clean_low_kbytes', value: String(this.state.le9ecCleanLow) },
-                    { path: '/proc/sys/vm/clean_min_kbytes', value: String(this.state.le9ecCleanMin) }
+                    ...(keys.includes('anon_min') ? [{ path: '/proc/sys/vm/anon_min_kbytes', value: String(this.state.le9ecAnon) }] : []),
+                    ...(keys.includes('clean_low') ? [{ path: '/proc/sys/vm/clean_low_kbytes', value: String(this.state.le9ecCleanLow) }] : []),
+                    ...(keys.includes('clean_min') ? [{ path: '/proc/sys/vm/clean_min_kbytes', value: String(this.state.le9ecCleanMin) }] : [])
                 ]
             }, {
                 onCancel: () => this.loadLe9ecConfig()
@@ -2009,12 +2023,11 @@ class CoronaAddon {
             if (!confirmed) return false;
         }
         await Promise.all([
-            this.exec(`echo ${this.state.le9ecAnon} > /proc/sys/vm/anon_min_kbytes`),
-            this.exec(`echo ${this.state.le9ecCleanLow} > /proc/sys/vm/clean_low_kbytes`),
-            this.exec(`echo ${this.state.le9ecCleanMin} > /proc/sys/vm/clean_min_kbytes`)
+            ...(keys.includes('anon_min') ? [this.exec(`echo ${this.state.le9ecAnon} > /proc/sys/vm/anon_min_kbytes`)] : []),
+            ...(keys.includes('clean_low') ? [this.exec(`echo ${this.state.le9ecCleanLow} > /proc/sys/vm/clean_low_kbytes`)] : []),
+            ...(keys.includes('clean_min') ? [this.exec(`echo ${this.state.le9ecCleanMin} > /proc/sys/vm/clean_min_kbytes`)] : [])
         ]);
-        const config = `enabled=1\nanon_min=${this.state.le9ecAnon}\nclean_low=${this.state.le9ecCleanLow}\nclean_min=${this.state.le9ecCleanMin}`;
-        await this.writeConfig('le9ec.conf', config);
+        await this.mergeConfigFile('le9ec.conf', updates, ['enabled', 'anon_min', 'clean_low', 'clean_min']);
         await this.updateModuleDescription();
         this.showToast('LE9EC 配置已应用');
         setTimeout(() => this.loadLe9ecStatus(), 500);
@@ -2069,7 +2082,7 @@ class CoronaAddon {
         const container = document.getElementById('algorithm-list');
         container.innerHTML = this.algorithms.map(alg => `<div class="option-item ${alg === this.state.algorithm ? 'selected' : ''}" data-value="${alg}">${alg}</div>`).join('');
         container.querySelectorAll('.option-item').forEach(item => {
-            item.addEventListener('click', async (e) => { container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.algorithm = e.currentTarget.dataset.value; await this.saveZramConfig(); });
+            item.addEventListener('click', async (e) => { container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.algorithm = e.currentTarget.dataset.value; await this.saveZramConfig('algorithm'); });
         });
     }
     renderReadaheadOptions() {
@@ -2415,6 +2428,7 @@ class CoronaAddon {
         this.settingsInitPromise = (async () => {
             let appPolicyReady = false;
             let priorityThreadReady = false;
+            let memoryOptReady = false;
             try {
                 await this.ensureFeatureScript('app-policy');
                 appPolicyReady = true;
@@ -2426,6 +2440,12 @@ class CoronaAddon {
                 priorityThreadReady = true;
             } catch (e) {
                 console.error('ensureFeatureScript(priority-thread) failed', e);
+            }
+            try {
+                await this.ensureFeatureScript('memory-opt');
+                memoryOptReady = true;
+            } catch (e) {
+                console.error('ensureFeatureScript(memory-opt) failed', e);
             }
             if (!this.settingsUiInitialized) {
                 this.renderStaticOptions();
@@ -2443,7 +2463,7 @@ class CoronaAddon {
                 this.initZramWriteback();
                 this.initZramPath();
                 this.initCustomScripts();
-                this.initSystemOpt();
+                if (memoryOptReady && typeof this.initSystemOpt === 'function') this.initSystemOpt();
                 if (appPolicyReady && typeof this.initAppPolicy === 'function') this.initAppPolicy();
                 this.initCoronaKernel();
                 this.settingsUiInitialized = true;
@@ -2670,9 +2690,20 @@ class CoronaAddon {
         if (pathDisplay) pathDisplay.textContent = zramPath;
         this.updateZramModeHint(this.state.zramEnabled ? 'module' : (isActive ? 'system' : 'off'), runtimeInfo);
     }
-    async saveZramConfig(skipPreview = false) {
+    getZramFieldUpdates(changedField = 'zram') {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
-        const config = `enabled=${this.state.zramEnabled ? '1' : '0'}\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
+        const field = changedField || 'zram';
+        const updates = {};
+        if (field === 'zram' || field === 'enabled') updates.enabled = this.state.zramEnabled ? '1' : '0';
+        if (field === 'zram' || field === 'algorithm') updates.algorithm = this.state.algorithm;
+        if (field === 'zram' || field === 'size') updates.size = String(sizeBytes);
+        if (field === 'zram' || field === 'swappiness') updates.swappiness = String(this.state.swappiness);
+        if (field === 'zram' || field === 'zram_writeback') updates.zram_writeback = this.state.zramWriteback;
+        if (field === 'zram' || field === 'zram_path') updates.zram_path = this.state.zramPath;
+        return updates;
+    }
+    async saveZramConfig(changedField = 'zram', skipPreview = false) {
+        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将保存 ZRAM 配置。',
@@ -2683,7 +2714,7 @@ class CoronaAddon {
             });
             if (!confirmed) return false;
         }
-        await this.writeConfig('zram.conf', config);
+        await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
         await this.updateModuleDescription();
         this.showToast('ZRAM 配置已保存');
         return true;
@@ -2752,7 +2783,7 @@ class CoronaAddon {
     async applySwappinessImmediate(skipPreview = false) {
       return this.withLock('zram', async () => {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
-        const config = `enabled=${this.state.zramEnabled ? '1' : '0'}\nalgorithm=${this.state.algorithm}\nsize=${sizeBytes}\nswappiness=${this.state.swappiness}\nzram_writeback=${this.state.zramWriteback}\nzram_path=${this.state.zramPath}`;
+        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates('swappiness'), ['enabled', 'algorithm', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将更新 Swappiness。',
@@ -2767,7 +2798,7 @@ class CoronaAddon {
         try {
             await this.sleep(0);
             const ok = await this.writeAndVerifySysfs(this.state.swappiness, '/proc/sys/vm/swappiness', 'Swappiness');
-            await this.writeConfig('zram.conf', config);
+            await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates('swappiness'), ['enabled', 'algorithm', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
             await this.updateModuleDescription();
             if (ok) this.showToast(`Swappiness: ${this.state.swappiness}`);
             return ok;
@@ -2857,32 +2888,42 @@ class CoronaAddon {
                     container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                     e.currentTarget.classList.add('selected');
                     this.state.cpuGovernor = e.currentTarget.dataset.value;
-                    await this.applyCpuGovernorImmediate();
+                    await this.applyCpuGovernorImmediate('governor');
                 });
             });
         }
         const currentEl = document.getElementById('cpu-gov-current');
         if (currentEl) currentEl.textContent = this.state.cpuEnabled ? (this.state.cpuGovernor || '--') : '已禁用';
     }
-    async applyCpuGovernorImmediate(skipPreview = false) {
+    async applyCpuGovernorImmediate(changedField = 'governor', skipPreview = false) {
       return this.withLock('governor', async () => {
-        const config = `enabled=${this.state.cpuEnabled ? '1' : '0'}\ngovernor=${this.state.cpuGovernor}`;
+        const updates = {};
+        if (changedField === 'governor' || changedField === 'cpu' || changedField === 'enabled') updates.enabled = this.state.cpuEnabled ? '1' : '0';
+        if (changedField === 'governor' || changedField === 'cpu') updates.governor = this.state.cpuGovernor;
+        const config = await this.buildMergedConfigContent('cpu_governor.conf', updates, ['enabled', 'governor']);
+        const writes = [];
+        if ((changedField === 'governor' || changedField === 'cpu') && this.state.cpuEnabled) {
+            writes.push({ path: '/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor', value: this.state.cpuGovernor });
+        }
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将应用 CPU 调频器。',
                 configs: [{ filename: 'cpu_governor.conf', content: config }],
-                writes: [{ path: '/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor', value: this.state.cpuGovernor }]
+                writes
             }, {
                 onCancel: () => this.loadCpuGovernorConfig()
             });
             if (!confirmed) return false;
         }
         if (!this.state.cpuEnabled) {
-            return this.saveDisabledConfig('cpu_governor.conf', config, 'CPU 配置已保存（禁用状态）');
+            await this.mergeConfigFile('cpu_governor.conf', updates, ['enabled', 'governor']);
+            await this.updateModuleDescription();
+            this.showToast('CPU 配置已保存（禁用状态）');
+            return true;
         }
-        await this.exec(`for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo "${this.state.cpuGovernor}" > "$f" 2>/dev/null; done`);
+        if (changedField === 'governor' || changedField === 'cpu') await this.exec(`for f in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo "${this.state.cpuGovernor}" > "$f" 2>/dev/null; done`);
         const readback = (await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null')).trim();
-        await this.writeConfig('cpu_governor.conf', config);
+        await this.mergeConfigFile('cpu_governor.conf', updates, ['enabled', 'governor']);
         await this.updateModuleDescription();
         document.getElementById('cpu-gov-current').textContent = readback || this.state.cpuGovernor;
         if (readback && readback !== this.state.cpuGovernor) {
@@ -2914,29 +2955,39 @@ class CoronaAddon {
                 container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                 e.currentTarget.classList.add('selected');
                 this.state.tcp = e.currentTarget.dataset.value;
-                await this.applyTcpImmediate();
+                await this.applyTcpImmediate('congestion');
             });
         });
         document.getElementById('tcp-current').textContent = this.state.tcpEnabled ? (this.state.tcp || '--') : '已禁用';
     }
-    async applyTcpImmediate(skipPreview = false) {
+    async applyTcpImmediate(changedField = 'congestion', skipPreview = false) {
       return this.withLock('tcp', async () => {
-        const config = `enabled=${this.state.tcpEnabled ? '1' : '0'}\ncongestion=${this.state.tcp}`;
+        const updates = {};
+        if (changedField === 'congestion' || changedField === 'tcp' || changedField === 'enabled') updates.enabled = this.state.tcpEnabled ? '1' : '0';
+        if (changedField === 'congestion' || changedField === 'tcp') updates.congestion = this.state.tcp;
+        const config = await this.buildMergedConfigContent('tcp.conf', updates, ['enabled', 'congestion']);
+        const writes = [];
+        if ((changedField === 'congestion' || changedField === 'tcp') && this.state.tcpEnabled) {
+            writes.push({ path: '/proc/sys/net/ipv4/tcp_congestion_control', value: this.state.tcp });
+        }
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将应用 TCP 拥塞算法。',
                 configs: [{ filename: 'tcp.conf', content: config }],
-                writes: [{ path: '/proc/sys/net/ipv4/tcp_congestion_control', value: this.state.tcp }]
+                writes
             }, {
                 onCancel: () => this.loadTCPConfig()
             });
             if (!confirmed) return false;
         }
         if (!this.state.tcpEnabled) {
-            return this.saveDisabledConfig('tcp.conf', config, 'TCP 配置已保存（禁用状态）');
+            await this.mergeConfigFile('tcp.conf', updates, ['enabled', 'congestion']);
+            await this.updateModuleDescription();
+            this.showToast('TCP 配置已保存（禁用状态）');
+            return true;
         }
-        const ok = await this.writeAndVerifySysfs(this.state.tcp, '/proc/sys/net/ipv4/tcp_congestion_control', 'TCP 拥塞算法');
-        await this.writeConfig('tcp.conf', config);
+        const ok = (changedField === 'congestion' || changedField === 'tcp') ? await this.writeAndVerifySysfs(this.state.tcp, '/proc/sys/net/ipv4/tcp_congestion_control', 'TCP 拥塞算法') : true;
+        await this.mergeConfigFile('tcp.conf', updates, ['enabled', 'congestion']);
         await this.updateModuleDescription();
         document.getElementById('tcp-current').textContent = this.state.tcp;
         if (ok) this.showToast(`TCP 拥塞算法: ${this.state.tcp}`);
@@ -3253,7 +3304,7 @@ class CoronaAddon {
                 list.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                 item.classList.add('selected');
                 this.state.zramWriteback = item.dataset.value;
-                await this.saveZramConfig();
+                await this.saveZramConfig('zram_writeback');
             });
         });
     }
@@ -3295,7 +3346,7 @@ class CoronaAddon {
                     return;
                 }
                 this.state.zramPath = newPath;
-                const saved = await this.saveZramConfig();
+                const saved = await this.saveZramConfig('zram_path');
                 if (!saved) return;
                 await this.loadZramStatus();
             });
@@ -3344,7 +3395,7 @@ class CoronaAddon {
             swapSwitch.addEventListener('change', (e) => {
                 this.state.swapEnabled = e.target.checked;
                 this.toggleSwapSettings(e.target.checked);
-                this.saveSwapConfig();
+                this.saveSwapConfig('enabled');
             });
         }
         if (swapSizeSlider) {
@@ -3354,7 +3405,7 @@ class CoronaAddon {
             });
             swapSizeSlider.addEventListener('change', (e) => {
                 this.state.swapSize = parseInt(e.target.value);
-                if (this.state.swapEnabled) this.saveSwapConfig();
+                this.saveSwapConfig('size');
             });
         }
         if (priorityList) {
@@ -3363,7 +3414,7 @@ class CoronaAddon {
                     priorityList.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                     item.classList.add('selected');
                     this.state.swapPriority = parseInt(item.dataset.value);
-                    if (this.state.swapEnabled) this.saveSwapConfig();
+                    this.saveSwapConfig('priority');
                 });
             });
         }
@@ -3414,9 +3465,18 @@ class CoronaAddon {
         }
         await this.loadSwapStatus();
     }
-    async saveSwapConfig(skipPreview = false) {
+    getSwapFieldUpdates(changedField = 'swap') {
         const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
-        const config = `enabled=${this.state.swapEnabled ? '1' : '0'}\nsize=${this.state.swapSize}\npriority=${this.state.swapPriority}\npath=${swapPath}`;
+        const updates = {};
+        if (changedField === 'swap' || changedField === 'enabled') updates.enabled = this.state.swapEnabled ? '1' : '0';
+        if (changedField === 'swap' || changedField === 'size') updates.size = String(this.state.swapSize);
+        if (changedField === 'swap' || changedField === 'priority') updates.priority = String(this.state.swapPriority);
+        if (changedField === 'swap' || changedField === 'path') updates.path = swapPath;
+        return updates;
+    }
+    async saveSwapConfig(changedField = 'swap', skipPreview = false) {
+        const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
+        const config = await this.buildMergedConfigContent('swap.conf', this.getSwapFieldUpdates(changedField), ['enabled', 'size', 'priority', 'path']);
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: this.state.swapEnabled ? '即将保存 Swap 配置。' : '即将关闭 Swap。',
@@ -3428,7 +3488,7 @@ class CoronaAddon {
             });
             if (!confirmed) return false;
         }
-        await this.writeConfig('swap.conf', config);
+        await this.mergeConfigFile('swap.conf', this.getSwapFieldUpdates(changedField), ['enabled', 'size', 'priority', 'path']);
         if (!this.state.swapEnabled) {
             await this.exec(`swapoff ${this.shellQuote(swapPath)} 2>/dev/null`);
             await this.exec(`rm -f ${this.shellQuote(swapPath)} 2>/dev/null`);
@@ -3533,35 +3593,35 @@ class CoronaAddon {
                 this.state.watermarkScale = parseInt(e.target.value);
                 document.getElementById('watermark-value').textContent = this.state.watermarkScale;
             });
-            watermarkSlider.addEventListener('change', () => this.applyVmConfig());
+            watermarkSlider.addEventListener('change', () => this.applyVmConfig(['watermark_scale_factor']));
         }
         if (extraFreeSlider) {
             extraFreeSlider.addEventListener('input', (e) => {
                 this.state.extraFreeKbytes = parseInt(e.target.value);
                 document.getElementById('extra-free-value').textContent = `${this.state.extraFreeKbytes} KB`;
             });
-            extraFreeSlider.addEventListener('change', () => this.applyVmConfig());
+            extraFreeSlider.addEventListener('change', () => this.applyVmConfig(['extra_free_kbytes']));
         }
         if (dirtyRatioSlider) {
             dirtyRatioSlider.addEventListener('input', (e) => {
                 this.state.dirtyRatio = parseInt(e.target.value);
                 document.getElementById('dirty-ratio-value').textContent = `${this.state.dirtyRatio}%`;
             });
-            dirtyRatioSlider.addEventListener('change', () => this.applyVmConfig());
+            dirtyRatioSlider.addEventListener('change', () => this.applyVmConfig(['dirty_ratio']));
         }
         if (dirtyBgSlider) {
             dirtyBgSlider.addEventListener('input', (e) => {
                 this.state.dirtyBgRatio = parseInt(e.target.value);
                 document.getElementById('dirty-bg-value').textContent = `${this.state.dirtyBgRatio}%`;
             });
-            dirtyBgSlider.addEventListener('change', () => this.applyVmConfig());
+            dirtyBgSlider.addEventListener('change', () => this.applyVmConfig(['dirty_background_ratio']));
         }
         if (vfsPressureSlider) {
             vfsPressureSlider.addEventListener('input', (e) => {
                 this.state.vfsCachePressure = parseInt(e.target.value);
                 document.getElementById('vfs-pressure-value').textContent = this.state.vfsCachePressure;
             });
-            vfsPressureSlider.addEventListener('change', () => this.applyVmConfig());
+            vfsPressureSlider.addEventListener('change', () => this.applyVmConfig(['vfs_cache_pressure']));
         }
         this.loadVmConfig();
     }
@@ -3591,19 +3651,27 @@ class CoronaAddon {
         if (slider) { slider.value = val; this.updateSliderProgress(slider); }
         if (value) value.textContent = `${val}${suffix}`;
     }
-    async applyVmConfig(skipPreview = false) {
+    async applyVmConfig(changedKeys = null, skipPreview = false) {
       return this.withLock('vm', async () => {
-        const config = `enabled=${this.state.vmEnabled ? '1' : '0'}\nwatermark_scale_factor=${this.state.watermarkScale}\nextra_free_kbytes=${this.state.extraFreeKbytes}\ndirty_ratio=${this.state.dirtyRatio}\ndirty_background_ratio=${this.state.dirtyBgRatio}\nvfs_cache_pressure=${this.state.vfsCachePressure}`;
+        const keys = Array.isArray(changedKeys) ? changedKeys : (changedKeys ? [changedKeys] : ['enabled', 'watermark_scale_factor', 'extra_free_kbytes', 'dirty_ratio', 'dirty_background_ratio', 'vfs_cache_pressure']);
+        const updates = {};
+        if (keys.includes('enabled')) updates.enabled = this.state.vmEnabled ? '1' : '0';
+        if (keys.includes('watermark_scale_factor')) updates.watermark_scale_factor = String(this.state.watermarkScale);
+        if (keys.includes('extra_free_kbytes')) updates.extra_free_kbytes = String(this.state.extraFreeKbytes);
+        if (keys.includes('dirty_ratio')) updates.dirty_ratio = String(this.state.dirtyRatio);
+        if (keys.includes('dirty_background_ratio')) updates.dirty_background_ratio = String(this.state.dirtyBgRatio);
+        if (keys.includes('vfs_cache_pressure')) updates.vfs_cache_pressure = String(this.state.vfsCachePressure);
+        const config = await this.buildMergedConfigContent('vm.conf', updates, ['enabled', 'watermark_scale_factor', 'extra_free_kbytes', 'dirty_ratio', 'dirty_background_ratio', 'vfs_cache_pressure']);
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将应用虚拟内存参数。',
                 configs: [{ filename: 'vm.conf', content: config }],
                 writes: [
-                    { path: '/proc/sys/vm/watermark_scale_factor', value: String(this.state.watermarkScale) },
-                    { path: '/proc/sys/vm/extra_free_kbytes', value: String(this.state.extraFreeKbytes) },
-                    { path: '/proc/sys/vm/dirty_ratio', value: String(this.state.dirtyRatio) },
-                    { path: '/proc/sys/vm/dirty_background_ratio', value: String(this.state.dirtyBgRatio) },
-                    { path: '/proc/sys/vm/vfs_cache_pressure', value: String(this.state.vfsCachePressure) }
+                    ...(keys.includes('watermark_scale_factor') ? [{ path: '/proc/sys/vm/watermark_scale_factor', value: String(this.state.watermarkScale) }] : []),
+                    ...(keys.includes('extra_free_kbytes') ? [{ path: '/proc/sys/vm/extra_free_kbytes', value: String(this.state.extraFreeKbytes) }] : []),
+                    ...(keys.includes('dirty_ratio') ? [{ path: '/proc/sys/vm/dirty_ratio', value: String(this.state.dirtyRatio) }] : []),
+                    ...(keys.includes('dirty_background_ratio') ? [{ path: '/proc/sys/vm/dirty_background_ratio', value: String(this.state.dirtyBgRatio) }] : []),
+                    ...(keys.includes('vfs_cache_pressure') ? [{ path: '/proc/sys/vm/vfs_cache_pressure', value: String(this.state.vfsCachePressure) }] : [])
                 ]
             }, {
                 onCancel: () => this.loadVmConfig()
@@ -3611,16 +3679,18 @@ class CoronaAddon {
             if (!confirmed) return false;
         }
         if (!this.state.vmEnabled) {
-            return this.saveDisabledConfig('vm.conf', config, 'VM 配置已保存（禁用状态）');
+            await this.mergeConfigFile('vm.conf', updates, ['enabled', 'watermark_scale_factor', 'extra_free_kbytes', 'dirty_ratio', 'dirty_background_ratio', 'vfs_cache_pressure']);
+            this.showToast('VM 配置已保存（禁用状态）');
+            return true;
         }
         this.showLoading(true);
-        await this.writeConfig('vm.conf', config);
+        await this.mergeConfigFile('vm.conf', updates, ['enabled', 'watermark_scale_factor', 'extra_free_kbytes', 'dirty_ratio', 'dirty_background_ratio', 'vfs_cache_pressure']);
         await Promise.all([
-            this.exec(`echo ${this.state.watermarkScale} > /proc/sys/vm/watermark_scale_factor 2>/dev/null`),
-            this.exec(`echo ${this.state.extraFreeKbytes} > /proc/sys/vm/extra_free_kbytes 2>/dev/null`),
-            this.exec(`echo ${this.state.dirtyRatio} > /proc/sys/vm/dirty_ratio 2>/dev/null`),
-            this.exec(`echo ${this.state.dirtyBgRatio} > /proc/sys/vm/dirty_background_ratio 2>/dev/null`),
-            this.exec(`echo ${this.state.vfsCachePressure} > /proc/sys/vm/vfs_cache_pressure 2>/dev/null`)
+            ...(keys.includes('watermark_scale_factor') ? [this.exec(`echo ${this.state.watermarkScale} > /proc/sys/vm/watermark_scale_factor 2>/dev/null`)] : []),
+            ...(keys.includes('extra_free_kbytes') ? [this.exec(`echo ${this.state.extraFreeKbytes} > /proc/sys/vm/extra_free_kbytes 2>/dev/null`)] : []),
+            ...(keys.includes('dirty_ratio') ? [this.exec(`echo ${this.state.dirtyRatio} > /proc/sys/vm/dirty_ratio 2>/dev/null`)] : []),
+            ...(keys.includes('dirty_background_ratio') ? [this.exec(`echo ${this.state.dirtyBgRatio} > /proc/sys/vm/dirty_background_ratio 2>/dev/null`)] : []),
+            ...(keys.includes('vfs_cache_pressure') ? [this.exec(`echo ${this.state.vfsCachePressure} > /proc/sys/vm/vfs_cache_pressure 2>/dev/null`)] : [])
         ]);
         this.showLoading(false);
         this.showToast('VM 参数已应用');
@@ -3638,7 +3708,7 @@ class CoronaAddon {
             const el = document.getElementById('lru-gen-container');
             if (el) el.style.display = '';
             const sw = document.getElementById('lru-gen-switch');
-            if (sw) sw.addEventListener('change', (e) => { this.state.lruGenEnabled = e.target.checked; this.applyKernelFeatures(); });
+            if (sw) sw.addEventListener('change', (e) => { this.state.lruGenEnabled = e.target.checked; this.applyKernelFeatures(['lru_gen']); });
         }
         if (this.kernelFeatures.thp) {
             featureCount++;
@@ -3651,7 +3721,7 @@ class CoronaAddon {
                         list.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                         item.classList.add('selected');
                         this.state.thp = item.dataset.value;
-                        this.applyKernelFeatures();
+                        this.applyKernelFeatures(['thp']);
                     });
                 });
             }
@@ -3661,14 +3731,14 @@ class CoronaAddon {
             const el = document.getElementById('ksm-container');
             if (el) el.style.display = '';
             const sw = document.getElementById('ksm-switch');
-            if (sw) sw.addEventListener('change', (e) => { this.state.ksmEnabled = e.target.checked; this.applyKernelFeatures(); });
+            if (sw) sw.addEventListener('change', (e) => { this.state.ksmEnabled = e.target.checked; this.applyKernelFeatures(['ksm']); });
         }
         if (this.kernelFeatures.compaction) {
             featureCount++;
             const el = document.getElementById('compaction-container');
             if (el) el.style.display = '';
             const sw = document.getElementById('compaction-switch');
-            if (sw) sw.addEventListener('change', (e) => { this.state.compactionEnabled = e.target.checked; this.applyKernelFeatures(); });
+            if (sw) sw.addEventListener('change', (e) => { this.state.compactionEnabled = e.target.checked; this.applyKernelFeatures(['compaction']); });
         }
         if (featureCount > 0) {
             if (emptyEl) emptyEl.style.display = 'none';
@@ -3707,15 +3777,21 @@ class CoronaAddon {
             }
         }
     }
-    async applyKernelFeatures(skipPreview = false) {
+    async applyKernelFeatures(changedKeys = null, skipPreview = false) {
       return this.withLock('kernel-features', async () => {
-        const config = `lru_gen=${this.state.lruGenEnabled ? '1' : '0'}\nthp=${this.state.thp}\nksm=${this.state.ksmEnabled ? '1' : '0'}\ncompaction=${this.state.compactionEnabled ? '1' : '0'}`;
+        const keys = Array.isArray(changedKeys) ? changedKeys : (changedKeys ? [changedKeys] : ['lru_gen', 'thp', 'ksm', 'compaction']);
+        const updates = {};
+        if (keys.includes('lru_gen')) updates.lru_gen = this.state.lruGenEnabled ? '1' : '0';
+        if (keys.includes('thp')) updates.thp = this.state.thp;
+        if (keys.includes('ksm')) updates.ksm = this.state.ksmEnabled ? '1' : '0';
+        if (keys.includes('compaction')) updates.compaction = this.state.compactionEnabled ? '1' : '0';
+        const config = await this.buildMergedConfigContent('kernel.conf', updates, ['lru_gen', 'thp', 'ksm', 'compaction']);
         if (!skipPreview) {
             const writes = [];
-            if (this.kernelFeatures.lruGen) writes.push({ path: '/sys/kernel/mm/lru_gen/enabled', value: this.state.lruGenEnabled ? 'Y' : 'N' });
-            if (this.kernelFeatures.thp) writes.push({ path: '/sys/kernel/mm/transparent_hugepage/enabled', value: this.state.thp });
-            if (this.kernelFeatures.ksm) writes.push({ path: '/sys/kernel/mm/ksm/run', value: this.state.ksmEnabled ? '1' : '0' });
-            if (this.kernelFeatures.compaction) writes.push({ path: '/proc/sys/vm/compaction_proactiveness', value: this.state.compactionEnabled ? '20' : '0' });
+            if (keys.includes('lru_gen') && this.kernelFeatures.lruGen) writes.push({ path: '/sys/kernel/mm/lru_gen/enabled', value: this.state.lruGenEnabled ? 'Y' : 'N' });
+            if (keys.includes('thp') && this.kernelFeatures.thp) writes.push({ path: '/sys/kernel/mm/transparent_hugepage/enabled', value: this.state.thp });
+            if (keys.includes('ksm') && this.kernelFeatures.ksm) writes.push({ path: '/sys/kernel/mm/ksm/run', value: this.state.ksmEnabled ? '1' : '0' });
+            if (keys.includes('compaction') && this.kernelFeatures.compaction) writes.push({ path: '/proc/sys/vm/compaction_proactiveness', value: this.state.compactionEnabled ? '20' : '0' });
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将应用内核特性设置。',
                 configs: [{ filename: 'kernel.conf', content: config }],
@@ -3726,18 +3802,18 @@ class CoronaAddon {
             if (!confirmed) return false;
         }
         this.showLoading(true);
-        await this.writeConfig('kernel.conf', config);
+        await this.mergeConfigFile('kernel.conf', updates, ['lru_gen', 'thp', 'ksm', 'compaction']);
         const promises = [];
-        if (this.kernelFeatures.lruGen) {
+        if (keys.includes('lru_gen') && this.kernelFeatures.lruGen) {
             promises.push(this.exec(`echo ${this.state.lruGenEnabled ? 'Y' : 'N'} > /sys/kernel/mm/lru_gen/enabled 2>/dev/null`));
         }
-        if (this.kernelFeatures.thp) {
+        if (keys.includes('thp') && this.kernelFeatures.thp) {
             promises.push(this.exec(`echo ${this.state.thp} > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null`));
         }
-        if (this.kernelFeatures.ksm) {
+        if (keys.includes('ksm') && this.kernelFeatures.ksm) {
             promises.push(this.exec(`echo ${this.state.ksmEnabled ? '1' : '0'} > /sys/kernel/mm/ksm/run 2>/dev/null`));
         }
-        if (this.kernelFeatures.compaction) {
+        if (keys.includes('compaction') && this.kernelFeatures.compaction) {
             promises.push(this.exec(`echo ${this.state.compactionEnabled ? '20' : '0'} > /proc/sys/vm/compaction_proactiveness 2>/dev/null`));
         }
         await Promise.all(promises);
@@ -3941,141 +4017,6 @@ class CoronaAddon {
         this.renderScriptsList();
         this.updateScriptsCount();
         this.showToast('脚本已删除');
-    }
-    initSystemOpt() {
-        const switches = ['lmk', 'device-config', 'reclaim', 'kswapd', 'protect', 'fstrim'];
-        switches.forEach(name => {
-            const sw = document.getElementById(`${name}-switch`);
-            if (sw) sw.addEventListener('change', () => this.saveAndApplySystemOpt(name));
-        });
-        this.loadSystemOptConfig();
-    }
-    async loadSystemOptConfig() {
-        const configs = {
-            lmk: { file: 'lmk.conf', switch: 'lmk-switch' },
-            device: { file: 'device.conf', switch: 'device-config-switch' },
-            reclaim: { file: 'reclaim.conf', switch: 'reclaim-switch' },
-            kswapd: { file: 'kswapd.conf', switch: 'kswapd-switch' },
-            protect: { file: 'protect.conf', switch: 'protect-switch' },
-            fstrim: { file: 'fstrim.conf', switch: 'fstrim-switch' }
-        };
-        let enabledCount = 0;
-        for (const [key, cfg] of Object.entries(configs)) {
-            const content = await this.exec(`cat ${this.configDir}/${cfg.file} 2>/dev/null`);
-            const sw = document.getElementById(cfg.switch);
-            if (sw) {
-                const enabled = content.includes('enabled=1');
-                sw.checked = enabled;
-                if (enabled) enabledCount++;
-            }
-        }
-        const badge = document.getElementById('system-opt-badge');
-        if (badge) badge.textContent = enabledCount > 0 ? `${enabledCount}项已启用` : '未配置';
-    }
-    async saveAndApplySystemOpt(name, skipPreview = false) {
-        const switchMap = {
-            'lmk': 'lmk-switch',
-            'device-config': 'device-config-switch',
-            'reclaim': 'reclaim-switch',
-            'kswapd': 'kswapd-switch',
-            'protect': 'protect-switch',
-            'fstrim': 'fstrim-switch'
-        };
-        const fileMap = {
-            'lmk': 'lmk.conf',
-            'device-config': 'device.conf',
-            'reclaim': 'reclaim.conf',
-            'kswapd': 'kswapd.conf',
-            'protect': 'protect.conf',
-            'fstrim': 'fstrim.conf'
-        };
-        const summaryMap = {
-            'lmk': 'LMK 优化',
-            'device-config': '解锁后台限制',
-            'reclaim': '禁用激进回收',
-            'kswapd': 'kswapd 优化',
-            'protect': '关键进程保护',
-            'fstrim': '开机 fstrim'
-        };
-        const actionMap = {
-            'lmk': ['更新 sys.lmk.minfree_levels'],
-            'device-config': ['写入 activity_manager device_config', '关闭 phantom 进程限制'],
-            'reclaim': ['关闭 DAMON/process_reclaim', '必要时关闭 THP 与 osensemanager 特性'],
-            'kswapd': ['将 kswapd 放入前台 cpuset 与 cpuctl'],
-            'protect': ['将关键进程迁入 active_fg memcg'],
-            'fstrim': ['执行 sm fstrim']
-        };
-        const sw = document.getElementById(switchMap[name]);
-        if (!sw) return false;
-        const enabled = sw.checked ? '1' : '0';
-        const config = `enabled=${enabled}`;
-        if (!skipPreview) {
-            const confirmed = await this.confirmChangePreview('变更预览', {
-                summary: `即将${sw.checked ? '启用' : '禁用'} ${summaryMap[name] || name}。`,
-                configs: [{ filename: fileMap[name], content: config }],
-                actions: sw.checked ? (actionMap[name] || ['立即应用系统优化']) : [],
-                notes: sw.checked ? [] : ['关闭后仅更新配置文件。']
-            }, {
-                onCancel: () => this.loadSystemOptConfig()
-            });
-            if (!confirmed) return false;
-        }
-        await this.writeConfig(fileMap[name], config);
-        if (sw.checked) {
-            this.showLoading(true);
-            await this.applySystemOptNow(name);
-            this.showLoading(false);
-        }
-        this.loadSystemOptConfig();
-        this.showToast(sw.checked ? '已启用并应用' : '已禁用');
-        return true;
-    }
-    async applySystemOptNow(name) {
-        const memInfo = await this.exec('cat /proc/meminfo | grep MemTotal');
-        const memKb = parseInt(memInfo.replace(/[^0-9]/g, '')) || 8000000;
-        const sdkVersion = parseInt(await this.exec('getprop ro.build.version.sdk')) || 30;
-        const isOplus = (await this.exec('find /proc -maxdepth 1 -name "oplus*" 2>/dev/null | head -1')).trim() !== '';
-        if (name === 'lmk') {
-            if (sdkVersion > 28) {
-                let levels = '4096:0,5120:100,8192:200,32768:250,65536:900,96000:950';
-                if (memKb > 8388608) levels = '4096:0,5120:100,32768:200,96000:250,131072:900,204800:950';
-                else if (memKb > 6291456) levels = '4096:0,5120:100,8192:200,32768:250,96000:900,131072:950';
-                await this.exec(`resetprop sys.lmk.minfree_levels "${levels}"`);
-            }
-        } else if (name === 'device-config') {
-            await this.exec('device_config set_sync_disabled_for_tests until_reboot');
-            await this.exec('device_config put activity_manager max_cached_processes 32768');
-            await this.exec('device_config put activity_manager max_phantom_processes 32768');
-            await this.exec('device_config put activity_manager use_compaction false');
-            await this.exec('settings put global settings_enable_monitor_phantom_procs false');
-        } else if (name === 'reclaim') {
-            await this.exec('echo off > /sys/kernel/mm/damon/admin/kdamonds/0/state 2>/dev/null');
-            await this.exec('echo 0 > /sys/module/process_reclaim/parameters/enable_process_reclaim 2>/dev/null');
-            if (isOplus) {
-                await this.exec('echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null');
-                await this.exec('dumpsys osensemanager proc debug feature 0 2>/dev/null');
-            }
-        } else if (name === 'kswapd') {
-            const kswapd = await this.exec('pgrep kswapd');
-            if (kswapd) {
-                await this.exec(`echo ${kswapd.trim()} > /dev/cpuset/foreground/cgroup.procs 2>/dev/null`);
-                await this.exec('mkdir -p /dev/cpuctl/kswapd');
-                await this.exec(`echo ${kswapd.trim()} > /dev/cpuctl/kswapd/cgroup.procs 2>/dev/null`);
-                await this.exec('echo 1 > /dev/cpuctl/kswapd/cpu.uclamp.latency_sensitive 2>/dev/null');
-            }
-        } else if (name === 'protect') {
-            if (memKb > 8388608) {
-                await this.exec('mkdir -p /dev/memcg/system/active_fg');
-                await this.exec('echo 0 > /dev/memcg/system/active_fg/memory.swappiness 2>/dev/null');
-                const apps = ['com.android.systemui', 'com.android.launcher', 'surfaceflinger', 'system_server'];
-                for (const app of apps) {
-                    const pid = await this.exec(`pidof ${app} 2>/dev/null | head -n1`);
-                    if (pid.trim()) await this.exec(`echo ${pid.trim()} > /dev/memcg/system/active_fg/cgroup.procs 2>/dev/null`);
-                }
-            }
-        } else if (name === 'fstrim') {
-            await this.exec('sm fstrim 2>/dev/null');
-        }
     }
     initScrollEffect() {
         const floatingHeader = document.getElementById('floating-header');
