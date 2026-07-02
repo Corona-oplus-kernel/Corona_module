@@ -2987,7 +2987,24 @@ class CoronaAddon {
         return appliedCount;
     }
     async editPriorityRule(processName) { this.selectedPriorityProcess = processName; this.showPrioritySetting(); }
-    async deletePriorityRule(processName) { const confirmed = await this.showConfirm(`确定要删除 ${processName} 的优先级规则吗？`, '删除规则'); if (!confirmed) return; delete this.priorityRules[processName]; this.selectedPriorityProcess = processName; await this.exec(this.getAppPolicyScript('priority-del', this.shellQuote(processName))); this.renderPriorityRules(); this.updatePriorityCount(); this.updateAppPolicyRow(processName); this.renderAppPolicySummary(); this.showToast(`已删除 ${processName} 的优先级规则`); }
+    async deletePriorityRule(processName) {
+        const nextRules = { ...this.priorityRules };
+        delete nextRules[processName];
+        const confirmed = await this.confirmChangePreview('变更预览', {
+            summary: `即将删除 ${processName} 的优先级规则。`,
+            configs: [{ filename: 'process_priority.conf', content: this.serializePriorityRules(nextRules) || '# empty' }],
+            notes: ['删除后不会再对该应用或进程应用保存的 nice / I/O 优先级。']
+        });
+        if (!confirmed) return;
+        delete this.priorityRules[processName];
+        this.selectedPriorityProcess = processName;
+        await this.exec(this.getAppPolicyScript('priority-del', this.shellQuote(processName)));
+        this.renderPriorityRules();
+        this.updatePriorityCount();
+        this.updateAppPolicyRow(processName);
+        this.renderAppPolicySummary();
+        this.showToast(`已删除 ${processName} 的优先级规则`);
+    }
     async applyAllPriorityRules() { const promises = Object.keys(this.priorityRules).map(name => this.applyPriorityRule(name)); await Promise.all(promises); }
     async detectKernelFeatures() {
         const [lruGen, thp, ksm, compaction] = await Promise.all([
