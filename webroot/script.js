@@ -165,6 +165,7 @@ class CoronaAddon {
         await this.resolvePaths();
         await this.ensureFeatureScript('settings-ui');
         await this.ensureFeatureScript('home-ui');
+        await this.ensureFeatureScript('memory-core');
         this.showInitOverlay(true, this.t('initDefault'));
         try {
             this.updateInitOverlayMessage(this.t('initResolve'));
