@@ -115,10 +115,122 @@ list_package_threads() {
         for task_dir in /proc/$pid/task/[0-9]*; do
             [ -r "$task_dir/comm" ] || continue
             thread_name=$(cat "$task_dir/comm" 2>/dev/null)
-            [ -n "$thread_name" ] && printf '%s
-' "$thread_name"
+            [ -n "$thread_name" ] && printf '%s\n' "$thread_name"
         done
     done | awk 'NF && !seen[$0]++ { print $0 }' | sort
+}
+
+thread_name_matches() {
+    thread_name="$1"
+    thread_pattern="$2"
+    case "$thread_pattern" in
+        *'*'*|*'?'*|*'['*) case "$thread_name" in $thread_pattern) return 0 ;; esac ;;
+        *) [ "$thread_name" = "$thread_pattern" ] && return 0 ;;
+    esac
+    return 1
+}
+
+apply_sched_policy_to_tid() {
+    tid="$1"
+    sched_policy="$2"
+    rt_prio="$3"
+    case "$sched_policy" in
+        ''|other|normal)
+            chrt -o -p 0 "$tid" 2>/dev/null ;;
+        batch)
+            chrt -b -p 0 "$tid" 2>/dev/null ;;
+        idle)
+            chrt -i -p 0 "$tid" 2>/dev/null ;;
+        fifo)
+            [ -n "$rt_prio" ] || rt_prio=1
+            chrt -f -p "$rt_prio" "$tid" 2>/dev/null ;;
+        rr)
+            [ -n "$rt_prio" ] || rt_prio=1
+            chrt -r -p "$rt_prio" "$tid" 2>/dev/null ;;
+    esac
+}
+
+apply_cpuset_to_tid() {
+    tid="$1"
+    cpuset_group="$2"
+    [ -n "$cpuset_group" ] || return 0
+    tasks_file="/dev/cpuset/$cpuset_group/tasks"
+    [ -f "$tasks_file" ] || return 0
+    echo "$tid" > "$tasks_file" 2>/dev/null
+}
+
+apply_uclamp_to_tid() {
+    tid="$1"
+    uclamp_min="$2"
+    uclamp_max="$3"
+    cpuctl_group="$4"
+    if [ -w /proc/oplus_qos_sched/qos_task_uclamp ] && { [ -n "$uclamp_min" ] || [ -n "$uclamp_max" ]; }; then
+        min_val=${uclamp_min:-0}
+        max_val=${uclamp_max:-1024}
+        printf '%s %s %s\n' "$tid" "$min_val" "$max_val" > /proc/oplus_qos_sched/qos_task_uclamp 2>/dev/null && return 0
+    fi
+    [ -n "$cpuctl_group" ] || return 0
+    tasks_file="/dev/cpuctl/$cpuctl_group/tasks"
+    min_file="/dev/cpuctl/$cpuctl_group/cpu.uclamp.min"
+    max_file="/dev/cpuctl/$cpuctl_group/cpu.uclamp.max"
+    [ -f "$tasks_file" ] || return 0
+    [ -n "$uclamp_min" ] && [ -f "$min_file" ] && echo "$uclamp_min" > "$min_file" 2>/dev/null
+    [ -n "$uclamp_max" ] && [ -f "$max_file" ] && echo "$uclamp_max" > "$max_file" 2>/dev/null
+    echo "$tid" > "$tasks_file" 2>/dev/null
+}
+
+set_walt_knob() {
+    path="$1"
+    value="$2"
+    [ -n "$value" ] || return 0
+    [ -f "$path" ] || return 0
+    echo "$value" > "$path" 2>/dev/null
+}
+
+apply_thread_walt_hints() {
+    enable_per_task_boost="$1"
+    enable_pipeline_special="$2"
+    disable_reduce_affinity="$3"
+    [ "$enable_per_task_boost" = "1" ] && set_walt_knob /proc/sys/walt/sched_per_task_boost 1
+    [ "$enable_pipeline_special" = "1" ] && set_walt_knob /proc/sys/walt/sched_pipeline_special 1
+    [ "$disable_reduce_affinity" = "1" ] && set_walt_knob /proc/sys/walt/task_reduce_affinity 0
+}
+
+apply_thread_priority_once() {
+    [ -f "$THREAD_PRIORITY_FILE" ] || return 0
+    walt_per_task_boost=0
+    walt_pipeline_special=0
+    walt_reduce_affinity=0
+    while IFS='=' read -r target values; do
+        case "$target" in ''|'#'*) continue ;; esac
+        [ -n "$values" ] || continue
+        package_name=$(printf '%s' "$target" | cut -d'|' -f1)
+        thread_pattern=$(printf '%s' "$target" | cut -d'|' -f2-)
+        [ -n "$package_name" ] && [ -n "$thread_pattern" ] || continue
+        IFS='|' read -r nice_val io_class io_level affinity_mask sched_policy rt_prio cpuset_group walt_boost walt_pipeline uclamp_min uclamp_max <<EOF
+$values
+EOF
+        [ "$walt_boost" = "1" ] && walt_per_task_boost=1 && walt_reduce_affinity=1
+        [ "$walt_pipeline" = "1" ] && walt_pipeline_special=1
+        for pid in $(package_pids_for_name "$package_name"); do
+            [ -d "/proc/$pid/task" ] || continue
+            for task_dir in /proc/$pid/task/[0-9]*; do
+                [ -r "$task_dir/comm" ] || continue
+                tid=${task_dir##*/}
+                thread_name=$(cat "$task_dir/comm" 2>/dev/null)
+                thread_name_matches "$thread_name" "$thread_pattern" || continue
+                [ -n "$nice_val" ] && renice -n "$nice_val" -p "$tid" 2>/dev/null
+                if [ -n "$io_class" ] && [ -n "$io_level" ]; then
+                    ionice -c "$io_class" -n "$io_level" -p "$tid" 2>/dev/null
+                fi
+                [ -n "$affinity_mask" ] && taskset -pc "$affinity_mask" "$tid" >/dev/null 2>&1
+                apply_cpuset_to_tid "$tid" "$cpuset_group"
+                apply_uclamp_to_tid "$tid" "$uclamp_min" "$uclamp_max" "$cpuset_group"
+                apply_sched_policy_to_tid "$tid" "$sched_policy" "$rt_prio"
+            done
+        done
+    done < "$THREAD_PRIORITY_FILE"
+    apply_thread_walt_hints "$walt_per_task_boost" "$walt_pipeline_special" "$walt_reduce_affinity"
 }
 
 profile_exists() {
@@ -147,7 +259,7 @@ monitor_daemon() {
     while true; do
         load_rules
         apply_protection_once
-        "$MODDIR/service.sh" --apply-thread-priority >/dev/null 2>&1
+        apply_thread_priority_once
         current_pkg=$(get_foreground_package)
         target_profile=base
         profile_dir=

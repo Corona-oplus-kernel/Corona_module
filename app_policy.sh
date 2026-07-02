@@ -8,6 +8,7 @@ PROTECT_FILE="$CONFIG_DIR/app_protect.list"
 PROFILES_LIST_FILE="$CONFIG_DIR/app_profiles.list"
 PRIORITY_FILE="$CONFIG_DIR/process_priority.conf"
 PROFILES_DIR="$CONFIG_DIR/app_profiles"
+THREAD_PRIORITY_FILE="$CONFIG_DIR/thread_priority.conf"
 ICONS_DIR="$MODDIR/webroot/app_icons"
 PIDFILE="$MODDIR/.app_policy_daemon.pid"
 STATEFILE="$MODDIR/.app_policy_state"
@@ -39,6 +40,7 @@ case "$1" in
     protect-once) apply_protection_once ;;
     daemon) monitor_daemon ;;
     foreground) get_foreground_package ;;
+    daemon-status) [ -f "$PIDFILE" ] && pid=$(cat "$PIDFILE" 2>/dev/null) && [ -n "$pid" ] && [ -d "/proc/$pid" ] && printf "%s" "$pid" ;;
     thread-list) list_package_threads "$2" ;;
     *) exit 1 ;;
 esac
