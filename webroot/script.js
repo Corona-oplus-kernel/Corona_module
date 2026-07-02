@@ -4198,6 +4198,27 @@ CoronaAddon.prototype.buildAppRulesConfig = function() {
     ];
     return lines.join('\n');
 };
+CoronaAddon.prototype.getAppPolicyListFilename = function(key) {
+    if (key === 'whitelist') return 'app_whitelist.list';
+    if (key === 'protect') return 'app_protect.list';
+    if (key === 'profiles') return 'app_profiles.list';
+    return `${key || 'app_policy'}.list`;
+};
+CoronaAddon.prototype.serializeAppPolicyList = function(items = []) {
+    return [...new Set((items || []).filter(Boolean))].join('\n');
+};
+CoronaAddon.prototype.buildAppPolicyPreviewConfigs = function(keys = ['whitelist', 'protect', 'profiles'], overrides = {}) {
+    const configs = [];
+    if (keys.includes('rules')) {
+        configs.push({ filename: 'app_rules.conf', content: this.buildAppRulesConfig() });
+    }
+    ['whitelist', 'protect', 'profiles'].forEach(key => {
+        if (!keys.includes(key)) return;
+        const items = overrides[key] || this.appPolicy[key] || [];
+        configs.push({ filename: this.getAppPolicyListFilename(key), content: this.serializeAppPolicyList(items) || '# empty' });
+    });
+    return configs;
+};
 CoronaAddon.prototype.renderAppPolicySummary = function() {
     this.ensureAppPolicyState();
     const wl = this.appPolicy.whitelist.length;
@@ -4294,14 +4315,29 @@ CoronaAddon.prototype.initAppPolicy = function() {
     if (monitorSwitch && !monitorSwitch.dataset.bound) {
         monitorSwitch.dataset.bound = '1';
         monitorSwitch.addEventListener('change', async () => {
+            const previous = this.appPolicy.monitorEnabled;
             this.appPolicy.monitorEnabled = monitorSwitch.checked;
+            const confirmed = await this.confirmChangePreview('变更预览', {
+                summary: `即将${monitorSwitch.checked ? '开启' : '关闭'}应用预设自动切换。`,
+                configs: this.buildAppPolicyPreviewConfigs(['rules']),
+                actions: [monitorSwitch.checked ? '启动应用策略守护，前台应用命中预设时自动切换配置' : '停止自动切换，仅保留当前默认配置'],
+                notes: ['白名单、保护和应用预设名单不会丢失。']
+            }, { onCancel: () => { this.appPolicy.monitorEnabled = previous; this.renderAppPolicySummary(); } });
+            if (!confirmed) return;
             await this.saveAppRulesConfig(`应用预设自动切换已${monitorSwitch.checked ? '开启' : '关闭'}`);
         });
     }
     if (notifySwitch && !notifySwitch.dataset.bound) {
         notifySwitch.dataset.bound = '1';
         notifySwitch.addEventListener('change', async () => {
+            const previous = this.appPolicy.notifyEnabled;
             this.appPolicy.notifyEnabled = notifySwitch.checked;
+            const confirmed = await this.confirmChangePreview('变更预览', {
+                summary: `即将${notifySwitch.checked ? '开启' : '关闭'}应用策略通知。`,
+                configs: this.buildAppPolicyPreviewConfigs(['rules']),
+                notes: ['仅影响应用预设切换通知，不影响名单和守护逻辑。']
+            }, { onCancel: () => { this.appPolicy.notifyEnabled = previous; this.renderAppPolicySummary(); } });
+            if (!confirmed) return;
             await this.saveAppRulesConfig(`切换通知已${notifySwitch.checked ? '开启' : '关闭'}`);
         });
     }
@@ -4490,11 +4526,21 @@ CoronaAddon.prototype.reorderAppPolicyRow = function(pkg) {
 CoronaAddon.prototype.toggleAppPolicyPackage = async function(mode, pkg) {
     this.ensureAppPolicyState();
     const key = mode;
-    const set = new Set(this.appPolicy[key] || []);
+    const previous = [...(this.appPolicy[key] || [])];
+    const set = new Set(previous);
     const adding = !set.has(pkg);
     if (adding) set.add(pkg); else set.delete(pkg);
-    this.appPolicy[key] = [...set];
+    const nextItems = [...set];
     const label = key === 'whitelist' ? '白名单' : key === 'protect' ? '保护列表' : '列表';
+    const confirmed = await this.confirmChangePreview('变更预览', {
+        summary: `即将${adding ? '加入' : '移出'} ${pkg} 到${label}。`,
+        configs: this.buildAppPolicyPreviewConfigs([key], { [key]: nextItems }),
+        actions: key === 'protect'
+            ? ['更新保护进程名单，并在守护运行时重新应用受保护内存组']
+            : ['更新应用策略名单']
+    });
+    if (!confirmed) return;
+    this.appPolicy[key] = nextItems;
     this.updateAppPolicyRow(pkg);
     this.reorderAppPolicyRow(pkg);
     this.renderAppPolicySummary();
@@ -4598,6 +4644,16 @@ CoronaAddon.prototype.setAppProfileFromCurrentConfig = async function(pkg) {
         this.showToast('当前没有可保存为预设的配置');
         return;
     }
+    const nextProfiles = [...new Set([...(this.appPolicy.profiles || []), pkg])];
+    const confirmed = await this.confirmChangePreview('变更预览', {
+        summary: `即将为 ${pkg} 保存当前应用预设。`,
+        configs: [
+            ...this.buildAppPolicyPreviewConfigs(['profiles'], { profiles: nextProfiles }),
+            ...Object.keys(files).map(filename => ({ filename: `app_profiles/${pkg}/${filename}`, content: files[filename] }))
+        ],
+        actions: ['写入该应用的独立预设目录，命中前台时可自动切换']
+    });
+    if (!confirmed) return;
     await this.copyCurrentConfigToProfile(pkg);
 };
 CoronaAddon.prototype.setAppProfileFromSnapshot = async function(pkg, snapshotId) {
@@ -4606,11 +4662,28 @@ CoronaAddon.prototype.setAppProfileFromSnapshot = async function(pkg, snapshotId
         this.showToast('快照不存在或为空');
         return;
     }
+    const nextProfiles = [...new Set([...(this.appPolicy.profiles || []), pkg])];
+    const confirmed = await this.confirmChangePreview('变更预览', {
+        summary: `即将为 ${pkg} 套用参数快照预设。`,
+        configs: [
+            ...this.buildAppPolicyPreviewConfigs(['profiles'], { profiles: nextProfiles }),
+            ...Object.keys(snapshot.files).map(filename => ({ filename: `app_profiles/${pkg}/${filename}`, content: snapshot.files[filename] }))
+        ],
+        actions: ['写入应用独立预设目录，并在命中前台时自动切换']
+    });
+    if (!confirmed) return;
     await this.writeProfileFiles(pkg, snapshot.files);
 };
 CoronaAddon.prototype.clearAppProfile = async function(pkg) {
+    const nextProfiles = (this.appPolicy.profiles || []).filter(item => item !== pkg);
+    const confirmed = await this.confirmChangePreview('变更预览', {
+        summary: `即将清除 ${pkg} 的应用预设。`,
+        configs: this.buildAppPolicyPreviewConfigs(['profiles'], { profiles: nextProfiles }),
+        actions: [`删除 app_profiles/${pkg}/ 下的独立预设文件`]
+    });
+    if (!confirmed) return;
     await this.exec(`rm -rf ${this.shellQuote(`${this.configDir}/app_profiles/${pkg}`)}`);
-    this.appPolicy.profiles = this.appPolicy.profiles.filter(item => item !== pkg);
+    this.appPolicy.profiles = nextProfiles;
     await this.saveAppRulesConfig('应用预设已清除');
     this.updateAppPolicyRow(pkg);
 };
