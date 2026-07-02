@@ -37,6 +37,7 @@ class CoronaAddon {
             changePreviewEnabled: true,
             showSettingDescriptions: true,
             showCategoryConfigToggles: true,
+            language: 'zh',
             swapEnabled: false,
             swapSize: 2048,
             swapPriority: 0,
@@ -117,9 +118,9 @@ class CoronaAddon {
         return true;
     }
     async init() {
-        this.showInitOverlay(true, '正在初始化，请稍候...');
+        this.showInitOverlay(true, this.t('initDefault'));
         try {
-            this.updateInitOverlayMessage('正在解析模块环境...');
+            this.updateInitOverlayMessage(this.t('initResolve'));
             await this.resolvePaths();
             const brand = (await this.exec('getprop ro.product.brand')).toLowerCase();
             const manufacturer = (await this.exec('getprop ro.product.manufacturer')).toLowerCase();
@@ -128,17 +129,18 @@ class CoronaAddon {
                 this.showUnsupportedDevice(brand || manufacturer);
                 return;
             }
-            this.updateInitOverlayMessage('正在准备配置...');
+            this.updateInitOverlayMessage(this.t('initPrepare'));
             await this.ensureConfigDir();
             await this.loadRuntimeConfig();
             await this.loadAppMetaCache();
             this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
             this.initTheme();
+            this.initLanguagePreference();
             this.initChangePreviewPreference();
             this.initSettingDescriptionPreference();
             this.initCategoryConfigVisibilityPreference();
             this.bindAllEvents();
-            this.updateInitOverlayMessage('正在加载设备信息...');
+            this.updateInitOverlayMessage(this.t('initDevice'));
             await this.loadDeviceInfo();
             await this.loadModuleVersion();
             this.initDetailOverlays();
@@ -150,11 +152,11 @@ class CoronaAddon {
                 this.initStaticHeader();
             }
             this.initModuleIntro();
-            this.updateInitOverlayMessage('正在预加载配置页面...');
+            this.updateInitOverlayMessage(this.t('initSettings'));
             await this.ensureSettingsPageReady(true);
-            this.updateInitOverlayMessage('正在获取实时状态...');
+            this.updateInitOverlayMessage(this.t('initRealtime'));
             await this.updateRealtimeData(true);
-            this.updateInitOverlayMessage('正在预加载应用列表...');
+            this.updateInitOverlayMessage(this.t('initApps'));
             await this.prewarmAppPolicyData(true);
             this.startRealtimeMonitor();
             this.scheduleDeferredInit();
@@ -431,6 +433,145 @@ class CoronaAddon {
         const saved = localStorage.getItem('corona_category_config_toggles');
         this.setCategoryConfigVisibility(saved === null ? true : saved === '1');
     }
+    initLanguagePreference() {
+        const saved = localStorage.getItem('corona_language');
+        this.setLanguage(saved === 'en' ? 'en' : 'zh');
+    }
+    getTranslations() {
+        return {
+            zh: {
+                tabHome: '主页',
+                tabSettings: '配置',
+                moduleSettings: '模块设置',
+                lightTheme: '浅色模式',
+                darkTheme: '深色模式',
+                goldTheme: '皇涩主题',
+                languageLabel: '界面语言',
+                languageDesc: '切换中文或 English 界面文案',
+                changePreview: '变更预览',
+                changePreviewDesc: '关闭后跳过变更预览，直接应用设置',
+                settingDescriptions: '设置说明',
+                settingDescriptionsDesc: '显示各项功能的用途说明，关闭后仅保留标题与操作控件',
+                categoryConfig: '显示分类配置',
+                categoryConfigDesc: '关闭后隐藏各分类配置的启用开关，不影响模块功能和已保存参数',
+                cardVisibility: '模块卡片显示',
+                cardVisibilityDesc: '关闭后仅隐藏配置页卡片，不影响模块功能和已保存参数',
+                themeSwitched: '主题已切换',
+                previewEnabled: '变更预览已开启',
+                previewDisabled: '变更预览已关闭',
+                descriptionsShown: '设置说明已显示',
+                descriptionsHidden: '设置说明已隐藏',
+                categoryShown: '分类配置已显示',
+                categoryHidden: '分类配置已隐藏',
+                initDefault: '正在初始化，请稍候...',
+                initResolve: '正在解析模块环境...',
+                initPrepare: '正在准备配置...',
+                initDevice: '正在加载设备信息...',
+                initSettings: '正在预加载配置页面...',
+                initRealtime: '正在获取实时状态...',
+                initApps: '正在预加载应用列表...',
+                unsupportedTitle: '设备不支持',
+                unsupportedBody: '此模块仅支持 OnePlus / OPPO / realme / OPlus 设备',
+                processing: '处理中...'
+            },
+            en: {
+                tabHome: 'Home',
+                tabSettings: 'Settings',
+                moduleSettings: 'Module Settings',
+                lightTheme: 'Light',
+                darkTheme: 'Dark',
+                goldTheme: 'Gold',
+                languageLabel: 'Language',
+                languageDesc: 'Switch UI text between Chinese and English',
+                changePreview: 'Change Preview',
+                changePreviewDesc: 'Skip preview and apply changes directly when disabled',
+                settingDescriptions: 'Setting Descriptions',
+                settingDescriptionsDesc: 'Show feature descriptions; keep only titles and controls when disabled',
+                categoryConfig: 'Show Category Toggles',
+                categoryConfigDesc: 'Hide category enable toggles only; saved settings remain unchanged',
+                cardVisibility: 'Module Cards',
+                cardVisibilityDesc: 'Hide config cards only; module behavior and saved values stay unchanged',
+                themeSwitched: 'Theme switched',
+                previewEnabled: 'Change preview enabled',
+                previewDisabled: 'Change preview disabled',
+                descriptionsShown: 'Setting descriptions shown',
+                descriptionsHidden: 'Setting descriptions hidden',
+                categoryShown: 'Category toggles shown',
+                categoryHidden: 'Category toggles hidden',
+                initDefault: 'Initializing, please wait...',
+                initResolve: 'Resolving module environment...',
+                initPrepare: 'Preparing configuration...',
+                initDevice: 'Loading device information...',
+                initSettings: 'Preloading settings page...',
+                initRealtime: 'Loading realtime status...',
+                initApps: 'Preloading app list...',
+                unsupportedTitle: 'Unsupported device',
+                unsupportedBody: 'This module supports OnePlus / OPPO / realme / OPlus devices only',
+                processing: 'Processing...'
+            }
+        };
+    }
+    t(key) {
+        const lang = this.state.language === 'en' ? 'en' : 'zh';
+        const table = this.getTranslations()[lang] || {};
+        const fallback = this.getTranslations().zh || {};
+        return table[key] || fallback[key] || key;
+    }
+    setLanguage(language, persist = false) {
+        const normalized = language === 'en' ? 'en' : 'zh';
+        this.state.language = normalized;
+        document.documentElement.lang = normalized === 'en' ? 'en' : 'zh-CN';
+        const select = document.getElementById('language-select');
+        if (select) select.value = normalized;
+        if (persist) localStorage.setItem('corona_language', normalized);
+        this.applyTranslations();
+    }
+    applyTranslations() {
+        const setText = (selector, value) => {
+            const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
+            if (el) el.textContent = value;
+        };
+        setText('.tab-item[data-page="home"] .tab-label', this.t('tabHome'));
+        setText('.tab-item[data-page="settings"] .tab-label', this.t('tabSettings'));
+        setText('#app-settings-card .module-card-title', this.t('moduleSettings'));
+        const themeLabels = document.querySelectorAll('#theme-options .theme-option span');
+        if (themeLabels[0]) themeLabels[0].textContent = this.t('lightTheme');
+        if (themeLabels[1]) themeLabels[1].textContent = this.t('darkTheme');
+        if (themeLabels[2]) themeLabels[2].textContent = this.t('goldTheme');
+        setText('#language-switch-label', this.t('languageLabel'));
+        setText('#language-switch-desc', this.t('languageDesc'));
+        const langSelect = document.getElementById('language-select');
+        if (langSelect) {
+            if (langSelect.options[0]) langSelect.options[0].text = this.state.language === 'en' ? 'Chinese' : '中文';
+            if (langSelect.options[1]) langSelect.options[1].text = 'English';
+        }
+        const prefRows = document.querySelectorAll('#app-settings-content .ui-pref-switch-container .switch-info');
+        if (prefRows[1]) {
+            const labels = prefRows[1].querySelectorAll('span');
+            if (labels[0]) labels[0].textContent = this.t('changePreview');
+            if (labels[1]) labels[1].textContent = this.t('changePreviewDesc');
+        }
+        if (prefRows[2]) {
+            const labels = prefRows[2].querySelectorAll('span');
+            if (labels[0]) labels[0].textContent = this.t('settingDescriptions');
+            if (labels[1]) labels[1].textContent = this.t('settingDescriptionsDesc');
+        }
+        if (prefRows[3]) {
+            const labels = prefRows[3].querySelectorAll('span');
+            if (labels[0]) labels[0].textContent = this.t('categoryConfig');
+            if (labels[1]) labels[1].textContent = this.t('categoryConfigDesc');
+        }
+        const cardHeader = document.getElementById('card-visibility-toggle');
+        if (cardHeader) {
+            const labels = cardHeader.querySelectorAll('span');
+            if (labels[0]) labels[0].textContent = this.t('cardVisibility');
+            if (labels[1]) labels[1].textContent = this.t('cardVisibilityDesc');
+        }
+        const loadingText = document.querySelector('#loading .loading-text');
+        if (loadingText && !document.getElementById('loading')?.classList.contains('show')) {
+            loadingText.textContent = this.t('processing');
+        }
+    }
     setCategoryConfigVisibility(enabled, persist = false) {
         const normalized = !!enabled;
         this.state.showCategoryConfigToggles = normalized;
@@ -458,7 +599,7 @@ class CoronaAddon {
                 this.state.theme = opt.dataset.theme;
                 localStorage.setItem('corona_theme', this.state.theme);
                 this.applyTheme(this.state.theme);
-                this.showToast(`主题已切换: ${opt.querySelector('span').textContent}`);
+                this.showToast(`${this.t('themeSwitched')}: ${opt.querySelector('span').textContent}`);
             });
         });
     }
@@ -468,7 +609,7 @@ class CoronaAddon {
         toggle.checked = !!this.state.changePreviewEnabled;
         toggle.addEventListener('change', () => {
             this.setChangePreviewEnabled(toggle.checked, true);
-            this.showToast(`变更预览已${toggle.checked ? '开启' : '关闭'}`);
+            this.showToast(toggle.checked ? this.t('previewEnabled') : this.t('previewDisabled'));
         });
     }
     initSettingDescriptionToggle() {
@@ -477,7 +618,7 @@ class CoronaAddon {
         toggle.checked = !!this.state.showSettingDescriptions;
         toggle.addEventListener('change', () => {
             this.setSettingDescriptionsEnabled(toggle.checked, true);
-            this.showToast(`设置说明已${toggle.checked ? '显示' : '隐藏'}`);
+            this.showToast(toggle.checked ? this.t('descriptionsShown') : this.t('descriptionsHidden'));
         });
     }
     initCategoryConfigVisibilityToggle() {
@@ -486,7 +627,7 @@ class CoronaAddon {
         this.setCategoryConfigVisibility(this.state.showCategoryConfigToggles);
         toggle.addEventListener('change', () => {
             this.setCategoryConfigVisibility(toggle.checked, true);
-            this.showToast(`分类配置已${toggle.checked ? '显示' : '隐藏'}`);
+            this.showToast(toggle.checked ? this.t('categoryShown') : this.t('categoryHidden'));
         });
     }
     initSnapshots() {
@@ -2147,6 +2288,7 @@ class CoronaAddon {
                 this.initPerformanceMode();
                 this.initExpandableCards();
                 this.initThemeSelector();
+                this.initLanguageToggle();
                 this.initChangePreviewToggle();
                 this.initSettingDescriptionToggle();
                 this.initCategoryConfigVisibilityToggle();
@@ -2824,7 +2966,7 @@ class CoronaAddon {
             el.classList.add('show');
         } else {
             el.classList.remove('init-mode');
-            if (text) text.textContent = '处理中...';
+            if (text) text.textContent = this.t('processing');
             el.classList.remove('show');
             document.body.classList.remove('init-lock', 'app-booting');
             document.body.classList.add('app-ready');
@@ -2832,12 +2974,12 @@ class CoronaAddon {
     }
     updateInitOverlayMessage(message) {
         const text = document.getElementById('loading')?.querySelector('.loading-text');
-        if (text) text.textContent = message || '正在初始化，请稍候...';
+        if (text) text.textContent = message || this.t('initDefault');
     }
     showUnsupportedDevice(brand) {
         document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;padding:24px;text-align:center;font-family:system-ui,sans-serif">
-            <div><h2 style="color:#e53935;margin-bottom:12px">设备不支持</h2>
-            <p style="color:#666;font-size:14px">此模块仅支持 OnePlus / OPPO / realme / OPlus 设备<br>当前品牌: ${brand}</p></div></div>`;
+            <div><h2 style="color:#e53935;margin-bottom:12px">${this.t('unsupportedTitle')}</h2>
+            <p style="color:#666;font-size:14px">${this.t('unsupportedBody')}<br>Brand: ${brand}</p></div></div>`;
     }
     showLoading(show) {
         if (this.isInitializing) return;
