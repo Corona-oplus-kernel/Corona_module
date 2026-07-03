@@ -8,7 +8,13 @@
 </head>
 <body>
     <div class="floating-header" id="floating-header">
-        <span class="floating-header-title">Corona</span>
+        <button class="floating-header-link" id="floating-header-link" type="button" aria-label="打开 Corona 内核发布页">
+            <span class="floating-header-title">Corona</span>
+            <span class="floating-update-block hidden" id="floating-update-block">
+                <span class="floating-update-top"><span class="cpu-brand-badge snapdragon" id="floating-header-new">NEW</span><span class="floating-update-arrow">&gt;</span></span>
+                <span class="floating-update-copy">内核有新的更新</span>
+            </span>
+        </button>
     </div>
     <div class="bg-decoration"></div>
     <div class="container">

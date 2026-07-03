@@ -54,6 +54,8 @@ class CoronaAddon {
         };
         this.kernelFeatures = { lruGen: false, thp: false, ksm: false, compaction: false };
         this.isCoronaKernel = false;
+        this.localKernelWorkflowBuild = 0;
+        this.kernelUpdateInfo = null;
         this.cpuCores = [];
         this.cpuClusterInfo = { little: 0, mid: 0, big: 0, prime: 0 };
         this.cpuStats = {};

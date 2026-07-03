@@ -587,6 +587,105 @@
         const ver = match ? match[1] : '--';
         const el = document.getElementById('current-version-text');
         if (el) el.textContent = `当前版本：${ver}`;
+        await this.checkKernelReleaseUpdate();
+    },
+    extractKernelBuildNumber(source) {
+        const text = String(source || '').trim();
+        if (!text) return 0;
+        const match = text.match(/全量构建\s*#(\d+)/) || text.match(/#(\d+)/) || text.match(/(\d+)/);
+        return match ? parseInt(match[1], 10) || 0 : 0;
+    },
+    async fetchLatestKernelReleaseInfo() {
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        let timer = null;
+        try {
+            if (controller) timer = setTimeout(() => controller.abort(), 8000);
+            const response = await fetch('https://api.github.com/repos/wswzgdg/Corona-5.15-action/releases/latest', {
+                headers: { 'Accept': 'application/vnd.github+json' },
+                cache: 'no-store',
+                signal: controller ? controller.signal : undefined
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const title = String(data.name || data.tag_name || '');
+                const build = this.extractKernelBuildNumber(title);
+                if (build) {
+                    return {
+                        build,
+                        title,
+                        url: String(data.html_url || 'https://github.com/wswzgdg/Corona-5.15-action/releases/latest')
+                    };
+                }
+            }
+        } catch (_) {}
+        try {
+            const fallbackResponse = await fetch('https://github.com/wswzgdg/Corona-5.15-action/releases/latest', {
+                cache: 'no-store',
+                signal: controller ? controller.signal : undefined
+            });
+            if (!fallbackResponse.ok) return null;
+            const html = await fallbackResponse.text();
+            const titleMatch = html.match(/全量构建\s*#\d+/);
+            const title = titleMatch ? titleMatch[0] : '';
+            const build = this.extractKernelBuildNumber(title || html);
+            if (!build) return null;
+            return {
+                build,
+                title: title || `全量构建 #${build}`,
+                url: fallbackResponse.url || 'https://github.com/wswzgdg/Corona-5.15-action/releases/latest'
+            };
+        } catch (_) {
+            return null;
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
+    },
+    renderKernelReleaseUpdate() {
+        const hasUpdate = !!(this.kernelUpdateInfo && this.kernelUpdateInfo.build > this.localKernelWorkflowBuild);
+        const floatingBadge = document.getElementById('floating-header-new');
+        const floatingBlock = document.getElementById('floating-update-block');
+        const floatingLink = document.getElementById('floating-header-link');
+        if (floatingBadge) floatingBadge.classList.toggle('hidden', !hasUpdate);
+        if (floatingBlock) floatingBlock.classList.toggle('hidden', !hasUpdate);
+        if (floatingLink) floatingLink.classList.toggle('has-update', hasUpdate);
+    },
+    openKernelReleasePage() {
+        const url = this.kernelUpdateInfo?.url || 'https://github.com/wswzgdg/Corona-5.15-action/releases/latest';
+        if (!url) return;
+        if (typeof window !== 'undefined' && typeof window.open === 'function') {
+            const opened = window.open(url, '_blank');
+            if (opened) return;
+        }
+        if (typeof location !== 'undefined') location.href = url;
+    },
+    bindKernelReleaseUpdateEvents() {
+        const floatingLink = document.getElementById('floating-header-link');
+        if (floatingLink && !floatingLink.dataset.bound) {
+            floatingLink.dataset.bound = '1';
+            floatingLink.addEventListener('click', (event) => {
+                if (!this.kernelUpdateInfo) return;
+                event.preventDefault();
+                this.openKernelReleasePage();
+            });
+        }
+    },
+    async checkKernelReleaseUpdate() {
+        this.bindKernelReleaseUpdateEvents();
+        this.kernelUpdateInfo = null;
+        this.localKernelWorkflowBuild = 0;
+        if (!this.isCoronaKernel) {
+            this.renderKernelReleaseUpdate();
+            return;
+        }
+        const localBuild = this.extractKernelBuildNumber(await this.exec('cat /proc/corona_workflow_build 2>/dev/null'));
+        if (!localBuild) {
+            this.renderKernelReleaseUpdate();
+            return;
+        }
+        this.localKernelWorkflowBuild = localBuild;
+        const latest = await this.fetchLatestKernelReleaseInfo();
+        if (latest && latest.build > localBuild) this.kernelUpdateInfo = latest;
+        this.renderKernelReleaseUpdate();
     },
     initDeviceImageInteraction() {
         const container = document.getElementById('device-image-container');

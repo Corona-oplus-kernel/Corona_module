@@ -119,6 +119,61 @@ body.theme-dark .corona-title {
     opacity: 0;
 }
 
+.floating-header-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    pointer-events: none;
+}
+
+.floating-header-link.has-update {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.floating-update-block {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 1px;
+}
+
+.floating-update-block.hidden {
+    display: none;
+}
+
+.floating-update-top {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.floating-update-arrow {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-main);
+    line-height: 1;
+    opacity: 0.86;
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    transform: translateY(0);
+}
+
+.floating-update-copy {
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--text-sub);
+    white-space: nowrap;
+}
+
 .floating-header-title {
     font-size: 32px;
     font-weight: 600;
@@ -132,6 +187,14 @@ body.theme-dark .floating-header {
 
 body.theme-dark .floating-header-title {
     color: #FFFFFF;
+}
+
+body.theme-dark .floating-update-arrow {
+    color: #FFFFFF;
+}
+
+body.theme-dark .floating-update-copy {
+    color: rgba(255, 255, 255, 0.76);
 }
 
 * {
@@ -1891,6 +1954,15 @@ body.theme-gold .cpu-brand-badge.mediatek {
 
 .cpu-brand-badge.hidden {
     display: none;
+}
+
+.floating-header .cpu-brand-badge {
+    font-size: 8px;
+    line-height: 1;
+    padding: 2px 5px;
+    min-height: 0;
+    transform: translateY(1px);
+    flex: 0 0 auto;
 }
 
 .cpu-info-line {
