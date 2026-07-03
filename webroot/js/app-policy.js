@@ -208,7 +208,12 @@ CoronaAddon.prototype.initAppPolicy = function() {
         if (overlay && !overlay.dataset.bound) {
             overlay.dataset.bound = '1';
             overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) this.hideOverlay(id);
+                if (e.target !== overlay) return;
+                if (id === 'app-profile-overlay') {
+                    this.closeAppProfilePicker(false);
+                    return;
+                }
+                this.hideOverlay(id);
             });
         }
     });
@@ -338,6 +343,27 @@ CoronaAddon.prototype.renderAppPolicyLoadingState = function(message = '正在�
     if (!list) return;
     list.innerHTML = `<div class="app-policy-loading-state"><div class="loading-spinner"></div><span class="loading-text">${this.escapeHtml(message)}</span></div>`;
 };
+
+CoronaAddon.prototype.closeAppProfilePicker = function(committed = false) {
+    if (!committed && this.appProfileStateSnapshot) {
+        this.appPolicy = {
+            monitorEnabled: !!this.appProfileStateSnapshot.monitorEnabled,
+            notifyEnabled: !!this.appProfileStateSnapshot.notifyEnabled,
+            whitelist: [...(this.appProfileStateSnapshot.whitelist || [])],
+            protect: [...(this.appProfileStateSnapshot.protect || [])],
+            profiles: [...(this.appProfileStateSnapshot.profiles || [])]
+        };
+    }
+    const pkg = this.selectedAppProfilePackage;
+    this.selectedAppProfilePackage = '';
+    this.selectedAppProfileLabel = '';
+    this.appProfileStateSnapshot = null;
+    this.hideOverlay('app-profile-overlay');
+    if (pkg) {
+        this.updateAppPolicyRow(pkg);
+        this.renderAppPolicySummary();
+    }
+};
 CoronaAddon.prototype.setAppPolicyManageLoading = function(loading) {
     this.appPolicyManageLoading = !!loading;
     this.renderAppPolicySummary();
@@ -442,6 +468,13 @@ CoronaAddon.prototype.estimateCurrentProfileConfigCount = async function() {
 };
 CoronaAddon.prototype.openAppProfilePicker = async function(pkg, label) {
     this.ensureAppPolicyState();
+    this.appProfileStateSnapshot = {
+        monitorEnabled: !!this.appPolicy.monitorEnabled,
+        notifyEnabled: !!this.appPolicy.notifyEnabled,
+        whitelist: [...(this.appPolicy.whitelist || [])],
+        protect: [...(this.appPolicy.protect || [])],
+        profiles: [...(this.appPolicy.profiles || [])]
+    };
     this.selectedAppProfilePackage = pkg;
     this.selectedAppProfileLabel = label || pkg;
     this.currentProfileConfigCount = 0;
@@ -478,47 +511,66 @@ CoronaAddon.prototype.renderAppProfileChoices = function() {
     const snapshotOptions = snapshots.map(snapshot => `<div class="doze-preset" data-mode="snapshot" data-snapshot-id="${this.escapeHtml(snapshot.id || '')}"><div class="doze-preset-name">套用快照：${this.escapeHtml(snapshot.name || '未命名快照')}</div><div class="doze-preset-desc">${this.escapeHtml(this.formatSnapshotTime(snapshot.createdAt))} · ${Object.keys(snapshot.files || {}).length} 个配置</div></div>`).join('');
     container.innerHTML = actionOptions.join('') + snapshotOptions + clearOption;
     container.querySelectorAll('.doze-preset').forEach(item => {
-        item.addEventListener('click', async () => {
+        item.addEventListener('click', async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
             const mode = item.dataset.mode;
-            if (mode === 'toggle-whitelist') await this.toggleAppPolicyPackage('whitelist', this.selectedAppProfilePackage);
-            if (mode === 'toggle-protect') await this.toggleAppPolicyPackage('protect', this.selectedAppProfilePackage);
+            const pkg = this.selectedAppProfilePackage;
+            const label = this.selectedAppProfileLabel || pkg;
+            const snapshotId = item.dataset.snapshotId;
+            if (!pkg) return;
+            if (mode === 'toggle-whitelist') await this.toggleAppPolicyPackage('whitelist', pkg);
+            if (mode === 'toggle-protect') await this.toggleAppPolicyPackage('protect', pkg);
             if (mode === 'threads') {
-                this.hideOverlay('app-profile-overlay');
+                this.closeAppProfilePicker(false);
                 this.hideOverlay('app-policy-overlay');
-                await this.openThreadRuleManager(this.selectedAppProfilePackage, this.selectedAppProfileLabel || this.selectedAppProfilePackage);
+                await this.openThreadRuleManager(pkg, label);
                 return;
             }
             if (mode === 'priority') {
-                this.selectedPriorityProcess = this.selectedAppProfilePackage;
-                this.hideOverlay('app-profile-overlay');
+                this.selectedPriorityProcess = pkg;
+                this.closeAppProfilePicker(false);
                 this.hideOverlay('app-policy-overlay');
                 requestAnimationFrame(() => requestAnimationFrame(() => this.showPrioritySetting()));
                 return;
             }
-            if (mode === 'current') await this.setAppProfileFromCurrentConfig(this.selectedAppProfilePackage);
-            if (mode === 'snapshot') await this.setAppProfileFromSnapshot(this.selectedAppProfilePackage, item.dataset.snapshotId);
-            if (mode === 'clear') await this.clearAppProfile(this.selectedAppProfilePackage);
-            this.hideOverlay('app-profile-overlay');
-            this.refreshAppPolicyPackage(this.selectedAppProfilePackage);
+            if (mode === 'current') await this.setAppProfileFromCurrentConfig(pkg);
+            if (mode === 'snapshot') await this.setAppProfileFromSnapshot(pkg, snapshotId);
+            if (mode === 'clear') await this.clearAppProfile(pkg);
+            this.refreshAppPolicyPackage(pkg);
+            this.closeAppProfilePicker(true);
         });
     });
 };
 CoronaAddon.prototype.writeProfileFiles = async function(pkg, files) {
     const dir = `${this.configDir}/app_profiles/${pkg}`;
+    const entries = Object.entries(files || {}).filter(([, content]) => String(content || '').trim());
+    if (entries.length === 0) {
+        await this.exec(`rm -rf ${this.shellQuote(dir)}`);
+        this.showToast('没有可写入的预设配置');
+        return false;
+    }
     await this.exec(`rm -rf ${this.shellQuote(dir)} && mkdir -p ${this.shellQuote(dir)}`);
-    for (const [filename, content] of Object.entries(files || {})) {
-        const b64 = btoa(unescape(encodeURIComponent(String(content))));
+    for (const [filename, content] of entries) {
+        const b64 = btoa(unescape(encodeURIComponent(String(content).trim())));
         await this.exec(`echo '${b64}' | base64 -d > ${this.shellQuote(`${dir}/${filename}`)}`);
     }
-    await this.exec(`cp ${this.shellQuote(`${this.configDir}/runtime.conf`)} ${this.shellQuote(`${dir}/runtime.conf`)} 2>/dev/null`);
     this.markAppProfileSaved(pkg);
+    return true;
 };
 CoronaAddon.prototype.copyCurrentConfigToProfile = async function(pkg) {
     const dir = `${this.configDir}/app_profiles/${pkg}`;
-    const names = ['zram.conf','le9ec.conf','io_scheduler.conf','cpu_governor.conf','cpu_hotplug.conf','tcp.conf','process_priority.conf','thread_priority.conf','swap.conf','vm.conf','kernel.conf','corona_kernel.conf'];
-    const copyCmd = names.map(name => `[ -f ${this.shellQuote(`${this.configDir}/${name}`)} ] && cp ${this.shellQuote(`${this.configDir}/${name}`)} ${this.shellQuote(`${dir}/${name}`)} 2>/dev/null`).join('; ');
-    await this.exec(`rm -rf ${this.shellQuote(dir)} && mkdir -p ${this.shellQuote(dir)}; ${copyCmd}; cp ${this.shellQuote(`${this.configDir}/runtime.conf`)} ${this.shellQuote(`${dir}/runtime.conf`)} 2>/dev/null`);
+    const files = await this.collectSnapshotFiles();
+    const names = Object.keys(files || {});
+    if (names.length === 0) {
+        await this.exec(`rm -rf ${this.shellQuote(dir)}`);
+        this.showToast('当前没有可保存的预设配置');
+        return false;
+    }
+    const copyCmd = names.map(name => `cp ${this.shellQuote(`${this.configDir}/${name}`)} ${this.shellQuote(`${dir}/${name}`)} 2>/dev/null`).join('; ');
+    await this.exec(`rm -rf ${this.shellQuote(dir)} && mkdir -p ${this.shellQuote(dir)}; ${copyCmd}; find ${this.shellQuote(dir)} -maxdepth 1 -type f ! -size +0c -delete; find ${this.shellQuote(dir)} -mindepth 1 -maxdepth 1 | grep -q . || rmdir ${this.shellQuote(dir)} 2>/dev/null`);
     this.markAppProfileSaved(pkg);
+    return true;
 };
 CoronaAddon.prototype.setAppProfileFromCurrentConfig = async function(pkg) {
     const files = await this.collectSnapshotFiles();
@@ -565,6 +617,7 @@ CoronaAddon.prototype.clearAppProfile = async function(pkg) {
     });
     if (!confirmed) return;
     await this.exec(`rm -rf ${this.shellQuote(`${this.configDir}/app_profiles/${pkg}`)}`);
+    await this.exec(this.getAppPolicyScript('list-set', 'profiles', 'del', this.shellQuote(pkg)));
     this.appPolicy.profiles = nextProfiles;
     await this.saveAppRulesConfig('应用预设已清除');
     this.refreshAppPolicyPackage(pkg);
