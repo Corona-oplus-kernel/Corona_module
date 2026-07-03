@@ -5,7 +5,7 @@
 CoronaAddon.prototype.initPerformanceMode = function() { this.initProcessPriority();  }
 CoronaAddon.prototype.loadPerformanceModeConfig = async function() { await this.loadPriorityConfig(); await this.loadThreadPriorityConfig();  }
 CoronaAddon.prototype.initProcessPriority = function() {
-        this.priorityRules = {}; this.threadPriorityRules = []; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4; this.selectedThreadRuleKey = null; this.selectedThreadRulePackage = ''; this.selectedThreadRuleLabel = ''; this.selectedThreadPattern = ''; this.selectedThreadNice = 0; this.selectedThreadIoClass = 2; this.selectedThreadIoLevel = 4; this.selectedThreadAffinity = ''; this.selectedThreadCpuset = ''; this.selectedThreadUclampMin = ''; this.selectedThreadUclampMax = ''; this.selectedThreadSchedPolicy = 'normal'; this.selectedThreadRtPrio = 1; this.selectedThreadWaltBoost = false; this.selectedThreadWaltPipeline = false; this.threadSuggestionCache = Object.create(null); this.threadPanelState = 'rules'; this.threadSuggestionLoading = false; this.selectedThreadModePreset = 'custom';
+        this.priorityRules = {}; this.threadPriorityRules = []; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4; this.selectedThreadRuleKey = null; this.selectedThreadRulePackage = ''; this.selectedThreadRuleLabel = ''; this.selectedThreadPattern = ''; this.selectedThreadNice = 0; this.selectedThreadIoClass = 2; this.selectedThreadIoLevel = 4; this.selectedThreadAffinity = ''; this.selectedThreadCpuset = ''; this.selectedThreadUclampMin = ''; this.selectedThreadUclampMax = ''; this.selectedThreadSchedPolicy = 'normal'; this.selectedThreadRtPrio = 1; this.selectedThreadWaltBoost = false; this.selectedThreadWaltPipeline = false; this.threadPanelState = 'rules'; this.selectedThreadModePreset = 'custom'; this.threadTagEditingIndex = -1; this.pendingThreadTagName = ''; 
         document.getElementById('priority-cancel-btn').addEventListener('click', () => this.hideOverlay('priority-setting-overlay'));
         document.getElementById('priority-save-btn').addEventListener('click', () => this.savePriorityRule());
         document.getElementById('priority-process-search').addEventListener('input', (e) => { this.filterPriorityProcessList(e.target.value); });
@@ -165,13 +165,9 @@ CoronaAddon.prototype.applyAllPriorityRules = async function() { const promises 
 CoronaAddon.prototype.initThreadRuleUi = function() {
         document.getElementById('thread-rule-overlay')?.addEventListener('click', (e) => { if (e.target.id === 'thread-rule-overlay') this.hideOverlay('thread-rule-overlay'); });
         document.getElementById('thread-rule-editor-overlay')?.addEventListener('click', (e) => { if (e.target.id === 'thread-rule-editor-overlay') this.hideOverlay('thread-rule-editor-overlay'); });
-        document.getElementById('thread-rule-cancel-btn')?.addEventListener('click', () => { this.hideOverlay('thread-rule-editor-overlay'); this.showOverlay('thread-rule-overlay'); this.setActiveThreadPanel('rules'); });
+        document.getElementById('thread-rule-cancel-btn')?.addEventListener('click', () => { this.hideOverlay('thread-rule-editor-overlay'); this.showOverlay('thread-rule-overlay'); this.toggleThreadTagForm(true); });
         document.getElementById('thread-rule-save-btn')?.addEventListener('click', () => this.saveThreadRule());
-        document.querySelectorAll('[data-panel-toggle]').forEach(btn => btn.addEventListener('click', () => this.setActiveThreadPanel(btn.dataset.panelToggle || 'rules')));
-        const slider = document.getElementById('thread-nice-slider');
-        const value = document.getElementById('thread-nice-slider-value');
-        slider?.addEventListener('input', () => { this.selectedThreadNice = parseInt(slider.value, 10) || 0; value.textContent = this.selectedThreadNice; this.updateSliderProgress(slider); });
-        document.querySelectorAll('.thread-io-option').forEach(opt => { opt.addEventListener('click', () => { document.querySelectorAll('.thread-io-option').forEach(o => o.classList.remove('selected')); opt.classList.add('selected'); opt.animate([{ transform: 'scale(0.98)' }, { transform: 'scale(1.02)' }, { transform: 'scale(1)' }], { duration: 220, easing: 'ease-out' }); this.selectedThreadIoClass = parseInt(opt.dataset.class, 10); this.selectedThreadIoLevel = parseInt(opt.dataset.level, 10); }); });
+                document.getElementById('thread-tag-save-btn')?.addEventListener('click', () => this.saveThreadTag());
     }
 CoronaAddon.prototype.getThreadRuleKey = function(pkg, pattern) { return `${pkg}|${pattern}`;  }
 CoronaAddon.prototype.getThreadRulesForPackage = function(pkg) { return (this.threadPriorityRules || []).filter(rule => rule.packageName === pkg);  }
@@ -225,11 +221,90 @@ CoronaAddon.prototype.applyThreadPriorityRulesNow = async function() {
         await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --apply-thread-priority >/dev/null 2>&1`);
         await this.syncAppPolicyDaemon();
     }
-CoronaAddon.prototype.getCommonThreadPresets = function() { return [{ pattern: 'RenderThread', label: '渲染线程', desc: 'UI / 渲染提交' }, { pattern: 'MainThread', label: '主线程', desc: '应用主循环' }, { pattern: 'GameThread', label: '游戏线程', desc: '游戏主逻辑' }, { pattern: 'GLThread', label: '图形线程', desc: 'OpenGL 提交' }, { pattern: 'RHIThread', label: 'RHI 线程', desc: '渲染硬件接口' }, { pattern: 'DAVA::RhiThread', label: 'DAVA 渲染线程', desc: 'DAVA 引擎' }, { pattern: 'Thread-*', label: '通用工作线程', desc: '匹配 Thread-*' }];  }
-CoronaAddon.prototype.getThreadModePresets = function() { return [{ key: 'daily', label: '日用省电', desc: '偏保守，适合轻应用与低功耗', values: { nice: 2, ioClass: 3, ioLevel: 7, affinity: '', cpuset: 'background', uclampMin: '0', uclampMax: '256', schedPolicy: 'idle', rtPrio: 1, waltBoost: false, waltPipeline: false } }, { key: 'balanced', label: '均衡调度', desc: '响应与功耗平衡，适合日常常驻', values: { nice: 0, ioClass: 2, ioLevel: 4, affinity: '', cpuset: 'foreground', uclampMin: '128', uclampMax: '512', schedPolicy: 'normal', rtPrio: 1, waltBoost: false, waltPipeline: false } }, { key: 'render', label: '渲染优先', desc: '偏重渲染与交互线程，适合 UI / RenderThread', values: { nice: -6, ioClass: 2, ioLevel: 2, affinity: '4-7', cpuset: 'top-app', uclampMin: '256', uclampMax: '768', schedPolicy: 'fifo', rtPrio: 2, waltBoost: true, waltPipeline: true } }, { key: 'extreme', label: '极限性能', desc: '高性能高功耗，适合重负载游戏线程', values: { nice: -10, ioClass: 1, ioLevel: 0, affinity: '4-7', cpuset: 'top-app', uclampMin: '512', uclampMax: '1024', schedPolicy: 'rr', rtPrio: 4, waltBoost: true, waltPipeline: true } }, { key: 'custom', label: '自定义规则', desc: '保持当前填写内容，自由调整所有参数', values: null }];  }
-CoronaAddon.prototype.renderThreadModePresets = function(activeKey = 'custom') { const container = document.getElementById('thread-mode-list'); if (!container) return; const presets = this.getThreadModePresets(); container.innerHTML = presets.map(item => `<div class="thread-mode-chip ${item.key === activeKey ? 'active' : ''}" data-key="${this.escapeHtml(item.key)}"><div class="thread-mode-name">${this.escapeHtml(item.label)}</div><div class="thread-mode-desc">${this.escapeHtml(item.desc)}</div></div>`).join(''); container.querySelectorAll('.thread-mode-chip').forEach(chip => chip.addEventListener('click', () => this.applyThreadModePreset(chip.dataset.key || 'custom')));  }
-CoronaAddon.prototype.applyThreadModePreset = function(key) { const preset = this.getThreadModePresets().find(item => item.key === key); this.selectedThreadModePreset = key || 'custom'; if (!preset) return; if (preset.values) { const values = preset.values; this.selectedThreadNice = values.nice; this.selectedThreadIoClass = values.ioClass; this.selectedThreadIoLevel = values.ioLevel; this.selectedThreadAffinity = values.affinity; this.selectedThreadCpuset = values.cpuset; this.selectedThreadUclampMin = values.uclampMin; this.selectedThreadUclampMax = values.uclampMax; this.selectedThreadSchedPolicy = values.schedPolicy; this.selectedThreadRtPrio = values.rtPrio; this.selectedThreadWaltBoost = values.waltBoost; this.selectedThreadWaltPipeline = values.waltPipeline; this.syncThreadRuleEditorFields(); } this.renderThreadModePresets(this.selectedThreadModePreset);  }
-CoronaAddon.prototype.syncThreadRuleEditorFields = function() { const affinity = document.getElementById('thread-affinity-input'); const cpuset = document.getElementById('thread-cpuset-group'); const uclampMin = document.getElementById('thread-uclamp-min'); const uclampMax = document.getElementById('thread-uclamp-max'); const sched = document.getElementById('thread-sched-policy'); const rt = document.getElementById('thread-rt-prio'); const waltBoost = document.getElementById('thread-walt-boost'); const waltPipeline = document.getElementById('thread-walt-pipeline'); const slider = document.getElementById('thread-nice-slider'); const sliderValue = document.getElementById('thread-nice-slider-value'); if (affinity) affinity.value = this.selectedThreadAffinity; if (cpuset) cpuset.value = this.selectedThreadCpuset; if (uclampMin) uclampMin.value = this.selectedThreadUclampMin; if (uclampMax) uclampMax.value = this.selectedThreadUclampMax; if (sched) sched.value = this.selectedThreadSchedPolicy; if (rt) rt.value = String(this.selectedThreadRtPrio); if (waltBoost) waltBoost.checked = this.selectedThreadWaltBoost; if (waltPipeline) waltPipeline.checked = this.selectedThreadWaltPipeline; if (slider) { slider.value = String(this.selectedThreadNice); this.updateSliderProgress(slider); } if (sliderValue) sliderValue.textContent = String(this.selectedThreadNice); document.querySelectorAll('.thread-io-option').forEach(opt => opt.classList.toggle('selected', parseInt(opt.dataset.class, 10) === this.selectedThreadIoClass));  }
+CoronaAddon.prototype.getThreadTagStorageKey = function() { return 'corona_thread_tags_v1'; }
+CoronaAddon.prototype.loadCustomThreadTags = function() {
+        try {
+            const raw = localStorage.getItem(this.getThreadTagStorageKey()) || '[]';
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) return [];
+            return parsed.map(item => ({ name: String(item?.name || '').trim() })).filter(item => item.name);
+        } catch {
+            return [];
+        }
+    }
+CoronaAddon.prototype.saveCustomThreadTags = function(tags) {
+        try {
+            localStorage.setItem(this.getThreadTagStorageKey(), JSON.stringify((tags || []).map(item => ({ name: String(item?.name || '').trim() })).filter(item => item.name)));
+        } catch {}
+    }
+CoronaAddon.prototype.toggleThreadTagForm = function(show = true, item = null, index = -1) {
+        this.threadTagEditingIndex = show ? index : -1;
+        const nameInput = document.getElementById('thread-tag-name-input');
+        const saveBtn = document.getElementById('thread-tag-save-btn');
+        if (nameInput) nameInput.value = item?.name || '';
+        if (saveBtn) saveBtn.textContent = index >= 0 ? '保存修改' : '保存标签';
+        if (show) nameInput?.focus();
+    }
+CoronaAddon.prototype.renderCustomThreadTags = function() {
+        const container = document.getElementById('thread-rule-tag-list');
+        if (!container) return;
+        const tags = this.loadCustomThreadTags();
+        if (!tags.length) {
+            container.innerHTML = '';
+            this.toggleThreadTagForm(true);
+            return;
+        }
+        container.innerHTML = tags.map((item, index) => `<button class="thread-tag-card" data-thread-tag-index="${index}"><div class="thread-tag-card-name">${this.escapeHtml(item.name)}</div><div class="thread-tag-card-actions"><span class="thread-tag-card-action" data-thread-tag-action="use" data-thread-tag-index="${index}">编辑规则</span><span class="thread-tag-card-action" data-thread-tag-action="edit" data-thread-tag-index="${index}">改名</span><span class="thread-tag-card-action delete" data-thread-tag-action="delete" data-thread-tag-index="${index}">删除</span></div></button>`).join('');
+        container.querySelectorAll('.thread-tag-card').forEach(card => card.addEventListener('click', (event) => {
+            const actionEl = event.target.closest('[data-thread-tag-action]');
+            const idx = parseInt((actionEl?.dataset.threadTagIndex || card.dataset.threadTagIndex || '-1'), 10);
+            const tag = tags[idx];
+            if (!tag) return;
+            if (!actionEl || actionEl.dataset.threadTagAction === 'use') {
+                this.pendingThreadTagName = tag.name;
+                this.openThreadRuleEditor(null, '');
+                return;
+            }
+            if (actionEl.dataset.threadTagAction === 'edit') {
+                this.toggleThreadTagForm(true, tag, idx);
+                return;
+            }
+            if (actionEl.dataset.threadTagAction === 'delete') {
+                const nextTags = tags.filter((_, i) => i !== idx);
+                this.saveCustomThreadTags(nextTags);
+                this.renderCustomThreadTags();
+                this.showToast(`已删除标签 ${tag.name}`);
+            }
+        }));
+    }
+CoronaAddon.prototype.saveThreadTag = function() {
+        const name = (document.getElementById('thread-tag-name-input')?.value || '').trim();
+        if (!name) { this.showToast('请先设置标签名称'); return false; }
+        const tags = this.loadCustomThreadTags();
+        const next = [...tags];
+        const item = { name };
+        const editing = this.threadTagEditingIndex >= 0 && this.threadTagEditingIndex < next.length;
+        if (editing) next[this.threadTagEditingIndex] = item;
+        else next.unshift(item);
+        this.saveCustomThreadTags(next);
+        this.toggleThreadTagForm(false);
+        this.renderCustomThreadTags();
+        if (editing) {
+            this.showToast(`已更新标签 ${name}`);
+            this.toggleThreadTagForm(true);
+            return true;
+        }
+        this.pendingThreadTagName = name;
+        this.showToast(`已保存标签 ${name}`);
+        const nameInput = document.getElementById('thread-tag-name-input');
+        if (nameInput) nameInput.value = '';
+        this.openThreadRuleEditor(null, '');
+        return true;
+    }
+CoronaAddon.prototype.getThreadModePresets = function() { return [{ key: 'daily', label: '日用省电', desc: '偏保守，适合轻应用与低功耗', values: { nice: 2, ioClass: 3, ioLevel: 7, affinity: '', cpuset: 'background', uclampMin: '0', uclampMax: '256', schedPolicy: 'idle', rtPrio: 1, waltBoost: false, waltPipeline: false } }, { key: 'balanced', label: '均衡调度', desc: '响应与功耗平衡，适合日常常驻', values: { nice: 0, ioClass: 2, ioLevel: 4, affinity: '', cpuset: 'foreground', uclampMin: '128', uclampMax: '512', schedPolicy: 'normal', rtPrio: 1, waltBoost: false, waltPipeline: false } }, { key: 'render', label: '渲染优先', desc: '偏重渲染与交互线程，适合 UI / RenderThread', values: { nice: -6, ioClass: 2, ioLevel: 2, affinity: '', cpuset: 'top-app', uclampMin: '256', uclampMax: '768', schedPolicy: 'fifo', rtPrio: 2, waltBoost: true, waltPipeline: true } }, { key: 'extreme', label: '极限性能', desc: '高性能高功耗，适合重负载游戏线程', values: { nice: -10, ioClass: 1, ioLevel: 0, affinity: '', cpuset: 'top-app', uclampMin: '512', uclampMax: '1024', schedPolicy: 'rr', rtPrio: 4, waltBoost: true, waltPipeline: true } }, { key: 'custom', label: '自定义规则', desc: '保持当前填写内容，自由调整所有参数', values: null }];  }
+CoronaAddon.prototype.renderThreadModePresets = function(activeKey = 'custom') { const container = document.getElementById('thread-mode-list'); if (!container) return; const presets = this.getThreadModePresets(); container.innerHTML = presets.map(item => `<div class="thread-mode-chip ${item.key === activeKey ? 'active' : ''}" data-key="${this.escapeHtml(item.key)}"><div class="thread-mode-name">${this.escapeHtml(item.label)}</div></div>`).join(''); container.querySelectorAll('.thread-mode-chip').forEach(chip => chip.addEventListener('click', () => this.applyThreadModePreset(chip.dataset.key || 'custom')));  }
+CoronaAddon.prototype.applyThreadModePreset = function(key) { const preset = this.getThreadModePresets().find(item => item.key === key); this.selectedThreadModePreset = key || 'custom'; if (!preset) return; if (preset.values) { const values = preset.values; this.selectedThreadAffinity = values.affinity; this.selectedThreadCpuset = values.cpuset; this.selectedThreadUclampMin = values.uclampMin; this.selectedThreadUclampMax = values.uclampMax; this.selectedThreadSchedPolicy = values.schedPolicy; this.selectedThreadRtPrio = values.rtPrio; this.selectedThreadWaltBoost = values.waltBoost; this.selectedThreadWaltPipeline = values.waltPipeline; this.syncThreadRuleEditorFields(); } this.renderThreadModePresets(this.selectedThreadModePreset);  }
+CoronaAddon.prototype.syncThreadRuleEditorFields = function() { const affinity = document.getElementById('thread-affinity-input'); const cpuset = document.getElementById('thread-cpuset-group'); const uclampMin = document.getElementById('thread-uclamp-min'); const uclampMax = document.getElementById('thread-uclamp-max'); const sched = document.getElementById('thread-sched-policy'); const rt = document.getElementById('thread-rt-prio'); const waltBoost = document.getElementById('thread-walt-boost'); const waltPipeline = document.getElementById('thread-walt-pipeline'); if (affinity) affinity.value = this.selectedThreadAffinity; if (cpuset) cpuset.value = this.selectedThreadCpuset; if (uclampMin) uclampMin.value = this.selectedThreadUclampMin; if (uclampMax) uclampMax.value = this.selectedThreadUclampMax; if (sched) sched.value = this.selectedThreadSchedPolicy; if (rt) rt.value = String(this.selectedThreadRtPrio); if (waltBoost) waltBoost.checked = this.selectedThreadWaltBoost; if (waltPipeline) waltPipeline.checked = this.selectedThreadWaltPipeline;  }
 CoronaAddon.prototype.loadLiveThreadSuggestions = async function(pkg, force = false) {
         const key = String(pkg || '').trim();
         if (!force && this.threadSuggestionCache && Array.isArray(this.threadSuggestionCache[key])) return this.threadSuggestionCache[key];
@@ -238,60 +313,15 @@ CoronaAddon.prototype.loadLiveThreadSuggestions = async function(pkg, force = fa
         this.threadSuggestionCache[key] = items;
         return items;
     }
-CoronaAddon.prototype.renderThreadChips = function(containerId, items, onPick, options = {}) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        const normalized = (items || []).map(item => typeof item === 'string' ? { pattern: item, label: item, desc: '' } : item).filter(item => item && item.pattern);
-        const unique = normalized.filter((item, index, list) => list.findIndex(other => other.pattern === item.pattern) === index);
-        if (unique.length === 0) { container.innerHTML = `<div class="priority-empty">${this.escapeHtml(options.emptyText || '暂无可用线程')}</div>`; return; }
-        container.innerHTML = unique.map(item => `<div class="thread-chip" data-value="${this.escapeHtml(item.pattern)}"><div class="thread-chip-name">${this.escapeHtml(item.label || item.pattern)}</div><div class="thread-chip-pattern">${this.escapeHtml(item.desc || item.pattern)}</div></div>`).join('');
-        container.querySelectorAll('.thread-chip').forEach(chip => chip.addEventListener('click', () => onPick(chip.dataset.value || '')));
-    }
-CoronaAddon.prototype.setActiveThreadPanel = function(panel) {
-        const next = panel || 'rules';
-        if (this.threadPanelState === next && next !== 'live') return;
-        this.threadPanelState = next;
-        if (this.threadPanelFrame) cancelAnimationFrame(this.threadPanelFrame);
-        this.threadPanelFrame = requestAnimationFrame(() => {
-            document.querySelectorAll('[data-panel]').forEach(section => {
-                section.classList.toggle('active', section.dataset.panel === next);
-            });
-            this.threadPanelFrame = null;
-            if (next === 'live') {
-                setTimeout(() => this.ensureLiveThreadSuggestions().catch(() => {}), 0);
-            }
-        });
-    }
-CoronaAddon.prototype.ensureLiveThreadSuggestions = async function(force = false) {
-        const pkg = this.selectedThreadRulePackage;
-        if (!pkg || this.threadSuggestionLoading) return;
-        const container = document.getElementById('thread-rule-live-list');
-        if (!force && this.threadSuggestionCache && Array.isArray(this.threadSuggestionCache[pkg])) {
-            this.renderThreadChips('thread-rule-live-list', this.threadSuggestionCache[pkg].map(item => ({ pattern: item, label: item, desc: '当前进程线程' })), (pattern) => this.openThreadRuleEditor(null, pattern), { emptyText: '暂无运行线程' });
-            return;
-        }
-        this.threadSuggestionLoading = true;
-        if (container) container.innerHTML = '<div class="priority-loading">正在读取...</div>';
-        try {
-            const liveThreads = await this.loadLiveThreadSuggestions(pkg, force);
-            if (this.selectedThreadRulePackage !== pkg) return;
-            this.renderThreadChips('thread-rule-live-list', liveThreads.map(item => ({ pattern: item, label: item, desc: '当前进程线程' })), (pattern) => this.openThreadRuleEditor(null, pattern), { emptyText: '暂无运行线程' });
-        } catch (error) {
-            if (this.selectedThreadRulePackage !== pkg) return;
-            if (container) container.innerHTML = '<div class="priority-empty">读取线程失败</div>';
-        } finally {
-            this.threadSuggestionLoading = false;
-        }
-    }
 CoronaAddon.prototype.renderThreadRuleList = function() {
         const list = document.getElementById('thread-rule-list');
         if (!list) return;
         const rules = this.getThreadRulesForPackage(this.selectedThreadRulePackage);
         if (rules.length === 0) {
-            list.innerHTML = '<div class="priority-empty">该应用还没有线程规则，点下方常用线程或运行线程即可添加</div>';
+            list.innerHTML = '<div class="priority-empty">该应用还没有线程规则，可以切到自定义标签新建一个入口</div>'; 
             return;
         }
-        list.innerHTML = rules.map(rule => `<div class="thread-rule-item" data-key="${this.escapeHtml(rule.key)}"><div class="thread-rule-info"><div class="thread-rule-name">${this.escapeHtml(rule.threadPattern)}</div><div class="thread-rule-values">nice ${rule.nice} · I/O ${rule.ioClass}/${rule.ioLevel}${rule.affinity ? ` · 亲和性 ${this.escapeHtml(rule.affinity)}` : ''}${rule.cpuset ? ` · cpuset ${this.escapeHtml(rule.cpuset)}` : ''}${rule.uclampMin !== '' ? ` · uclamp.min ${this.escapeHtml(String(rule.uclampMin))}` : ''}${rule.uclampMax !== '' ? ` · uclamp.max ${this.escapeHtml(String(rule.uclampMax))}` : ''}${rule.schedPolicy && rule.schedPolicy !== 'normal' ? ` · ${this.escapeHtml(rule.schedPolicy)}(${rule.rtPrio})` : ''}${rule.waltBoost ? ' · WALT boost' : ''}${rule.waltPipeline ? ' · pipeline' : ''}</div></div><div class="thread-rule-actions"><button class="priority-rule-btn edit" data-action="edit" data-key="${this.escapeHtml(rule.key)}">✎</button><button class="priority-rule-btn delete" data-action="delete" data-key="${this.escapeHtml(rule.key)}">✕</button></div></div>`).join('');
+        list.innerHTML = rules.map(rule => `<div class="thread-rule-item" data-key="${this.escapeHtml(rule.key)}"><div class="thread-rule-info"><div class="thread-rule-name">${this.escapeHtml(rule.threadPattern)}</div><div class="thread-rule-values">${rule.affinity ? `亲和性 ${this.escapeHtml(rule.affinity)}` : '未设置亲和性'}${rule.cpuset ? ` · cpuset ${this.escapeHtml(rule.cpuset)}` : ''}${rule.uclampMin !== '' ? ` · uclamp.min ${this.escapeHtml(String(rule.uclampMin))}` : ''}${rule.uclampMax !== '' ? ` · uclamp.max ${this.escapeHtml(String(rule.uclampMax))}` : ''}${rule.schedPolicy && rule.schedPolicy !== 'normal' ? ` · ${this.escapeHtml(rule.schedPolicy)}(${rule.rtPrio})` : ''}${rule.waltBoost ? ' · WALT boost' : ''}${rule.waltPipeline ? ' · pipeline' : ''}</div></div><div class="thread-rule-actions"><button class="priority-rule-btn edit" data-action="edit" data-key="${this.escapeHtml(rule.key)}">✎</button><button class="priority-rule-btn delete" data-action="delete" data-key="${this.escapeHtml(rule.key)}">✕</button></div></div>`).join('');
         list.querySelectorAll('.priority-rule-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); const key = btn.dataset.key; if (btn.dataset.action === 'edit') this.openThreadRuleEditor(key); else this.deleteThreadRule(key); }));
     }
 CoronaAddon.prototype.openThreadRuleManager = async function(pkg, label) {
@@ -301,12 +331,11 @@ CoronaAddon.prototype.openThreadRuleManager = async function(pkg, label) {
         const title = document.getElementById('thread-rule-title');
         if (title) title.textContent = `${label || pkg} · 线程规则`;
         this.renderThreadRuleList();
-        this.renderThreadChips('thread-rule-common-list', this.getCommonThreadPresets(), (pattern) => this.openThreadRuleEditor(null, pattern), { emptyText: '暂无常用模式' });
-        const live = document.getElementById('thread-rule-live-list');
-        if (live) live.innerHTML = '<div class="priority-empty">展开后读取</div>';
+        this.toggleThreadTagForm(false);
+        this.renderCustomThreadTags();
         this.hideOverlay('app-policy-overlay');
         this.showOverlay('thread-rule-overlay');
-        this.setActiveThreadPanel(this.getThreadRulesForPackage(pkg).length > 0 ? 'rules' : 'common');
+        this.toggleThreadTagForm(true);
     }
 CoronaAddon.prototype.openThreadRuleEditor = function(ruleKey = null, presetPattern = '') {
         const existing = ruleKey ? (this.threadPriorityRules || []).find(item => item.key === ruleKey) : null;
@@ -325,7 +354,8 @@ CoronaAddon.prototype.openThreadRuleEditor = function(ruleKey = null, presetPatt
         this.selectedThreadWaltBoost = !!existing?.waltBoost;
         this.selectedThreadWaltPipeline = !!existing?.waltPipeline;
         const title = document.getElementById('thread-rule-editor-title');
-        if (title) title.textContent = `${this.selectedThreadRuleLabel || this.selectedThreadRulePackage} · 线程规则`;
+        if (title) title.textContent = this.pendingThreadTagName ? `${this.pendingThreadTagName} · 线程规则` : `${this.selectedThreadRuleLabel || this.selectedThreadRulePackage} · 线程规则`;
+        this.pendingThreadTagName = ''; 
         const appInfo = document.getElementById('thread-rule-selected-app');
         if (appInfo) appInfo.innerHTML = `<span class="process-name">${this.escapeHtml(this.selectedThreadRulePackage)}</span>`;
         const input = document.getElementById('thread-pattern-input');
@@ -356,14 +386,13 @@ CoronaAddon.prototype.buildThreadRulePreviewActions = function(rule) {
             rule.uclampMax !== '' ? `设置 uclamp.max=${rule.uclampMax}` : '不设置 uclamp.max',
             rule.schedPolicy !== 'normal' ? `设置调度策略 ${rule.schedPolicy} (rt=${rule.rtPrio})` : '保持 normal 调度策略',
             rule.waltBoost ? '启用 WALT per-task boost 并关闭 task_reduce_affinity' : '不启用 WALT per-task boost',
-            rule.waltPipeline ? '启用 WALT pipeline special' : '不启用 WALT pipeline special',
-            `设置 nice=${rule.nice} 与 I/O=${rule.ioClass}/${rule.ioLevel}`
+            rule.waltPipeline ? '启用 WALT pipeline special' : '不启用 WALT pipeline special'
         ];
     }
-CoronaAddon.prototype.reopenThreadRuleManager = function(panel = 'rules') {
+CoronaAddon.prototype.reopenThreadRuleManager = function() {
         this.hideOverlay('thread-rule-editor-overlay');
         this.showOverlay('thread-rule-overlay');
-        this.setActiveThreadPanel(panel);
+        this.toggleThreadTagForm(true);
     }
 CoronaAddon.prototype.refreshThreadRulePackageState = function(packageName, { reorder = false } = {}) {
         this.renderThreadRuleList();
@@ -378,9 +407,9 @@ CoronaAddon.prototype.saveThreadRule = async function() {
             key: this.getThreadRuleKey(this.selectedThreadRulePackage, editorState.threadPattern),
             packageName: this.selectedThreadRulePackage,
             threadPattern: editorState.threadPattern,
-            nice: this.selectedThreadNice,
-            ioClass: this.selectedThreadIoClass,
-            ioLevel: this.selectedThreadIoLevel,
+            nice: 0,
+            ioClass: 2,
+            ioLevel: 4,
             affinity: editorState.affinity,
             cpuset: editorState.cpuset,
             uclampMin: editorState.uclampMin,

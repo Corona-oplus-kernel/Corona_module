@@ -1353,25 +1353,18 @@
         <div class="detail-card priority-process-card thread-rule-card">
             <div class="detail-header">
                 <span class="detail-title" id="thread-rule-title">线程规则</span>
-                            </div>
-            <div class="thread-rule-section active" data-panel="rules">
-                <button class="thread-rule-section-title" data-panel-toggle="rules"><span>现有规则</span><span class="thread-rule-section-arrow">⌄</span></button>
-                <div class="thread-rule-section-body" data-panel-body="rules">
-                    <div class="priority-process-list" id="thread-rule-list">
-                        <div class="priority-loading">加载中...</div>
+            </div>
+            <div class="thread-rule-flow">
+                <div class="thread-tag-form" id="thread-tag-form">
+                    <input type="text" id="thread-tag-name-input" class="priority-search" placeholder="标签名称，例如 : Ciallo～">
+                    <div class="thread-tag-form-actions">
+                        <button class="thread-tag-primary-btn" id="thread-tag-save-btn">保存标签</button>
                     </div>
                 </div>
-            </div>
-            <div class="thread-rule-section" data-panel="common">
-                <button class="thread-rule-section-title" data-panel-toggle="common"><span>常用线程模式</span><span class="thread-rule-section-arrow">⌄</span></button>
-                <div class="thread-rule-section-body" data-panel-body="common">
-                    <div class="thread-chip-list thread-chip-grid" id="thread-rule-common-list"></div>
-                </div>
-            </div>
-            <div class="thread-rule-section" data-panel="live">
-                <button class="thread-rule-section-title" data-panel-toggle="live"><span>当前运行线程</span><span class="thread-rule-section-arrow">⌄</span></button>
-                <div class="thread-rule-section-body" data-panel-body="live">
-                    <div class="thread-chip-list thread-chip-grid" id="thread-rule-live-list"><div class="priority-empty">展开后读取</div></div>
+                <div class="thread-tag-card-list" id="thread-rule-tag-list"></div>
+                <div class="thread-rule-subtitle">已保存规则</div>
+                <div class="priority-process-list" id="thread-rule-list">
+                    <div class="priority-loading">加载中...</div>
                 </div>
             </div>
         </div>
@@ -1392,25 +1385,6 @@
             <div class="priority-setting-section">
                 <div class="priority-setting-label">规则模式</div>
                 <div class="thread-mode-grid" id="thread-mode-list"></div>
-            </div>
-            <div class="priority-setting-section">
-                <div class="priority-setting-label">CPU 优先级 (nice)</div>
-                <div class="priority-nice-slider-container">
-                    <input type="range" class="range-slider priority-nice-slider" id="thread-nice-slider" min="-20" max="19" step="1" value="0">
-                    <div class="slider-labels">
-                        <span>-20 (最高)</span>
-                        <span class="slider-value" id="thread-nice-slider-value">0</span>
-                        <span>19 (最低)</span>
-                    </div>
-                </div>
-            </div>
-            <div class="priority-setting-section">
-                <div class="priority-setting-label">I/O 优先级</div>
-                <div class="priority-io-options" id="thread-io-options">
-                    <div class="io-option thread-io-option" data-class="1" data-level="0"><div class="io-class">实时</div><div class="io-desc">最高优先级</div></div>
-                    <div class="io-option thread-io-option selected" data-class="2" data-level="4"><div class="io-class">尽力</div><div class="io-desc">默认优先级</div></div>
-                    <div class="io-option thread-io-option" data-class="3" data-level="7"><div class="io-class">空闲</div><div class="io-desc">后台任务</div></div>
-                </div>
             </div>
             <div class="priority-setting-section thread-rule-grid">
                 <div>
@@ -1461,8 +1435,8 @@
             <div class="priority-setting-section">
                 <div class="priority-setting-label">WALT 增强</div>
                 <div class="switch-list compact-switch-list">
-                    <label class="mini-switch-row"><input type="checkbox" id="thread-walt-boost"><span>Per-task boost</span></label>
-                    <label class="mini-switch-row"><input type="checkbox" id="thread-walt-pipeline"><span>Pipeline special</span></label>
+                    <label class="mini-switch-row"><input type="checkbox" id="thread-walt-boost"><span class="mini-switch-copy"><span class="mini-switch-title">Per-task boost</span><span class="mini-switch-desc">提升命中线程的 WALT 任务权重</span></span></label>
+                    <label class="mini-switch-row"><input type="checkbox" id="thread-walt-pipeline"><span class="mini-switch-copy"><span class="mini-switch-title">Pipeline special</span><span class="mini-switch-desc">让渲染链路线程更容易被特殊处理</span></span></label>
                 </div>
                 <div class="priority-setting-hint">会尝试打开相关 WALT 节点，并关闭 `task_reduce_affinity`</div>
             </div>
