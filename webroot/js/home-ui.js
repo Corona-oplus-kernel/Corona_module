@@ -383,16 +383,42 @@
             content.style.maxHeight = content.scrollHeight + 'px';
         });
     },
+    async ensureExpandableOpen(toggleId, contentId) {
+        const toggle = document.getElementById(toggleId);
+        const content = document.getElementById(contentId);
+        if (!toggle || !content) return;
+        if (content.classList.contains('expanded')) return;
+        toggle.click();
+        await this.sleep(360);
+    },
+    async openSettingsTarget({ cardId, cardToggleId, cardContentId, subToggleId, subContentId, scrollBlock = 'center' }) {
+        await this.switchPage('settings');
+        await this.sleep(80);
+        if (cardToggleId && cardContentId) {
+            await this.ensureExpandableOpen(cardToggleId, cardContentId);
+        }
+        if (subToggleId && subContentId) {
+            await this.ensureExpandableOpen(subToggleId, subContentId);
+        }
+        const target = document.getElementById(subToggleId || cardId || cardToggleId);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: scrollBlock });
+    },
     initHomeCardClicks() {
         document.getElementById('cpu-card').addEventListener('click', async () => {
-            await this.switchPage('settings');
-            const cpuCard = document.getElementById('cpu-governor-card');
-            if (cpuCard) cpuCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            await this.openSettingsTarget({
+                cardId: 'cpu-governor-card',
+                cardToggleId: 'cpu-governor-toggle',
+                cardContentId: 'cpu-governor-content',
+                scrollBlock: 'center'
+            });
         });
         document.getElementById('swap-card').addEventListener('click', async () => {
-            await this.switchPage('settings');
-            const zramCard = document.getElementById('zram-card');
-            if (zramCard) zramCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            await this.openSettingsTarget({
+                cardId: 'memory-compression-card',
+                cardToggleId: 'memory-compression-toggle',
+                cardContentId: 'memory-compression-content',
+                scrollBlock: 'start'
+            });
         });
         document.getElementById('battery-card').addEventListener('click', () => this.showBatteryDetail());
         document.getElementById('mem-card').addEventListener('click', () => this.showUFSDetail());
