@@ -1,18 +1,26 @@
 #!/system/bin/sh
 
+normalize_foreground_package() {
+    pkg="$1"
+    case "$pkg" in
+        ''|me.weishu.kernelsu|com.android.shell) return 1 ;;
+    esac
+    printf '%s\n' "$pkg"
+}
+
 get_foreground_package() {
-    pkg=$(dumpsys activity activities 2>/dev/null | sed -n 's/.*topResumedActivity: .* \([^ /][^ /]*\)\/.*/\1/p' | head -n1)
+    pkg=$(dumpsys activity activities 2>/dev/null | sed -n 's/.*topResumedActivity[=:].* \([^ /][^ /]*\)\/.*/\1/p' | while IFS= read -r line; do normalize_foreground_package "$line"; done | tail -n1)
     [ -n "$pkg" ] && {
-        echo "$pkg"
+        printf '%s\n' "$pkg"
         return 0
     }
-    pkg=$(dumpsys window windows 2>/dev/null | sed -n 's/.*mCurrentFocus=.* \([^ /][^ /]*\)\/.*/\1/p' | head -n1)
+    pkg=$(dumpsys window windows 2>/dev/null | sed -n 's/.*mCurrentFocus=.* \([^ /][^ /]*\)\/.*/\1/p' | while IFS= read -r line; do normalize_foreground_package "$line"; done | tail -n1)
     [ -n "$pkg" ] && {
-        echo "$pkg"
+        printf '%s\n' "$pkg"
         return 0
     }
-    pkg=$(dumpsys activity top 2>/dev/null | sed -n 's/.*ACTIVITY \([^ /][^ /]*\)\/.*/\1/p' | head -n1)
-    [ -n "$pkg" ] && echo "$pkg"
+    pkg=$(dumpsys window windows 2>/dev/null | sed -n 's/.*mFocusedApp=.* \([^ /][^ /]*\)\/.*/\1/p' | while IFS= read -r line; do normalize_foreground_package "$line"; done | tail -n1)
+    [ -n "$pkg" ] && printf '%s\n' "$pkg"
 }
 
 protect_package() {
@@ -88,14 +96,8 @@ run_memclean() {
     [ -n "$after" ] || after=0
     freed=$((after - before))
     [ "$freed" -lt 0 ] && freed=0
-    printf 'before_kb=%s
-after_kb=%s
-freed_kb=%s
-foreground=%s
-killed=%s
-' "$before" "$after" "$freed" "$foreground_pkg" "$killed"
+    printf 'before_kb=%s\nafter_kb=%s\nfreed_kb=%s\nforeground=%s\nkilled=%s\n' "$before" "$after" "$freed" "$foreground_pkg" "$killed"
 }
-
 
 package_pids_for_name() {
     target="$1"
@@ -207,9 +209,9 @@ apply_thread_priority_once() {
         package_name=$(printf '%s' "$target" | cut -d'|' -f1)
         thread_pattern=$(printf '%s' "$target" | cut -d'|' -f2-)
         [ -n "$package_name" ] && [ -n "$thread_pattern" ] || continue
-        IFS='|' read -r nice_val io_class io_level affinity_mask sched_policy rt_prio cpuset_group walt_boost walt_pipeline uclamp_min uclamp_max <<EOF
+        IFS='|' read -r nice_val io_class io_level affinity_mask sched_policy rt_prio cpuset_group walt_boost walt_pipeline uclamp_min uclamp_max <<EOF2
 $values
-EOF
+EOF2
         [ "$walt_boost" = "1" ] && walt_per_task_boost=1 && walt_reduce_affinity=1
         [ "$walt_pipeline" = "1" ] && walt_pipeline_special=1
         for pid in $(package_pids_for_name "$package_name"); do
@@ -243,7 +245,7 @@ ensure_singleton() {
     if [ -f "$PIDFILE" ]; then
         old_pid=$(cat "$PIDFILE" 2>/dev/null)
         if [ -n "$old_pid" ] && [ -d "/proc/$old_pid" ]; then
-            cmdline=$(tr '\\0' ' ' < "/proc/$old_pid/cmdline" 2>/dev/null)
+            cmdline=$(tr '\0' ' ' < "/proc/$old_pid/cmdline" 2>/dev/null)
             case "$cmdline" in
                 *app_policy.sh*daemon*) exit 0 ;;
             esac
@@ -258,8 +260,6 @@ monitor_daemon() {
     last_profile=""
     while true; do
         load_rules
-        apply_protection_once
-        apply_thread_priority_once
         current_pkg=$(get_foreground_package)
         target_profile=base
         profile_dir=
@@ -276,10 +276,10 @@ monitor_daemon() {
                 [ "$notify_enabled" = "1" ] && send_notification "Corona 应用预设" "已切换到 $(get_package_label "$current_pkg")"
             fi
             last_profile="$target_profile"
-            printf 'foreground=%s
-profile=%s
-' "$current_pkg" "$target_profile" > "$STATEFILE"
+            printf 'foreground=%s\nprofile=%s\n' "$current_pkg" "$target_profile" > "$STATEFILE"
         fi
+        apply_protection_once
+        apply_thread_priority_once
         sleep 3
     done
 }
