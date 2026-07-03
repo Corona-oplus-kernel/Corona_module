@@ -8,5 +8,6 @@ swapfile=$(get_conf_value "$CONFIG_DIR/swap.conf" "path")
 [ -z "$swapfile" ] && swapfile="$MODPATH/swapfile.img"
 rm -rf "$CONFIG_DIR"
 rm -rf "$MODPATH/scripts.d/.logs"
+rm -f /data/adb/post-fs-data.d/Corona.sh
 swapoff "$swapfile" 2>/dev/null
 rm -f "$swapfile"

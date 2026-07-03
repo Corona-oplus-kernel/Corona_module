@@ -681,8 +681,8 @@
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将通过官方初始化链应用 ZRAM。',
                 configs: [{ filename: 'zram.conf', content: config }],
-                actions: ['执行 /product/bin/init.oplus.nandswap.sh boot_completed', '由官方初始化后再叠加 mm-sys 显式参数'],
-                notes: ['保留官方 nandswap / hybridswap 优化，仅覆写你显式设置的 ZRAM 项。']
+                actions: ['执行模块内 apply-zram helper', '先跑官方 nandswap，再叠加模块 mm-sys 显式参数'],
+                notes: ['不依赖系统挂载，只使用系统原生入口 + 模块内脚本。']
             }, {
                 onCancel: () => this.loadZramConfig()
             });
@@ -693,7 +693,7 @@
             await this.sleep(0);
         }
         await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates('zram'), ['enabled', 'algorithm', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
-        await this.exec('/system/bin/sh /product/bin/init.oplus.nandswap.sh boot_completed >/dev/null 2>&1');
+        await this.exec(`/system/bin/sh ${this.modDir}/scripts/apply-zram.sh >/dev/null 2>&1`);
         await this.updateModuleDescription();
         if (manageLoading) this.showLoading(false);
         this.showToast('ZRAM 配置已应用');
@@ -708,7 +708,7 @@
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将通过官方初始化链更新 ZRAM Swappiness。',
                 configs: [{ filename: 'zram.conf', content: config }],
-                actions: ['执行 /product/bin/init.oplus.nandswap.sh boot_completed', '官方初始化后由 mm-sys 只覆写 swappiness'],
+                actions: ['执行模块内 apply-zram helper', '官方初始化后由模块 mm-sys 只覆写 swappiness'],
                 notes: ['不会替你补全其它未设置的 ZRAM 参数。']
             }, {
                 onCancel: () => this.loadZramConfig()
@@ -718,7 +718,7 @@
         this.showLoading(true);
         await this.sleep(0);
         await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates('swappiness'), ['enabled', 'algorithm', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
-        await this.exec('/system/bin/sh /product/bin/init.oplus.nandswap.sh boot_completed >/dev/null 2>&1');
+        await this.exec(`/system/bin/sh ${this.modDir}/scripts/apply-zram.sh >/dev/null 2>&1`);
         await this.updateModuleDescription();
         this.showLoading(false);
         this.showToast('Swappiness 已更新');

@@ -1,5 +1,5 @@
 #!/system/bin/sh
-SKIPMOUNT=false
+SKIPMOUNT=true
 PROPFILE=false
 POSTFSDATA=false
 
