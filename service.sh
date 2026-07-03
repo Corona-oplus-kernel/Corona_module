@@ -18,19 +18,85 @@ get_conf_value() { [ -f "$1" ] && grep -m1 "^$2=" "$1" | cut -d'=' -f2-; }
 
 wait_until_boot_complete() { until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 5; done; }
 wait_until_login() { until [ -d "/data/data/android" ]; do sleep 5; done; }
-has_mm_sys_entry() { [ -f /odm/etc/init.oplus.mm-sys.sh ]; }
+get_active_zram_dev() {
+    awk 'NR > 1 && ($1 ~ /^\/dev\/block\/zram/ || $1 ~ /^\/dev\/zram/) { print $1; exit }' /proc/swaps 2>/dev/null
+}
+
+get_active_zram_block() {
+    dev=$(get_active_zram_dev)
+    [ -n "$dev" ] || return 1
+    dev=${dev#/dev/block/}
+    dev=${dev#/dev/}
+    [ -d "/sys/block/$dev" ] || return 1
+    echo "$dev"
+}
+
+get_active_zram_algorithm() {
+    block=$(get_active_zram_block) || return 1
+    raw=$(cat "/sys/block/$block/comp_algorithm" 2>/dev/null)
+    active=$(echo "$raw" | sed -n 's/.*\[\([^]]*\)\].*/\1/p')
+    [ -n "$active" ] && {
+        echo "$active"
+        return 0
+    }
+    echo "$raw" | awk '{print $1}'
+}
+
+zram_config_needs_overlay() {
+    conf="$CONFIG_DIR/zram.conf"
+    [ -f "$conf" ] || return 1
+    [ "$(get_conf_value "$conf" enabled)" = "1" ] || return 1
+
+    dev=$(get_active_zram_dev)
+    [ -n "$dev" ] || return 0
+    block=$(get_active_zram_block) || return 0
+
+    if grep -q '^size=' "$conf"; then
+        want=$(get_conf_value "$conf" size)
+        now=$(cat "/sys/block/$block/disksize" 2>/dev/null | tr -d ' \n')
+        [ -n "$want" ] && [ "$want" != "$now" ] && return 0
+    fi
+
+    if grep -q '^algorithm=' "$conf"; then
+        want=$(get_conf_value "$conf" algorithm)
+        now=$(get_active_zram_algorithm 2>/dev/null)
+        [ -n "$want" ] && [ "$want" != "$now" ] && [ "kernel:$want" != "$now" ] && return 0
+    fi
+
+    if grep -q '^swappiness=' "$conf"; then
+        want=$(get_conf_value "$conf" swappiness)
+        now_vm=$(cat /proc/sys/vm/swappiness 2>/dev/null | tr -d ' \n')
+        now_apps=$(cat /dev/memcg/apps/memory.swappiness 2>/dev/null | tr -d ' \n')
+        [ -n "$want" ] && { [ "$want" != "$now_vm" ] || [ "$want" != "$now_apps" ]; } && return 0
+    fi
+
+    if grep -q '^zram_writeback=' "$conf"; then
+        want=$(get_conf_value "$conf" zram_writeback)
+        if [ "$want" = "false" ] && [ -f "/sys/block/$block/backing_dev" ]; then
+            now=$(cat "/sys/block/$block/backing_dev" 2>/dev/null | tr -d ' \n')
+            [ "$now" != "none" ] && return 0
+        fi
+    fi
+
+    return 1
+}
+
+get_zram_apply_helper() {
+    [ -f "$MODDIR/scripts/apply-zram.sh" ] && { echo "$MODDIR/scripts/apply-zram.sh"; return 0; }
+    return 1
+}
 
 should_trigger_official_nandswap() {
-    [ -f /product/bin/init.oplus.nandswap.sh ] || return 1
     [ -f "$CONFIG_DIR/zram.conf" ] || return 1
     [ "$(get_conf_value "$CONFIG_DIR/zram.conf" enabled)" = "1" ] || return 1
-    awk 'NR > 1 && $1 ~ /zram/ { found=1; exit } END { exit found ? 0 : 1 }' /proc/swaps 2>/dev/null && return 1
-    return 0
+    zram_config_needs_overlay && return 0
+    return 1
 }
 
 trigger_official_nandswap_once() {
     should_trigger_official_nandswap || return 0
-    /system/bin/sh /product/bin/init.oplus.nandswap.sh boot_completed >/dev/null 2>&1
+    helper=$(get_zram_apply_helper)
+    [ -n "$helper" ] && /system/bin/sh "$helper" >/dev/null 2>&1
 }
 
 get_system_info() {
