@@ -1,4 +1,4 @@
-# Corona v4.2.9
+# Corona v4.3.0
 
-- 清理语言残留并完善 zram 与界面细节
-- 重构 zram 初始化链并整理 WebUI 行为
+- release: v4.3.0
+- 优化应用策略与线程规则交互
