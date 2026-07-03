@@ -9,17 +9,15 @@ normalize_foreground_package() {
 }
 
 get_foreground_package() {
-    pkg=$(dumpsys activity activities 2>/dev/null | sed -n 's/.*topResumedActivity[=:].* \([^ /][^ /]*\)\/.*/\1/p' | while IFS= read -r line; do normalize_foreground_package "$line"; done | tail -n1)
+    dump=$(dumpsys window windows 2>/dev/null)
+    pkg=$(printf '%s
+' "$dump" | sed -n 's/.*mCurrentFocus=.* \([^ /][^ /]*\)\/.*/\1/p' | while IFS= read -r line; do normalize_foreground_package "$line"; done | tail -n1)
     [ -n "$pkg" ] && {
         printf '%s\n' "$pkg"
         return 0
     }
-    pkg=$(dumpsys window windows 2>/dev/null | sed -n 's/.*mCurrentFocus=.* \([^ /][^ /]*\)\/.*/\1/p' | while IFS= read -r line; do normalize_foreground_package "$line"; done | tail -n1)
-    [ -n "$pkg" ] && {
-        printf '%s\n' "$pkg"
-        return 0
-    }
-    pkg=$(dumpsys window windows 2>/dev/null | sed -n 's/.*mFocusedApp=.* \([^ /][^ /]*\)\/.*/\1/p' | while IFS= read -r line; do normalize_foreground_package "$line"; done | tail -n1)
+    pkg=$(printf '%s
+' "$dump" | sed -n 's/.*mFocusedApp=.* \([^ /][^ /]*\)\/.*/\1/p' | while IFS= read -r line; do normalize_foreground_package "$line"; done | tail -n1)
     [ -n "$pkg" ] && printf '%s\n' "$pkg"
 }
 
@@ -323,6 +321,8 @@ ensure_singleton() {
 monitor_daemon() {
     ensure_singleton
     last_profile=""
+    last_foreground=""
+    slow_tick=0
     while true; do
         load_rules
         current_pkg=$(get_foreground_package)
@@ -332,6 +332,8 @@ monitor_daemon() {
             target_profile="$current_pkg"
             profile_dir="$PROFILES_DIR/$current_pkg"
         fi
+        profile_changed=0
+        foreground_changed=0
         if [ "$target_profile" != "$last_profile" ]; then
             if [ "$target_profile" = "base" ]; then
                 "$MODDIR/service.sh" --apply-runtime-config >/dev/null 2>&1
@@ -341,10 +343,27 @@ monitor_daemon() {
                 [ "$notify_enabled" = "1" ] && send_notification "Corona 应用预设" "已切换到 $(get_package_label "$current_pkg")"
             fi
             last_profile="$target_profile"
-            printf 'foreground=%s\nprofile=%s\n' "$current_pkg" "$target_profile" > "$STATEFILE"
+            profile_changed=1
+            printf 'foreground=%s
+profile=%s
+' "$current_pkg" "$target_profile" > "$STATEFILE"
         fi
-        apply_protection_once
-        apply_thread_priority_once
-        sleep 3
+        if [ "$current_pkg" != "$last_foreground" ]; then
+            foreground_changed=1
+        fi
+        if [ "$foreground_changed" -eq 1 ] || [ "$profile_changed" -eq 1 ]; then
+            [ -f "$THREAD_PRIORITY_FILE" ] && apply_thread_priority_once
+            last_foreground="$current_pkg"
+        fi
+        slow_tick=$((slow_tick + 1))
+        if [ "$slow_tick" -ge 5 ]; then
+            slow_tick=0
+            [ -n "$protect_csv" ] && apply_protection_once
+        fi
+        if [ "$foreground_changed" -eq 0 ] && [ "$profile_changed" -eq 0 ] && [ "$target_profile" = "base" ]; then
+            sleep 5
+        else
+            sleep 3
+        fi
     done
 }
