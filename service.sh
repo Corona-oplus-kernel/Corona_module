@@ -139,23 +139,85 @@ thread_name_matches() {
     return 1
 }
 
+normalize_affinity_mask() {
+    affinity_value="$1"
+    [ -n "$affinity_value" ] || return 1
+    case "$affinity_value" in
+        *-*|*,*)
+            result=0
+            old_ifs="$IFS"
+            IFS=','
+            set -- $affinity_value
+            IFS="$old_ifs"
+            for part in "$@"; do
+                case "$part" in
+                    *-*)
+                        start=${part%-*}
+                        end=${part#*-}
+                        ;;
+                    *)
+                        start=$part
+                        end=$part
+                        ;;
+                esac
+                [ -n "$start" ] && [ -n "$end" ] || return 1
+                i=$start
+                while [ "$i" -le "$end" ] 2>/dev/null; do
+                    result=$((result | (1 << i)))
+                    i=$((i + 1))
+                done
+            done
+            printf '%x\n' "$result"
+            return 0
+            ;;
+        0x*|0X*)
+            printf '%s\n' "${affinity_value#0x}"
+            return 0
+            ;;
+        *[a-fA-F]*)
+            printf '%s\n' "$affinity_value"
+            return 0
+            ;;
+        *)
+            printf '%x\n' $((1 << affinity_value))
+            return 0
+            ;;
+    esac
+}
+
+get_task_nice() {
+    tid="$1"
+    awk '{print $19}' "/proc/$tid/stat" 2>/dev/null
+}
+
+set_task_nice_absolute() {
+    tid="$1"
+    target_nice="$2"
+    [ -n "$target_nice" ] || return 1
+    current_nice=$(get_task_nice "$tid")
+    [ -n "$current_nice" ] || return 1
+    delta=$((target_nice - current_nice))
+    [ "$delta" -eq 0 ] 2>/dev/null && return 0
+    renice -n "$delta" -p "$tid" 2>/dev/null
+}
+
 apply_sched_policy_to_tid() {
     tid="$1"
     sched_policy="$2"
     rt_prio="$3"
     case "$sched_policy" in
         ''|other|normal)
-            chrt -o -p 0 "$tid" 2>/dev/null ;;
+            chrt -o -p "$tid" 0 2>/dev/null ;;
         batch)
-            chrt -b -p 0 "$tid" 2>/dev/null ;;
+            chrt -b -p "$tid" 0 2>/dev/null ;;
         idle)
-            chrt -i -p 0 "$tid" 2>/dev/null ;;
+            chrt -i -p "$tid" 0 2>/dev/null ;;
         fifo)
             [ -n "$rt_prio" ] || rt_prio=1
-            chrt -f -p "$rt_prio" "$tid" 2>/dev/null ;;
+            chrt -f -p "$tid" "$rt_prio" 2>/dev/null ;;
         rr)
             [ -n "$rt_prio" ] || rt_prio=1
-            chrt -r -p "$rt_prio" "$tid" 2>/dev/null ;;
+            chrt -r -p "$tid" "$rt_prio" 2>/dev/null ;;
     esac
 }
 
@@ -229,11 +291,14 @@ EOF
                 tid=${task_dir##*/}
                 thread_name=$(cat "$task_dir/comm" 2>/dev/null)
                 thread_name_matches "$thread_name" "$thread_pattern" || continue
-                [ -n "$nice_val" ] && renice -n "$nice_val" -p "$tid" 2>/dev/null
+                [ -n "$nice_val" ] && set_task_nice_absolute "$tid" "$nice_val"
                 if [ -n "$io_class" ] && [ -n "$io_level" ]; then
                     ionice -c "$io_class" -n "$io_level" -p "$tid" 2>/dev/null
                 fi
-                [ -n "$affinity_mask" ] && taskset -pc "$affinity_mask" "$tid" >/dev/null 2>&1
+                                if [ -n "$affinity_mask" ]; then
+                    affinity_hex=$(normalize_affinity_mask "$affinity_mask")
+                    [ -n "$affinity_hex" ] && taskset -p "$affinity_hex" "$tid" >/dev/null 2>&1
+                fi
                 apply_cpuset_to_tid "$tid" "$cpuset_group"
                 apply_uclamp_to_tid "$tid" "$uclamp_min" "$uclamp_max" "$cpuset_group"
                 apply_sched_policy_to_tid "$tid" "$sched_policy" "$rt_prio"
