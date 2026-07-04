@@ -1,5 +1,3 @@
-# Corona v4.3.3
+# Corona v4.3.4
 
-- release: v4.3.3
-- 优化首页卡片跳转到配置页
-- 为浮层增加内核更新提示
+- feat: show kernel workflow build in module settings
