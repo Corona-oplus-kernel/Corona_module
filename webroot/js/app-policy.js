@@ -371,14 +371,27 @@ CoronaAddon.prototype.setAppPolicyManageLoading = function(loading) {
 CoronaAddon.prototype.openAppPolicyOverlay = async function(mode) {
     this.ensureAppPolicyState();
     this.currentAppPolicyMode = mode;
-    this.appPolicyRenderLimit = 60;
     const titleMap = { manage: '应用列表' };
     const title = document.getElementById('app-policy-title');
     if (title) title.textContent = titleMap[mode] || '选择应用';
     this.setAppPolicyManageLoading(true);
     this.showOverlay('app-policy-overlay');
+    if (this.installedApps && this.installedApps.length > 0) {
+        this.renderAppPolicyList();
+        this.setAppPolicyManageLoading(false);
+        setTimeout(async () => {
+            try {
+                await this.loadInstalledApps(true);
+                this.renderAppPolicyList();
+            } catch (error) {
+                console.error('refresh installed apps failed', error);
+            }
+        }, 80);
+        return;
+    }
     this.renderAppPolicyLoadingState();
     try {
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         await this.loadInstalledApps();
         this.renderAppPolicyList();
     } catch (error) {

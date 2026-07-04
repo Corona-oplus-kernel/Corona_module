@@ -217,6 +217,7 @@
                 const isExpanded = list.classList.contains('expanded');
                 list.classList.toggle('expanded', !isExpanded);
                 toggle.classList.toggle('expanded', !isExpanded);
+                this.refreshExpandedContentHeight('app-settings-content');
             });
         }
         const appSettingsCard = document.querySelector('.module-card[data-card-key="app-settings"]');
@@ -246,6 +247,7 @@
                 if (card) card.classList.toggle('card-hidden', !sw.checked);
                 if (appSettingsCard) appSettingsCard.classList.remove('card-hidden');
                 this.refreshSettingsSectionMarkers();
+                this.refreshExpandedContentHeight('app-settings-content');
             });
         });
         this.refreshCardVisibilityAvailability();
@@ -281,15 +283,18 @@
             let sibling = marker.nextElementSibling;
             while (sibling) {
                 if (sibling.classList.contains('section-marker-settings')) break;
-                if (sibling.classList.contains('module-card') && sibling.dataset.cardKey === 'app-settings') break;
-                if (sibling.classList.contains('module-card') && sibling.dataset.cardKey && this.isSettingsCardVisible(sibling)) {
-                    hasVisibleCard = true;
-                    break;
+                if (sibling.classList.contains('module-card') && sibling.dataset.cardKey) {
+                    if (this.isSettingsCardVisible(sibling)) {
+                        hasVisibleCard = true;
+                        break;
+                    }
+                    if (sibling.dataset.cardKey === 'app-settings') break;
                 }
                 sibling = sibling.nextElementSibling;
             }
             marker.style.display = hasVisibleCard ? '' : 'none';
         });
+        this.refreshExpandedContentHeight('app-settings-content');
     },
     initSubCards() {
         const subCards = [
@@ -368,10 +373,24 @@
             const contentId = toggle.id.replace('-toggle', '-content');
             const content = document.getElementById(contentId);
             const icon = toggle.querySelector('.expand-icon');
-            if (!content || !content.classList.contains('expanded')) return;
+            if (!content) return;
+            if (content._anim) {
+                content.removeEventListener('transitionend', content._anim);
+                content._anim = null;
+            }
             content.classList.remove('expanded');
             toggle.classList.remove('expanded');
             if (icon) icon.classList.remove('expanded');
+            content.style.maxHeight = '0px';
+            content.style.setProperty('overflow', 'hidden', 'important');
+        });
+        requestAnimationFrame(() => {
+            items.forEach(toggle => {
+                const contentId = toggle.id.replace('-toggle', '-content');
+                const content = document.getElementById(contentId);
+                if (!content || content.classList.contains('expanded')) return;
+                content.style.removeProperty('overflow');
+            });
         });
     },
     refreshExpandedContentHeight(contentId) {
@@ -1187,15 +1206,7 @@ Swap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的
 
 不同的调频策略在性能和功耗之间有不同的侧重，可以根据实际使用需求选择合适的调频器。`
             },
-            'process-priority': {
-                title: '进程优先级',
-                content: `通过调整进程的 CPU 优先级 (Nice) 和 IO 优先级，可以让重要的应用获得更多的系统资源。
-
-为游戏、音乐播放器等对性能敏感的应用设置较高优先级，可以获得更流畅的使用体验。
-
-设置的规则会在每次开机后自动应用。`
-            },
-            'tcp': {
+                        'tcp': {
                 title: 'TCP 拥塞算法',
                 content: `TCP 拥塞控制算法影响网络数据传输的效率和稳定性。
 
