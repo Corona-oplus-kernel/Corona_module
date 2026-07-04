@@ -641,6 +641,7 @@
             });
             if (response.ok) {
                 const data = await response.json();
+                if (data && (data.prerelease || data.draft)) return null;
                 const title = String(data.name || data.tag_name || '');
                 const build = this.extractKernelBuildNumber(title);
                 if (build) {
@@ -658,6 +659,8 @@
                 signal: controller ? controller.signal : undefined
             });
             if (!fallbackResponse.ok) return null;
+            const latestUrl = String(fallbackResponse.url || '');
+            if (latestUrl && !latestUrl.includes('/releases/')) return null;
             const html = await fallbackResponse.text();
             const titleMatch = html.match(/全量构建\s*#\d+/);
             const title = titleMatch ? titleMatch[0] : '';
@@ -666,7 +669,7 @@
             return {
                 build,
                 title: title || `全量构建 #${build}`,
-                url: fallbackResponse.url || 'https://github.com/wswzgdg/Corona-5.15-action/releases/latest'
+                url: latestUrl || 'https://github.com/wswzgdg/Corona-5.15-action/releases/latest'
             };
         } catch (_) {
             return null;
