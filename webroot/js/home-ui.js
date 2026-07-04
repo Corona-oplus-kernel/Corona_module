@@ -607,12 +607,20 @@
         await this.sleep(500);
         await this.exec('reboot');
     },
+    renderKernelWorkflowBuild() {
+        const section = document.getElementById('kernel-build-section');
+        const text = document.getElementById('kernel-build-text');
+        const show = !!(this.isCoronaKernel && this.localKernelWorkflowBuild);
+        if (section) section.classList.toggle('hidden', !show);
+        if (text && show) text.textContent = `当前迭代：#${this.localKernelWorkflowBuild}`;
+    },
     async loadModuleVersion() {
         const prop = await this.exec(`cat ${this.modDir}/module.prop`);
         const match = prop.match(/version=(\S+)/);
         const ver = match ? match[1] : '--';
         const el = document.getElementById('current-version-text');
         if (el) el.textContent = `当前版本：${ver}`;
+        this.renderKernelWorkflowBuild();
         await this.checkKernelReleaseUpdate();
     },
     extractKernelBuildNumber(source) {
@@ -700,15 +708,18 @@
         this.kernelUpdateInfo = null;
         this.localKernelWorkflowBuild = 0;
         if (!this.isCoronaKernel) {
+            this.renderKernelWorkflowBuild();
             this.renderKernelReleaseUpdate();
             return;
         }
         const localBuild = this.extractKernelBuildNumber(await this.exec('cat /proc/corona_workflow_build 2>/dev/null'));
         if (!localBuild) {
+            this.renderKernelWorkflowBuild();
             this.renderKernelReleaseUpdate();
             return;
         }
         this.localKernelWorkflowBuild = localBuild;
+        this.renderKernelWorkflowBuild();
         const latest = await this.fetchLatestKernelReleaseInfo();
         if (latest && latest.build > localBuild) this.kernelUpdateInfo = latest;
         this.renderKernelReleaseUpdate();
