@@ -715,7 +715,7 @@
             this.renderKernelReleaseUpdate();
             return;
         }
-        const localBuild = this.extractKernelBuildNumber(await this.exec('(cat /proc/corona 2>/dev/null || cat /proc/corona_workflow_build 2>/dev/null) | head -n 1'));
+        const localBuild = this.extractKernelBuildNumber(await this.exec('cat /proc/corona 2>/dev/null'));
         if (!localBuild) {
             this.renderKernelWorkflowBuild();
             this.renderKernelReleaseUpdate();
