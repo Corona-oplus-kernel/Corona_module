@@ -106,7 +106,11 @@ get_system_info() {
     kernel_version1=$(echo "$kernel_version" | cut -d'.' -f1)
     is_oplus=0; find /proc -maxdepth 1 -name "oplus*" 2>/dev/null | grep -q . && is_oplus=1
     isCoronaKernel=0
-    [ -f /proc/corona ] && [ "$(cat /proc/corona 2>/dev/null)" = "1" ] && isCoronaKernel=1
+    corona_node_value="$(cat /proc/corona 2>/dev/null)"
+    case "$corona_node_value" in
+        ''|*[!0-9]*) ;;
+        *) [ "$corona_node_value" -gt 0 ] && isCoronaKernel=1 ;;
+    esac
 }
 
 apply_io_config() {

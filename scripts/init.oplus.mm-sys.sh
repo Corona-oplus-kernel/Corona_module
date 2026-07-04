@@ -327,8 +327,11 @@ apply_corona_kswapd() {
 
 apply_corona_kernel_modules() {
   [ ! -f "$CORONA_CONFIG/corona_kernel.conf" ] && return
-  [ ! -f /proc/corona ] && return
-  [ "$(cat /proc/corona 2>/dev/null)" != "1" ] && return
+  corona_node_value="$(cat /proc/corona 2>/dev/null)"
+  case "$corona_node_value" in
+    ''|*[!0-9]*) return ;;
+    *) [ "$corona_node_value" -gt 0 ] || return ;;
+  esac
   local user_window_ms=$(corona_get corona_kernel.conf user_window_ms)
   local slack_off_ms=$(corona_get corona_kernel.conf slack_off_ms)
   case "$user_window_ms" in ''|*[!0-9]*) user_window_ms="" ;; esac
