@@ -271,8 +271,7 @@
     },
     async awaitInitialRealtimeReady() {
         await this.updateRealtimeData(true);
-        await this.sleep(220);
-        await this.updateRealtimeData(true);
+        requestAnimationFrame(() => { this.updateRealtimeData(true); });
     },
     async updateRealtimeData(forceHeavy) {
         if (this.realtimeBusy) return;

@@ -167,7 +167,6 @@ class CoronaAddon {
         await this.ensureFeatureScript('settings-ui');
         await this.ensureFeatureScript('home-ui');
         await this.ensureFeatureScript('memory-core');
-        await this.ensureFeatureScript('app-policy');
         this.showInitOverlay(true, this.t('initDefault'));
         try {
             this.updateInitOverlayMessage(this.t('initResolve'));
@@ -195,20 +194,18 @@ class CoronaAddon {
             this.initDetailOverlays();
             this.initHomeCardClicks();
             this.initChart();
+            this.updateInitOverlayMessage(this.t('initSettings'));
+            await this.ensureSettingsPageReady(true);
             if (!this.lightweightUi) {
                 this.initScrollEffect();
             } else {
                 this.initStaticHeader();
             }
             this.initModuleIntro();
-            this.updateInitOverlayMessage(this.t('initSettings'));
-            await this.ensureSettingsPageReady(true);
             this.updateInitOverlayMessage(this.t('initRealtime'));
             await this.awaitInitialRealtimeReady();
-            this.updateInitOverlayMessage(this.t('initApps'));
-            await this.prewarmAppPolicyData(true);
             this.startRealtimeMonitor();
-            this.scheduleDeferredInit();
+            this.schedulePostInitWarmup();
         } finally {
             this.isInitializing = false;
             this.showInitOverlay(false);
@@ -579,15 +576,8 @@ function rafThrottle(fn) {
         });
     };
 }
-let _expandingCount = 0;
-function beginExpand() {
-    _expandingCount++;
-    if (_expandingCount === 1) document.body.classList.add('cards-expanding');
-}
-function endExpand() {
-    if (_expandingCount > 0) _expandingCount--;
-    if (_expandingCount === 0) document.body.classList.remove('cards-expanding');
-}
+function beginExpand() {}
+function endExpand() {}
 document.addEventListener('DOMContentLoaded', () => { window.corona = new CoronaAddon(); });
 document.addEventListener('visibilitychange', () => {
     document.body.classList.toggle('app-hidden', document.hidden);
