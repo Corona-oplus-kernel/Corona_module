@@ -18,9 +18,14 @@
     --radius-pill: 50px;
     --nav-height: 56px;
     --motion-ease: cubic-bezier(0.22, 0.78, 0.18, 1);
-    --motion-fast: 0.2s;
-    --motion-base: 0.32s;
-    --motion-slow: 0.42s;
+    --motion-fast: 0.28s;
+    --motion-base: 0.45s;
+    --motion-slow: 0.59s;
+    --module-font: "OPPOSans", "OnePlus Sans", "MiSans", "HarmonyOS Sans SC", "Noto Sans SC", "PingFang SC", "Source Han Sans SC", sans-serif;
+}
+
+body, button, input, select, textarea {
+    font-family: var(--module-font);
 }
 
 body.theme-gold {
@@ -340,7 +345,7 @@ body.monet-decoration .bg-decoration::before {
     right: 0;
     transform: translateX(26px) translateY(0) translateZ(0);
     opacity: 0;
-    transition: transform 0.34s cubic-bezier(0.22, 0.78, 0, 1), opacity 0.26s ease;
+    transition: transform 0.34s var(--motion-ease), opacity 0.26s ease;
     pointer-events: none;
     will-change: transform, opacity;
 }
@@ -399,7 +404,7 @@ body.monet-decoration .bg-decoration::before {
     padding: 18px 20px;
     margin-bottom: 12px;
     box-shadow: var(--glass-shadow);
-    transition: transform 0.28s cubic-bezier(0.22, 0.78, 0, 1), box-shadow 0.28s ease, opacity 0.28s ease, filter 0.28s ease;
+    transition: transform 0.28s var(--motion-ease), box-shadow 0.28s ease, opacity 0.28s ease, filter 0.28s ease;
 }
 
 .card:active {
@@ -423,7 +428,7 @@ body.monet-decoration .bg-decoration::before {
     background: rgba(52, 130, 255, 0.1);
     border-radius: 50%;
     transform: translate(-50%, -50%);
-    transition: width 0.4s ease, height 0.4s ease, opacity 0.4s ease;
+    transition: width var(--motion-base) ease, height var(--motion-base) ease, opacity var(--motion-base) ease;
     opacity: 0;
 }
 
@@ -626,7 +631,7 @@ body.monet-decoration .bg-decoration::before {
     );
     background-size: 200% 100%;
     animation: waveFlow 2s ease-in-out infinite;
-    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 0.5s var(--motion-ease);
 }
 
 body.theme-gold .progress-bar-mini .progress-fill {
@@ -729,7 +734,7 @@ body.theme-gold .progress-bar-mini .progress-fill {
     );
     background-size: 200% 100%;
     animation: waveFlow 2s ease-in-out infinite;
-    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 0.5s var(--motion-ease);
 }
 
 .progress-fill.swap {
@@ -1045,7 +1050,7 @@ body.theme-gold .io-advanced-group-header {
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 2px 6px rgba(95, 72, 40, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.24);
-    transition: transform 0.15s, box-shadow 0.15s;
+    transition: transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
     border: none;
 }
 
@@ -1100,7 +1105,7 @@ body.theme-gold .io-advanced-group-header {
     font-size: 13px;
     color: var(--text-sub);
     cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+    transition: background-color var(--motion-fast) ease, border-color var(--motion-fast) ease, color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
     position: relative;
     overflow: hidden;
     transition: background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease;
@@ -1137,7 +1142,7 @@ body.theme-gold .io-advanced-group-header {
     padding: 12px 4px;
     text-align: center;
     border: 1.5px solid transparent;
-    transition: opacity 0.3s, transform 0.3s, background-color 0.3s, color 0.3s, box-shadow 0.3s;
+    transition: opacity var(--motion-base) ease, transform var(--motion-base) var(--motion-ease), background-color var(--motion-base) ease, color var(--motion-base) ease, box-shadow var(--motion-base) ease;
     cursor: pointer;
 }
 
@@ -1236,7 +1241,7 @@ body.theme-gold .cpu-cluster-badge {
     background: transparent;
     border: none;
     border-radius: 16px;
-    transition: opacity 0.5s cubic-bezier(0.32, 0.72, 0, 1), transform 0.5s cubic-bezier(0.32, 0.72, 0, 1), background-color 0.5s cubic-bezier(0.32, 0.72, 0, 1), color 0.5s cubic-bezier(0.32, 0.72, 0, 1), box-shadow 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+    transition: opacity var(--motion-slow) var(--motion-ease), transform var(--motion-slow) var(--motion-ease), background-color var(--motion-slow) ease, color var(--motion-slow) ease, box-shadow var(--motion-slow) ease;
     position: relative;
     z-index: 2;
     cursor: pointer;
@@ -1261,7 +1266,7 @@ body.theme-gold .cpu-cluster-badge {
     background: rgba(255, 255, 255, 0.9);
     border-radius: 16px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    transition: transform 0.44s cubic-bezier(0.22, 0.78, 0, 1), box-shadow 0.28s ease;
+    transition: transform var(--motion-slow) var(--motion-ease), box-shadow var(--motion-fast) ease;
     z-index: 1;
 }
 
@@ -1296,7 +1301,7 @@ body.theme-gold .tab-item.active {
     font-weight: 500;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: opacity var(--motion-fast) ease, transform var(--motion-fast) var(--motion-ease);
     z-index: 20100;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     will-change: opacity, transform;
@@ -3275,7 +3280,7 @@ body.theme-dark .range-slider::-webkit-slider-thumb {
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 2px 8px rgba(52, 130, 255, 0.6);
-    transition: transform 0.15s, box-shadow 0.15s;
+    transition: transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
     border: none;
 }
 .card-title-expandable {
@@ -3291,7 +3296,7 @@ body.theme-dark .range-slider::-webkit-slider-thumb {
 .expand-icon {
     font-size: 12px;
     color: var(--text-sub);
-    transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+    transition: transform 0.32s var(--motion-ease);
     display: inline-block;
     transform: rotate(90deg);
 }
@@ -3302,8 +3307,8 @@ body.theme-dark .range-slider::-webkit-slider-thumb {
     overflow: hidden;
     max-height: 0;
     margin-top: 0;
-    transition: max-height 0.26s var(--motion-ease),
-                margin-top 0.26s var(--motion-ease);
+    transition: max-height var(--motion-base) var(--motion-ease),
+                margin-top var(--motion-base) var(--motion-ease);
 }
 .expandable-content.expanded {
     margin-top: 14px;
@@ -3403,7 +3408,7 @@ body.theme-dark .confirm-dialog-body #confirm-dialog-message.preview-message {
 .confirm-dialog {
     opacity: 0;
     transform: translateY(18px) scale(0.94);
-    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.24s ease, box-shadow 0.24s ease;
+    transition: transform 0.3s var(--motion-ease), opacity 0.24s ease, box-shadow 0.24s ease;
     will-change: transform, opacity;
 }
 #confirm-dialog-overlay.show .confirm-dialog {
@@ -3453,7 +3458,7 @@ body.theme-dark .confirm-dialog-body #confirm-dialog-message.preview-message {
 }
 .module-intro-card {
     transform: translateY(16px) scale(0.92);
-    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.22s var(--motion-ease), opacity 0.2s ease, box-shadow 0.2s ease;
     will-change: transform, opacity;
 }
 #module-intro-overlay.show .module-intro-card {
@@ -4155,9 +4160,9 @@ body.theme-dark .module-card {
     max-height: 0;
     opacity: 0;
     margin-top: 0;
-    transition: max-height 0.28s var(--motion-ease),
-                opacity 0.22s ease,
-                margin-top 0.28s var(--motion-ease);
+    transition: max-height var(--motion-base) var(--motion-ease),
+                opacity var(--motion-fast) ease,
+                margin-top var(--motion-base) var(--motion-ease);
 }
 .card-visibility-switches.expanded {
     max-height: 720px;
@@ -4202,15 +4207,26 @@ body.theme-dark #page-settings .sub-card {
     display: block;
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.28s var(--motion-ease);
+    opacity: 0;
+    transform: translateY(-8px);
+    transform-origin: top center;
+    will-change: max-height, opacity, transform, padding;
+    transition: max-height var(--motion-base) var(--motion-ease),
+                padding var(--motion-base) var(--motion-ease),
+                opacity var(--motion-fast) ease,
+                transform 0.34s var(--motion-ease);
 }
 .module-card-content.expanded {
     padding: 16px 18px 18px;
+    opacity: 1;
+    transform: translateY(0);
 }
 .module-card-content.hidden {
     display: block;
     max-height: 0;
     padding: 0 18px;
+    opacity: 0;
+    transform: translateY(-8px);
 }
 
 .module-card-content.animating,
@@ -4565,8 +4581,8 @@ body.app-hidden *::after {
 
 
 #memory-compression-card .expandable-content {
-    transition: max-height 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                margin-top 0.32s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition: max-height 0.32s var(--motion-ease),
+                margin-top 0.32s var(--motion-ease);
 }
 
 .update-section .section-header-row {
@@ -4673,7 +4689,7 @@ body.app-ready .banner-image,
 body.app-ready .card,
 body.app-ready .module-card,
 body.app-ready .tab-bar-container {
-    transition: opacity 0.5s ease, transform 0.6s cubic-bezier(0.22, 0.78, 0, 1), box-shadow 0.25s ease;
+    transition: opacity 0.5s ease, transform 0.6s var(--motion-ease), box-shadow 0.25s ease;
 }
 
 body.app-ready .corona-title-container,
@@ -4833,7 +4849,7 @@ body.theme-dark .section-marker::after {
 
 body.app-ready .title-overline,
 body.app-ready .corona-title {
-    animation: titleBreathIn 0.62s cubic-bezier(0.22, 0.78, 0, 1);
+    animation: titleBreathIn 0.62s var(--motion-ease);
 }
 
 @media (max-width: 420px) {
