@@ -28,6 +28,14 @@ body, button, input, select, textarea {
     font-family: var(--module-font);
 }
 
+@font-face {
+    font-family: "OPPOSans";
+    src: url("fonts/OPPOSans-Regular.ttc") format("truetype-collection");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
 body.theme-gold {
     --bg-color: #F4EEE2;
     --glass-surface: #F8F3EA;
