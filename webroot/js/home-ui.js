@@ -1149,14 +1149,14 @@
                 el.style.opacity = sameBlock ? String(Math.max(0.18, progress)) : el.style.opacity;
                 el.style.transform = sameBlock ? `translateY(${(1 - progress) * -4}px)` : el.style.transform;
             });
-            if (titleBottom <= triggerPoint && !headerShown) {
+            const scrollTop = scroller === window ? window.scrollY : scroller.scrollTop;
+            if (scrollTop > 28 && !headerShown) {
                 headerShown = true;
                 floatingHeader.classList.add('visible');
-            } else if (titleBottom > triggerPoint && headerShown) {
+            } else if (scrollTop <= 8 && headerShown) {
                 headerShown = false;
                 floatingHeader.classList.remove('visible');
             }
-            const scrollTop = scroller === window ? window.scrollY : scroller.scrollTop;
             if (scrollTop <= 4 || (activePage && activePage.getBoundingClientRect().top >= -2) || titleRect.top >= 8) {
                 currentTitle.style.opacity = '1';
                 currentTitle.style.transform = 'translateY(0)';

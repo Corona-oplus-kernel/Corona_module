@@ -196,11 +196,8 @@ class CoronaAddon {
             this.initChart();
             this.updateInitOverlayMessage(this.t('initSettings'));
             await this.ensureSettingsPageReady(true);
-            if (!this.lightweightUi) {
-                this.initScrollEffect();
-            } else {
-                this.initStaticHeader();
-            }
+            this.initStaticHeader();
+            this.initScrollEffect();
             this.initModuleIntro();
             this.updateInitOverlayMessage(this.t('initRealtime'));
             await this.awaitInitialRealtimeReady();
