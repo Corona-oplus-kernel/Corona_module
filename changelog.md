@@ -1,3 +1,3 @@
 # Corona v4.3.4
 
-- feat: show kernel workflow build in module settings
+- 只检查正式内核 release 更新
