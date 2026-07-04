@@ -182,7 +182,8 @@ class CoronaAddon {
             await this.ensureConfigDir();
             await this.loadRuntimeConfig();
             await this.loadAppMetaCache();
-            this.isCoronaKernel = (await this.exec('cat /proc/corona 2>/dev/null')).trim() === '1';
+            const coronaNodeValue = (await this.exec('cat /proc/corona 2>/dev/null')).trim();
+            this.isCoronaKernel = /^\d+$/.test(coronaNodeValue) && parseInt(coronaNodeValue, 10) > 0;
             this.initTheme();
             this.initChangePreviewPreference();
             this.initSettingDescriptionPreference();
