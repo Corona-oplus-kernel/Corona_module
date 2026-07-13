@@ -751,8 +751,11 @@ body.app-hidden *::after {
     gap: 4px;
     padding: 10px 12px;
     border-radius: var(--radius-ctl, 14px);
-    background: var(--primary-light, rgba(52, 130, 255, 0.08));
+    background: rgba(0, 0, 0, 0.03);
     border: 1px solid var(--glass-border, rgba(0,0,0,0.06));
+}
+body.theme-dark .swap-device-row {
+    background: rgba(255, 255, 255, 0.04);
 }
 .swap-device-title {
     font-size: 13px;

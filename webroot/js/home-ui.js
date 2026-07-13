@@ -87,14 +87,9 @@
 
         content.classList.remove('hidden');
         content.style.removeProperty('pointer-events');
-        content.classList.remove('expanded');
         content.style.overflow = 'hidden';
-        content.style.maxHeight = '0px';
-        content.style.opacity = '0';
-        content.style.transform = 'translateY(-8px)';
-        void content.offsetHeight;
 
-        // measure real height with expanded styles (padding etc.)
+        // measure target height with expanded class/padding
         content.classList.add('expanded');
         content.style.maxHeight = 'none';
         content.style.opacity = '1';
@@ -102,13 +97,14 @@
         const target = Math.max(content.scrollHeight, 1);
         const duration = this.getPanelAnimMs(target);
 
-        // restart from collapsed
+        // start collapsed frame
         content.style.maxHeight = '0px';
         content.style.opacity = '0';
         content.style.transform = 'translateY(-8px)';
         this.setPanelTransition(content, duration);
         void content.offsetHeight;
 
+        // animate open
         content.style.maxHeight = target + 'px';
         content.style.opacity = '1';
         content.style.transform = 'translateY(0)';
@@ -131,7 +127,7 @@
                 content.style.maxHeight = 'none';
                 content.style.overflow = 'visible';
                 content.style.opacity = '1';
-                content.style.transform = 'translateY(0)';
+                content.style.transform = 'none';
             }
             if (cardEl) cardEl.classList.remove('expanding');
             if (typeof endExpand === 'function') endExpand();
@@ -141,13 +137,12 @@
         };
         const onEnd = (e) => {
             if (e && e.target !== content) return;
-            // only complete on height transition to avoid early cut-off
             if (e && e.propertyName && e.propertyName !== 'max-height') return;
             finish();
         };
         content._anim = onEnd;
         content.addEventListener('transitionend', onEnd);
-        content._animTimer = setTimeout(finish, duration + 80);
+        content._animTimer = setTimeout(finish, duration + 100);
     },
     collapsePanelContent(content, toggle, { icon = null, cardEl = null, onCollapse = null, beforeCollapse = null } = {}) {
         if (!content) return;
@@ -158,21 +153,22 @@
             try { beforeCollapse(); } catch (e) {}
         }
 
+        // use visual height, more accurate than scrollHeight with max-height:none
         content.style.overflow = 'hidden';
-        // pin exact open height first
-        content.style.maxHeight = 'none';
-        const from = Math.max(content.scrollHeight, 1);
-        content.style.maxHeight = from + 'px';
         content.style.opacity = '1';
-        content.style.transform = 'translateY(0)';
+        content.style.transform = 'none';
+        const rectH = content.getBoundingClientRect().height;
+        const from = Math.max(rectH || content.scrollHeight || 1, 1);
+        content.style.maxHeight = from + 'px';
         const duration = this.getPanelAnimMs(from);
         this.setPanelTransition(content, duration);
         void content.offsetHeight;
 
+        // animate close
         content.classList.remove('expanded');
         content.style.maxHeight = '0px';
         content.style.opacity = '0';
-        content.style.transform = 'translateY(-8px)';
+        content.style.transform = 'translateY(-6px)';
 
         if (toggle) toggle.classList.remove('expanded');
         if (icon) icon.classList.remove('expanded');
@@ -190,15 +186,17 @@
             clearTimeout(content._animTimer);
             content._anim = null;
             content._animTimer = null;
-            this.clearPanelTransition(content);
-            // force fully closed — prevents half-open leftovers
-            content.classList.remove('expanded');
-            content.classList.add('hidden');
-            content.style.maxHeight = '0px';
-            content.style.opacity = '0';
-            content.style.transform = 'translateY(-8px)';
-            content.style.overflow = 'hidden';
-            content.style.pointerEvents = 'none';
+            // hard close — no residual gap
+            if (typeof this.forceClosePanel === 'function') {
+                this.forceClosePanel(content, toggle);
+            } else {
+                this.clearPanelTransition(content);
+                content.classList.remove('expanded');
+                content.classList.add('hidden');
+                content.style.maxHeight = '0px';
+                content.style.opacity = '0';
+                content.style.overflow = 'hidden';
+            }
             if (cardEl) cardEl.classList.remove('expanding');
             if (typeof endExpand === 'function') endExpand();
         };

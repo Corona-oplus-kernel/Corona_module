@@ -1,10 +1,10 @@
 :root {
-    --bg-color: #F3F5F8;
-    --glass-surface: rgba(255, 255, 255, 0.86);
-    --glass-surface-strong: rgba(255, 255, 255, 0.94);
-    --glass-border: rgba(15, 23, 42, 0.08);
-    --glass-shadow: 0 2px 8px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.05);
-    --glass-shadow-lg: 0 8px 28px rgba(15, 23, 42, 0.10);
+    --bg-color: #F0F4F8;
+    --glass-surface: rgba(255, 255, 255, 0.42);
+    --glass-surface-strong: rgba(255, 255, 255, 0.58);
+    --glass-border: rgba(255, 255, 255, 0.28);
+    --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.06);
+    --glass-shadow-lg: 0 18px 40px rgba(0, 0, 0, 0.10);
     --hue: 214;
     --primary: hsl(var(--hue), 82%, 50%);
     --primary-dim: hsla(var(--hue), 82%, 50%, 0.14);
@@ -54,12 +54,12 @@ body {
     --card-bg: var(--glass-surface);
 }
 body.theme-dark {
-    --bg-color: #101217;
-    --glass-surface: rgba(30, 33, 40, 0.92);
-    --glass-surface-strong: rgba(38, 42, 52, 0.96);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
-    --glass-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.36);
+    --bg-color: #0B0D11;
+    --glass-surface: rgba(30, 33, 40, 0.52);
+    --glass-surface-strong: rgba(38, 42, 52, 0.68);
+    --glass-border: rgba(255, 255, 255, 0.10);
+    --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+    --glass-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.36);
     --primary: hsl(var(--hue), 78%, 62%);
     --primary-dim: hsla(var(--hue), 78%, 62%, 0.18);
     --primary-light: hsla(var(--hue), 78%, 62%, 0.12);
@@ -71,10 +71,10 @@ body.theme-dark {
 }
 body.theme-gold {
     --bg-color: #F4EEE2;
-    --glass-surface: rgba(251, 247, 240, 0.94);
-    --glass-surface-strong: rgba(252, 248, 241, 0.98);
-    --glass-border: rgba(109, 85, 51, 0.12);
-    --glass-shadow: 0 2px 10px rgba(71, 53, 28, 0.06);
+    --glass-surface: rgba(251, 247, 240, 0.48);
+    --glass-surface-strong: rgba(252, 248, 241, 0.62);
+    --glass-border: rgba(255, 255, 255, 0.35);
+    --glass-shadow: 0 8px 28px rgba(71, 53, 28, 0.07);
     --primary: hsl(var(--hue), 58%, 42%);
     --primary-dim: hsla(var(--hue), 58%, 42%, 0.14);
     --primary-light: hsla(var(--hue), 58%, 42%, 0.09);
