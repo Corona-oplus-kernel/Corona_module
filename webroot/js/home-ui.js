@@ -56,9 +56,10 @@
         this.clearPanelTransition(content);
         content.classList.remove('expanded', 'expanding', 'panel-animating');
         content.classList.add('hidden');
+        content.style.transition = 'none';
         content.style.maxHeight = '0px';
         content.style.opacity = '0';
-        content.style.transform = 'translateY(-8px)';
+        content.style.transform = 'none';
         content.style.overflow = 'hidden';
         content.style.pointerEvents = 'none';
 
@@ -154,30 +155,28 @@
         this.ensureCollapsible(content);
         if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
         if (content._anim) { content.removeEventListener('transitionend', content._anim); content._anim = null; }
+
+        // 1) Freeze current visual height FIRST — prevents jank when children collapse
+        content.classList.add('expanded');
+        content.classList.remove('hidden');
+        content.style.pointerEvents = 'none';
+        content.style.overflow = 'hidden';
+        content.style.opacity = '1';
+        content.style.transform = 'none';
+        content.style.transition = 'none';
+
+        const from = Math.max(content.getBoundingClientRect().height || content.scrollHeight || 1, 1);
+        content.style.maxHeight = from + 'px';
+        void content.offsetHeight; // lock pin
+
+        // 2) Now safe to collapse nested panels (parent height is pinned)
         if (typeof beforeCollapse === 'function') {
             try { beforeCollapse(); } catch (e) {}
         }
 
-        // Keep expanded class during fold so padding/content stay visible;
-        // only animate height — avoids "content vanishes then collapses".
-        content.classList.add('expanded');
-        content.classList.remove('hidden');
-        content.style.overflow = 'hidden';
-        content.style.opacity = '1';
-        content.style.transform = 'none';
-        content.style.pointerEvents = 'none';
-
-        const rectH = content.getBoundingClientRect().height;
-        const from = Math.max(rectH || content.scrollHeight || 1, 1);
-        content.style.maxHeight = from + 'px';
         const duration = this.getPanelAnimMs(from);
-        this.setPanelTransition(content, duration, 'height');
-        void content.offsetHeight;
 
-        // fold height only
-        content.style.maxHeight = '0px';
-
-        // chevrons can turn immediately
+        // 3) Next frame: enable transition then animate to 0 (double rAF = no hitch)
         if (toggle) toggle.classList.remove('expanded');
         if (icon) icon.classList.remove('expanded');
         const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
@@ -194,10 +193,8 @@
             clearTimeout(content._animTimer);
             content._anim = null;
             content._animTimer = null;
-            // only now hide content / remove expanded
-            if (typeof this.forceClosePanel === 'function') {
-                this.forceClosePanel(content, toggle);
-            } else {
+            if (typeof this.forceClosePanel === 'function') this.forceClosePanel(content, toggle);
+            else {
                 this.clearPanelTransition(content);
                 content.classList.remove('expanded');
                 content.classList.add('hidden');
@@ -215,7 +212,14 @@
         };
         content._anim = onEnd;
         content.addEventListener('transitionend', onEnd);
-        content._animTimer = setTimeout(finish, duration + 120);
+
+        requestAnimationFrame(() => {
+            this.setPanelTransition(content, duration, 'height');
+            requestAnimationFrame(() => {
+                content.style.maxHeight = '0px';
+                content._animTimer = setTimeout(finish, duration + 100);
+            });
+        });
     },
 
     initChart() {
