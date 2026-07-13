@@ -47,6 +47,7 @@
 
     forceClosePanel(content, toggle = null) {
         if (!content) return;
+        if (typeof this.releasePanelScrollLock === 'function') this.releasePanelScrollLock();
         if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
         if (content._anim) {
             try { content.removeEventListener('transitionend', content._anim); } catch (e) {}
@@ -70,6 +71,15 @@
             if (header) header.classList.remove('expanded');
         }
     },
+    releasePanelScrollLock() {
+        const scroller = document.querySelector('.container');
+        if (!scroller) return;
+        if (scroller._panelLockScroll) {
+            scroller.removeEventListener('scroll', scroller._panelLockScroll);
+            scroller._panelLockScroll = null;
+        }
+        scroller.style.removeProperty('overflow-anchor');
+    },
     forceCloseAllPanels() {
         document.querySelectorAll('.module-card-content, .sub-expandable-content').forEach((content) => {
             let toggle = null;
@@ -88,6 +98,7 @@
         if (!content) return;
         this.ensureCollapsible(content);
         content._panelState = 'opening';
+        if (typeof this.releasePanelScrollLock === 'function') this.releasePanelScrollLock();
 
         // cancel in-flight anim — then reverse from CURRENT height (no snap to 0)
         if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
@@ -162,6 +173,7 @@
         if (!content) return;
         this.ensureCollapsible(content);
         content._panelState = 'closing';
+        if (typeof this.releasePanelScrollLock === 'function') this.releasePanelScrollLock();
 
         // cancel in-flight anim — reverse from CURRENT height (no snap to full then close)
         if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
@@ -217,27 +229,7 @@
             try { onCollapse(); } catch (e) {}
         }
 
-        const scroller = document.querySelector('.container');
-        const pinScroll = scroller ? scroller.scrollTop : 0;
-        const lockScroll = () => {
-            if (!scroller) return;
-            const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-            scroller.scrollTop = Math.min(pinScroll, max);
-        };
-        if (scroller) {
-            scroller.style.overflowAnchor = 'none';
-            scroller.addEventListener('scroll', lockScroll, { passive: true });
-        }
-
         let finished = false;
-        const cleanupScroll = () => {
-            if (!scroller) return;
-            scroller.removeEventListener('scroll', lockScroll);
-            scroller.style.removeProperty('overflow-anchor');
-            const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-            if (scroller.scrollTop > max) scroller.scrollTop = max;
-        };
-
         const finish = () => {
             if (finished) return;
             finished = true;
@@ -257,7 +249,6 @@
             content._openHeight = 0;
             content._panelState = 'closed';
 
-            cleanupScroll();
             if (cardEl) cardEl.classList.remove('expanding');
             if (typeof endExpand === 'function') endExpand();
 
