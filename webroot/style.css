@@ -4203,3 +4203,13 @@ body.theme-dark #zram-settings .option-item {
     border: none !important;
     box-shadow: none !important;
 }
+
+/* App list overlay above panel/page animation layers */
+#app-policy-overlay,
+#app-profile-overlay {
+    z-index: 12000 !important;
+}
+#app-policy-list {
+    contain: content;
+    -webkit-overflow-scrolling: touch;
+}

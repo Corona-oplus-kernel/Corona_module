@@ -150,6 +150,7 @@
                 content._panelState = 'open';
             }
             if (cardEl) cardEl.classList.remove('expanding');
+            content.style.willChange = 'auto';
             if (typeof endExpand === 'function') endExpand();
             if (typeof onExpand === 'function') {
                 Promise.resolve().then(() => onExpand()).catch(() => {});
@@ -164,6 +165,7 @@
         content.addEventListener('transitionend', onEnd);
 
         // transition then reflow then open
+        content.style.willChange = 'max-height';
         this.setPanelTransition(content, duration, 'height');
         void content.offsetHeight;
         content.style.maxHeight = target + 'px';
@@ -250,6 +252,7 @@
             content._panelState = 'closed';
 
             if (cardEl) cardEl.classList.remove('expanding');
+            content.style.willChange = 'auto';
             if (typeof endExpand === 'function') endExpand();
 
             if (typeof beforeCollapse === 'function') {
@@ -267,6 +270,7 @@
         content._anim = onEnd;
         content.addEventListener('transitionend', onEnd);
 
+        content.style.willChange = 'max-height';
         this.setPanelTransition(content, duration, 'height');
         void content.offsetHeight;
         content.style.maxHeight = '0px';

@@ -80,7 +80,7 @@ body.theme-dark .sub-card-header.expanded {
     opacity: 1; /* keep content visible while height folds */
     transform: none;
     transform-origin: top center;
-    will-change: max-height;
+    /* will-change set only during JS anim */
     transition-property: max-height;
     transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
     transition-duration: 0.4s;

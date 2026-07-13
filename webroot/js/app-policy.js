@@ -366,24 +366,32 @@ CoronaAddon.prototype.openAppPolicyOverlay = async function(mode) {
     const titleMap = { manage: '应用列表' };
     const title = document.getElementById('app-policy-title');
     if (title) title.textContent = titleMap[mode] || '选择应用';
+
+    // show overlay immediately — never wait for shell/list before paint
     this.setAppPolicyManageLoading(true);
     this.showOverlay('app-policy-overlay');
-    if (this.installedApps && this.installedApps.length > 0) {
-        this.renderAppPolicyList();
-        this.setAppPolicyManageLoading(false);
-        setTimeout(async () => {
-            try {
-                await this.loadInstalledApps(true);
-                this.renderAppPolicyList();
-            } catch (error) {
-                console.error('refresh installed apps failed', error);
-            }
-        }, 80);
-        return;
-    }
     this.renderAppPolicyLoadingState();
+
+    // yield so overlay animation can start (animation must not block on list build)
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
     try {
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        if (this.installedApps && this.installedApps.length > 0) {
+            this.renderAppPolicyList();
+            this.setAppPolicyManageLoading(false);
+            // background refresh
+            setTimeout(async () => {
+                try {
+                    await this.loadInstalledApps(true);
+                    if (document.getElementById('app-policy-overlay')?.classList.contains('show')) {
+                        this.renderAppPolicyList();
+                    }
+                } catch (error) {
+                    console.error('refresh installed apps failed', error);
+                }
+            }, 120);
+            return;
+        }
         await this.loadInstalledApps();
         this.renderAppPolicyList();
     } catch (error) {
@@ -411,29 +419,68 @@ CoronaAddon.prototype.renderAppPolicyList = function() {
     if (!list) return;
     const keyword = (document.getElementById('app-policy-search')?.value || '').trim().toLowerCase();
     const membership = this.getAppPolicyMembership();
-    const apps = this.installedApps
+
+    // event delegation once — avoid thousands of listeners
+    if (!list.dataset.clickBound) {
+        list.dataset.clickBound = '1';
+        list.addEventListener('click', (e) => {
+            const row = e.target.closest('.app-policy-row');
+            if (!row || !list.contains(row)) return;
+            const pkg = row.dataset.pkg;
+            if (!pkg) return;
+            this.openAppProfilePicker(pkg, row.dataset.label || pkg).catch((err) => console.error(err));
+        });
+    }
+
+    // cancel previous chunk render
+    if (list._renderToken) list._renderToken.cancelled = true;
+    const token = { cancelled: false };
+    list._renderToken = token;
+
+    const configured = new Set();
+    (this.installedApps || []).forEach((app) => {
+        if (this.isAppPolicyConfigured(app.packageName, membership)) configured.add(app.packageName);
+    });
+
+    const apps = (this.installedApps || [])
         .filter(app => !keyword || app.label.toLowerCase().includes(keyword) || app.packageName.toLowerCase().includes(keyword))
         .sort((a, b) => {
-            const aActive = this.isAppPolicyConfigured(a.packageName, membership);
-            const bActive = this.isAppPolicyConfigured(b.packageName, membership);
+            const aActive = configured.has(a.packageName);
+            const bActive = configured.has(b.packageName);
             if (aActive !== bActive) return aActive ? -1 : 1;
-            return a.label.localeCompare(b.label, 'zh-Hans-CN-u-co-pinyin') || a.packageName.localeCompare(b.packageName);
+            // plain compare first (much cheaper than pinyin collator on full list)
+            return a.label.localeCompare(b.label, 'zh') || a.packageName.localeCompare(b.packageName);
         });
+
     if (apps.length === 0) {
         list.innerHTML = '<div class="priority-empty">没有匹配的应用</div>';
         return;
     }
-    list.innerHTML = apps.map(app => {
+
+    const rowHtml = (app) => {
+        const active = configured.has(app.packageName);
         const tags = this.renderAppPolicyTags(app.packageName, membership);
-        return `<div class="app-policy-row ${this.isAppPolicyConfigured(app.packageName, membership) ? 'active' : ''}" data-pkg="${this.escapeHtml(app.packageName)}" data-label="${this.escapeHtml(app.label)}">${this.renderAppPolicyIcon(app)}<div class="app-policy-info"><div class="app-policy-name">${this.escapeHtml(app.label)}</div><div class="app-policy-package">${this.escapeHtml(app.packageName)}</div><div class="app-policy-tags">${tags}</div></div><div class="app-policy-check">✓</div></div>`;
-    }).join('');
-    this.hydrateAppPolicyIcons(list);
-    list.querySelectorAll('.app-policy-row').forEach(row => {
-        row.addEventListener('click', async () => {
-            const pkg = row.dataset.pkg;
-            await this.openAppProfilePicker(pkg, row.dataset.label || pkg);
-        });
-    });
+        return `<div class="app-policy-row ${active ? 'active' : ''}" data-pkg="${this.escapeHtml(app.packageName)}" data-label="${this.escapeHtml(app.label)}">${this.renderAppPolicyIcon(app)}<div class="app-policy-info"><div class="app-policy-name">${this.escapeHtml(app.label)}</div><div class="app-policy-package">${this.escapeHtml(app.packageName)}</div><div class="app-policy-tags">${tags}</div></div><div class="app-policy-check">✓</div></div>`;
+    };
+
+    // chunked paint so opening list never freezes UI (animation/main thread)
+    list.innerHTML = '';
+    const chunk = 36;
+    let index = 0;
+    const paint = () => {
+        if (token.cancelled) return;
+        const end = Math.min(index + chunk, apps.length);
+        let html = '';
+        for (let i = index; i < end; i++) html += rowHtml(apps[i]);
+        list.insertAdjacentHTML('beforeend', html);
+        // hydrate only the new batch
+        this.hydrateAppPolicyIcons(list);
+        index = end;
+        if (index < apps.length) {
+            requestAnimationFrame(paint);
+        }
+    };
+    requestAnimationFrame(paint);
 };
 CoronaAddon.prototype.reorderAppPolicyRow = function(pkg) {
     const list = document.getElementById('app-policy-list');
