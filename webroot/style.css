@@ -1,29 +1,30 @@
 :root {
-    --bg-color: #F0F4F8;
-    --glass-surface: rgba(255, 255, 255, 0.45);
-    --glass-surface-strong: rgba(255, 255, 255, 0.55);
-    --glass-border: rgba(255, 255, 255, 0.25);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
-    --glass-shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    --bg-color: #F3F5F8;
+    --glass-surface: rgba(255, 255, 255, 0.86);
+    --glass-surface-strong: rgba(255, 255, 255, 0.94);
+    --glass-border: rgba(15, 23, 42, 0.08);
+    --glass-shadow: 0 2px 8px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.05);
+    --glass-shadow-lg: 0 8px 28px rgba(15, 23, 42, 0.10);
     --hue: 214;
     --primary: hsl(var(--hue), 82%, 50%);
-    --primary-dim: hsla(var(--hue), 82%, 50%, 0.18);
-    --primary-light: hsla(var(--hue), 82%, 50%, 0.12);
+    --primary-dim: hsla(var(--hue), 82%, 50%, 0.14);
+    --primary-light: hsla(var(--hue), 82%, 50%, 0.09);
     --accent: hsl(var(--hue), 70%, 42%);
     --on-primary: #ffffff;
-    --card-bg: #ffffff;
-    --warning: #FF9800;
-    --danger: #F44336;
-    --text-main: #1A1A1A;
-    --text-sub: #6E6E6E;
-    --text-dim: #A0A0A0;
-    --radius-card: 20px;
-    --radius-pill: 50px;
+    --card-bg: var(--glass-surface);
+    --warning: #F59E0B;
+    --danger: #EF4444;
+    --text-main: #111827;
+    --text-sub: #6B7280;
+    --text-dim: #9CA3AF;
+    --radius-card: 18px;
+    --radius-ctl: 14px;
+    --radius-pill: 999px;
     --nav-height: 56px;
-    --motion-ease: cubic-bezier(0.22, 0.78, 0.18, 1);
-    --motion-fast: 0.28s;
-    --motion-base: 0.45s;
-    --motion-slow: 0.59s;
+    --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --motion-fast: 0.22s;
+    --motion-base: 0.36s;
+    --motion-slow: 0.5s;
     --module-font: "OPPOSans", "OnePlus Sans", "MiSans", "HarmonyOS Sans SC", "Noto Sans SC", "PingFang SC", "Source Han Sans SC", sans-serif;
 }
 
@@ -46,26 +47,42 @@ html {
 }
 body {
     --primary: hsl(var(--hue), 82%, 50%);
-    --primary-dim: hsla(var(--hue), 82%, 50%, 0.18);
-    --primary-light: hsla(var(--hue), 82%, 50%, 0.12);
+    --primary-dim: hsla(var(--hue), 82%, 50%, 0.14);
+    --primary-light: hsla(var(--hue), 82%, 50%, 0.09);
     --accent: hsl(var(--hue), 70%, 42%);
     --on-primary: #ffffff;
-    --card-bg: #ffffff;
+    --card-bg: var(--glass-surface);
 }
 body.theme-dark {
+    --bg-color: #101217;
+    --glass-surface: rgba(30, 33, 40, 0.92);
+    --glass-surface-strong: rgba(38, 42, 52, 0.96);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+    --glass-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.36);
     --primary: hsl(var(--hue), 78%, 62%);
-    --primary-dim: hsla(var(--hue), 78%, 62%, 0.22);
-    --primary-light: hsla(var(--hue), 78%, 62%, 0.14);
+    --primary-dim: hsla(var(--hue), 78%, 62%, 0.18);
+    --primary-light: hsla(var(--hue), 78%, 62%, 0.12);
     --accent: hsl(var(--hue), 70%, 58%);
-    --card-bg: #1e1e22;
+    --card-bg: var(--glass-surface);
+    --text-main: #F3F4F6;
+    --text-sub: #9CA3AF;
+    --text-dim: #6B7280;
 }
 body.theme-gold {
-    /* gold surfaces elsewhere; primary follows hue with solid tones */
+    --bg-color: #F4EEE2;
+    --glass-surface: rgba(251, 247, 240, 0.94);
+    --glass-surface-strong: rgba(252, 248, 241, 0.98);
+    --glass-border: rgba(109, 85, 51, 0.12);
+    --glass-shadow: 0 2px 10px rgba(71, 53, 28, 0.06);
     --primary: hsl(var(--hue), 58%, 42%);
-    --primary-dim: hsla(var(--hue), 58%, 42%, 0.18);
-    --primary-light: hsla(var(--hue), 58%, 42%, 0.12);
+    --primary-dim: hsla(var(--hue), 58%, 42%, 0.14);
+    --primary-light: hsla(var(--hue), 58%, 42%, 0.09);
     --accent: hsl(var(--hue), 52%, 38%);
-    --card-bg: #F8F3EA;
+    --card-bg: var(--glass-surface);
+    --text-main: #241A11;
+    --text-sub: #66523D;
+    --text-dim: #9A8262;
 }
 
 /* Soft theme / color transition - minimal */
@@ -671,15 +688,15 @@ body.monet-decoration .bg-decoration::before {
 }
 
 .card {
-    background: rgba(255, 255, 255, 0.35);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: var(--glass-surface);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius-card);
-    padding: 18px 20px;
+    padding: 16px 18px;
     margin-bottom: 12px;
     box-shadow: var(--glass-shadow);
-    transition: transform 0.28s var(--motion-ease), box-shadow 0.28s ease, opacity 0.28s ease, filter 0.28s ease;
+    transition: transform var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) ease, opacity var(--motion-fast) ease;
 }
 
 .card:active {
@@ -751,10 +768,10 @@ body.monet-decoration .bg-decoration::before {
     border-radius: var(--radius-card);
     margin-bottom: 12px;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.35);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: var(--glass-surface);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
     cursor: grab;
     transition: transform 0.15s ease-out;

@@ -150,7 +150,7 @@
 .option-item {
     background: rgba(0, 0, 0, 0.04);
     border: 1.5px solid transparent;
-    border-radius: 12px;
+    border-radius: var(--radius-pill);
     padding: 10px 8px;
     text-align: center;
     font-size: 13px;
@@ -176,7 +176,7 @@
 .option-list .option-item {
     flex-shrink: 0;
     min-width: 80px;
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
     padding: 10px 14px;
 }
 
@@ -262,16 +262,17 @@
 
 .action-btn {
     width: 100%;
-    padding: 14px;
+    padding: 12px 18px;
+    min-height: 46px;
     background: var(--primary);
-    color: #fffdf8;
+    color: #ffffff;
     border: none;
-    border-radius: 14px;
+    border-radius: var(--radius-pill);
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
-    transition: opacity 0.2s, transform 0.2s, background-color 0.2s, color 0.2s, box-shadow 0.2s;
-    box-shadow: 0 4px 10px color-mix(in srgb, var(--primary) 24%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    transition: opacity var(--motion-fast) ease, transform var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+    box-shadow: 0 2px 10px hsla(var(--hue), 82%, 50%, 0.22);
 }
 
 .action-btn:hover {

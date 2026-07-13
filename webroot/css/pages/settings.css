@@ -167,7 +167,7 @@ body.theme-dark .sub-card-header.expanded {
     gap: 8px 16px;
     padding: 8px 12px;
     background: var(--glass-surface);
-    border-radius: 10px;
+    border-radius: var(--radius-ctl, 14px);
     margin-bottom: 12px;
 }
 
@@ -208,10 +208,10 @@ body.theme-dark .lru-switch {
 }
 
 .module-card {
-    background: rgba(255, 255, 255, 0.35);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: var(--glass-surface);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius-card);
     margin-bottom: 12px;
     box-shadow: var(--glass-shadow);
@@ -224,7 +224,8 @@ body.theme-dark .lru-switch {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
+    padding: 14px 16px;
+    min-height: 52px;
 }
 .module-card-info {
     flex: 1;
@@ -396,7 +397,7 @@ body.theme-dark #page-settings .sub-card {
     width: 100%;
     padding: 12px 14px;
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--radius-ctl, 14px);
     background: var(--card-bg);
     color: var(--text-main);
     font-size: 14px;
@@ -424,7 +425,7 @@ body.theme-dark #page-settings .sub-card {
     flex: 1;
     padding: 10px 16px;
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--radius-ctl, 14px);
     background: var(--card-bg);
     color: var(--text-main);
     font-size: 13px;
@@ -458,7 +459,7 @@ body.theme-dark #page-settings .sub-card {
 .zram-device-option {
     cursor: pointer;
     transition: background 0.2s, transform 0.15s;
-    border-radius: 10px;
+    border-radius: var(--radius-ctl, 14px);
     font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
     font-size: 13px;
 }
@@ -749,7 +750,7 @@ body.app-hidden *::after {
     flex-direction: column;
     gap: 4px;
     padding: 10px 12px;
-    border-radius: 12px;
+    border-radius: var(--radius-ctl, 14px);
     background: var(--primary-light, rgba(52, 130, 255, 0.08));
     border: 1px solid var(--glass-border, rgba(0,0,0,0.06));
 }
@@ -807,14 +808,13 @@ body.theme-dark #swap-content .text-input {
 #swap-content .action-btn,
 #memory-compression-content .action-btn {
     margin-top: 14px;
-    background: hsla(var(--hue), 82%, 50%, 0.55);
+    background: var(--primary);
     color: #fff;
-    border: 1px solid hsla(var(--hue), 82%, 50%, 0.35);
-    border-radius: 14px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 4px 14px hsla(var(--hue), 82%, 50%, 0.16);
+    border: none;
+    border-radius: var(--radius-pill);
+    box-shadow: 0 2px 10px hsla(var(--hue), 82%, 50%, 0.22);
     font-weight: 600;
+    min-height: 46px;
 }
 #zram-content .action-btn:active,
 #swap-content .action-btn:active,
@@ -838,7 +838,7 @@ body.theme-dark #swap-content .zram-actions-sep {
     background: hsla(var(--hue), 82%, 50%, 0.14);
     color: var(--primary);
     border: 1px solid hsla(var(--hue), 82%, 50%, 0.22);
-    border-radius: 10px;
+    border-radius: var(--radius-ctl, 14px);
     font-weight: 600;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
