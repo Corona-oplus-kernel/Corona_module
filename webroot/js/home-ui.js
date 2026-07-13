@@ -87,39 +87,39 @@
     expandPanelContent(content, toggle, { icon = null, cardEl = null, onExpand = null } = {}) {
         if (!content) return;
         this.ensureCollapsible(content);
+        content._panelState = 'opening';
+
+        // cancel in-flight anim — then reverse from CURRENT height (no snap to 0)
         if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
-        if (content._anim) { content.removeEventListener('transitionend', content._anim); content._anim = null; }
+        if (content._anim) { try { content.removeEventListener('transitionend', content._anim); } catch (e) {} content._anim = null; }
+
+        const currentH = Math.max(content.getBoundingClientRect().height || 0, 0);
 
         content.classList.remove('hidden');
-        content.style.removeProperty('pointer-events');
+        content.classList.add('expanded');
+        content.style.pointerEvents = '';
         content.style.overflow = 'hidden';
+        content.style.opacity = '1';
+        content.style.transform = 'none';
+        content.style.transition = 'none';
 
-        // 箭头先转（修延迟）
+        // measure full open height
+        content.style.maxHeight = 'none';
+        const target = Math.max(content.scrollHeight, 1);
+        content._openHeight = target;
+
+        // start from where we are (interrupted mid-close resumes from middle)
+        const from = Math.min(currentH || 0, target);
+        content.style.maxHeight = from + 'px';
+        void content.offsetHeight;
+
+        const duration = this.getPanelAnimMs(Math.max(target - from, target * 0.35));
+
+        // arrow open with height
         if (toggle) toggle.classList.add('expanded');
         if (icon) icon.classList.add('expanded');
         const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
         if (header) header.classList.add('expanded');
-
-        // measure target height with expanded class/padding
-        content.classList.add('expanded');
-        content.style.maxHeight = 'none';
-        content.style.opacity = '1';
-        content.style.transform = 'translateY(0)';
-        const target = Math.max(content.scrollHeight, 1);
-        content._openHeight = target;
-        const duration = this.getPanelAnimMs(target);
-
-        // start collapsed frame
-        content.style.maxHeight = '0px';
-        content.style.opacity = '0';
-        content.style.transform = 'translateY(-8px)';
-        this.setPanelTransition(content, duration);
-        void content.offsetHeight;
-
-        // animate open
-        content.style.maxHeight = target + 'px';
-        content.style.opacity = '1';
-        content.style.transform = 'translateY(0)';
 
         let finished = false;
         const finish = () => {
@@ -135,7 +135,8 @@
                 content.style.overflow = 'visible';
                 content.style.opacity = '1';
                 content.style.transform = 'none';
-                content._openHeight = Math.max(content.getBoundingClientRect().height || content.scrollHeight || 1, 1);
+                content._openHeight = Math.max(content.getBoundingClientRect().height || target, 1);
+                content._panelState = 'open';
             }
             if (cardEl) cardEl.classList.remove('expanding');
             if (typeof endExpand === 'function') endExpand();
@@ -150,15 +151,30 @@
         };
         content._anim = onEnd;
         content.addEventListener('transitionend', onEnd);
-        content._animTimer = setTimeout(finish, duration + 100);
+
+        // transition then reflow then open
+        this.setPanelTransition(content, duration, 'height');
+        void content.offsetHeight;
+        content.style.maxHeight = target + 'px';
+        content._animTimer = setTimeout(finish, duration + 80);
     },
     collapsePanelContent(content, toggle, { icon = null, cardEl = null, onCollapse = null, beforeCollapse = null } = {}) {
         if (!content) return;
         this.ensureCollapsible(content);
-        if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
-        if (content._anim) { content.removeEventListener('transitionend', content._anim); content._anim = null; }
+        content._panelState = 'closing';
 
-        // Keep content visible (expanded) while height folds — no opacity fade
+        // cancel in-flight anim — reverse from CURRENT height (no snap to full then close)
+        if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
+        if (content._anim) { try { content.removeEventListener('transitionend', content._anim); } catch (e) {} content._anim = null; }
+
+        const currentH = Math.max(content.getBoundingClientRect().height || 0, 0);
+        if (currentH < 2 && !content.classList.contains('expanded')) {
+            // already closed
+            content.classList.add('hidden');
+            content.classList.remove('expanded');
+            return;
+        }
+
         content.classList.add('expanded');
         content.classList.remove('hidden');
         content.style.pointerEvents = 'none';
@@ -167,13 +183,12 @@
         content.style.transform = 'none';
         content.style.transition = 'none';
 
-        // 箭头先转回（与折叠同时开始）
+        // 箭头随收起
         if (toggle) toggle.classList.remove('expanded');
         if (icon) icon.classList.remove('expanded');
         const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
         if (header) header.classList.remove('expanded');
 
-        // 模块设置内嵌列表：瞬间收，避免父级折叠时双重动画
         if (content.id === 'app-settings-content') {
             const visList = document.getElementById('card-visibility-list');
             const visToggle = document.getElementById('card-visibility-toggle');
@@ -184,11 +199,14 @@
             if (visToggle) visToggle.classList.remove('expanded');
         }
 
-        // 锁高度：优先用展开时缓存，避免大 DOM 再回流（卡顿主因之一）
-        let from = Number(content._openHeight) || 0;
+        // pin FROM current visual height (interrupted mid-open resumes from middle)
+        let from = currentH;
         if (!(from > 1)) {
-            content.style.maxHeight = 'none';
-            from = Math.max(content.getBoundingClientRect().height || content.scrollHeight || 1, 1);
+            from = Number(content._openHeight) || 0;
+            if (!(from > 1)) {
+                content.style.maxHeight = 'none';
+                from = Math.max(content.scrollHeight || 1, 1);
+            }
         }
         content.style.maxHeight = from + 'px';
         void content.offsetHeight;
@@ -199,7 +217,6 @@
             try { onCollapse(); } catch (e) {}
         }
 
-        // 滚动锁定：底部大卡片收起时避免页面回弹卡顿
         const scroller = document.querySelector('.container');
         const pinScroll = scroller ? scroller.scrollTop : 0;
         const lockScroll = () => {
@@ -229,7 +246,6 @@
             content._anim = null;
             content._animTimer = null;
 
-            // 轻量收尾（避免 forceClose 末段猛清样式再卡一下）
             content.style.transition = 'none';
             content.style.maxHeight = '0px';
             content.classList.remove('expanded');
@@ -239,12 +255,12 @@
             content.style.transform = 'none';
             content.style.pointerEvents = '';
             content._openHeight = 0;
+            content._panelState = 'closed';
 
             cleanupScroll();
             if (cardEl) cardEl.classList.remove('expanding');
             if (typeof endExpand === 'function') endExpand();
 
-            // 子项清理放到结束后，避免折叠中途卡顿
             if (typeof beforeCollapse === 'function') {
                 requestAnimationFrame(() => {
                     try { beforeCollapse(); } catch (e) {}
@@ -260,13 +276,10 @@
         content._anim = onEnd;
         content.addEventListener('transitionend', onEnd);
 
-        // 只动画高度；先设 transition 再 reflow 再设 0，保证有动画
-        requestAnimationFrame(() => {
-            this.setPanelTransition(content, duration, 'height');
-            void content.offsetHeight;
-            content.style.maxHeight = '0px';
-            content._animTimer = setTimeout(finish, duration + 80);
-        });
+        this.setPanelTransition(content, duration, 'height');
+        void content.offsetHeight;
+        content.style.maxHeight = '0px';
+        content._animTimer = setTimeout(finish, duration + 80);
     },
 
     initChart() {
@@ -412,11 +425,13 @@
             content.classList.remove('hidden', 'expanded');
             toggle.classList.remove('expanded');
             toggle.addEventListener('click', () => {
-                const open = content.classList.contains('expanded');
+                // opening/open -> collapse; closing/closed -> expand (supports reverse mid-anim)
+                const state = content._panelState || (content.classList.contains('expanded') && !content.classList.contains('hidden') ? 'open' : 'closed');
+                const shouldClose = state === 'open' || state === 'opening';
                 const cardEl = toggle.closest('.module-card');
                 if (cardEl) cardEl.classList.add('expanding');
                 if (typeof beginExpand === 'function') beginExpand();
-                if (open) {
+                if (shouldClose) {
                     this.collapsePanelContent(content, toggle, {
                         cardEl,
                         beforeCollapse: content.id === 'memory-compression-content'
@@ -540,11 +555,13 @@
             toggle.classList.remove('expanded');
             if (icon) icon.classList.remove('expanded');
             toggle.addEventListener('click', () => {
-                const open = content.classList.contains('expanded');
+                // opening/open -> collapse; closing/closed -> expand (supports reverse mid-anim)
+                const state = content._panelState || (content.classList.contains('expanded') && !content.classList.contains('hidden') ? 'open' : 'closed');
+                const shouldClose = state === 'open' || state === 'opening';
                 const cardEl = toggle.closest('.module-card');
                 if (cardEl) cardEl.classList.add('expanding');
                 if (typeof beginExpand === 'function') beginExpand();
-                if (open) {
+                if (shouldClose) {
                     this.collapsePanelContent(content, toggle, {
                         icon, cardEl, onCollapse: card.onCollapse || null
                     });
