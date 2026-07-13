@@ -3399,8 +3399,12 @@ body.theme-dark #page-settings::after {
         linear-gradient(180deg, rgba(20, 20, 24, 0) 0%, rgba(20, 20, 24, 0.12) 52%, rgba(14, 14, 18, 0) 100%);
 }
 
+/* 不要在可折叠内容上加底部 padding，末段会像卡住 */
+#app-settings-card:has(#app-settings-content.expanded) {
+    margin-bottom: calc(var(--nav-height) + 10px);
+}
 #app-settings-content.expanded {
-    padding-bottom: calc(var(--nav-height) + 2px);
+    /* no extra padding-bottom */
 }
 
 .page-lead {

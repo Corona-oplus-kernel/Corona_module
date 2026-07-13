@@ -130,7 +130,7 @@ body.theme-dark .sub-card-header.expanded {
 /* chevron more obvious */
 .sub-card-header .expand-icon,
 .module-card-expand {
-    transition: transform 0.42s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.3s ease;
+    transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 .sub-card-header.expanded .expand-icon {
     transform: rotate(270deg);
@@ -271,7 +271,6 @@ body.setting-descriptions-hidden .section-header-row > div {
     padding-left: 12px;
 }
 .module-card-expand {
-    transition: transform var(--motion-fast) ease, opacity var(--motion-fast) ease;
     width: 32px;
     height: 32px;
     display: flex;
@@ -279,18 +278,20 @@ body.setting-descriptions-hidden .section-header-row > div {
     justify-content: center;
     background: transparent;
     cursor: pointer;
-    transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
     color: var(--text-sub);
+    transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1), color 0.15s ease;
+}
+.module-card-expand.expanded {
+    transform: rotate(180deg);
 }
 .module-card-expand:active {
-    transform: scale(0.95);
     color: var(--primary);
 }
 .module-card-expand svg {
-    transition: transform 0.3s ease;
+    transition: none;
 }
 .module-card-expand.expanded svg {
-    transform: rotate(180deg);
+    transform: none;
 }
 .module-card-content > .switch-container {
     margin-bottom: 16px;

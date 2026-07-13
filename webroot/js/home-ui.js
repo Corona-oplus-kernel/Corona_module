@@ -24,10 +24,9 @@
         return inner;
     },
     getPanelAnimMs(heightPx) {
-        // taller content -> longer anim; short content stays snappy
         const h = Math.max(0, Number(heightPx) || 0);
-        // ~0.55ms per px, clamp 220ms .. 720ms
-        return Math.round(Math.min(720, Math.max(220, h * 0.55 + 180)));
+        // 展开别太快；高面板略慢（「同时」之前那版）
+        return Math.round(Math.min(420, Math.max(240, h * 0.32 + 180)));
     },
     setPanelTransition(content, durationMs, mode = 'both') {
         if (!content) return;
@@ -95,12 +94,19 @@
         content.style.removeProperty('pointer-events');
         content.style.overflow = 'hidden';
 
+        // 箭头先转（修延迟）
+        if (toggle) toggle.classList.add('expanded');
+        if (icon) icon.classList.add('expanded');
+        const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
+        if (header) header.classList.add('expanded');
+
         // measure target height with expanded class/padding
         content.classList.add('expanded');
         content.style.maxHeight = 'none';
         content.style.opacity = '1';
         content.style.transform = 'translateY(0)';
         const target = Math.max(content.scrollHeight, 1);
+        content._openHeight = target;
         const duration = this.getPanelAnimMs(target);
 
         // start collapsed frame
@@ -114,11 +120,6 @@
         content.style.maxHeight = target + 'px';
         content.style.opacity = '1';
         content.style.transform = 'translateY(0)';
-
-        if (toggle) toggle.classList.add('expanded');
-        if (icon) icon.classList.add('expanded');
-        const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
-        if (header) header.classList.add('expanded');
 
         let finished = false;
         const finish = () => {
@@ -134,6 +135,7 @@
                 content.style.overflow = 'visible';
                 content.style.opacity = '1';
                 content.style.transform = 'none';
+                content._openHeight = Math.max(content.getBoundingClientRect().height || content.scrollHeight || 1, 1);
             }
             if (cardEl) cardEl.classList.remove('expanding');
             if (typeof endExpand === 'function') endExpand();
@@ -156,7 +158,7 @@
         if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
         if (content._anim) { content.removeEventListener('transitionend', content._anim); content._anim = null; }
 
-        // 1) Freeze current visual height FIRST — prevents jank when children collapse
+        // Keep content visible (expanded) while height folds — no opacity fade
         content.classList.add('expanded');
         content.classList.remove('hidden');
         content.style.pointerEvents = 'none';
@@ -165,27 +167,60 @@
         content.style.transform = 'none';
         content.style.transition = 'none';
 
-        const from = Math.max(content.getBoundingClientRect().height || content.scrollHeight || 1, 1);
-        content.style.maxHeight = from + 'px';
-        void content.offsetHeight; // lock pin
-
-        // 2) Now safe to collapse nested panels (parent height is pinned)
-        if (typeof beforeCollapse === 'function') {
-            try { beforeCollapse(); } catch (e) {}
-        }
-
-        const duration = this.getPanelAnimMs(from);
-
-        // 3) Next frame: enable transition then animate to 0 (double rAF = no hitch)
+        // 箭头先转回（与折叠同时开始）
         if (toggle) toggle.classList.remove('expanded');
         if (icon) icon.classList.remove('expanded');
         const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
         if (header) header.classList.remove('expanded');
+
+        // 模块设置内嵌列表：瞬间收，避免父级折叠时双重动画
+        if (content.id === 'app-settings-content') {
+            const visList = document.getElementById('card-visibility-list');
+            const visToggle = document.getElementById('card-visibility-toggle');
+            if (visList) {
+                visList.style.transition = 'none';
+                visList.classList.remove('expanded');
+            }
+            if (visToggle) visToggle.classList.remove('expanded');
+        }
+
+        // 锁高度：优先用展开时缓存，避免大 DOM 再回流（卡顿主因之一）
+        let from = Number(content._openHeight) || 0;
+        if (!(from > 1)) {
+            content.style.maxHeight = 'none';
+            from = Math.max(content.getBoundingClientRect().height || content.scrollHeight || 1, 1);
+        }
+        content.style.maxHeight = from + 'px';
+        void content.offsetHeight;
+
+        const duration = this.getPanelAnimMs(from);
+
         if (typeof onCollapse === 'function') {
             try { onCollapse(); } catch (e) {}
         }
 
+        // 滚动锁定：底部大卡片收起时避免页面回弹卡顿
+        const scroller = document.querySelector('.container');
+        const pinScroll = scroller ? scroller.scrollTop : 0;
+        const lockScroll = () => {
+            if (!scroller) return;
+            const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+            scroller.scrollTop = Math.min(pinScroll, max);
+        };
+        if (scroller) {
+            scroller.style.overflowAnchor = 'none';
+            scroller.addEventListener('scroll', lockScroll, { passive: true });
+        }
+
         let finished = false;
+        const cleanupScroll = () => {
+            if (!scroller) return;
+            scroller.removeEventListener('scroll', lockScroll);
+            scroller.style.removeProperty('overflow-anchor');
+            const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+            if (scroller.scrollTop > max) scroller.scrollTop = max;
+        };
+
         const finish = () => {
             if (finished) return;
             finished = true;
@@ -193,18 +228,30 @@
             clearTimeout(content._animTimer);
             content._anim = null;
             content._animTimer = null;
-            if (typeof this.forceClosePanel === 'function') this.forceClosePanel(content, toggle);
-            else {
-                this.clearPanelTransition(content);
-                content.classList.remove('expanded');
-                content.classList.add('hidden');
-                content.style.maxHeight = '0px';
-                content.style.opacity = '0';
-                content.style.overflow = 'hidden';
-            }
+
+            // 轻量收尾（避免 forceClose 末段猛清样式再卡一下）
+            content.style.transition = 'none';
+            content.style.maxHeight = '0px';
+            content.classList.remove('expanded');
+            content.classList.add('hidden');
+            content.style.overflow = 'hidden';
+            content.style.opacity = '1';
+            content.style.transform = 'none';
+            content.style.pointerEvents = '';
+            content._openHeight = 0;
+
+            cleanupScroll();
             if (cardEl) cardEl.classList.remove('expanding');
             if (typeof endExpand === 'function') endExpand();
+
+            // 子项清理放到结束后，避免折叠中途卡顿
+            if (typeof beforeCollapse === 'function') {
+                requestAnimationFrame(() => {
+                    try { beforeCollapse(); } catch (e) {}
+                });
+            }
         };
+
         const onEnd = (e) => {
             if (e && e.target !== content) return;
             if (e && e.propertyName && e.propertyName !== 'max-height') return;
@@ -213,12 +260,12 @@
         content._anim = onEnd;
         content.addEventListener('transitionend', onEnd);
 
+        // 只动画高度；先设 transition 再 reflow 再设 0，保证有动画
         requestAnimationFrame(() => {
             this.setPanelTransition(content, duration, 'height');
-            requestAnimationFrame(() => {
-                content.style.maxHeight = '0px';
-                content._animTimer = setTimeout(finish, duration + 100);
-            });
+            void content.offsetHeight;
+            content.style.maxHeight = '0px';
+            content._animTimer = setTimeout(finish, duration + 80);
         });
     },
 
