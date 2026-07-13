@@ -77,20 +77,19 @@ body.theme-dark .sub-card-header.expanded {
     display: block;
     overflow: hidden;
     max-height: 0;
-    opacity: 0;
-    transform: translateY(-8px);
+    opacity: 1; /* keep content visible while height folds */
+    transform: none;
     transform-origin: top center;
-    will-change: max-height, opacity, transform;
-    /* duration set per open/close by JS according to height */
-    transition-property: max-height, opacity, transform;
-    transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1), ease, cubic-bezier(0.22, 0.61, 0.36, 1);
-    transition-duration: 0.4s, 0.3s, 0.35s;
+    will-change: max-height;
+    transition-property: max-height;
+    transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+    transition-duration: 0.4s;
 }
 
 .sub-expandable-content.expanded,
 .module-card-content.expanded {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
 }
 
 .sub-expandable-content.hidden,

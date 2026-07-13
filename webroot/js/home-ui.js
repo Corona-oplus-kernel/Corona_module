@@ -29,11 +29,16 @@
         // ~0.55ms per px, clamp 220ms .. 720ms
         return Math.round(Math.min(720, Math.max(220, h * 0.55 + 180)));
     },
-    setPanelTransition(content, durationMs) {
+    setPanelTransition(content, durationMs, mode = 'both') {
         if (!content) return;
         const d = Math.max(180, Number(durationMs) || 320);
         const ease = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
-        content.style.transition = `max-height ${d}ms ${ease}, opacity ${Math.round(d * 0.75)}ms ease, transform ${Math.round(d * 0.85)}ms ${ease}`;
+        if (mode === 'height') {
+            // collapse: only fold height so inner content stays visible while closing
+            content.style.transition = `max-height ${d}ms ${ease}`;
+            return;
+        }
+        content.style.transition = `max-height ${d}ms ${ease}, opacity ${Math.round(d * 0.7)}ms ease, transform ${Math.round(d * 0.8)}ms ${ease}`;
     },
     clearPanelTransition(content) {
         if (!content) return;
@@ -153,23 +158,26 @@
             try { beforeCollapse(); } catch (e) {}
         }
 
-        // use visual height, more accurate than scrollHeight with max-height:none
+        // Keep expanded class during fold so padding/content stay visible;
+        // only animate height — avoids "content vanishes then collapses".
+        content.classList.add('expanded');
+        content.classList.remove('hidden');
         content.style.overflow = 'hidden';
         content.style.opacity = '1';
         content.style.transform = 'none';
+        content.style.pointerEvents = 'none';
+
         const rectH = content.getBoundingClientRect().height;
         const from = Math.max(rectH || content.scrollHeight || 1, 1);
         content.style.maxHeight = from + 'px';
         const duration = this.getPanelAnimMs(from);
-        this.setPanelTransition(content, duration);
+        this.setPanelTransition(content, duration, 'height');
         void content.offsetHeight;
 
-        // animate close
-        content.classList.remove('expanded');
+        // fold height only
         content.style.maxHeight = '0px';
-        content.style.opacity = '0';
-        content.style.transform = 'translateY(-6px)';
 
+        // chevrons can turn immediately
         if (toggle) toggle.classList.remove('expanded');
         if (icon) icon.classList.remove('expanded');
         const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
@@ -186,7 +194,7 @@
             clearTimeout(content._animTimer);
             content._anim = null;
             content._animTimer = null;
-            // hard close — no residual gap
+            // only now hide content / remove expanded
             if (typeof this.forceClosePanel === 'function') {
                 this.forceClosePanel(content, toggle);
             } else {
