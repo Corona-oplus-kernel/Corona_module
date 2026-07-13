@@ -7,10 +7,12 @@
         const savedTheme = localStorage.getItem('corona_theme') || 'light';
         const normalizedTheme = savedTheme === 'auto' ? 'light' : savedTheme;
         this.state.theme = normalizedTheme;
+        this.state.hue = parseInt(localStorage.getItem('corona_color_hue') || '214', 10) || 214;
         if (normalizedTheme !== savedTheme) {
             localStorage.setItem('corona_theme', normalizedTheme);
         }
-        this.applyTheme(normalizedTheme);
+        this.applyTheme(normalizedTheme, false);
+        this.applyHue(this.state.hue, false);
     },
     initChangePreviewPreference() {
         const saved = localStorage.getItem('corona_change_preview');
@@ -133,26 +135,194 @@
         const toggle = document.getElementById('category-config-visibility-switch');
         if (toggle) toggle.checked = normalized;
     },
-    applyTheme(theme) {
+    applyThemeTransition() {
+        const body = document.body;
+        body.classList.add('theme-animate');
+        if (this._themeAnimTimer) clearTimeout(this._themeAnimTimer);
+        this._themeAnimTimer = setTimeout(() => {
+            body.classList.remove('theme-animate');
+        }, 300);
+    },
+    normalizeHue(hue) {
+        const n = parseInt(hue, 10);
+        if (!Number.isFinite(n)) return 214;
+        return Math.max(0, Math.min(360, n));
+    },
+    applyHue(hue, animate = true) {
+        const value = this.normalizeHue(hue);
+        if (animate) this.applyThemeTransition();
+        document.documentElement.style.setProperty('--hue', String(value));
+        document.body.style.setProperty('--hue', String(value));
+        // explicit solid colors for WebView compatibility
+        const isDark = document.body.classList.contains('theme-dark');
+        const isGold = document.body.classList.contains('theme-gold');
+        const sat = isGold ? 58 : (isDark ? 78 : 82);
+        const light = isGold ? 42 : (isDark ? 62 : 50);
+        const primary = `hsl(${value}, ${sat}%, ${light}%)`;
+        const dim = `hsla(${value}, ${sat}%, ${light}%, ${isDark ? 0.22 : 0.18})`;
+        const lite = `hsla(${value}, ${sat}%, ${light}%, ${isDark ? 0.14 : 0.12})`;
+        const accent = `hsl(${value}, ${Math.max(sat - 10, 50)}%, ${Math.max(light - 8, 36)}%)`;
+        [document.documentElement, document.body].forEach(el => {
+            el.style.setProperty('--primary', primary);
+            el.style.setProperty('--primary-dim', dim);
+            el.style.setProperty('--primary-light', lite);
+            el.style.setProperty('--accent', accent);
+        });
+        this.state.hue = value;
+        localStorage.setItem('corona_color_hue', String(value));
+        // migrate away from old accent keys
+        try { localStorage.removeItem('corona_accent'); } catch (e) {}
+
+        if (typeof this.updateColorPrefUI === 'function') this.updateColorPrefUI(value);
+
+        // refresh slider fills that use primary color
+        document.querySelectorAll('.range-slider').forEach(el => {
+            if (typeof this.updateSliderProgress === 'function') this.updateSliderProgress(el);
+        });
+    },
+    applyTheme(theme, animate = true) {
         const body = document.body;
         const normalizedTheme = theme === 'auto' ? 'light' : theme;
+        if (animate) this.applyThemeTransition();
         body.classList.remove('theme-light', 'theme-dark', 'theme-gold');
         body.classList.add(`theme-${normalizedTheme}`);
-        document.querySelectorAll('.range-slider').forEach(slider => this.updateSliderProgress(slider));
+        // ensure hue still drives primary after theme class changes
+        const hue = this.state.hue || this.normalizeHue(localStorage.getItem('corona_color_hue') || 214);
+        document.documentElement.style.setProperty('--hue', String(hue));
+        body.style.setProperty('--hue', String(hue));
+        document.querySelectorAll('.range-slider').forEach(slider => {
+            if (typeof this.updateSliderProgress === 'function') this.updateSliderProgress(slider);
+        });
+    },
+    initAccentSelector() {
+        const current = this.normalizeHue(this.state.hue || localStorage.getItem('corona_color_hue') || 214);
+        this.applyHue(current, false);
+        this.updateColorPrefUI(current);
+
+        const openBtn = document.getElementById('color-picker-btn');
+        if (openBtn && !openBtn.dataset.bound) {
+            openBtn.dataset.bound = '1';
+            openBtn.addEventListener('click', () => this.showColorPicker());
+        }
+
+        const resetBtn = document.getElementById('theme-reset-btn');
+        if (resetBtn && !resetBtn.dataset.bound) {
+            resetBtn.dataset.bound = '1';
+            resetBtn.addEventListener('click', async () => {
+                this.state.theme = 'light';
+                localStorage.setItem('corona_theme', 'light');
+                document.querySelectorAll('#theme-options .theme-option').forEach(o => {
+                    o.classList.toggle('selected', o.dataset.theme === 'light');
+                });
+                this.applyTheme('light', true);
+                this.applyHue(214, false);
+                this.updateColorPrefUI(214);
+                if (typeof this.resetUiLayout === 'function') this.resetUiLayout();
+                if (typeof this.switchPage === 'function') await this.switchPage('home');
+                if (typeof this.showToast === 'function') this.showToast('已返回默认界面');
+            });
+        }
+    },
+    updateColorPrefUI(hue) {
+        const value = this.normalizeHue(hue);
+        const swatch = document.getElementById('color-pref-swatch');
+        const desc = document.getElementById('color-pref-desc');
+        if (swatch) swatch.style.background = `hsl(${value}, 82%, 50%)`;
+        if (desc) desc.textContent = `当前色调 ${value}°`;
+    },
+    showColorPicker() {
+        if (document.querySelector('.color-picker-overlay')) return;
+        const originalHue = String(this.normalizeHue(this.state.hue || localStorage.getItem('corona_color_hue') || 214));
+        // same preset set as Zram_WebUI demo
+        const presetHues = [0, 37, 66, 97, 124, 148, 176, 212, 255, 300, 325];
+
+        const overlay = document.createElement('div');
+        overlay.className = 'color-picker-overlay';
+        const dialog = document.createElement('div');
+        dialog.className = 'color-picker-dialog';
+        dialog.innerHTML = `
+            <h2>颜色选择器</h2>
+            <div class="color-picker-content">
+                <div class="preset-colors">
+                    ${presetHues.map(h => `
+                        <button type="button" class="preset-color${Math.abs(h - Number(originalHue)) <= 2 ? ' active' : ''}" data-hue="${h}" aria-label="色调 ${h}" style="--preview-hue:${h};background:hsl(${h}, 82%, 50%)"></button>
+                    `).join('')}
+                </div>
+                <label>
+                    <span>色调值</span>
+                    <div class="hue-control">
+                        <input type="range" id="picker-hue-slider" min="0" max="360" value="${originalHue}">
+                        <output id="picker-hue-value">${originalHue}°</output>
+                    </div>
+                </label>
+            </div>
+            <div class="dialog-buttons">
+                <button type="button" class="dialog-button" id="cancel-color">取消</button>
+                <button type="button" class="dialog-button filled" id="apply-color">应用</button>
+            </div>
+        `;
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        const slider = dialog.querySelector('#picker-hue-slider');
+        const output = dialog.querySelector('#picker-hue-value');
+        const presets = dialog.querySelectorAll('.preset-color');
+
+        const previewHue = (hue) => {
+            const v = String(this.normalizeHue(hue));
+            document.documentElement.style.setProperty('--hue', v);
+            document.body.style.setProperty('--hue', v);
+            if (output) output.textContent = `${v}°`;
+            if (slider && slider.value !== v) slider.value = v;
+            presets.forEach(p => {
+                const h = parseInt(p.dataset.hue, 10);
+                p.classList.toggle('active', Math.abs(h - Number(v)) <= 2);
+            });
+            const swatch = document.getElementById('color-pref-swatch');
+            if (swatch) swatch.style.background = `hsl(${v}, 82%, 50%)`;
+        };
+
+        presets.forEach(p => {
+            p.addEventListener('click', () => previewHue(p.dataset.hue));
+        });
+        slider.addEventListener('input', () => previewHue(slider.value));
+
+        const closeDialog = (restore) => {
+            if (restore) this.applyHue(originalHue, false);
+            overlay.classList.add('closing');
+            dialog.classList.add('closing');
+            setTimeout(() => overlay.remove(), 180);
+        };
+
+        dialog.querySelector('#cancel-color').addEventListener('click', () => closeDialog(true));
+        dialog.querySelector('#apply-color').addEventListener('click', () => {
+            const hue = this.normalizeHue(slider.value);
+            this.applyHue(hue, true);
+            this.updateColorPrefUI(hue);
+            closeDialog(false);
+            if (typeof this.showToast === 'function') this.showToast(`${this.t('colorChanged')}: ${hue}°`);
+        });
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeDialog(true);
+        });
     },
     initThemeSelector() {
-        const themeOptions = document.querySelectorAll('.theme-option');
+        const themeOptions = document.querySelectorAll('#theme-options .theme-option');
         themeOptions.forEach(opt => {
-            if (opt.dataset.theme === this.state.theme) { opt.classList.add('selected'); } else { opt.classList.remove('selected'); }
+            if (opt.dataset.theme === this.state.theme) opt.classList.add('selected');
+            else opt.classList.remove('selected');
+            if (opt.dataset.bound) return;
+            opt.dataset.bound = '1';
             opt.addEventListener('click', () => {
                 themeOptions.forEach(o => o.classList.remove('selected'));
                 opt.classList.add('selected');
                 this.state.theme = opt.dataset.theme;
                 localStorage.setItem('corona_theme', this.state.theme);
-                this.applyTheme(this.state.theme);
+                this.applyTheme(this.state.theme, true);
                 this.showToast(`${this.t('themeSwitched')}: ${opt.querySelector('span').textContent}`);
             });
         });
+        if (typeof this.initAccentSelector === 'function') this.initAccentSelector();
     },
     initChangePreviewToggle() {
         const toggle = document.getElementById('change-preview-switch');

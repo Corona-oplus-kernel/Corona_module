@@ -5,13 +5,17 @@ class CoronaAddon {
         this.configDir = '';
         this.runtimeConfig = { swapPath: '' };
         this.algorithms = [];
-        this.readaheadOptions = [128, 256, 384, 512, 768, 1024, 2048, 4096];
-        this.ioNrRequestsOptions = [64, 128, 256, 512, 1024, 2048];
-        this.ioRqAffinityOptions = [0, 1, 2];
-        this.ioNomergesOptions = [0, 1, 2];
+        this.readaheadOptions = [];
+        this.ioNrRequestsOptions = [];
+        this.ioRqAffinityOptions = [];
+        this.ioNomergesOptions = [];
         this.snapshotConfigFiles = ['zram.conf', 'le9ec.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'process_priority.conf', 'thread_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf'];
         this.state = {
             algorithm: 'lz4',
+            recompAlgorithm1: 'none',
+            recompAlgorithm2: 'none',
+            recompAlgorithm3: 'none',
+            zstdCompressionLevel: 1,
             zramSize: 8,
             swappiness: 100,
             zramWriteback: 'default',
@@ -34,6 +38,8 @@ class CoronaAddon {
             le9ecCleanMin: 524288,
             dualCell: false,
             theme: 'gold',
+            accent: 'blue',
+            hue: 214,
             changePreviewEnabled: true,
             showSettingDescriptions: true,
             showCategoryConfigToggles: true,
@@ -53,6 +59,7 @@ class CoronaAddon {
             compactionEnabled: false
         };
         this.kernelFeatures = { lruGen: false, thp: false, ksm: false, compaction: false };
+        this.zramFeatures = { multiComp: false, zstdLevel: false };
         this.isCoronaKernel = false;
         this.localKernelWorkflowBuild = 0;
         this.kernelUpdateInfo = null;
@@ -69,6 +76,7 @@ class CoronaAddon {
         this.le9ecSupported = false;
         this.realtimeIntervalMs = 6000;
         this.realtimeTimer = null;
+        this.zramMetricsTimer = null;
         this.realtimeBusy = false;
         this.realtimeTick = 0;
         this.isInitializing = true;
@@ -94,7 +102,10 @@ class CoronaAddon {
             'battery-level', 'battery-capacity', 'battery-temp', 'cpu-temp',
             'system-version', 'kernel-version', 'history-chart',
             'zram-current-alg', 'zram-current-size', 'zram-current-swappiness', 'zram-status',
-            'swap-status', 'swap-current-status', 'swap-current-size', 'swap-size-value',
+            'zram-raw-size', 'zram-compr-size', 'zram-mem-used', 'zram-compr-ratio', 'zram-backing-dev', 'zram-bd-io',
+            'hyb-enable', 'hyb-loop', 'hyb-zst', 'hyb-zsu', 'hyb-est', 'hyb-esu', 'hyb-reclaimin', 'hyb-batchout', 'hyb-swapd-wakeup',
+            'zstd-level-slider', 'zstd-level-value',
+            'swap-status', 'swap-current-status', 'swap-current-size', 'swap-size-value', 'swap-io-in', 'swap-io-out',
             'vm-status', 'lru-status'
         ];
         ids.forEach(id => { this.dom[id] = document.getElementById(id); });
@@ -107,6 +118,7 @@ class CoronaAddon {
             'memory-opt': 'js/memory-opt.js',
             'le9ec': 'js/le9ec.js',
             'memory-core': 'js/memory-core.js',
+            'settings-memory-page': 'js/settings-memory-page.js',
             'settings-ui': 'js/settings-ui.js',
             'home-ui': 'js/home-ui.js',
             'custom-scripts': 'js/custom-scripts.js',
@@ -167,6 +179,7 @@ class CoronaAddon {
         await this.ensureFeatureScript('settings-ui');
         await this.ensureFeatureScript('home-ui');
         await this.ensureFeatureScript('memory-core');
+        await this.ensureFeatureScript('settings-memory-page');
         this.showInitOverlay(true, this.t('initDefault'));
         try {
             this.updateInitOverlayMessage(this.t('initResolve'));
@@ -206,6 +219,14 @@ class CoronaAddon {
         } finally {
             this.isInitializing = false;
             this.showInitOverlay(false);
+        }
+    }
+    schedulePostInitWarmup() {
+        // deferred home interactions (author popup, banner drag, etc.)
+        if (typeof this.scheduleDeferredInit === 'function') {
+            this.scheduleDeferredInit();
+        } else if (typeof this.initEasterEgg === 'function') {
+            try { this.initEasterEgg(); } catch (e) {}
         }
     }
     updateSliderProgress(slider) {
@@ -474,12 +495,31 @@ class CoronaAddon {
     async ensureConfigDir() { await this.exec(`mkdir -p ${this.shellQuote(this.configDir)}`); }
     bindAllEvents() {
         document.querySelectorAll('.tab-item').forEach(tab => { tab.addEventListener('click', async (e) => { await this.switchPage(e.currentTarget.dataset.page); }); });
-        document.getElementById('zram-switch').addEventListener('change', async (e) => { this.state.zramEnabled = e.target.checked; this.toggleZramSettings(e.target.checked); await this.saveZramConfig('enabled'); });
-        document.getElementById('zram-size-slider').addEventListener('input', (e) => { this.state.zramSize = parseFloat(e.target.value); document.getElementById('zram-size-value').textContent = `${this.state.zramSize.toFixed(2)} GB`; });
-        document.getElementById('zram-size-slider').addEventListener('change', async (e) => { this.state.zramSize = parseFloat(e.target.value); await this.saveZramConfig('size'); });
-        document.getElementById('swappiness-slider').addEventListener('input', (e) => { this.state.swappiness = parseInt(e.target.value); document.getElementById('swappiness-value').textContent = this.state.swappiness; });
-        document.getElementById('swappiness-slider').addEventListener('change', async (e) => { this.state.swappiness = parseInt(e.target.value); if (this.state.zramEnabled) await this.applySwappinessImmediate(); else await this.saveZramConfig('swappiness'); });
-        document.getElementById('zram-apply-btn').addEventListener('click', async (e) => { e.stopPropagation(); if (!this.state.zramEnabled) { this.showToast('ZRAM 未启用'); return; } await this.applyZramImmediate(); });
+        document.getElementById('zram-switch').addEventListener('change', (e) => {
+            this.state.zramEnabled = e.target.checked;
+            this.toggleZramSettings(e.target.checked);
+            this.markZramDirty();
+        });
+        document.getElementById('zram-size-slider').addEventListener('input', (e) => {
+            this.state.zramSize = parseFloat(e.target.value);
+            document.getElementById('zram-size-value').textContent = `${this.state.zramSize.toFixed(2)} GB`;
+        });
+        document.getElementById('zram-size-slider').addEventListener('change', (e) => {
+            this.state.zramSize = parseFloat(e.target.value);
+            this.markZramDirty();
+        });
+        document.getElementById('swappiness-slider').addEventListener('input', (e) => {
+            this.state.swappiness = parseInt(e.target.value);
+            document.getElementById('swappiness-value').textContent = this.state.swappiness;
+        });
+        document.getElementById('swappiness-slider').addEventListener('change', (e) => {
+            this.state.swappiness = parseInt(e.target.value);
+            this.markZramDirty();
+        });
+        document.getElementById('zram-apply-btn').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await this.applyZramImmediate();
+        });
         document.getElementById('le9ec-switch').addEventListener('change', async (e) => { this.state.le9ecEnabled = e.target.checked; this.toggleLe9ecSettings(e.target.checked); await this.saveLe9ecConfig(['enabled']); });
         document.getElementById('le9ec-anon-slider').addEventListener('input', (e) => { this.state.le9ecAnon = parseInt(e.target.value) * 1024; document.getElementById('le9ec-anon-value').textContent = `${e.target.value} MB`; });
         document.getElementById('le9ec-anon-slider').addEventListener('change', (e) => { this.state.le9ecAnon = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(['anon_min']); else this.saveLe9ecConfig(['anon_min']); });
@@ -513,6 +553,22 @@ class CoronaAddon {
             if (el) el.textContent = this.state.vmEnabled ? '已修改' : '已禁用';
         });
     }
+    resetUiLayout() {
+        if (typeof this.forceCloseAllPanels === 'function') {
+            this.forceCloseAllPanels();
+        } else {
+            document.querySelectorAll('.module-card-header.expanded, .sub-card-header.expanded, .sub-expandable-header.expanded').forEach(el => el.classList.remove('expanded'));
+            document.querySelectorAll('.module-card-content, .sub-expandable-content').forEach(el => {
+                el.classList.remove('expanded');
+                el.classList.add('hidden');
+                el.style.maxHeight = '0px';
+                el.style.opacity = '0';
+                el.style.overflow = 'hidden';
+            });
+        }
+        const floatingHeader = document.getElementById('floating-header');
+        if (floatingHeader) floatingHeader.classList.remove('visible', 'overlay-hidden');
+    }
     async switchPage(pageName) {
         const pages = document.querySelectorAll('.page');
         const tabs = document.querySelectorAll('.tab-item');
@@ -520,6 +576,10 @@ class CoronaAddon {
         const currentActive = document.querySelector('.page.active');
         const targetPage = document.getElementById(`page-${pageName}`);
         if (!targetPage || currentActive === targetPage) return;
+        // fully close half-open panels when going home / leaving settings
+        if (pageName === 'home' || (currentActive && currentActive.id === 'page-settings')) {
+            if (typeof this.forceCloseAllPanels === 'function') this.forceCloseAllPanels();
+        }
         pages.forEach(p => p.classList.remove('left', 'right'));
         if (currentActive) {
             if (pageName === 'settings') { currentActive.classList.add('left'); slider.classList.add('right'); }

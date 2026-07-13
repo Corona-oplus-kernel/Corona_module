@@ -4,9 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Corona 控制台</title>
-    <link rel="stylesheet" href="style.css?v=2026070203">
+    <link rel="stylesheet" href="style.css?v=2026071409">
+    <link rel="stylesheet" href="css/components.css?v=2026071409">
+    <link rel="stylesheet" href="css/pages/settings.css?v=2026071409">
+    <link rel="stylesheet" href="css/animations.css?v=2026071409">
+    <script>
+    (function () {
+        try {
+            var hue = localStorage.getItem('corona_color_hue') || '214';
+            var h = parseInt(hue, 10) || 214;
+            var root = document.documentElement;
+            root.style.setProperty('--hue', String(h));
+            root.style.setProperty('--primary', 'hsl(' + h + ', 82%, 50%)');
+            root.style.setProperty('--primary-dim', 'hsla(' + h + ', 82%, 50%, 0.18)');
+            root.style.setProperty('--primary-light', 'hsla(' + h + ', 82%, 50%, 0.12)');
+            root.style.setProperty('--accent', 'hsl(' + h + ', 70%, 42%)');
+            root.dataset.hue = String(h);
+        } catch (e) {}
+    })();
+    </script>
 </head>
 <body>
+    <div class="theme-transition-overlay" id="theme-transition-overlay"></div>
     <div class="floating-header" id="floating-header">
         <button class="floating-header-link" id="floating-header-link" type="button" aria-label="打开 Corona 内核发布页">
             <span class="floating-header-title">Corona</span>
@@ -183,26 +202,95 @@
                             <span class="expand-icon">❯</span>
                         </div>
                         <div id="zram-content" class="sub-expandable-content">
-                            <div class="info-row">
-                                <div class="info-item">
-                                    <span class="info-label">当前算法</span>
-                                    <span class="info-value" id="zram-current-alg">--</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-label">当前大小</span>
-                                    <span class="info-value" id="zram-current-size">--</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-label">Swappiness</span>
-                                    <span class="info-value" id="zram-current-swappiness">--</span>
+<div class="zram-status-card" id="zram-status-card">
+                                <div class="zram-status-title">运行状态</div>
+                                <div class="info-list" id="zram-status-list">
+                                    <div class="info-item" data-metric="alg">
+                                        <span class="info-label">算法</span>
+                                        <span class="info-value" id="zram-current-alg">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="size">
+                                        <span class="info-label">大小</span>
+                                        <span class="info-value" id="zram-current-size">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="swappiness">
+                                        <span class="info-label">Swappiness</span>
+                                        <span class="info-value" id="zram-current-swappiness">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="path">
+                                        <span class="info-label">设备路径</span>
+                                        <span class="info-value" id="zram-current-path">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="raw" hidden>
+                                        <span class="info-label">原始数据</span>
+                                        <span class="info-value" id="zram-raw-size">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="compr" hidden>
+                                        <span class="info-label">压缩后</span>
+                                        <span class="info-value" id="zram-compr-size">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="mem" hidden>
+                                        <span class="info-label">物理占用</span>
+                                        <span class="info-value" id="zram-mem-used">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="ratio" hidden>
+                                        <span class="info-label">压缩比</span>
+                                        <span class="info-value" id="zram-compr-ratio">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="backing" hidden>
+                                        <span class="info-label">回写设备</span>
+                                        <span class="info-value" id="zram-backing-dev">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="bdio" hidden>
+                                        <span class="info-label">回写读写</span>
+                                        <span class="info-value" id="zram-bd-io">--</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="info-row info-row-single">
-                                <div class="info-item info-item-full">
-                                    <span class="info-label">设备路径</span>
-                                    <span class="info-value" id="zram-current-path">/dev/block/zram0</span>
+
+                            <div class="zram-status-card" id="hybridswap-metrics" hidden>
+                                <div class="zram-status-title">HybridSwap</div>
+                                <div class="info-list" id="hybridswap-list">
+                                    <div class="info-item" data-metric="hyb-enable" hidden>
+                                        <span class="info-label">状态</span>
+                                        <span class="info-value" id="hyb-enable">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="hyb-loop" hidden>
+                                        <span class="info-label">回写环</span>
+                                        <span class="info-value" id="hyb-loop">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="hyb-zst" hidden>
+                                        <span class="info-label">ZRAM 池</span>
+                                        <span class="info-value" id="hyb-zst">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="hyb-zsu" hidden>
+                                        <span class="info-label">ZRAM 占用</span>
+                                        <span class="info-value" id="hyb-zsu">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="hyb-est" hidden>
+                                        <span class="info-label">ESwap 池</span>
+                                        <span class="info-value" id="hyb-est">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="hyb-esu" hidden>
+                                        <span class="info-label">ESwap 占用</span>
+                                        <span class="info-value" id="hyb-esu">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="hyb-reclaimin" hidden>
+                                        <span class="info-label">回写入</span>
+                                        <span class="info-value" id="hyb-reclaimin">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="hyb-batchout" hidden>
+                                        <span class="info-label">读回出</span>
+                                        <span class="info-value" id="hyb-batchout">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="hyb-swapd" hidden>
+                                        <span class="info-label">swapd 唤醒</span>
+                                        <span class="info-value" id="hyb-swapd-wakeup">--</span>
+                                    </div>
                                 </div>
                             </div>
+
+                            
                             <div class="switch-container">
                                 <div class="switch-info">
                                     <span class="switch-label">启用 ZRAM</span>
@@ -214,10 +302,37 @@
                                 </label>
                             </div>
                             <div class="setting-hint" id="zram-mode-hint">未检测到运行状态</div>
-                            <div id="zram-settings" class="sub-settings hidden">
+<div id="zram-settings" class="sub-settings hidden">
                                 <div class="setting-section">
                                     <span class="section-label">压缩算法</span>
                                     <div class="option-grid" id="algorithm-list"></div>
+                                </div>
+                                <div class="setting-section" id="zram-recomp-section" hidden>
+                                    <span class="section-label">重压缩算法</span>
+                                    <span class="setting-hint">内核不支持时自动隐藏</span>
+                                    <div class="setting-section" style="margin-top:10px">
+                                        <span class="section-label">重压缩 1</span>
+                                        <div class="option-grid" id="recomp-algorithm-list-1"></div>
+                                    </div>
+                                    <div class="setting-section">
+                                        <span class="section-label">重压缩 2</span>
+                                        <div class="option-grid" id="recomp-algorithm-list-2"></div>
+                                    </div>
+                                    <div class="setting-section">
+                                        <span class="section-label">重压缩 3</span>
+                                        <div class="option-grid" id="recomp-algorithm-list-3"></div>
+                                    </div>
+                                </div>
+                                <div class="setting-section" id="zstd-level-section" hidden>
+                                    <span class="section-label">ZSTD 压缩级别</span>
+                                    <div class="slider-container">
+                                        <input type="range" class="range-slider" id="zstd-level-slider" min="1" max="22" step="1" value="1">
+                                        <div class="slider-labels">
+                                            <span>1</span>
+                                            <span class="slider-value" id="zstd-level-value">1</span>
+                                            <span>22</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="setting-section">
                                     <span class="section-label">ZRAM 大小</span>
@@ -250,7 +365,7 @@
                                     </div>
                                 </div>
                                 <div class="setting-section">
-                                    <span class="section-label">ZRAM 设备路径</span>
+                                    <span class="section-label">设备路径</span>
                                     <div class="zram-path-container">
                                         <input type="text" class="text-input" id="zram-path-input" placeholder="/dev/block/zram0" value="/dev/block/zram0">
                                         <div class="zram-path-buttons">
@@ -258,10 +373,10 @@
                                             <button class="btn-small btn-primary" id="zram-path-save">保存</button>
                                         </div>
                                     </div>
-                                    <span class="setting-hint">自定义 ZRAM 设备路径，适用于多 ZRAM 设备或非标准路径</span>
                                 </div>
                             </div>
-                            <button class="action-btn" id="zram-apply-btn" style="margin-top:12px;width:100%">应用 ZRAM 配置</button>
+                            <div class="zram-actions-sep"></div>
+                            <button class="action-btn" id="zram-apply-btn" style="width:100%">应用 ZRAM 配置</button>
                         </div>
                     </div>
                     <div class="sub-card" id="swap-sub">
@@ -279,6 +394,22 @@
                                 <div class="info-item">
                                     <span class="info-label">当前大小</span>
                                     <span class="info-value" id="swap-current-size">--</span>
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <div class="info-item">
+                                    <span class="info-label">换入 (pswpin)</span>
+                                    <span class="info-value" id="swap-io-in">--</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">换出 (pswpout)</span>
+                                    <span class="info-value" id="swap-io-out">--</span>
+                                </div>
+                            </div>
+                            <div class="setting-section" style="margin-top:8px">
+                                <span class="section-label">已启用 Swap 设备</span>
+                                <div id="swap-devices-list" class="swap-devices-list">
+                                    <div class="setting-hint">未检测到 Swap 设备</div>
                                 </div>
                             </div>
                             <div class="switch-container">
@@ -312,7 +443,8 @@
                                     </div>
                                 </div>
                             </div>
-                            <button class="action-btn" id="swap-apply-btn" style="margin-top:12px;width:100%">应用 Swap 配置</button>
+                            <div class="zram-actions-sep"></div>
+                            <button class="action-btn" id="swap-apply-btn" style="width:100%">应用 Swap 配置</button>
                         </div>
                     </div>
                     <div class="sub-card" id="lru-sub">
@@ -1013,6 +1145,17 @@
                             <span>皇涩主题</span>
                         </div>
                     </div>
+                    <div class="setting-section theme-color-section">
+                        <button type="button" class="color-pref-button" id="color-picker-btn">
+                            <div class="color-pref-swatch" id="color-pref-swatch"></div>
+                            <div class="color-pref-text">
+                                <span class="color-pref-label">颜色选择器</span>
+                                <span class="color-pref-desc" id="color-pref-desc">调整界面主色</span>
+                            </div>
+                            <span class="color-pref-arrow">›</span>
+                        </button>
+                        <button type="button" class="action-btn" id="theme-reset-btn" style="margin-top:12px;width:100%">恢复默认界面</button>
+                    </div>
                     <div class="switch-container ui-pref-switch-container">
                         <div class="switch-info">
                             <span class="switch-label">变更预览</span>
@@ -1528,6 +1671,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026070203" defer></script>
+    <script src="script.js?v=2026071409" defer></script>
 </body>
 </html>

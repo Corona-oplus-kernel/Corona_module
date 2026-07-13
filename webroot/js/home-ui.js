@@ -3,6 +3,215 @@
   window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
   if (window.CoronaFeatureScripts["home-ui"]) return;
   Object.assign(CoronaAddon.prototype, {
+    ensureCollapsible(content) {
+        if (!content) return null;
+        if (content.dataset.collapsibleReady === '1') {
+            return content.querySelector(':scope > .collapsible-inner') || content.firstElementChild;
+        }
+        const inner = document.createElement('div');
+        inner.className = 'collapsible-inner';
+        while (content.firstChild) inner.appendChild(content.firstChild);
+        content.appendChild(inner);
+        content.dataset.collapsibleReady = '1';
+        content.classList.add('collapsible-panel');
+        content.classList.remove('expanded');
+        content.style.removeProperty('max-height');
+        content.style.removeProperty('overflow');
+        content.style.removeProperty('opacity');
+        content.style.removeProperty('transform');
+        content.style.removeProperty('padding');
+        content.style.removeProperty('transition-duration');
+        return inner;
+    },
+    getPanelAnimMs(heightPx) {
+        // taller content -> longer anim; short content stays snappy
+        const h = Math.max(0, Number(heightPx) || 0);
+        // ~0.55ms per px, clamp 220ms .. 720ms
+        return Math.round(Math.min(720, Math.max(220, h * 0.55 + 180)));
+    },
+    setPanelTransition(content, durationMs) {
+        if (!content) return;
+        const d = Math.max(180, Number(durationMs) || 320);
+        const ease = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
+        content.style.transition = `max-height ${d}ms ${ease}, opacity ${Math.round(d * 0.75)}ms ease, transform ${Math.round(d * 0.85)}ms ${ease}`;
+    },
+    clearPanelTransition(content) {
+        if (!content) return;
+        content.style.removeProperty('transition');
+        content.style.removeProperty('transition-duration');
+    },
+
+    forceClosePanel(content, toggle = null) {
+        if (!content) return;
+        if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
+        if (content._anim) {
+            try { content.removeEventListener('transitionend', content._anim); } catch (e) {}
+            content._anim = null;
+        }
+        this.clearPanelTransition(content);
+        content.classList.remove('expanded', 'expanding', 'panel-animating');
+        content.classList.add('hidden');
+        content.style.maxHeight = '0px';
+        content.style.opacity = '0';
+        content.style.transform = 'translateY(-8px)';
+        content.style.overflow = 'hidden';
+        content.style.pointerEvents = 'none';
+
+        if (toggle) {
+            toggle.classList.remove('expanded');
+            const icon = toggle.querySelector ? toggle.querySelector('.expand-icon') : null;
+            if (icon) icon.classList.remove('expanded');
+            const header = (toggle.closest && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'))) || null;
+            if (header) header.classList.remove('expanded');
+        }
+    },
+    forceCloseAllPanels() {
+        document.querySelectorAll('.module-card-content, .sub-expandable-content').forEach((content) => {
+            let toggle = null;
+            if (content.id && content.id.endsWith('-content')) {
+                toggle = document.getElementById(content.id.replace(/-content$/, '-toggle'));
+            }
+            this.forceClosePanel(content, toggle);
+        });
+        document.querySelectorAll('.module-card-header.expanded, .sub-card-header.expanded, .module-card-expand.expanded').forEach((el) => {
+            el.classList.remove('expanded');
+        });
+        document.querySelectorAll('.module-card.expanding').forEach((el) => el.classList.remove('expanding'));
+        if (typeof this.stopZramMetricsRefresh === 'function') this.stopZramMetricsRefresh();
+    },
+    expandPanelContent(content, toggle, { icon = null, cardEl = null, onExpand = null } = {}) {
+        if (!content) return;
+        this.ensureCollapsible(content);
+        if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
+        if (content._anim) { content.removeEventListener('transitionend', content._anim); content._anim = null; }
+
+        content.classList.remove('hidden');
+        content.style.removeProperty('pointer-events');
+        content.classList.remove('expanded');
+        content.style.overflow = 'hidden';
+        content.style.maxHeight = '0px';
+        content.style.opacity = '0';
+        content.style.transform = 'translateY(-8px)';
+        void content.offsetHeight;
+
+        // measure real height with expanded styles (padding etc.)
+        content.classList.add('expanded');
+        content.style.maxHeight = 'none';
+        content.style.opacity = '1';
+        content.style.transform = 'translateY(0)';
+        const target = Math.max(content.scrollHeight, 1);
+        const duration = this.getPanelAnimMs(target);
+
+        // restart from collapsed
+        content.style.maxHeight = '0px';
+        content.style.opacity = '0';
+        content.style.transform = 'translateY(-8px)';
+        this.setPanelTransition(content, duration);
+        void content.offsetHeight;
+
+        content.style.maxHeight = target + 'px';
+        content.style.opacity = '1';
+        content.style.transform = 'translateY(0)';
+
+        if (toggle) toggle.classList.add('expanded');
+        if (icon) icon.classList.add('expanded');
+        const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
+        if (header) header.classList.add('expanded');
+
+        let finished = false;
+        const finish = () => {
+            if (finished) return;
+            finished = true;
+            if (content._anim) content.removeEventListener('transitionend', content._anim);
+            clearTimeout(content._animTimer);
+            content._anim = null;
+            content._animTimer = null;
+            this.clearPanelTransition(content);
+            if (content.classList.contains('expanded')) {
+                content.style.maxHeight = 'none';
+                content.style.overflow = 'visible';
+                content.style.opacity = '1';
+                content.style.transform = 'translateY(0)';
+            }
+            if (cardEl) cardEl.classList.remove('expanding');
+            if (typeof endExpand === 'function') endExpand();
+            if (typeof onExpand === 'function') {
+                Promise.resolve().then(() => onExpand()).catch(() => {});
+            }
+        };
+        const onEnd = (e) => {
+            if (e && e.target !== content) return;
+            // only complete on height transition to avoid early cut-off
+            if (e && e.propertyName && e.propertyName !== 'max-height') return;
+            finish();
+        };
+        content._anim = onEnd;
+        content.addEventListener('transitionend', onEnd);
+        content._animTimer = setTimeout(finish, duration + 80);
+    },
+    collapsePanelContent(content, toggle, { icon = null, cardEl = null, onCollapse = null, beforeCollapse = null } = {}) {
+        if (!content) return;
+        this.ensureCollapsible(content);
+        if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
+        if (content._anim) { content.removeEventListener('transitionend', content._anim); content._anim = null; }
+        if (typeof beforeCollapse === 'function') {
+            try { beforeCollapse(); } catch (e) {}
+        }
+
+        content.style.overflow = 'hidden';
+        // pin exact open height first
+        content.style.maxHeight = 'none';
+        const from = Math.max(content.scrollHeight, 1);
+        content.style.maxHeight = from + 'px';
+        content.style.opacity = '1';
+        content.style.transform = 'translateY(0)';
+        const duration = this.getPanelAnimMs(from);
+        this.setPanelTransition(content, duration);
+        void content.offsetHeight;
+
+        content.classList.remove('expanded');
+        content.style.maxHeight = '0px';
+        content.style.opacity = '0';
+        content.style.transform = 'translateY(-8px)';
+
+        if (toggle) toggle.classList.remove('expanded');
+        if (icon) icon.classList.remove('expanded');
+        const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
+        if (header) header.classList.remove('expanded');
+        if (typeof onCollapse === 'function') {
+            try { onCollapse(); } catch (e) {}
+        }
+
+        let finished = false;
+        const finish = () => {
+            if (finished) return;
+            finished = true;
+            if (content._anim) content.removeEventListener('transitionend', content._anim);
+            clearTimeout(content._animTimer);
+            content._anim = null;
+            content._animTimer = null;
+            this.clearPanelTransition(content);
+            // force fully closed — prevents half-open leftovers
+            content.classList.remove('expanded');
+            content.classList.add('hidden');
+            content.style.maxHeight = '0px';
+            content.style.opacity = '0';
+            content.style.transform = 'translateY(-8px)';
+            content.style.overflow = 'hidden';
+            content.style.pointerEvents = 'none';
+            if (cardEl) cardEl.classList.remove('expanding');
+            if (typeof endExpand === 'function') endExpand();
+        };
+        const onEnd = (e) => {
+            if (e && e.target !== content) return;
+            if (e && e.propertyName && e.propertyName !== 'max-height') return;
+            finish();
+        };
+        content._anim = onEnd;
+        content.addEventListener('transitionend', onEnd);
+        content._animTimer = setTimeout(finish, duration + 120);
+    },
+
     initChart() {
         this.chartCanvas = document.getElementById('history-chart');
         this.chartCtx = this.chartCanvas ? this.chartCanvas.getContext('2d') : null;
@@ -131,78 +340,39 @@
             { toggle: 'le9ec-toggle', content: 'le9ec-content', onExpand: () => this.loadLe9ecStatus() },
             { toggle: 'io-scheduler-toggle', content: 'io-scheduler-content', onExpand: null },
             { toggle: 'cpu-governor-toggle', content: 'cpu-governor-content', onExpand: null },
-            { toggle: 'app-policy-toggle', content: 'app-policy-content', onExpand: () => { this.renderAppPolicySummary(); } },
+            { toggle: 'app-policy-toggle', content: 'app-policy-content', onExpand: null },
             { toggle: 'tcp-toggle', content: 'tcp-content', onExpand: null },
             { toggle: 'custom-scripts-toggle', content: 'custom-scripts-content', onExpand: null },
             { toggle: 'system-opt-toggle', content: 'system-opt-content', onExpand: null },
-            { toggle: 'corona-kernel-toggle', content: 'corona-kernel-content', onExpand: () => this.loadCoronaKernelConfig() },
+            { toggle: 'corona-kernel-toggle', content: 'corona-kernel-content', onExpand: () => { setTimeout(() => this.loadCoronaKernelConfig(), 0); } },
             { toggle: 'app-settings-toggle', content: 'app-settings-content', onExpand: null }
         ];
         cards.forEach(card => {
             const toggle = document.getElementById(card.toggle);
             const content = document.getElementById(card.content);
-            if (toggle && content) {
-                content.classList.remove('hidden');
-                content.classList.remove('expanded');
-                toggle.classList.remove('expanded');
-                toggle.addEventListener('click', () => {
-                    const isExpanded = content.classList.contains('expanded');
-                    const cardEl = toggle.closest('.module-card');
-                    if (cardEl) cardEl.classList.add('expanding');
-                    if (content._anim) {
-                        content.removeEventListener('transitionend', content._anim);
-                        content._anim = null;
-                        content.style.removeProperty('overflow');
-                        endExpand();
-                    }
-                    beginExpand();
-                    content.style.setProperty('overflow', 'hidden', 'important');
-                    if (isExpanded) {
-                        if (content.id === 'memory-compression-content') {
-                            this.collapseMemoryCompressionChildren(content);
-                        }
-                        const h = content.scrollHeight;
-                        content.style.maxHeight = h + 'px';
-                        content.offsetHeight;
-                        content.classList.remove('expanded');
-                        toggle.classList.remove('expanded');
-                        content.style.maxHeight = '0px';
-                        const done = (e) => {
-                            if (e.target !== content || e.propertyName !== 'max-height') return;
-                            content.removeEventListener('transitionend', done);
-                            content._anim = null;
-                            content.style.removeProperty('overflow');
-                            if (cardEl) cardEl.classList.remove('expanding');
-                            endExpand();
-                        };
-                        content._anim = done;
-                        content.addEventListener('transitionend', done);
-                    } else {
-                        content.classList.add('expanded');
-                        toggle.classList.add('expanded');
-                        if (card.onExpand) card.onExpand();
-                        requestAnimationFrame(() => {
-                            const h = content.scrollHeight;
-                            content.style.maxHeight = h + 'px';
-                            const done = (e) => {
-                                if (e.target !== content || e.propertyName !== 'max-height') return;
-                                content.removeEventListener('transitionend', done);
-                                content._anim = null;
-                                if (content.classList.contains('expanded')) {
-                                    content.style.maxHeight = 'none';
-                                    content.style.removeProperty('overflow');
-                                } else {
-                                    content.style.removeProperty('overflow');
-                                }
-                                if (cardEl) cardEl.classList.remove('expanding');
-                                endExpand();
-                            };
-                            content._anim = done;
-                            content.addEventListener('transitionend', done);
-                        });
-                    }
-                });
-            }
+            if (!toggle || !content) return;
+            this.ensureCollapsible(content);
+            content.classList.remove('hidden', 'expanded');
+            toggle.classList.remove('expanded');
+            toggle.addEventListener('click', () => {
+                const open = content.classList.contains('expanded');
+                const cardEl = toggle.closest('.module-card');
+                if (cardEl) cardEl.classList.add('expanding');
+                if (typeof beginExpand === 'function') beginExpand();
+                if (open) {
+                    this.collapsePanelContent(content, toggle, {
+                        cardEl,
+                        beforeCollapse: content.id === 'memory-compression-content'
+                            ? () => this.collapseMemoryCompressionChildren(content)
+                            : null
+                    });
+                } else {
+                    this.expandPanelContent(content, toggle, {
+                        cardEl,
+                        onExpand: card.onExpand || null
+                    });
+                }
+            });
         });
         this.initSubCards();
         this.initCardVisibility();
@@ -298,7 +468,7 @@
     },
     initSubCards() {
         const subCards = [
-            { toggle: 'zram-toggle', content: 'zram-content', onExpand: () => this.loadZramStatus() },
+            { toggle: 'zram-toggle', content: 'zram-content', onExpand: () => this.startZramMetricsRefresh(), onCollapse: () => this.stopZramMetricsRefresh() },
             { toggle: 'swap-toggle', content: 'swap-content', onExpand: () => this.loadSwapStatus() },
             { toggle: 'lru-toggle', content: 'lru-content', onExpand: null },
             { toggle: 'vm-toggle', content: 'vm-content', onExpand: null }
@@ -306,101 +476,48 @@
         subCards.forEach(card => {
             const toggle = document.getElementById(card.toggle);
             const content = document.getElementById(card.content);
-            if (toggle && content) {
-                const icon = toggle.querySelector('.expand-icon');
-                toggle.addEventListener('click', () => {
-                    const isExpanded = content.classList.contains('expanded');
-                    const cardEl = toggle.closest('.module-card');
-                    if (cardEl) cardEl.classList.add('expanding');
-                    if (content._anim) {
-                        content.removeEventListener('transitionend', content._anim);
-                        content._anim = null;
-                        content.style.removeProperty('overflow');
-                        endExpand();
-                    }
-                    beginExpand();
-                    content.style.setProperty('overflow', 'hidden', 'important');
-                    if (isExpanded) {
-                        const h = content.scrollHeight;
-                        content.style.maxHeight = h + 'px';
-                        content.offsetHeight;
-                        content.classList.remove('expanded');
-                        toggle.classList.remove('expanded');
-                        if (icon) icon.classList.remove('expanded');
-                        content.style.maxHeight = '0px';
-                        const done = (e) => {
-                            if (e.target !== content || e.propertyName !== 'max-height') return;
-                            content.removeEventListener('transitionend', done);
-                            content._anim = null;
-                            content.style.removeProperty('overflow');
-                            if (cardEl) cardEl.classList.remove('expanding');
-                            endExpand();
-                        };
-                        content._anim = done;
-                        content.addEventListener('transitionend', done);
-                    } else {
-                        content.classList.add('expanded');
-                        toggle.classList.add('expanded');
-                        if (icon) icon.classList.add('expanded');
-                        if (card.onExpand) card.onExpand();
-                        requestAnimationFrame(() => {
-                            const h = content.scrollHeight;
-                            content.style.maxHeight = h + 'px';
-                            const done = (e) => {
-                                if (e.target !== content || e.propertyName !== 'max-height') return;
-                                content.removeEventListener('transitionend', done);
-                                content._anim = null;
-                                if (content.classList.contains('expanded')) {
-                                    content.style.maxHeight = 'none';
-                                    content.style.removeProperty('overflow');
-                                } else {
-                                    content.style.removeProperty('overflow');
-                                }
-                                if (cardEl) cardEl.classList.remove('expanding');
-                                endExpand();
-                            };
-                            content._anim = done;
-                            content.addEventListener('transitionend', done);
-                        });
-                    }
-                });
-            }
-        });
-    },
-    collapseMemoryCompressionChildren(parentContent) {
-        const items = parentContent.querySelectorAll('.sub-card-header[id$="-toggle"]');
-        items.forEach(toggle => {
-            const contentId = toggle.id.replace('-toggle', '-content');
-            const content = document.getElementById(contentId);
+            if (!toggle || !content) return;
             const icon = toggle.querySelector('.expand-icon');
-            if (!content) return;
-            if (content._anim) {
-                content.removeEventListener('transitionend', content._anim);
-                content._anim = null;
-            }
+            this.ensureCollapsible(content);
             content.classList.remove('expanded');
             toggle.classList.remove('expanded');
             if (icon) icon.classList.remove('expanded');
-            content.style.maxHeight = '0px';
-            content.style.setProperty('overflow', 'hidden', 'important');
-        });
-        requestAnimationFrame(() => {
-            items.forEach(toggle => {
-                const contentId = toggle.id.replace('-toggle', '-content');
-                const content = document.getElementById(contentId);
-                if (!content || content.classList.contains('expanded')) return;
-                content.style.removeProperty('overflow');
+            toggle.addEventListener('click', () => {
+                const open = content.classList.contains('expanded');
+                const cardEl = toggle.closest('.module-card');
+                if (cardEl) cardEl.classList.add('expanding');
+                if (typeof beginExpand === 'function') beginExpand();
+                if (open) {
+                    this.collapsePanelContent(content, toggle, {
+                        icon, cardEl, onCollapse: card.onCollapse || null
+                    });
+                } else {
+                    this.expandPanelContent(content, toggle, {
+                        icon, cardEl, onExpand: card.onExpand || null
+                    });
+                }
             });
         });
     },
-    refreshExpandedContentHeight(contentId) {
-        const content = document.getElementById(contentId);
-        if (!content || !content.classList.contains('expanded')) return;
-        if (content.style.maxHeight === 'none') return;
-        requestAnimationFrame(() => {
-            if (!content.classList.contains('expanded')) return;
-            content.style.maxHeight = content.scrollHeight + 'px';
+    collapseMemoryCompressionChildren(parentContent) {
+        if (typeof this.stopZramMetricsRefresh === 'function') this.stopZramMetricsRefresh();
+        if (!parentContent) return;
+        parentContent.querySelectorAll('.sub-expandable-content').forEach((content) => {
+            let toggle = null;
+            if (content.id && content.id.endsWith('-content')) {
+                toggle = document.getElementById(content.id.replace(/-content$/, '-toggle'));
+            }
+            if (typeof this.forceClosePanel === 'function') this.forceClosePanel(content, toggle);
+            else {
+                content.classList.remove('expanded');
+                content.classList.add('hidden');
+                content.style.maxHeight = '0px';
+            }
         });
+    },
+    refreshExpandedContentHeight(contentId) {
+        const content = typeof contentId === 'string' ? document.getElementById(contentId) : contentId;
+        if (content) this.ensureCollapsible(content);
     },
     async ensureExpandableOpen(toggleId, contentId) {
         const toggle = document.getElementById(toggleId);

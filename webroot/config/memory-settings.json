@@ -1,0 +1,7 @@
+{
+  "algorithmFallback": ["lz4", "lzo", "zstd"],
+  "readaheadOptions": [128, 256, 384, 512, 768, 1024, 2048, 4096],
+  "ioNrRequestsOptions": [64, 128, 256, 512, 1024, 2048],
+  "ioRqAffinityOptions": [0, 1, 2],
+  "ioNomergesOptions": [0, 1, 2]
+}

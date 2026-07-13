@@ -1,0 +1,112 @@
+ .floating-header {
+    will-change: transform, opacity;
+    transition: transform var(--motion-slow) var(--motion-ease), opacity var(--motion-fast) ease, visibility 0s linear var(--motion-slow);
+}
+
+.floating-header.visible {
+    animation: floatingHeaderDrop var(--motion-slow) var(--motion-ease);
+    transition: transform var(--motion-slow) var(--motion-ease), opacity var(--motion-fast) ease;
+}
+
+@keyframes floatingHeaderDrop {
+    from {
+        transform: translate3d(0, -118%, 0);
+        opacity: 0;
+    }
+    to {
+        transform: translate3d(0, 0, 0);
+        opacity: 1;
+    }
+}
+
+.toast {
+    transition: opacity var(--motion-fast) ease, transform var(--motion-fast) var(--motion-ease);
+    will-change: opacity, transform;
+}
+
+.loading-overlay {
+    transition: opacity 0.3s ease, transform 0.3s ease, background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.loading-spinner {
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.detail-overlay {
+    transition: visibility 0s linear 0.32s;
+}
+
+.detail-overlay.show {
+    transition: visibility 0s linear 0s;
+}
+
+#confirm-dialog-overlay,
+#confirm-dialog-overlay.show {
+    transition: visibility 0s linear 0s;
+}
+
+.detail-card {
+    transition: transform var(--motion-base) var(--motion-ease);
+    will-change: transform;
+}
+
+.detail-overlay.show .detail-card {
+    transition: transform var(--motion-slow) var(--motion-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .detail-overlay {
+        transition: visibility 0s linear 0.2s;
+    }
+    .detail-overlay.show {
+        transition: visibility 0s linear 0s;
+    }
+    .detail-card,
+    .detail-overlay.show .detail-card {
+        transition: transform 0.2s ease;
+    }
+}
+
+.sub-expandable-content {
+    will-change: max-height, opacity, transform, padding;
+    transition: max-height 0.38s cubic-bezier(0.25, 0.78, 0.18, 1),
+                padding 0.38s cubic-bezier(0.25, 0.78, 0.18, 1),
+                opacity 0.24s ease,
+                transform 0.30s cubic-bezier(0.22, 0.76, 0.24, 1);
+}
+
+.module-card-content {
+    will-change: max-height, opacity, transform, padding;
+    transition: max-height var(--motion-base) var(--motion-ease),
+                padding var(--motion-base) var(--motion-ease),
+                opacity var(--motion-fast) ease,
+                transform 0.34s var(--motion-ease);
+}
+
+.module-card-content.animating,
+.sub-expandable-content.animating {
+    transition: background-color var(--motion-base) ease, border-color var(--motion-base) ease, box-shadow var(--motion-base) ease;
+}
+
+@keyframes titleBreathIn {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+        filter: blur(8px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+        filter: blur(0);
+    }
+}
+
+body.app-ready .title-overline,
+body.app-ready .corona-title {
+    animation: titleBreathIn 0.62s var(--motion-ease);
+}

@@ -127,14 +127,14 @@ CoronaAddon.prototype.syncAppPolicyDaemon = async function() {
     const pid = (await this.exec(`cat ${this.shellQuote(pidFile)} 2>/dev/null`)).trim();
     if (pid) await this.exec(`kill ${pid} 2>/dev/null`);
     await this.exec(`rm -f ${this.shellQuote(pidFile)} ${this.shellQuote(`${this.modDir}/.app_policy_state`)}`);
-    await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --apply-runtime-config >/dev/null 2>&1`);
+    // skip full service.sh re-apply here; rules file already written, daemon stop is enough for UI path
 };
 CoronaAddon.prototype.scheduleAppPolicySync = function() {
     if (this.appPolicySyncTimer) clearTimeout(this.appPolicySyncTimer);
     this.appPolicySyncTimer = setTimeout(() => {
         this.syncAppPolicyDaemon().catch(() => {});
         this.appPolicySyncTimer = null;
-    }, 120);
+    }, 80);
 };
 CoronaAddon.prototype.saveAppRulesConfig = async function(showToastText = '', options = {}) {
     await this.writeConfig('app_rules.conf', this.buildAppRulesConfig());
@@ -153,7 +153,7 @@ CoronaAddon.prototype.persistAppRulesSoon = function(showToastText = '') {
     this.appRulesPersistTimer = setTimeout(() => {
         this.saveAppRulesConfig('', { syncNow: false }).catch(() => {});
         this.appRulesPersistTimer = null;
-    }, 180);
+    }, 100);
 };
 CoronaAddon.prototype.initAppPolicy = function() {
     this.ensureAppPolicyState();
@@ -161,31 +161,16 @@ CoronaAddon.prototype.initAppPolicy = function() {
     const notifySwitch = document.getElementById('app-notify-switch');
     if (monitorSwitch && !monitorSwitch.dataset.bound) {
         monitorSwitch.dataset.bound = '1';
-        monitorSwitch.addEventListener('change', async () => {
-            const previous = this.appPolicy.monitorEnabled;
+        monitorSwitch.addEventListener('change', () => {
             this.appPolicy.monitorEnabled = monitorSwitch.checked;
-            const confirmed = await this.confirmChangePreview('变更预览', {
-                summary: `即将${monitorSwitch.checked ? '开启' : '关闭'}应用预设自动切换。`,
-                configs: this.buildAppPolicyPreviewConfigs(['rules']),
-                actions: [monitorSwitch.checked ? '启动应用策略守护，前台应用命中预设时自动切换配置' : '停止自动切换，仅保留当前默认配置'],
-                notes: ['白名单、保护和应用预设名单不会丢失。']
-            }, { onCancel: () => { this.appPolicy.monitorEnabled = previous; this.renderAppPolicySummary(); } });
-            if (!confirmed) return;
-            await this.saveAppRulesConfig(`应用预设自动切换已${monitorSwitch.checked ? '开启' : '关闭'}`);
+            this.persistAppRulesSoon(`应用预设自动切换已${monitorSwitch.checked ? '开启' : '关闭'}`);
         });
     }
     if (notifySwitch && !notifySwitch.dataset.bound) {
         notifySwitch.dataset.bound = '1';
-        notifySwitch.addEventListener('change', async () => {
-            const previous = this.appPolicy.notifyEnabled;
+        notifySwitch.addEventListener('change', () => {
             this.appPolicy.notifyEnabled = notifySwitch.checked;
-            const confirmed = await this.confirmChangePreview('变更预览', {
-                summary: `即将${notifySwitch.checked ? '开启' : '关闭'}应用策略通知。`,
-                configs: this.buildAppPolicyPreviewConfigs(['rules']),
-                notes: ['仅影响应用预设切换通知，不影响名单和守护逻辑。']
-            }, { onCancel: () => { this.appPolicy.notifyEnabled = previous; this.renderAppPolicySummary(); } });
-            if (!confirmed) return;
-            await this.saveAppRulesConfig(`切换通知已${notifySwitch.checked ? '开启' : '关闭'}`);
+            this.persistAppRulesSoon(`切换通知已${notifySwitch.checked ? '开启' : '关闭'}`);
         });
     }
     const buttons = {
@@ -243,8 +228,15 @@ CoronaAddon.prototype.loadInstalledApps = async function(force = false) {
     });
     apps.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN-u-co-pinyin') || a.packageName.localeCompare(b.packageName));
     this.installedApps = apps;
-    if (cacheChanged) await this.saveAppMetaCache();
+    if (cacheChanged) this.scheduleSaveAppMetaCache();
     return apps;
+};
+CoronaAddon.prototype.scheduleSaveAppMetaCache = function() {
+    if (this._appMetaSaveTimer) clearTimeout(this._appMetaSaveTimer);
+    this._appMetaSaveTimer = setTimeout(() => {
+        this.saveAppMetaCache().catch(() => {});
+        this._appMetaSaveTimer = null;
+    }, 600);
 };
 CoronaAddon.prototype.prewarmAppPolicyData = async function(force = false) {
     this.ensureAppPolicyState();

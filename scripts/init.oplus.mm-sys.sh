@@ -78,6 +78,29 @@ write_zram_swappiness() {
   echo "$corona_swappiness" > /sys/module/zram_opt/parameters/vm_swappiness 2>/dev/null
 }
 
+
+
+apply_zstd_compression_level() {
+  [ -f /sys/module/zstd/parameters/compression_level ] || return 0
+  local level=$(corona_get zram.conf zstd_compression_level)
+  [ -n "$level" ] || return 0
+  echo "$level" > /sys/module/zstd/parameters/compression_level 2>/dev/null
+}
+
+apply_zram_recomp_algorithms() {
+  local zram_block="$1"
+  [ -f "/sys/block/$zram_block/recomp_algorithm" ] || return 0
+  local i=1
+  local algo
+  while [ "$i" -le 3 ]; do
+    algo=$(corona_get zram.conf "recomp_algorithm$i")
+    if [ -n "$algo" ] && [ "$algo" != "none" ]; then
+      echo "algo=$algo priority=$i" > "/sys/block/$zram_block/recomp_algorithm" 2>/dev/null
+    fi
+    i=$((i + 1))
+  done
+}
+
 configure_zram_device() {
   local zram_path="$1"
   local size="$2"
@@ -89,6 +112,8 @@ configure_zram_device() {
   /system/bin/swapoff "$zram_path" 2>/dev/null
   echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
   [ -n "$comp_algorithm" ] && echo "$comp_algorithm" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null
+  apply_zram_recomp_algorithms "$zram_block"
+  apply_zstd_compression_level
   if [ "$zram_writeback" = "false" ]; then
     echo none > "/sys/block/$zram_block/backing_dev" 2>/dev/null
     [ -f "/sys/block/$zram_block/hybridswap_loop_device" ] && echo none > "/sys/block/$zram_block/hybridswap_loop_device" 2>/dev/null
@@ -205,6 +230,8 @@ init_zram() {
     /system/bin/swapoff "$zram_path" 2>/dev/null
     echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
     [ -n "$target_algorithm" ] && echo "$target_algorithm" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null
+    apply_zram_recomp_algorithms "$zram_block"
+    apply_zstd_compression_level
     if [ "$has_writeback" -eq 1 ] && [ "$corona_writeback" = "false" ]; then
       echo none > "/sys/block/$zram_block/backing_dev" 2>/dev/null
       [ -f "/sys/block/$zram_block/hybridswap_loop_device" ] && echo none > "/sys/block/$zram_block/hybridswap_loop_device" 2>/dev/null

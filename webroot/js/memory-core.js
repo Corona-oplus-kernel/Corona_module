@@ -3,59 +3,6 @@
   window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
   if (window.CoronaFeatureScripts["memory-core"]) return;
   Object.assign(CoronaAddon.prototype, {
-    renderStaticOptions() { this.renderAlgorithmOptions(); this.renderReadaheadOptions(); this.renderIOAdvancedOptions(); },
-    renderAlgorithmOptions() {
-        const container = document.getElementById('algorithm-list');
-        container.innerHTML = this.algorithms.map(alg => `<div class="option-item ${alg === this.state.algorithm ? 'selected' : ''}" data-value="${alg}">${alg}</div>`).join('');
-        container.querySelectorAll('.option-item').forEach(item => {
-            item.addEventListener('click', async (e) => { container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.algorithm = e.currentTarget.dataset.value; await this.saveZramConfig('algorithm'); });
-        });
-    },
-    renderReadaheadOptions() {
-        const container = document.getElementById('readahead-list');
-        container.innerHTML = this.readaheadOptions.map(size => `<div class="option-item ${size === this.state.readahead ? 'selected' : ''}" data-value="${size}">${size}</div>`).join('');
-        container.querySelectorAll('.option-item').forEach(item => {
-            item.addEventListener('click', async (e) => { container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.readahead = parseInt(e.currentTarget.dataset.value); await this.applyReadaheadImmediate(); });
-        });
-    },
-    renderDiscreteOptions(containerId, values, currentValue, formatter, onSelect) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        container.innerHTML = values.map(value => `<div class="option-item ${value === currentValue ? 'selected' : ''}" data-value="${value}">${formatter ? formatter(value) : value}</div>`).join('');
-        container.querySelectorAll('.option-item').forEach(item => {
-            item.addEventListener('click', async (e) => {
-                container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
-                e.currentTarget.classList.add('selected');
-                await onSelect(e.currentTarget.dataset.value);
-            });
-        });
-    },
-    renderIOAdvancedOptions() {
-        const ensureValues = (values, fallback) => Array.isArray(values) && values.length > 0 ? values : fallback;
-        this.ioNrRequestsOptions = ensureValues(this.ioNrRequestsOptions, [64, 128, 256, 512, 1024, 2048]);
-        this.ioRqAffinityOptions = ensureValues(this.ioRqAffinityOptions, [0, 1, 2]);
-        this.ioNomergesOptions = ensureValues(this.ioNomergesOptions, [0, 1, 2]);
-        this.renderDiscreteOptions('io-nr-requests-list', this.ioNrRequestsOptions, this.state.ioNrRequests, null, async (value) => {
-            this.state.ioNrRequests = parseInt(value);
-            await this.applyIOConfigImmediate('nr_requests');
-        });
-        this.renderDiscreteOptions('io-rq-affinity-list', this.ioRqAffinityOptions, this.state.ioRqAffinity, null, async (value) => {
-            this.state.ioRqAffinity = parseInt(value);
-            await this.applyIOConfigImmediate('rq_affinity');
-        });
-        this.renderDiscreteOptions('io-nomerges-list', this.ioNomergesOptions, this.state.ioNomerges, null, async (value) => {
-            this.state.ioNomerges = parseInt(value);
-            await this.applyIOConfigImmediate('nomerges');
-        });
-        const iostatsSwitch = document.getElementById('io-iostats-switch');
-        if (iostatsSwitch && !iostatsSwitch.dataset.bound) {
-            iostatsSwitch.dataset.bound = '1';
-            iostatsSwitch.addEventListener('change', async (e) => {
-                this.state.ioIostats = e.target.checked;
-                await this.applyIOConfigImmediate('iostats');
-            });
-        }
-    },
     async getPreferredBlockDevice() {
         const device = (await this.exec("for d in /sys/block/*; do b=$(basename \"$d\"); case \"$b\" in loop*|ram*|zram*|dm-*) continue ;; esac; [ -d \"$d/queue\" ] || continue; echo \"$b\"; break; done")).trim();
         return device || '';
@@ -181,6 +128,7 @@
         ]);
         this.kernelVersion = kernelVersion || '';
         await this.detectZramAlgorithms();
+        if (typeof this.detectZramFeatures === "function") await this.detectZramFeatures();
         const brandEl = document.getElementById('device-brand');
         if (brandEl) brandEl.textContent = brand || '--';
         document.getElementById('device-model').textContent = (marketName && marketName.trim()) || model || '--';
@@ -399,6 +347,8 @@
                 console.error('ensureFeatureScript(le9ec) failed', e);
             }
             if (!this.settingsUiInitialized) {
+                if (typeof this.loadMemoryPageTextResources === 'function') await this.loadMemoryPageTextResources();
+                if (typeof this.loadMemoryPageConfig === 'function') await this.loadMemoryPageConfig();
                 if (typeof this.renderStaticOptions === 'function') this.renderStaticOptions();
                 if (priorityThreadReady && typeof this.initPerformanceMode === 'function') this.initPerformanceMode();
                 if (typeof this.initExpandableCards === 'function') this.initExpandableCards();
@@ -411,6 +361,7 @@
                 if (typeof this.initSwapSettings === 'function') this.initSwapSettings();
                 if (typeof this.initVmSettings === 'function') this.initVmSettings();
                 if (typeof this.initZramWriteback === 'function') this.initZramWriteback();
+                if (typeof this.initZstdLevel === 'function') this.initZstdLevel();
                 if (typeof this.initZramPath === 'function') this.initZramPath();
                 if (customScriptsReady && typeof this.initCustomScripts === 'function') this.initCustomScripts();
                 if (memoryOptReady && typeof this.initSystemOpt === 'function') this.initSystemOpt();
@@ -434,6 +385,7 @@
                 });
                 this.initKernelFeatures();
                 const statusTasks = [
+                    ['detectZramFeatures', () => this.detectZramFeatures()],
                     ['loadZramStatus', () => this.loadZramStatus()],
                     ['loadLe9ecStatus', () => this.loadLe9ecStatus()],
                     ...(appPolicyReady && typeof this.loadAppRulesConfig === 'function' ? [['loadAppRulesConfig', () => this.loadAppRulesConfig()]] : [])
@@ -608,6 +560,20 @@
                 const pathInput = document.getElementById('zram-path-input');
                 if (pathInput) pathInput.value = this.state.zramPath;
             }
+            for (let i = 1; i <= 3; i++) {
+                const m = config.match(new RegExp(`recomp_algorithm${i}=(\S+)`));
+                this.state[`recompAlgorithm${i}`] = m ? m[1] : 'none';
+            }
+            if (typeof this.renderRecompAlgorithmOptions === 'function') this.renderRecompAlgorithmOptions();
+            const zstdMatch = config.match(/zstd_compression_level=(\d+)/);
+            if (zstdMatch) {
+                this.state.zstdCompressionLevel = parseInt(zstdMatch[1], 10) || 1;
+                const zstdSlider = document.getElementById('zstd-level-slider');
+                const zstdValue = document.getElementById('zstd-level-value');
+                if (zstdSlider) { zstdSlider.value = this.state.zstdCompressionLevel; this.updateSliderProgress(zstdSlider); }
+                if (zstdValue) zstdValue.textContent = this.state.zstdCompressionLevel;
+            }
+            this.updateZstdLevelVisibility();
         } else {
             this.state.zramEnabled = false;
             const sw = document.getElementById('zram-switch');
@@ -616,32 +582,327 @@
         }
         await this.loadZramStatus();
     },
+    parseNumericList(text) {
+        return String(text || '')
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean)
+            .map(item => Number(item));
+    },
+    formatZramRatio(raw, compressed) {
+        const r = Number(raw) || 0;
+        const c = Number(compressed) || 0;
+        if (!r || !c) return '--';
+        return `${(r / c).toFixed(1)}:1`;
+    },
+    normalizeBackingDev(value) {
+        const normalized = String(value || '')
+            .trim()
+            .replace(/^\/dev\/block\/\(null\)$/i, '')
+            .replace(/^none$/i, '');
+        return normalized || '';
+    },
+    parseHybridMap(text) {
+        const result = {};
+        String(text || '').split('\n').forEach(line => {
+            const raw = line.trim();
+            if (!raw) return;
+            // formats: "KEY: value KB" or "key value"
+            let m = raw.match(/^([A-Za-z0-9_\-]+)\s*:\s*(.+)$/);
+            if (m) {
+                result[m[1]] = m[2].trim();
+                return;
+            }
+            m = raw.match(/^([A-Za-z0-9_\-]+)\s+(.+)$/);
+            if (m) result[m[1]] = m[2].trim();
+        });
+        return result;
+    },
+    parseHybridSizeToBytes(value) {
+        if (value === undefined || value === null || value === '') return 0;
+        const s = String(value).trim();
+        const m = s.match(/^([0-9]+(?:\.[0-9]+)?)\s*([KMG]?B?)?$/i);
+        if (!m) {
+            const n = parseInt(s, 10);
+            return Number.isFinite(n) ? n : 0;
+        }
+        let num = parseFloat(m[1]);
+        const unit = (m[2] || '').toUpperCase();
+        if (unit.startsWith('G')) num *= 1024 * 1024 * 1024;
+        else if (unit.startsWith('M')) num *= 1024 * 1024;
+        else if (unit.startsWith('K')) num *= 1024;
+        return Math.round(num);
+    },
+    formatHybridPair(compr, orig) {
+        const c = this.parseHybridSizeToBytes(compr);
+        const o = this.parseHybridSizeToBytes(orig);
+        if (!c && !o) return '';
+        if (o > 0 && c > 0) return `${this.formatBytes(c)} / ${this.formatBytes(o)}`;
+        return this.formatBytes(c || o);
+    },
+    summarizeHybridEnable(text) {
+        const t = String(text || '').trim();
+        if (!t) return '--';
+        // e.g. hybridswap enable reclaim_in enable swapd enable
+        const parts = [];
+        if (/reclaim_in\s+enable/i.test(t) || /reclaimin\s+enable/i.test(t)) parts.push('回写');
+        if (/swapd\s+enable/i.test(t)) parts.push('swapd');
+        if (/hybridswap\s+enable/i.test(t)) parts.unshift('开');
+        else if (/disable/i.test(t)) return '关';
+        return parts.length ? parts.join('+') : t.split(/\s+/).slice(0, 3).join(' ');
+    },
+    isEmptyMetric(value) {
+        if (value === undefined || value === null) return true;
+        const s = String(value).trim();
+        if (!s || s === '--' || s === '-' || s === 'none' || s === '未启用') return true;
+        if (s === '0' || s === '0 B' || s === '0B' || s === '0.0 GB' || s === '0.00 GB') return true;
+        if (/^R 0 B \/ W 0 B$/i.test(s)) return true;
+        if (/^0 B \/ 0 B$/i.test(s)) return true;
+        return false;
+    },
+    setMetricValue(id, value, { always = false } = {}) {
+        const el = document.getElementById(id);
+        if (!el) return false;
+        const item = el.closest('.info-item');
+        const empty = this.isEmptyMetric(value);
+        const text = empty ? '--' : String(value);
+        el.textContent = text;
+        if (item) {
+            if (always) item.hidden = false;
+            else item.hidden = empty;
+        }
+        return !empty;
+    },
+    refreshMetricCard(cardId) {
+        const card = document.getElementById(cardId);
+        if (!card) return;
+        const items = card.querySelectorAll('.info-item');
+        const visible = [...items].some(item => !item.hidden);
+        card.hidden = !visible;
+    },
+    async loadHybridSwapMetrics(zramBlock) {
+        const section = document.getElementById('hybridswap-metrics');
+        if (!section) return;
+        if (!zramBlock) {
+            section.hidden = true;
+            return;
+        }
+        const basePath = `/sys/block/${zramBlock}`;
+        const [meminfoRaw, snapRaw, vmstatRaw, loopRaw, enableRaw] = await Promise.all([
+            this.exec(`cat ${basePath}/hybridswap_meminfo 2>/dev/null`),
+            this.exec(`cat ${basePath}/hybridswap_stat_snap 2>/dev/null`),
+            this.exec(`cat ${basePath}/hybridswap_vmstat 2>/dev/null`),
+            this.exec(`cat ${basePath}/hybridswap_loop_device 2>/dev/null`),
+            this.exec(`cat ${basePath}/hybridswap_enable 2>/dev/null`)
+        ]);
+        const hasNode = !!(meminfoRaw || snapRaw || enableRaw || loopRaw);
+        if (!hasNode) {
+            section.hidden = true;
+            return;
+        }
+
+        const mem = this.parseHybridMap(meminfoRaw);
+        const snap = this.parseHybridMap(snapRaw);
+        const vm = this.parseHybridMap(vmstatRaw);
+        const loop = String(loopRaw || '').trim();
+
+        this.setMetricValue('hyb-enable', this.summarizeHybridEnable(enableRaw));
+        this.setMetricValue('hyb-loop', (loop && loop !== 'none') ? loop.replace(/^\/dev\/block\//, '').replace(/^\/dev\//, '') : '');
+
+        const zst = this.parseHybridSizeToBytes(mem.ZST);
+        const est = this.parseHybridSizeToBytes(mem.EST);
+        this.setMetricValue('hyb-zst', zst > 0 ? this.formatBytes(zst) : '');
+        this.setMetricValue('hyb-zsu', this.formatHybridPair(mem.ZSU_C, mem.ZSU_O));
+        this.setMetricValue('hyb-est', est > 0 ? this.formatBytes(est) : '');
+        this.setMetricValue('hyb-esu', this.formatHybridPair(mem.ESU_C, mem.ESU_O));
+
+        const reclaim = this.parseHybridSizeToBytes(snap.reclaimin_bytes || snap.reclaimin_real_load);
+        const batch = this.parseHybridSizeToBytes(snap.batchout_bytes || snap.batchout_real_load);
+        const reclaimCnt = parseInt(snap.reclaimin_cnt || '0', 10) || 0;
+        const batchCnt = parseInt(snap.batchout_cnt || '0', 10) || 0;
+        this.setMetricValue('hyb-reclaimin', reclaim > 0 ? this.formatBytes(reclaim) : (reclaimCnt > 0 ? String(reclaimCnt) : ''));
+        this.setMetricValue('hyb-batchout', batch > 0 ? this.formatBytes(batch) : (batchCnt > 0 ? String(batchCnt) : ''));
+
+        const wakeup = parseInt(vm.swapd_wakeup || '0', 10) || 0;
+        this.setMetricValue('hyb-swapd-wakeup', wakeup > 0 ? String(wakeup) : '');
+
+        this.refreshMetricCard('hybridswap-metrics');
+    },
     async loadZramStatus() {
         const detectedPath = await this.detectActiveZramPath();
         const zramPath = detectedPath || this.state.zramPath;
         const zramBlock = this.getZramBlockName(zramPath);
-        const [algRaw, disksize, swappiness, swapInfo] = await Promise.all([
+        const pageSize = 4096;
+        const [algRaw, disksize, swappiness, swapInfo, mmStatRaw, bdStatRaw, backingDevRaw] = await Promise.all([
             zramBlock ? this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`) : '',
             zramBlock ? this.exec(`cat /sys/block/${zramBlock}/disksize 2>/dev/null`) : '',
             this.exec('cat /proc/sys/vm/swappiness 2>/dev/null'),
-            this.getActiveSwapInfo(zramPath)
+            this.getActiveSwapInfo(zramPath),
+            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/mm_stat 2>/dev/null`) : '',
+            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/bd_stat 2>/dev/null`) : '',
+            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/backing_dev 2>/dev/null`) : ''
         ]);
         const currentAlg = algRaw.match(/\[([^\]]+)\]/)?.[1] || algRaw.split(' ')[0] || '--';
         const sizeGB = disksize ? (parseInt(disksize) / 1024 / 1024 / 1024).toFixed(1) : '0';
         const swappinessValue = parseInt((swappiness || '').trim(), 10);
-        document.getElementById('zram-current-alg').textContent = currentAlg;
-        document.getElementById('zram-current-size').textContent = `${sizeGB} GB`;
-        document.getElementById('zram-current-swappiness').textContent = swappiness.trim() || '--';
+        this.setMetricValue('zram-current-alg', currentAlg && currentAlg !== '--' ? currentAlg : '', { always: true });
+        this.setMetricValue('zram-current-size', disksize && parseInt(disksize, 10) > 0 ? `${sizeGB} GB` : '', { always: true });
+        this.setMetricValue('zram-current-swappiness', (swappiness || '').trim() || '', { always: true });
+        this.setMetricValue('zram-current-path', zramPath || '', { always: true });
+
+        // mm_stat / bd_stat — hide empties
+        const mmStat = this.parseNumericList(mmStatRaw);
+        const bdStat = this.parseNumericList(bdStatRaw);
+        const rawDataSize = Number(mmStat[0] || 0);
+        const compressedSize = Number(mmStat[1] || 0);
+        const physicalMemoryUsed = Number(mmStat[2] || 0);
+        const compressionRatio = this.formatZramRatio(rawDataSize, compressedSize);
+        const backingDevice = this.normalizeBackingDev(backingDevRaw);
+        const bdRead = Number(bdStat[1] || 0) * pageSize;
+        const bdWrite = Number(bdStat[2] || 0) * pageSize;
+
+        this.setMetricValue('zram-raw-size', rawDataSize > 0 ? this.formatBytes(rawDataSize) : '');
+        this.setMetricValue('zram-compr-size', compressedSize > 0 ? this.formatBytes(compressedSize) : '');
+        this.setMetricValue('zram-mem-used', physicalMemoryUsed > 0 ? this.formatBytes(physicalMemoryUsed) : '');
+        this.setMetricValue('zram-compr-ratio', compressionRatio !== '--' ? compressionRatio : '');
+        this.setMetricValue('zram-backing-dev', (backingDevice && backingDevice !== '--') ? backingDevice : '');
+        this.setMetricValue('zram-bd-io', (bdRead > 0 || bdWrite > 0) ? `R ${this.formatBytes(bdRead)} / W ${this.formatBytes(bdWrite)}` : '');
+        this.refreshMetricCard('zram-status-card');
+
         const isActive = !!swapInfo;
-        const runtimeInfo = { currentAlg, sizeBytes: parseInt(disksize || '0', 10) || 0, swappinessValue, isActive, path: zramPath };
-        const statusEl = document.getElementById('zram-status');
+        const runtimeInfo = {
+            currentAlg,
+            sizeBytes: parseInt(disksize || '0', 10) || 0,
+            swappinessValue,
+            isActive,
+            path: zramPath,
+            compressionRatio,
+            physicalMemoryUsed
+        };
         if (!this.state.zramEnabled) this.syncZramControlsFromRuntime(runtimeInfo);
-        if (statusEl) statusEl.textContent = isActive ? (this.state.zramEnabled ? `模块:${currentAlg.toUpperCase()}` : `系统:${currentAlg.toUpperCase()}`) : '未启用';
+
+        const statusEl = document.getElementById('zram-status');
+        if (statusEl) {
+            if (!isActive) statusEl.textContent = '未启用';
+            else if (compressionRatio && compressionRatio !== '--') statusEl.textContent = `${this.state.zramEnabled ? '模块' : '系统'}:${compressionRatio}`;
+            else statusEl.textContent = `${this.state.zramEnabled ? '模块' : '系统'}:${(currentAlg || '--').toUpperCase()}`;
+        }
         const memBadge = document.getElementById('memory-compression-badge');
-        if (memBadge) memBadge.textContent = isActive ? (this.state.zramEnabled ? `ZRAM: 模块接管` : `ZRAM: 系统默认`) : '未配置';
-        const pathDisplay = document.getElementById('zram-current-path');
-        if (pathDisplay) pathDisplay.textContent = zramPath;
+        if (memBadge) {
+            if (!isActive) memBadge.textContent = '未配置';
+            else if (compressionRatio && compressionRatio !== '--') memBadge.textContent = `ZRAM ${compressionRatio}`;
+            else memBadge.textContent = this.state.zramEnabled ? 'ZRAM: 模块接管' : 'ZRAM: 系统默认';
+        }
+
+        await this.loadHybridSwapMetrics(zramBlock);
         this.updateZramModeHint(this.state.zramEnabled ? 'module' : (isActive ? 'system' : 'off'), runtimeInfo);
+    },
+    startZramMetricsRefresh(intervalMs = 4000) {
+        this.stopZramMetricsRefresh();
+        if (!this.zramMetricsVisibilityBound) {
+            this.zramMetricsVisibilityBound = true;
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) return;
+                const content = document.getElementById('zram-content');
+                if (content && content.classList.contains('expanded') && typeof this.loadZramStatus === 'function') {
+                    this.loadZramStatus();
+                }
+            });
+        }
+        // let expand animation start before shell reads
+        setTimeout(() => {
+            if (typeof this.loadZramStatus === 'function') this.loadZramStatus();
+        }, 60);
+        this.zramMetricsTimer = setInterval(() => {
+            const content = document.getElementById('zram-content');
+            if (!content || !content.classList.contains('expanded')) {
+                this.stopZramMetricsRefresh();
+                return;
+            }
+            if (document.hidden) return;
+            this.loadZramStatus();
+        }, intervalMs);
+    },
+    stopZramMetricsRefresh() {
+        if (this.zramMetricsTimer) {
+            clearInterval(this.zramMetricsTimer);
+            this.zramMetricsTimer = null;
+        }
+    },
+    async detectZramFeatures() {
+        if (!this.zramFeatures) this.zramFeatures = { multiComp: false, zstdLevel: false };
+        const zramBlock = this.getZramBlockName(this.state.zramPath) || 'zram0';
+        const [recompNode, zstdNode] = await Promise.all([
+            this.exec(`[ -f /sys/block/${zramBlock}/recomp_algorithm ] && echo 1 || echo 0`),
+            this.exec('[ -f /sys/module/zstd/parameters/compression_level ] && echo 1 || echo 0')
+        ]);
+        this.zramFeatures.multiComp = (recompNode || '').trim() === '1';
+        this.zramFeatures.zstdLevel = (zstdNode || '').trim() === '1';
+        if (typeof this.renderRecompAlgorithmOptions === 'function') this.renderRecompAlgorithmOptions();
+        this.updateZstdLevelVisibility();
+        return this.zramFeatures;
+    },
+    usesZstdAlgorithm() {
+        const algs = [
+            this.state.algorithm,
+            this.state.recompAlgorithm1,
+            this.state.recompAlgorithm2,
+            this.state.recompAlgorithm3
+        ].map(a => String(a || '').toLowerCase());
+        return algs.some(a => a === 'zstd' || a.startsWith('zstd'));
+    },
+    updateZstdLevelVisibility() {
+        const section = document.getElementById('zstd-level-section');
+        if (!section) return;
+        const supported = !!(this.zramFeatures && this.zramFeatures.zstdLevel);
+        const needed = this.usesZstdAlgorithm();
+        const show = !!(supported && needed); if ('hidden' in section) section.hidden = !show; else section.style.display = show ? '' : 'none';
+    },
+    initZstdLevel() {
+        const slider = document.getElementById('zstd-level-slider');
+        const valueEl = document.getElementById('zstd-level-value');
+        if (!slider || slider.dataset.bound) return;
+        slider.dataset.bound = '1';
+        slider.addEventListener('input', (e) => {
+            slider.dataset.userTouched = '1';
+            this.state.zstdCompressionLevel = parseInt(e.target.value, 10) || 1;
+            if (valueEl) valueEl.textContent = this.state.zstdCompressionLevel;
+            this.updateSliderProgress(slider);
+        });
+        slider.addEventListener('change', (e) => {
+            slider.dataset.userTouched = '1';
+            this.state.zstdCompressionLevel = parseInt(e.target.value, 10) || 1;
+            if (valueEl) valueEl.textContent = this.state.zstdCompressionLevel;
+            this.markZramDirty();
+        });
+    },
+    markZramDirty() {
+        this._zramDirty = true;
+        const btn = document.getElementById('zram-apply-btn');
+        if (btn && !btn.dataset.dirtyHint) {
+            btn.dataset.dirtyHint = '1';
+            const base = btn.textContent.replace(/\s*\*$/, '');
+            btn.textContent = base.includes('应用') ? `${base.replace('应用 ZRAM 配置', '应用 ZRAM 配置')} *` : `${base} *`;
+            if (!btn.textContent.includes('*')) btn.textContent = '应用 ZRAM 配置 *';
+        }
+    },
+    clearZramDirty() {
+        this._zramDirty = false;
+        const btn = document.getElementById('zram-apply-btn');
+        if (btn) {
+            btn.dataset.dirtyHint = '';
+            btn.textContent = '应用 ZRAM 配置';
+        }
+    },
+    markSwapDirty() {
+        this._swapDirty = true;
+        const btn = document.getElementById('swap-apply-btn');
+        if (btn) btn.textContent = '应用 Swap 配置 *';
+    },
+    clearSwapDirty() {
+        this._swapDirty = false;
+        const btn = document.getElementById('swap-apply-btn');
+        if (btn) btn.textContent = '应用 Swap 配置';
     },
     getZramFieldUpdates(changedField = 'zram') {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
@@ -649,6 +910,12 @@
         const updates = {};
         if (field === 'zram' || field === 'enabled') updates.enabled = this.state.zramEnabled ? '1' : '0';
         if (field === 'zram' || field === 'algorithm') updates.algorithm = this.state.algorithm;
+        if (field === 'zram' || field === 'zstd_compression_level') updates.zstd_compression_level = String(this.state.zstdCompressionLevel || 1);
+        if (field === 'zram' || field === 'recomp_algorithm1' || field === 'recomp_algorithm2' || field === 'recomp_algorithm3') {
+            updates.recomp_algorithm1 = this.state.recompAlgorithm1 || 'none';
+            updates.recomp_algorithm2 = this.state.recompAlgorithm2 || 'none';
+            updates.recomp_algorithm3 = this.state.recompAlgorithm3 || 'none';
+        }
         if (field === 'zram' || field === 'size') updates.size = String(sizeBytes);
         if (field === 'zram' || field === 'swappiness') updates.swappiness = String(this.state.swappiness);
         if (field === 'zram' || field === 'zram_writeback') updates.zram_writeback = this.state.zramWriteback;
@@ -656,7 +923,7 @@
         return updates;
     },
     async saveZramConfig(changedField = 'zram', skipPreview = false) {
-        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
+        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将保存 ZRAM 配置。',
@@ -667,15 +934,101 @@
             });
             if (!confirmed) return false;
         }
-        await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
+        await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
         await this.updateModuleDescription();
         this.showToast('ZRAM 配置已保存');
+        return true;
+    },
+    async verifyZramApplyResult(options = {}) {
+        const expectAlg = options.algorithm !== undefined ? options.algorithm : this.state.algorithm;
+        const expectSize = options.sizeBytes !== undefined ? options.sizeBytes : Math.round(this.state.zramSize * 1024 * 1024 * 1024);
+        const expectSwap = options.swappiness !== undefined ? options.swappiness : this.state.swappiness;
+        const expectZstd = options.zstdLevel !== undefined ? options.zstdLevel : this.state.zstdCompressionLevel;
+        const checkAlg = options.checkAlgorithm !== false;
+        const checkSize = options.checkSize !== false;
+        const checkSwap = options.checkSwappiness !== false;
+        const checkZstd = options.checkZstd === true || (this.usesZstdAlgorithm && this.usesZstdAlgorithm() && this.zramFeatures && this.zramFeatures.zstdLevel);
+
+        // wait a bit for nandswap/mm-sys chain to settle
+        await this.sleep(options.delayMs || 800);
+
+        const zramPath = await this.detectActiveZramPath() || this.state.zramPath;
+        const zramBlock = this.getZramBlockName(zramPath);
+        if (!zramBlock) {
+            this.showToast('ZRAM 校验失败：未找到活动设备');
+            return false;
+        }
+
+        const mismatches = [];
+        const [algRaw, disksizeRaw, swapRaw, zstdRaw, recompRaw] = await Promise.all([
+            this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`),
+            this.exec(`cat /sys/block/${zramBlock}/disksize 2>/dev/null`),
+            this.exec('cat /proc/sys/vm/swappiness 2>/dev/null'),
+            checkZstd ? this.exec('cat /sys/module/zstd/parameters/compression_level 2>/dev/null') : Promise.resolve(''),
+            this.zramFeatures && this.zramFeatures.multiComp
+                ? this.exec(`cat /sys/block/${zramBlock}/recomp_algorithm 2>/dev/null`)
+                : Promise.resolve('')
+        ]);
+
+        if (checkAlg && expectAlg) {
+            const currentAlg = (algRaw.match(/\[([^\]]+)\]/)?.[1] || algRaw.split(/\s+/)[0] || '').replace(/^kernel:/, '');
+            const want = String(expectAlg).replace(/^kernel:/, '');
+            if (currentAlg && currentAlg !== want) {
+                mismatches.push(`算法 ${currentAlg}≠${want}`);
+            }
+        }
+
+        if (checkSize && expectSize) {
+            const now = parseInt(String(disksizeRaw || '').trim(), 10) || 0;
+            // allow 1MB tolerance
+            if (now > 0 && Math.abs(now - expectSize) > 1024 * 1024) {
+                const nowGb = (now / 1024 / 1024 / 1024).toFixed(2);
+                const wantGb = (expectSize / 1024 / 1024 / 1024).toFixed(2);
+                mismatches.push(`大小 ${nowGb}G≠${wantGb}G`);
+            }
+        }
+
+        if (checkSwap && expectSwap !== undefined && expectSwap !== null && expectSwap !== '') {
+            const now = parseInt(String(swapRaw || '').trim(), 10);
+            const want = parseInt(expectSwap, 10);
+            if (Number.isFinite(now) && Number.isFinite(want) && now !== want) {
+                mismatches.push(`swappiness ${now}≠${want}`);
+            }
+        }
+
+        if (checkZstd && expectZstd !== undefined && expectZstd !== null && expectZstd !== '') {
+            const now = parseInt(String(zstdRaw || '').trim(), 10);
+            const want = parseInt(expectZstd, 10);
+            if (Number.isFinite(now) && Number.isFinite(want) && now !== want) {
+                mismatches.push(`zstd ${now}≠${want}`);
+            }
+        }
+
+        // soft check recomp: if configured non-none, recomp node should mention algo (best-effort)
+        if (this.zramFeatures && this.zramFeatures.multiComp) {
+            for (let i = 1; i <= 3; i++) {
+                const want = this.state[`recompAlgorithm${i}`];
+                if (!want || want === 'none') continue;
+                const raw = String(recompRaw || '');
+                if (raw && raw.indexOf(want) < 0 && !new RegExp(`#${i}.*${want}|${want}.*#${i}`).test(raw)) {
+                    // many kernels only show current selected recomp format differently; warn lightly
+                    // skip hard fail if recomp node empty after apply (common when busy)
+                    if (raw.trim()) mismatches.push(`重压缩${i} 未见 ${want}`);
+                }
+            }
+        }
+
+        if (mismatches.length) {
+            this.showToast(`ZRAM 部分未生效: ${mismatches.join(' / ')}`);
+            return false;
+        }
+        if (options.toastSuccess) this.showToast(options.toastSuccess);
         return true;
     },
     async applyZramImmediate(manageLoading = true, skipPreview = false) {
       return this.withLock('zram', async () => {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
-        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates('zram'), ['enabled', 'algorithm', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
+        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates('zram'), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将通过官方初始化链应用 ZRAM。',
@@ -691,18 +1044,33 @@
             this.showLoading(true);
             await this.sleep(0);
         }
-        await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates('zram'), ['enabled', 'algorithm', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
-        await this.exec(`/system/bin/sh ${this.modDir}/scripts/apply-zram.sh >/dev/null 2>&1`);
+        await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates('zram'), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
+        if (this.state.zramEnabled) {
+            await this.exec(`/system/bin/sh ${this.modDir}/scripts/apply-zram.sh >/dev/null 2>&1`);
+        }
         await this.updateModuleDescription();
+        if (typeof this.clearZramDirty === 'function') this.clearZramDirty();
         if (manageLoading) this.showLoading(false);
-        this.showToast('ZRAM 配置已应用');
-        setTimeout(() => this.loadZramStatus(), 500);
-        return true;
+        if (!this.state.zramEnabled) {
+            this.showToast('ZRAM 配置已保存（未启用）');
+            setTimeout(() => this.loadZramStatus(), 200);
+            return true;
+        }
+        const ok = await this.verifyZramApplyResult({
+            algorithm: this.state.algorithm,
+            sizeBytes: sizeBytes,
+            swappiness: this.state.swappiness,
+            zstdLevel: this.state.zstdCompressionLevel,
+            checkZstd: !!(this.usesZstdAlgorithm && this.usesZstdAlgorithm())
+        });
+        if (ok) this.showToast('ZRAM 配置已应用并校验');
+        setTimeout(() => this.loadZramStatus(), 300);
+        return ok;
       });
     },
     async applySwappinessImmediate(skipPreview = false) {
       return this.withLock('zram', async () => {
-        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates('swappiness'), ['enabled', 'algorithm', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
+        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates('swappiness'), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将通过官方初始化链更新 ZRAM Swappiness。',
@@ -716,13 +1084,20 @@
         }
         this.showLoading(true);
         await this.sleep(0);
-        await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates('swappiness'), ['enabled', 'algorithm', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
+        await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates('swappiness'), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
         await this.exec(`/system/bin/sh ${this.modDir}/scripts/apply-zram.sh >/dev/null 2>&1`);
         await this.updateModuleDescription();
         this.showLoading(false);
-        this.showToast('Swappiness 已更新');
-        setTimeout(() => this.loadZramStatus(), 500);
-        return true;
+        const ok = await this.verifyZramApplyResult({
+            checkAlgorithm: false,
+            checkSize: false,
+            checkSwappiness: true,
+            checkZstd: false,
+            swappiness: this.state.swappiness
+        });
+        if (ok) this.showToast('Swappiness 已更新并校验');
+        setTimeout(() => this.loadZramStatus(), 300);
+        return ok;
       });
     },
     async loadIOConfig() {
@@ -1136,12 +1511,19 @@
         document.addEventListener('mouseup', handleEnd);
     },
     initEasterEgg() {
+        if (this._easterEggBound) return;
         const banner = document.querySelector('.banner-image');
         const authorCard = document.getElementById('author-card');
         const overlay = document.getElementById('easter-egg-overlay');
         const card = document.getElementById('easter-egg-card');
         if (!overlay || !card) return;
-        if (banner) { banner.addEventListener('click', () => { this.easterEgg.clickCount++; if (this.easterEgg.clickTimer) { clearTimeout(this.easterEgg.clickTimer); } this.easterEgg.clickTimer = setTimeout(() => { this.easterEgg.clickCount = 0; }, 500); if (this.easterEgg.clickCount >= 1) { this.easterEgg.clickCount = 0; this.showEasterEgg(); } }); }
+        this._easterEggBound = true;
+
+        if (banner && !banner.dataset.easterBound) {
+            banner.dataset.easterBound = '1';
+            banner.addEventListener('click', () => this.showEasterEgg());
+        }
+
         const authorLinkBtn = document.getElementById('author-link-btn');
         if (authorLinkBtn && !authorLinkBtn.dataset.bound) {
             authorLinkBtn.dataset.bound = '1';
@@ -1150,37 +1532,74 @@
                 this.openExternalUrl('https://github.com/wswzgdg');
             });
         }
-        if (authorCard) { authorCard.addEventListener('click', () => { this.easterEgg.authorClickCount = (this.easterEgg.authorClickCount || 0) + 1; if (this.easterEgg.authorClickTimer) { clearTimeout(this.easterEgg.authorClickTimer); } this.easterEgg.authorClickTimer = setTimeout(() => { this.easterEgg.authorClickCount = 0; }, 500); if (this.easterEgg.authorClickCount >= 1) { this.easterEgg.authorClickCount = 0; this.showCreditsCard(); } }); }
+
+        if (authorCard && !authorCard.dataset.easterBound) {
+            authorCard.dataset.easterBound = '1';
+            authorCard.addEventListener('click', (e) => {
+                // ignore clicks on the external link button
+                if (e.target && e.target.closest && e.target.closest('#author-link-btn')) return;
+                this.showCreditsCard();
+            });
+        }
+
+        // touch drag on card
         let cardTouchStartX = 0, cardTouchStartY = 0, cardOffsetX = 0, cardOffsetY = 0;
-        card.addEventListener('touchstart', (e) => { const touch = e.touches[0]; cardTouchStartX = touch.clientX; cardTouchStartY = touch.clientY; card.style.transition = 'none'; }, { passive: true });
-        card.addEventListener('touchmove', (e) => { if (!this.easterEgg.isOverlayOpen) return; const touch = e.touches[0]; cardOffsetX = (touch.clientX - cardTouchStartX) * 0.15; cardOffsetY = (touch.clientY - cardTouchStartY) * 0.15; cardOffsetX = Math.max(-20, Math.min(20, cardOffsetX)); cardOffsetY = Math.max(-20, Math.min(20, cardOffsetY)); card.style.transform = `scale(1) translate(${cardOffsetX}px, ${cardOffsetY}px)`; }, { passive: true });
-        card.addEventListener('touchend', () => { card.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'; card.style.transform = 'scale(1) translate(0, 0)'; cardOffsetX = 0; cardOffsetY = 0; });
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) { this.hideEasterEgg(); } });
+        card.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            cardTouchStartX = touch.clientX;
+            cardTouchStartY = touch.clientY;
+            card.style.transition = 'none';
+        }, { passive: true });
+        card.addEventListener('touchmove', (e) => {
+            if (!this.easterEgg.isOverlayOpen) return;
+            const touch = e.touches[0];
+            cardOffsetX = Math.max(-20, Math.min(20, (touch.clientX - cardTouchStartX) * 0.15));
+            cardOffsetY = Math.max(-20, Math.min(20, (touch.clientY - cardTouchStartY) * 0.15));
+            card.style.transform = `scale(1) translate(${cardOffsetX}px, ${cardOffsetY}px)`;
+        }, { passive: true });
+        card.addEventListener('touchend', () => {
+            card.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            card.style.transform = 'scale(1) translate(0, 0)';
+            cardOffsetX = 0;
+            cardOffsetY = 0;
+        });
+
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) this.hideEasterEgg();
+        });
     },
-    showEasterEgg() { const overlay = document.getElementById('easter-egg-overlay'); const content = document.getElementById('easter-egg-content'); this.easterEgg.currentCard = 'thanks'; this.easterEgg.isOverlayOpen = true; content.innerHTML = `<div class="rainbow-text">感谢使用<span class="corona-c-rainbow">C</span>orona模块</div><div class="rainbow-text ciallo">Ciallo~(∠・ω< )⌒★</div>`; overlay.classList.add('show'); },
+    showEasterEgg() {
+        const overlay = document.getElementById('easter-egg-overlay');
+        const content = document.getElementById('easter-egg-content');
+        if (!overlay || !content) return;
+        this.easterEgg.currentCard = 'thanks';
+        this.easterEgg.isOverlayOpen = true;
+        content.innerHTML = `<div class="rainbow-text">感谢使用<span class="corona-c-rainbow">C</span>orona模块</div><div class="rainbow-text ciallo">Ciallo~(∠・ω< )⌒★</div>`;
+        overlay.classList.remove('hidden');
+        overlay.classList.add('show');
+    },
     openExternalUrl(url) {
         if (!url) return;
-        try {
-            window.open(url, '_blank', 'noopener,noreferrer');
-        } catch (error) {
-            try {
-                window.location.href = url;
-            } catch (_) {}
+        try { window.open(url, '_blank', 'noopener,noreferrer'); }
+        catch (error) {
+            try { window.location.href = url; } catch (_) {}
         }
     },
     buildCreditEntry(name, url = '') {
-        const safeName = this.escapeHtml(name);
-        const safeUrl = this.escapeHtml(url);
+        const safeName = this.escapeHtml ? this.escapeHtml(name) : String(name);
+        const safeUrl = this.escapeHtml ? this.escapeHtml(url) : String(url);
         const link = url ? `<button class="credit-link-btn" data-url="${safeUrl}" aria-label="打开 ${safeName} 的主页">&gt;</button>` : '';
         return `<div class="rainbow-text credit-entry"><span class="credit-name-text">${safeName}</span>${link}</div>`;
     },
     showCreditsCard() {
         const overlay = document.getElementById('easter-egg-overlay');
         const content = document.getElementById('easter-egg-content');
+        if (!overlay || !content) return;
         this.easterEgg.currentCard = 'credits';
         this.easterEgg.isOverlayOpen = true;
         this.easterEgg.xinranClickCount = 0;
         content.innerHTML = `<div class="rainbow-text credit-entry" id="xinran-credit-wrap"><span class="credit-name-text" id="xinran-credit">致谢爱人❤️然(≧ω≦)/</span><button class="credit-link-btn" data-url="https://github.com/Winkmoon" aria-label="打开然的主页">&gt;</button></div><div class="credits-section"><div class="rainbow-text credits-title">模块制作感谢名单</div>${this.buildCreditEntry('Cloud_Yun', 'https://github.com/yspbwx2010')}${this.buildCreditEntry('穆远星', 'https://github.com/MuYuanXing')}${this.buildCreditEntry('嘟嘟Ski')}${this.buildCreditEntry('Kanata')}</div>`;
+        overlay.classList.remove('hidden');
         overlay.classList.add('show');
         content.querySelectorAll('.credit-link-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -1191,17 +1610,38 @@
         });
         const xinranEl = document.getElementById('xinran-credit');
         if (xinranEl) {
-            const self = this;
-            xinranEl.onclick = function(e) {
+            xinranEl.onclick = (e) => {
                 e.stopPropagation();
-                self.easterEgg.xinranClickCount++;
-                if (self.easterEgg.xinranClickTimer) { clearTimeout(self.easterEgg.xinranClickTimer); }
-                self.easterEgg.xinranClickTimer = setTimeout(() => { self.easterEgg.xinranClickCount = 0; }, 1500);
-                if (self.easterEgg.xinranClickCount >= 3) { self.easterEgg.xinranClickCount = 0; self.hideEasterEgg(); setTimeout(() => { const xinranOverlay = document.getElementById('xinran-overlay'); xinranOverlay.classList.remove('hidden'); xinranOverlay.classList.add('show'); }, 300); }
+                this.easterEgg.xinranClickCount = (this.easterEgg.xinranClickCount || 0) + 1;
+                if (this.easterEgg.xinranClickTimer) clearTimeout(this.easterEgg.xinranClickTimer);
+                this.easterEgg.xinranClickTimer = setTimeout(() => { this.easterEgg.xinranClickCount = 0; }, 1500);
+                if (this.easterEgg.xinranClickCount >= 3) {
+                    this.easterEgg.xinranClickCount = 0;
+                    this.hideEasterEgg();
+                    setTimeout(() => {
+                        const xinranOverlay = document.getElementById('xinran-overlay');
+                        if (!xinranOverlay) return;
+                        xinranOverlay.classList.remove('hidden');
+                        xinranOverlay.classList.add('show');
+                    }, 300);
+                }
             };
         }
     },
-    hideEasterEgg() { const overlay = document.getElementById('easter-egg-overlay'); overlay.classList.remove('show'); this.easterEgg.isOverlayOpen = false; setTimeout(() => { const card = document.getElementById('easter-egg-card'); card.style.transform = ''; card.style.transition = ''; }, 400); },
+    hideEasterEgg() {
+        const overlay = document.getElementById('easter-egg-overlay');
+        if (!overlay) return;
+        overlay.classList.remove('show');
+        this.easterEgg.isOverlayOpen = false;
+        setTimeout(() => {
+            const card = document.getElementById('easter-egg-card');
+            if (card) {
+                card.style.transform = '';
+                card.style.transition = '';
+            }
+        }, 400);
+    },
+
     async detectKernelFeatures() {
         const [lruGen, thp, ksm, compaction] = await Promise.all([
             this.exec('cat /sys/kernel/mm/lru_gen/enabled 2>/dev/null'),
@@ -1222,7 +1662,7 @@
                 list.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                 item.classList.add('selected');
                 this.state.zramWriteback = item.dataset.value;
-                await this.saveZramConfig('zram_writeback');
+                this.markZramDirty();
             });
         });
     },
@@ -1253,21 +1693,14 @@
             });
         }
         if (saveBtn) {
-            saveBtn.addEventListener('click', async () => {
-                const newPath = pathInput.value.trim();
-                if (!newPath) {
-                    this.showToast('路径不能为空');
-                    return;
-                }
-                if (!newPath.startsWith('/dev/')) {
-                    this.showToast('路径必须以 /dev/ 开头');
-                    return;
-                }
-                this.state.zramPath = newPath;
-                const saved = await this.saveZramConfig('zram_path');
-                if (!saved) return;
-                await this.loadZramStatus();
-            });
+            saveBtn.addEventListener('click', () => {
+            const pathInput = document.getElementById('zram-path-input');
+            const val = (pathInput && pathInput.value || '').trim();
+            if (!val) { this.showToast('路径不能为空'); return; }
+            this.state.zramPath = val;
+            this.markZramDirty();
+            this.showToast('路径已记录，点应用生效');
+        });
         }
     },
     showZramDeviceSelector(devices, pathInput) {
@@ -1293,9 +1726,10 @@
             opt.addEventListener('click', () => {
                 pathInput.value = opt.dataset.path;
                 this.state.zramPath = opt.dataset.path;
+                if (typeof this.markZramDirty === 'function') this.markZramDirty();
                 overlay.classList.remove('show');
                 setTimeout(() => overlay.remove(), 300);
-                this.showToast(`已选择: ${opt.dataset.path}`);
+                this.showToast(`已选择: ${opt.dataset.path}（点应用生效）`);
             });
         });
         overlay.addEventListener('click', (e) => {
@@ -1313,7 +1747,7 @@
             swapSwitch.addEventListener('change', (e) => {
                 this.state.swapEnabled = e.target.checked;
                 this.toggleSwapSettings(e.target.checked);
-                this.saveSwapConfig('enabled');
+                this.markSwapDirty();
             });
         }
         if (swapSizeSlider) {
@@ -1323,7 +1757,7 @@
             });
             swapSizeSlider.addEventListener('change', (e) => {
                 this.state.swapSize = parseInt(e.target.value);
-                this.saveSwapConfig('size');
+                this.markSwapDirty();
             });
         }
         if (priorityList) {
@@ -1332,13 +1766,13 @@
                     priorityList.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                     item.classList.add('selected');
                     this.state.swapPriority = parseInt(item.dataset.value);
-                    this.saveSwapConfig('priority');
+                    this.markSwapDirty();
                 });
             });
         }
         this.loadSwapConfig();
         const swapApplyBtn = document.getElementById('swap-apply-btn');
-        if (swapApplyBtn) swapApplyBtn.addEventListener('click', async (e) => { e.stopPropagation(); if (!this.state.swapEnabled) { this.showToast('Swap 未启用'); return; } await this.applySwapImmediate(); });
+        if (swapApplyBtn) swapApplyBtn.addEventListener('click', async (e) => { e.stopPropagation(); /* enable check moved into applySwapImmediate */ await this.applySwapImmediate(); });
     },
     toggleSwapSettings(show) {
         const settings = document.getElementById('swap-settings');
@@ -1421,8 +1855,13 @@
       return this.withLock('swap', async () => {
         const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
         const q = this.shellQuote(swapPath);
+        if (!this.state.swapEnabled) {
+            const ok = await this.saveSwapConfig('swap', skipPreview);
+            if (ok && typeof this.clearSwapDirty === 'function') this.clearSwapDirty();
+            return ok;
+        }
         if (!skipPreview) {
-            const config = `enabled=1\nsize=${this.state.swapSize}\npriority=${this.state.swapPriority}\npath=${swapPath}`;
+            const config = await this.buildMergedConfigContent('swap.conf', this.getSwapFieldUpdates('swap'), ['enabled', 'size', 'priority', 'path']);
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将创建并启用 Swap。',
                 configs: [{ filename: 'swap.conf', content: config }],
@@ -1440,6 +1879,7 @@
         }
         this.showLoading(true);
         try {
+            await this.mergeConfigFile('swap.conf', this.getSwapFieldUpdates('swap'), ['enabled', 'size', 'priority', 'path']);
             await this.exec(`swapoff ${q} 2>/dev/null`);
             await this.exec(`rm -f ${q} 2>/dev/null`);
             const free = parseInt((await this.exec(`df -k ${this.shellQuote(swapPath.substring(0, swapPath.lastIndexOf('/')) || '/data')} 2>/dev/null | awk 'NR==2{print $4}'`)).trim()) || 0;
@@ -1483,21 +1923,76 @@
         }
       });
     },
+    parseSwapDevices(text) {
+        return String(text || '')
+            .trim()
+            .split('\n')
+            .slice(1)
+            .map(line => line.trim())
+            .filter(Boolean)
+            .map(line => {
+                const parts = line.split(/\s+/);
+                return {
+                    path: parts[0] || '-',
+                    type: parts[1] || '-',
+                    sizeKiB: parseInt(parts[2], 10) || 0,
+                    usedKiB: parseInt(parts[3], 10) || 0,
+                    priority: parts[4] || '-'
+                };
+            });
+    },
     async loadSwapStatus() {
-        const swaps = await this.exec('cat /proc/swaps 2>/dev/null | grep -v zram | grep -v Filename');
+        const pageSize = 4096;
+        const [swapsRaw, vmstatRaw] = await Promise.all([
+            this.exec('cat /proc/swaps 2>/dev/null'),
+            this.exec('cat /proc/vmstat 2>/dev/null')
+        ]);
+        const devices = this.parseSwapDevices(swapsRaw);
+        const fileDevices = devices.filter(d => !/zram/i.test(d.path));
         const statusEl = document.getElementById('swap-current-status');
         const sizeEl = document.getElementById('swap-current-size');
         const badgeEl = document.getElementById('swap-status');
-        if (swaps && swaps.trim()) {
-            const parts = swaps.trim().split(/\s+/);
-            const size = parts[2] ? (parseInt(parts[2]) / 1024).toFixed(0) : '0';
-            if (statusEl) statusEl.textContent = '已启用';
-            if (sizeEl) sizeEl.textContent = `${size} MB`;
+        const listEl = document.getElementById('swap-devices-list');
+        const ioInEl = document.getElementById('swap-io-in');
+        const ioOutEl = document.getElementById('swap-io-out');
+
+        if (fileDevices.length > 0) {
+            const totalKiB = fileDevices.reduce((s, d) => s + d.sizeKiB, 0);
+            if (statusEl) statusEl.textContent = `已启用 x${fileDevices.length}`;
+            if (sizeEl) sizeEl.textContent = `${(totalKiB / 1024).toFixed(0)} MB`;
             if (badgeEl) badgeEl.textContent = '已启用';
+        } else if (devices.length > 0) {
+            if (statusEl) statusEl.textContent = '仅 ZRAM';
+            if (sizeEl) sizeEl.textContent = '--';
+            if (badgeEl) badgeEl.textContent = 'ZRAM';
         } else {
             if (statusEl) statusEl.textContent = '未启用';
             if (sizeEl) sizeEl.textContent = '--';
             if (badgeEl) badgeEl.textContent = '未启用';
+        }
+
+        const vm = {};
+        String(vmstatRaw || '').split('\n').forEach(line => {
+            const parts = line.trim().split(/\s+/);
+            if (parts.length >= 2 && /^-?\d+$/.test(parts[1])) vm[parts[0]] = Number(parts[1]);
+        });
+        const pswpin = (Number(vm.pswpin) || 0) * pageSize;
+        const pswpout = (Number(vm.pswpout) || 0) * pageSize;
+        if (ioInEl) ioInEl.textContent = pswpin > 0 ? this.formatBytes(pswpin) : '0 B';
+        if (ioOutEl) ioOutEl.textContent = pswpout > 0 ? this.formatBytes(pswpout) : '0 B';
+
+        if (listEl) {
+            if (!devices.length) {
+                listEl.innerHTML = '<div class="setting-hint">未检测到 Swap 设备</div>';
+            } else {
+                listEl.innerHTML = devices.map(d => {
+                    const name = this.escapeHtml ? this.escapeHtml(d.path) : d.path;
+                    const used = this.formatBytes(d.usedKiB * 1024);
+                    const total = this.formatBytes(d.sizeKiB * 1024);
+                    const kind = /zram/i.test(d.path) ? 'zram' : d.type;
+                    return `<div class="swap-device-row"><div class="swap-device-title">${name}</div><div class="swap-device-meta"><span>${kind}</span><span>${used} / ${total}</span><span>prio ${d.priority}</span></div></div>`;
+                }).join('');
+            }
         }
     },
     initVmSettings() {

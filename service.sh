@@ -441,6 +441,32 @@ get_swap_priority() {
     awk -v dev="$1" 'NR > 1 && $1 == dev { print $5; exit }' /proc/swaps 2>/dev/null
 }
 
+
+
+apply_zstd_compression_level() {
+    conf="$CONFIG_DIR/zram.conf"
+    [ -f /sys/module/zstd/parameters/compression_level ] || return 0
+    [ -f "$conf" ] || return 0
+    level=$(get_conf_value "$conf" zstd_compression_level)
+    [ -n "$level" ] || return 0
+    echo "$level" > /sys/module/zstd/parameters/compression_level 2>/dev/null
+}
+
+apply_zram_recomp_algorithms() {
+    zram_block="$1"
+    conf="$CONFIG_DIR/zram.conf"
+    [ -f "/sys/block/$zram_block/recomp_algorithm" ] || return 0
+    [ -f "$conf" ] || return 0
+    i=1
+    while [ "$i" -le 3 ]; do
+        algo=$(get_conf_value "$conf" "recomp_algorithm$i")
+        if [ -n "$algo" ] && [ "$algo" != "none" ]; then
+            echo "algo=$algo priority=$i" > "/sys/block/$zram_block/recomp_algorithm" 2>/dev/null
+        fi
+        i=$((i + 1))
+    done
+}
+
 apply_zram_config() {
     [ ! -f "$CONFIG_DIR/zram.conf" ] && return
     enabled=$(get_conf_value "$CONFIG_DIR/zram.conf" enabled)
@@ -456,6 +482,8 @@ apply_zram_config() {
     swapoff "$zram_path" 2>/dev/null
     echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
     [ -n "$algorithm" ] && echo "$algorithm" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null
+    apply_zram_recomp_algorithms "$zram_block"
+    apply_zstd_compression_level
     [ "$zram_writeback" = "false" ] && echo none > "/sys/block/$zram_block/backing_dev" 2>/dev/null
     echo "$size" > "/sys/block/$zram_block/disksize" 2>/dev/null
     mkswap "$zram_path" 2>/dev/null || return
