@@ -148,8 +148,10 @@
         if (!Number.isFinite(n)) return 214;
         return Math.max(0, Math.min(360, n));
     },
-    applyHue(hue, animate = true) {
+    applyHue(hue, animate = true, options = {}) {
         const value = this.normalizeHue(hue);
+        const persist = options.persist !== false;
+        const updateState = options.updateState !== false;
         if (animate) this.applyThemeTransition();
         document.documentElement.style.setProperty('--hue', String(value));
         document.body.style.setProperty('--hue', String(value));
@@ -168,10 +170,11 @@
             el.style.setProperty('--primary-light', lite);
             el.style.setProperty('--accent', accent);
         });
-        this.state.hue = value;
-        localStorage.setItem('corona_color_hue', String(value));
-        // migrate away from old accent keys
-        try { localStorage.removeItem('corona_accent'); } catch (e) {}
+        if (updateState) this.state.hue = value;
+        if (persist) {
+            localStorage.setItem('corona_color_hue', String(value));
+            try { localStorage.removeItem('corona_accent'); } catch (e) {}
+        }
 
         if (typeof this.updateColorPrefUI === 'function') this.updateColorPrefUI(value);
 
@@ -179,6 +182,7 @@
         document.querySelectorAll('.range-slider').forEach(el => {
             if (typeof this.updateSliderProgress === 'function') this.updateSliderProgress(el);
         });
+        return { value, primary, dim, lite, accent };
     },
     applyTheme(theme, animate = true) {
         const body = document.body;
@@ -232,9 +236,8 @@
     },
     showColorPicker() {
         if (document.querySelector('.color-picker-overlay')) return;
-        const originalHue = String(this.normalizeHue(this.state.hue || localStorage.getItem('corona_color_hue') || 214));
-        // same preset set as Zram_WebUI demo
-        const presetHues = [0, 37, 66, 97, 124, 148, 176, 212, 255, 300, 325];
+        const originalHue = this.normalizeHue(this.state.hue || localStorage.getItem('corona_color_hue') || 214);
+        let draftHue = originalHue;
 
         const overlay = document.createElement('div');
         overlay.className = 'color-picker-overlay';
@@ -243,9 +246,21 @@
         dialog.innerHTML = `
             <h2>颜色选择器</h2>
             <div class="color-picker-content">
+                <div class="color-live-preview" id="color-live-preview">
+                    <div class="color-live-swatch" id="picker-live-swatch"></div>
+                    <div class="color-live-meta">
+                        <div class="color-live-title">实时预览</div>
+                        <div class="color-live-desc" id="picker-live-desc">色调 ${originalHue}°</div>
+                        <div class="color-live-samples">
+                            <span class="color-live-chip" id="picker-live-chip">选中项</span>
+                            <span class="color-live-btn" id="picker-live-btn">主按钮</span>
+                            <span class="color-live-dot" id="picker-live-dot"></span>
+                        </div>
+                    </div>
+                </div>
                 <div class="preset-colors">
-                    ${presetHues.map(h => `
-                        <button type="button" class="preset-color${Math.abs(h - Number(originalHue)) <= 2 ? ' active' : ''}" data-hue="${h}" aria-label="色调 ${h}" style="--preview-hue:${h};background:hsl(${h}, 82%, 50%)"></button>
+                    ${[0, 30, 60, 120, 180, 214, 260, 300, 330].map(h => `
+                        <button type="button" class="preset-color${Math.abs(h - originalHue) <= 2 ? ' active' : ''}" data-hue="${h}" aria-label="色调 ${h}" style="--preview-hue:${h};background:hsl(${h}, 82%, 50%)"></button>
                     `).join('')}
                 </div>
                 <label>
@@ -267,20 +282,39 @@
         const slider = dialog.querySelector('#picker-hue-slider');
         const output = dialog.querySelector('#picker-hue-value');
         const presets = dialog.querySelectorAll('.preset-color');
+        const liveSwatch = dialog.querySelector('#picker-live-swatch');
+        const liveDesc = dialog.querySelector('#picker-live-desc');
+        const liveChip = dialog.querySelector('#picker-live-chip');
+        const liveBtn = dialog.querySelector('#picker-live-btn');
+        const liveDot = dialog.querySelector('#picker-live-dot');
+
+        const paintLocalPreview = (value, primary, dim) => {
+            if (liveSwatch) liveSwatch.style.background = primary;
+            if (liveDesc) liveDesc.textContent = `色调 ${value}°`;
+            if (liveChip) {
+                liveChip.style.background = dim;
+                liveChip.style.color = primary;
+                liveChip.style.borderColor = primary;
+            }
+            if (liveBtn) liveBtn.style.background = primary;
+            if (liveDot) liveDot.style.background = primary;
+        };
 
         const previewHue = (hue) => {
-            const v = String(this.normalizeHue(hue));
-            document.documentElement.style.setProperty('--hue', v);
-            document.body.style.setProperty('--hue', v);
-            if (output) output.textContent = `${v}°`;
-            if (slider && slider.value !== v) slider.value = v;
+            draftHue = this.normalizeHue(hue);
+            // live theme preview without saving
+            const painted = this.applyHue(draftHue, false, { persist: false, updateState: false });
+            if (output) output.textContent = `${draftHue}°`;
+            if (slider && String(slider.value) !== String(draftHue)) slider.value = String(draftHue);
             presets.forEach(p => {
-                const h = parseInt(p.dataset.hue, 10);
-                p.classList.toggle('active', Math.abs(h - Number(v)) <= 2);
+                const ph = parseInt(p.dataset.hue, 10);
+                p.classList.toggle('active', Math.abs(ph - draftHue) <= 2);
             });
-            const swatch = document.getElementById('color-pref-swatch');
-            if (swatch) swatch.style.background = `hsl(${v}, 82%, 50%)`;
+            paintLocalPreview(painted.value, painted.primary, painted.dim);
         };
+
+        // initial preview paint
+        previewHue(originalHue);
 
         presets.forEach(p => {
             p.addEventListener('click', () => previewHue(p.dataset.hue));
@@ -288,7 +322,8 @@
         slider.addEventListener('input', () => previewHue(slider.value));
 
         const closeDialog = (restore) => {
-            if (restore) this.applyHue(originalHue, false);
+            if (restore) this.applyHue(originalHue, false, { persist: true, updateState: true });
+            else this.applyHue(draftHue, true, { persist: true, updateState: true });
             overlay.classList.add('closing');
             dialog.classList.add('closing');
             setTimeout(() => overlay.remove(), 180);
@@ -296,11 +331,9 @@
 
         dialog.querySelector('#cancel-color').addEventListener('click', () => closeDialog(true));
         dialog.querySelector('#apply-color').addEventListener('click', () => {
-            const hue = this.normalizeHue(slider.value);
-            this.applyHue(hue, true);
-            this.updateColorPrefUI(hue);
             closeDialog(false);
-            if (typeof this.showToast === 'function') this.showToast(`${this.t('colorChanged')}: ${hue}°`);
+            if (typeof this.updateColorPrefUI === 'function') this.updateColorPrefUI(draftHue);
+            if (typeof this.showToast === 'function') this.showToast(`${this.t('colorChanged')}: ${draftHue}°`);
         });
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) closeDialog(true);
