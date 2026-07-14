@@ -896,3 +896,37 @@ body.theme-dark #swap-content .zram-actions-sep {
 #zstd-level-section[hidden] {
     display: none !important;
 }
+
+/* Swap status list — full width rows, not squeezed side-by-side */
+#swap-status-card {
+    margin: 0 0 10px;
+}
+#swap-status-list .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+}
+#swap-status-list .info-label {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+#swap-status-list .info-value {
+    flex: 0 0 auto;
+    text-align: right;
+    white-space: nowrap;
+}
+#zram-status-list .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+}
+#zram-status-list .info-value {
+    text-align: right;
+    word-break: break-all;
+}
