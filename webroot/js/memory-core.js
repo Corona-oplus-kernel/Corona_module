@@ -701,6 +701,15 @@
             .replace(/^none$/i, '');
         return normalized || '';
     },
+    formatBackingDevName(value) {
+        const raw = this.normalizeBackingDev(value);
+        if (!raw) return '';
+        // show short loop device name: /dev/block/loop20 -> loop20
+        return raw
+            .replace(/^\/dev\/block\//, '')
+            .replace(/^\/dev\//, '')
+            .replace(/^block\//, '');
+    },
     parseHybridMap(text) {
         const result = {};
         String(text || '').split('\n').forEach(line => {
@@ -880,10 +889,10 @@
         this.setMetricValue('zram-compr-ratio', compressionRatio !== '--' ? compressionRatio : '0:1', opt);
         this.setMetricValue('zram-total-reads', this.formatBytes(totalReadBytes), opt);
         this.setMetricValue('zram-total-writes', this.formatBytes(totalWriteBytes), opt);
-        this.setMetricValue('zram-backing-dev', (backingDevice && backingDevice !== '--') ? backingDevice : '');
+        this.setMetricValue('zram-backing-dev', (backingDevice && backingDevice !== '--') ? this.formatBackingDevName(backingDevice) : '');
         const hasWb = !!(backingDevice || (bdStatRaw && String(bdStatRaw).trim()));
         const wbOpt = { always: hasWb };
-        this.setMetricValue('zram-bd-count', hasWb ? String(bdCount) : '', wbOpt);
+        this.setMetricValue('zram-bd-count', hasWb ? `${bdCount} 页` : '', wbOpt);
         this.setMetricValue('zram-bd-read', hasWb ? this.formatBytes(bdRead) : '', wbOpt);
         this.setMetricValue('zram-bd-write', hasWb ? this.formatBytes(bdWrite) : '', wbOpt);
         this.refreshMetricCard('zram-status-card');
@@ -2101,15 +2110,25 @@
         if (ioInEl) ioInEl.textContent = pswpin > 0 ? this.formatBytes(pswpin) : '0 B';
         if (ioOutEl) ioOutEl.textContent = pswpout > 0 ? this.formatBytes(pswpout) : '0 B';
 
+        // 仅文件 Swap 时展示设备列表；只有 zram 时整段隐藏
+        const devicesSection = document.getElementById('swap-devices-section') || (listEl && listEl.closest('.setting-section'));
         if (listEl) {
-            if (!devices.length) {
-                listEl.innerHTML = '<div class="setting-hint">未检测到 Swap 设备</div>';
+            if (!fileDevices.length) {
+                listEl.innerHTML = '';
+                if (devicesSection) {
+                    devicesSection.hidden = true;
+                    devicesSection.style.display = 'none';
+                }
             } else {
-                listEl.innerHTML = devices.map(d => {
+                if (devicesSection) {
+                    devicesSection.hidden = false;
+                    devicesSection.style.display = '';
+                }
+                listEl.innerHTML = fileDevices.map(d => {
                     const name = this.escapeHtml ? this.escapeHtml(d.path) : d.path;
                     const used = this.formatBytes(d.usedKiB * 1024);
                     const total = this.formatBytes(d.sizeKiB * 1024);
-                    const kind = /zram/i.test(d.path) ? 'zram' : d.type;
+                    const kind = d.type || 'file';
                     return `<div class="swap-device-row"><div class="swap-device-title">${name}</div><div class="swap-device-meta"><span>${kind}</span><span>${used} / ${total}</span><span>prio ${d.priority}</span></div></div>`;
                 }).join('');
             }
