@@ -1766,17 +1766,15 @@ body.theme-dark .detail-overlay.no-close-btn.show {
 
 .priority-nice-slider-container .range-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 24px;
-    height: 24px;
-    margin-top: -7px;
-    position: relative;
+    width: 22px;
+    height: 22px;
+    background: rgba(255, 255, 255, 0.88);
     border-radius: 50%;
-    background: var(--primary);
     cursor: pointer;
-    box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 28%, transparent);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    border: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.65);
 }
+
 
 .priority-nice-slider-container .range-slider::-webkit-slider-thumb:hover {
     transform: scale(1.06);
@@ -2617,12 +2615,12 @@ body.theme-dark .range-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     width: 22px;
     height: 22px;
-    background: linear-gradient(135deg, #5A9CFF 0%, var(--primary) 100%);
+    background: rgba(255, 255, 255, 0.78);
     border-radius: 50%;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(52, 130, 255, 0.6);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
     transition: transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.35);
 }
 .card-title-expandable {
     cursor: pointer;

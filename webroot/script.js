@@ -233,11 +233,11 @@ class CoronaAddon {
         const min = parseFloat(slider.min) || 0;
         const max = parseFloat(slider.max) || 100;
         const val = parseFloat(slider.value) || 0;
-        const percent = ((val - min) / (max - min)) * 100;
-        const styles = getComputedStyle(document.body);
+        const percent = Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
+        // fixed white translucent track — independent of theme primary color
         const isDark = document.body.classList.contains('theme-dark');
-        const filledColor = styles.getPropertyValue('--primary').trim() || 'rgba(52, 130, 255, 0.8)';
-        const emptyColor = isDark ? 'rgba(255, 255, 255, 0.15)' : (styles.getPropertyValue('--primary-dim').trim() || 'rgba(52, 130, 255, 0.12)');
+        const filledColor = isDark ? 'rgba(255, 255, 255, 0.55)' : 'rgba(255, 255, 255, 0.72)';
+        const emptyColor = isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(255, 255, 255, 0.28)';
         slider.style.background = `linear-gradient(to right, ${filledColor} 0%, ${filledColor} ${percent}%, ${emptyColor} ${percent}%, ${emptyColor} 100%)`;
     }
     initSliderProgress() {

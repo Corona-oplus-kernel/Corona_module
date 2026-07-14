@@ -283,8 +283,7 @@
                 </label>
             </div>
             <div class="dialog-buttons">
-                <button type="button" class="dialog-button" id="cancel-color">取消</button>
-                <button type="button" class="dialog-button filled" id="apply-color">应用</button>
+                <button type="button" class="dialog-button filled" id="close-color" style="flex:1">完成</button>
             </div>
         `;
         overlay.appendChild(dialog);
@@ -330,10 +329,10 @@
             }
         };
 
-        const previewHue = (hue) => {
+        const previewHue = (hue, { toast = false } = {}) => {
             draftHue = this.normalizeHue(hue);
-            // live theme preview without saving
-            const painted = this.applyHue(draftHue, false, { persist: false, updateState: false });
+            // 默认即时应用并保存，无需点「应用」
+            const painted = this.applyHue(draftHue, false, { persist: true, updateState: true });
             if (output) output.textContent = `${draftHue}°`;
             if (slider && String(slider.value) !== String(draftHue)) slider.value = String(draftHue);
             presets.forEach(p => {
@@ -341,32 +340,33 @@
                 p.classList.toggle('active', Math.abs(ph - draftHue) <= 2);
             });
             paintLocalPreview(painted.value, painted.primary, painted.dim);
+            if (typeof this.updateColorPrefUI === 'function') this.updateColorPrefUI(draftHue);
+            if (toast && typeof this.showToast === 'function') {
+                this.showToast(`${this.t('colorChanged')}: ${draftHue}°`);
+            }
         };
 
-        // initial preview paint
+        // initial paint (already current color, no toast)
         previewHue(originalHue);
 
         presets.forEach(p => {
-            p.addEventListener('click', () => previewHue(p.dataset.hue));
+            p.addEventListener('click', () => previewHue(p.dataset.hue, { toast: true }));
         });
+        // drag applies live; release toast once
         slider.addEventListener('input', () => previewHue(slider.value));
+        slider.addEventListener('change', () => previewHue(slider.value, { toast: true }));
 
-        const closeDialog = (restore) => {
-            if (restore) this.applyHue(originalHue, false, { persist: true, updateState: true });
-            else this.applyHue(draftHue, true, { persist: true, updateState: true });
+        const closeDialog = () => {
+            // already persisted on each change
+            this.applyHue(draftHue, false, { persist: true, updateState: true });
             overlay.classList.add('closing');
             dialog.classList.add('closing');
             setTimeout(() => overlay.remove(), 180);
         };
 
-        dialog.querySelector('#cancel-color').addEventListener('click', () => closeDialog(true));
-        dialog.querySelector('#apply-color').addEventListener('click', () => {
-            closeDialog(false);
-            if (typeof this.updateColorPrefUI === 'function') this.updateColorPrefUI(draftHue);
-            if (typeof this.showToast === 'function') this.showToast(`${this.t('colorChanged')}: ${draftHue}°`);
-        });
+        dialog.querySelector('#close-color').addEventListener('click', () => closeDialog());
         overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) closeDialog(true);
+            if (e.target === overlay) closeDialog();
         });
     },
     initThemeSelector() {
