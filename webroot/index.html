@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Corona 控制台</title>
-    <link rel="stylesheet" href="style.css?v=2026071455">
-    <link rel="stylesheet" href="css/components.css?v=2026071455">
-    <link rel="stylesheet" href="css/pages/settings.css?v=2026071455">
-    <link rel="stylesheet" href="css/animations.css?v=2026071455">
+    <link rel="stylesheet" href="style.css?v=2026071456">
+    <link rel="stylesheet" href="css/components.css?v=2026071456">
+    <link rel="stylesheet" href="css/pages/settings.css?v=2026071456">
+    <link rel="stylesheet" href="css/animations.css?v=2026071456">
     <script>
     (function () {
         try {
@@ -237,13 +237,29 @@
                                         <span class="info-label">压缩比</span>
                                         <span class="info-value" id="zram-compr-ratio">--</span>
                                     </div>
+                                    <div class="info-item" data-metric="reads" hidden>
+                                        <span class="info-label">总读取</span>
+                                        <span class="info-value" id="zram-total-reads">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="writes" hidden>
+                                        <span class="info-label">总写入</span>
+                                        <span class="info-value" id="zram-total-writes">--</span>
+                                    </div>
                                     <div class="info-item" data-metric="backing" hidden>
                                         <span class="info-label">回写设备</span>
                                         <span class="info-value" id="zram-backing-dev">--</span>
                                     </div>
-                                    <div class="info-item" data-metric="bdio" hidden>
-                                        <span class="info-label">回写读写</span>
-                                        <span class="info-value" id="zram-bd-io">--</span>
+                                    <div class="info-item" data-metric="bdcount" hidden>
+                                        <span class="info-label">回写块</span>
+                                        <span class="info-value" id="zram-bd-count">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="bdread" hidden>
+                                        <span class="info-label">回写读取</span>
+                                        <span class="info-value" id="zram-bd-read">--</span>
+                                    </div>
+                                    <div class="info-item" data-metric="bdwrite" hidden>
+                                        <span class="info-label">回写写入</span>
+                                        <span class="info-value" id="zram-bd-write">--</span>
                                     </div>
                                 </div>
                             </div>
@@ -1680,6 +1696,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071455" defer></script>
+    <script src="script.js?v=2026071456" defer></script>
 </body>
 </html>
