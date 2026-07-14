@@ -1367,17 +1367,18 @@ body.theme-gold .cpu-cluster-badge {
     left: 0;
     width: calc(50% - 4px);
     height: 100%;
-    background: var(--primary-dim);
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 16px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.45);
     transition: transform var(--motion-slow) var(--motion-ease), box-shadow var(--motion-fast) ease;
     z-index: 1;
 }
 
 body.theme-gold .tab-slider {
-    background: #F4EEE2;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
-    border: 1px solid rgba(117, 93, 60, 0.14);
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 body.theme-gold .tab-item.active {
@@ -2600,7 +2601,9 @@ body.theme-dark .tab-bar {
 }
 
 body.theme-dark .tab-slider {
-    background: rgba(50, 50, 50, 0.9);
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 body.theme-dark .range-slider {
