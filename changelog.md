@@ -1,16 +1,165 @@
-# Corona v4.3.6
+# Corona v4.4.6
 
-- 恢复半透明玻璃风格，优化卡片收起与 Swap 列表样式
-- 统一模块卡片/按钮/控件视觉语言
-- 自定义颜色改为色调预设+滑条，并优化主题切换过渡
-- 完善主题切换动画与强调色自定义
-- 应用 ZRAM 后校验算法/大小/swappiness/zstd 是否生效
-- Swap 面板展示 I/O 与全部 Swap 设备列表
-- WebUI 展示 OPLUS HybridSwap 运行状态指标
-- ZRAM 面板展开时自动刷新 mm_stat 运行指标
-- 支持 ZSTD compression_level 调节并在应用 ZRAM 时写入
-- 支持 ZRAM multi_comp 三级重压缩算法配置与应用
-- 从 Zram_WebUI 借鉴 mm_stat/bd_stat 状态指标，ZRAM 面板展示压缩比/物理占用/回写读写
+- release: v4.3.7
+- 应用策略开关与列表按钮间距对齐
+- 颜色选择器同步主页进度条与预览
+- ZRAM 管理徽章显示当前算法
+- 整理 ZRAM 回写与 Swap 指标布局，仅文件 Swap 显示设备列表
+- ZRAM 徽章恢复模块/系统接管文案
+- 修复模块设置展开动画节奏异常
+- ZRAM 状态增加压缩比、读写与回写指标
+- 修复模块设置内容被截断
+- 移除 translations 资源目录
+- 隐藏不支持能力、高级折叠动画、面板展开优化（无多语言）
+- 颜色选择器增加实时预览
+- 优化应用列表打开性能，避免主线程被列表与动画卡住
+- 修复连续点击后滚动被锁死无法拖动页面
+- 连续点击时从当前高度反向展开/收起
+- 优化面板展开收起：箭头半圈、时长与折叠卡顿
+- 修复大卡片折叠卡顿：先锁高度再收子项
+- 折叠时保持内容可见，先收高度再隐藏
+- 恢复半透明玻璃，优化卡片收起与 Swap 列表样式
+- 统一模块卡片按钮与控件视觉语言
+- 增强 ZRAM 配置与 WebUI 体验
+- 修复 Corona 浮动层触发时机
 - release: v4.3.6
 - 优化主卡片动画并适配模块字体
 - 优化模块设置联动与 WebUI 性能体验
+- release: v4.3.5
+- 为 Corona 浮动层补充下滑入场动画
+- 清理 /proc/corona 相关残留判断
+- 只保留 /proc/corona 作为内核迭代节点
+- 兼容从 /proc/corona 读取内核迭代次数
+- 只检查正式内核 release 更新
+- feat: show kernel workflow build in module settings
+- release: v4.3.3
+- 优化首页卡片跳转到配置页
+- 为浮层增加内核更新提示
+- release: v4.3.2
+- 优化应用策略守护轮询策略
+- 修复线程规则
+- 修复应用预设前台识别与自动恢复
+- release: v4.3.0
+- 优化应用策略与线程规则交互
+- 清理语言残留并完善 zram 与界面细节
+- 重构 zram 初始化链并整理 WebUI 行为
+- 优化应用策略与线程规则体验
+- 优化预览回退动画与初始化等待逻辑
+- 优化线程规则界面交互并更新版本号
+- 优化应用策略守护启动与单实例行为
+- 优化线程规则预设与分组样式
+- 优化线程规则交互与动画体验
+- 为线程规则补充 uclamp 控制
+- 为线程规则补充 cpuset 与 WALT 控制
+- 为应用线程规则添加亲和性与调度策略
+- 为应用线程优先级添加底层支持
+- 为优先级规则删除接入变更预览
+- 为应用策略接入变更预览
+- 重构应用策略脚本并优化应用列表交互
+- 恢复应用列表图标显示
+- 优化应用列表弹窗加载态
+- 优化应用策略状态显示与预设入口
+- 优化应用策略列表性能与交互
+- 合并应用策略与优先级并修正应用元数据链路
+- 优化 webui zram 状态显示与模块描述
+- 修复 mm-sys 接管下默认zram与重复内存配置
+- 刷个版本号跑工作流QWQ
+- 调整webui部分位置
+- 新增分类配置显示与变更预览开关
+- 新增分类配置开关
+- 扩展 IO 高级参数并完善 WebUI 展示
+- 补充 IO 高级参数说明文案
+- 修复空模块分类标题未隐藏
+- 新增模块卡片显示设置并联动隐藏空分类
+- 新增 WebUI 参数快照功能
+- 新增 WebUI 弹窗动画开关
+- 新增 WebUI 设置变更预览
+- fix: 修正滑条圆点颜色并更新版本号
+- 修正纸韵选项卡样式作用域
+- 清理 WebUI 重复样式规则
+- 优化 WebUI 纸韵主题与进度条动画
+- fix: preserve settings across Corona updates
+- hyw
+- 更新版本号
+- fix: LRU特性检测在UI初始化之后执行导致无法显示; 工作流打包排除无用文件
+- Revert "desc: 仅显示已配置项，无config不接管"
+- fix: 更新时保留旧模块description
+- desc: 仅显示已配置项，无config不接管
+- feat: 工作流自动生成changelog，支持手动触发
+- refactor: 移除模块内动态更新功能，保留版本号显示
+- feat: WebUI 版本号从 module.prop 动态获取
+- docs: 更新 changelog v4.1.2
+- fix: 更新流程改为下载→解压→100%安装→重载后清理
+- fix: 更新流程改为下载→安装→自动重载页面
+- fix: 模块内更新时保留当前 description
+- feat: 模块内更新添加进度条及安装中勿退出提示
+- ci: module.prop 变更时自动创建 release 并更新 update.json
+- refactor: ZRAM/Swap 手动应用，service.sh 补全开机应用，刷模块保留配置
+- fix: 更新方式改为直接替换模块文件，无需重启
+- feat: 添加远程更新功能 (updateJson + WebUI 检查更新)
+- feat: 所有重启生效项添加立即生效按钮, 版本升级至 v4.0.0
+- feat: OnePlus限定 + WebUI品牌检查 + odm overlay挂载 + UI优化
+- refactor: 内存参数移至 odm overlay，删除频率锁定，脚本改为 scripts.d
+- swappiness: map user value to SPT idle (baseline), not pressure
+- swappiness: map user value to SPT pressure target
+- swappiness: route Corona swappiness through SPT ceiling
+- ui: restore +x on webroot/style.css
+- ui: drop dusk frame from auto-theme preview
+- ui: smooth out animation easing across the app
+- ui: prefer ro.vendor.oplus.market.name for device model
+- ui: clean up overlay animation iteration cruft
+- ui: drop later-sheet detail-card transform override
+- ui: apply slide-up/down animation to all bottom-sheet overlays
+- ui: let storage sheet finish slide-down before hiding
+- ui: distinct slide-up/down for storage detail sheet
+- release: v3.7.3
+- ui: animate auto theme preview
+- corona kernel: detect via /proc/corona only; batch sysfs probe
+- ui: restore +x perms on webroot files
+- ui: corona kernel optimization card
+- core: harden config write path, kernel detection, and apply concurrency
+- service: remove unused apply_cpu_affinity_config
+- webui: fix per-core freq_lock.conf format mismatch with service.sh
+- webui: clip expandable content during transition to prevent reveal-then-grow jank
+- webui: drop child-element backdrop blur to fix sibling card refresh on expand
+- webui: drop opacity fade on expand to stop darken effect
+- webui: stop force-layering cards/options/sliders
+- webui: stop suppressing backdrop-filter during expand
+- webui: drop paint containment on module-card-content
+- webui: tone down memory-compression dividers and exclude floating header from backdrop suppression
+- webui: kill expand jank on memory-compression card, fix tcp.conf key
+- webui: tone down auto-theme swatch to soft day-to-night gradient
+- webui: replace auto-theme swatch with multicolor conic disc
+- webui: stop bg animation, fix expand toggle race
+- webui: cut expand-animation jank on cards
+- webui: smooth out scroll, sliders, and chart redraws
+- webui: restore config card visibility list
+- Clean up README by removing excess details
+- module: sync dynamic zram algorithm handling
+- Attempt to fix some invalid configurations
+- Delete backup files
+- Update module version number
+- Revert "使用Web Animations API替换max-height过渡，彻底消除展开卡顿"
+- 使用Web Animations API替换max-height过渡，彻底消除展开卡顿
+- 优化卡片展开收起动画流畅度，消除分段感
+- 修复tab-bar-container因transform覆盖导致的切换错位
+- 为所有卡片启用backdrop-filter模糊效果并优化GPU加速
+- Reapply safe animations to restored memory logic
+- Restore 74787e memory compression logic
+- Animate and reset nested memory cards
+- Fix nested memory compression toggles
+- Sync parent card height for nested expanders
+- Restore original memory compression section styling
+- Fix memory compression card nesting
+- Stabilize repeated overlay openings
+- Revert "Optimize repeated card toggles"
+- Optimize repeated card toggles
+- Smooth the final collapse transition
+- Synchronize card frame and content animations
+- Slow down MiuiX-style card animations
+- Use MiuiX-style section animations
+- Restore card motion and fix settings card borders
+- Smooth card transitions and remove settings dividers
+- Optimize WebUI responsiveness without removing features
+- 1
+- 同步模块更新
