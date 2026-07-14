@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Corona 控制台</title>
-    <link rel="stylesheet" href="style.css?v=2026071452">
-    <link rel="stylesheet" href="css/components.css?v=2026071452">
-    <link rel="stylesheet" href="css/pages/settings.css?v=2026071452">
-    <link rel="stylesheet" href="css/animations.css?v=2026071452">
+    <link rel="stylesheet" href="style.css?v=2026071455">
+    <link rel="stylesheet" href="css/components.css?v=2026071455">
+    <link rel="stylesheet" href="css/pages/settings.css?v=2026071455">
+    <link rel="stylesheet" href="css/animations.css?v=2026071455">
     <script>
     (function () {
         try {
@@ -64,7 +64,7 @@
                 </div>
                 <div class="card-col-right">
                     <div class="card card-small card-clickable" id="cpu-card">
-                        <div class="card-title"><span>处理器</span> ><span class="cpu-brand-badge hidden" id="cpu-brand-badge"></span></div>
+                        <div class="card-title">处理器 ><span class="cpu-brand-badge hidden" id="cpu-brand-badge"></span></div>
                         <div class="cpu-info-line">
                             <span class="info-primary" id="cpu-info">--</span>
                             <span class="info-secondary" id="cpu-cluster-info">--</span>
@@ -118,7 +118,7 @@
                 </div>
             </div>
             <div class="card card-clickable" id="battery-card">
-                <div class="card-title"><span>电池与温度</span> ><span class="refresh-indicator"></span></div>
+                <div class="card-title">电池与温度 ><span class="refresh-indicator"></span></div>
                 <div class="info-list">
                     <div class="info-item">
                         <span class="info-label">电池电量</span>
@@ -696,46 +696,47 @@
                             <span class="expand-icon">❯</span>
                         </div>
                         <div class="advanced-fold-body" id="io-advanced-body">
-                            <div class="setting-section">
-                                <span class="section-label">nr_requests</span>
-                                <span class="section-desc">限制队列可挂起的请求数量，值更大更偏吞吐，值更小更偏响应</span>
-                                <div class="option-grid cols-4" id="io-nr-requests-list">
-                                    <div class="option-item" data-value="64">64</div>
-                                    <div class="option-item selected" data-value="128">128</div>
-                                    <div class="option-item" data-value="256">256</div>
-                                    <div class="option-item" data-value="512">512</div>
-                                    <div class="option-item" data-value="1024">1024</div>
-                                    <div class="option-item" data-value="2048">2048</div>
-                                </div>
+<div class="setting-section">
+                            <span class="section-label">nr_requests</span>
+                            <span class="section-desc">限制队列可挂起的请求数量，值更大更偏吞吐，值更小更偏响应</span>
+                            <div class="option-grid cols-4" id="io-nr-requests-list">
+                                <div class="option-item" data-value="64">64</div>
+                                <div class="option-item selected" data-value="128">128</div>
+                                <div class="option-item" data-value="256">256</div>
+                                <div class="option-item" data-value="512">512</div>
+                                <div class="option-item" data-value="1024">1024</div>
+                                <div class="option-item" data-value="2048">2048</div>
                             </div>
-                            <div class="setting-section">
-                                <span class="section-label">rq_affinity</span>
-                                <span class="section-desc">控制请求完成回调尽量回到提交它的 CPU，常用于平衡延迟与 CPU 本地性</span>
-                                <div class="option-grid cols-4" id="io-rq-affinity-list">
-                                    <div class="option-item" data-value="0">0</div>
-                                    <div class="option-item selected" data-value="1">1</div>
-                                    <div class="option-item" data-value="2">2</div>
-                                </div>
+                        </div>
+                        <div class="setting-section">
+                            <span class="section-label">rq_affinity</span>
+                            <span class="section-desc">控制请求完成回调尽量回到提交它的 CPU，常用于平衡延迟与 CPU 本地性</span>
+                            <div class="option-grid cols-4" id="io-rq-affinity-list">
+                                <div class="option-item" data-value="0">0</div>
+                                <div class="option-item selected" data-value="1">1</div>
+                                <div class="option-item" data-value="2">2</div>
                             </div>
-                            <div class="setting-section">
-                                <span class="section-label">nomerges</span>
-                                <span class="section-desc">控制块层请求合并强度，减少合并更直接，保留合并更省队列开销</span>
-                                <div class="option-grid cols-4" id="io-nomerges-list">
-                                    <div class="option-item selected" data-value="0">0</div>
-                                    <div class="option-item" data-value="1">1</div>
-                                    <div class="option-item" data-value="2">2</div>
-                                </div>
+                        </div>
+                        <div class="setting-section">
+                            <span class="section-label">nomerges</span>
+                            <span class="section-desc">控制块层请求合并强度，减少合并更直接，保留合并更省队列开销</span>
+                            <div class="option-grid cols-4" id="io-nomerges-list">
+                                <div class="option-item selected" data-value="0">0</div>
+                                <div class="option-item" data-value="1">1</div>
+                                <div class="option-item" data-value="2">2</div>
                             </div>
-                            <div class="switch-container" id="io-iostats-container">
-                                <div class="switch-info">
-                                    <span class="switch-label">iostats</span>
-                                    <span class="switch-desc">统计块层 I/O 活动，方便观察负载变化；关闭可减少少量统计开销</span>
-                                </div>
-                                <label class="switch">
-                                    <input type="checkbox" id="io-iostats-switch">
-                                    <span class="slider"></span>
-                                </label>
+                        </div>
+                        <div class="switch-container" id="io-iostats-container">
+                            <div class="switch-info">
+                                <span class="switch-label">iostats</span>
+                                <span class="switch-desc">统计块层 I/O 活动，方便观察负载变化；关闭可减少少量统计开销</span>
                             </div>
+                            <label class="switch">
+                                <input type="checkbox" id="io-iostats-switch">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    
                         </div>
                     </div>
                 </div>
@@ -1193,7 +1194,6 @@
                             <input type="checkbox" id="category-config-visibility-switch">
                             <span class="slider"></span>
                         </label>
-                    </div>
                     </div>
                     <div class="setting-section card-visibility-settings-section">
                         <div class="card-visibility-header" id="card-visibility-toggle">
@@ -1680,6 +1680,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071452" defer></script>
+    <script src="script.js?v=2026071455" defer></script>
 </body>
 </html>
