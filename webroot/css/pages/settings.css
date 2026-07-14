@@ -77,20 +77,20 @@ body.theme-dark .sub-card-header.expanded {
     display: block;
     overflow: hidden;
     max-height: 0;
-    opacity: 1; /* keep content visible while height folds */
-    transform: none;
-    transform-origin: top center;
-    /* will-change set only during JS anim */
-    transition-property: max-height;
-    transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
-    transition-duration: 0.4s;
+    opacity: 1;
 }
-
 .sub-expandable-content.expanded,
 .module-card-content.expanded {
+    /* height driven by JS inline max-height during anim; none when open */
     opacity: 1;
-    transform: none;
 }
+.sub-expandable-content.hidden:not(.expanded),
+.module-card-content.hidden:not(.expanded) {
+    max-height: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none;
+}
+
 
 .sub-expandable-content.hidden,
 .module-card-content.hidden {
