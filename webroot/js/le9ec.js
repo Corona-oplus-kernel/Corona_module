@@ -9,7 +9,7 @@
         const exists = await this.exec('cat /proc/sys/vm/anon_min_kbytes 2>/dev/null');
         this.le9ecSupported = !!exists;
         if (!exists) {
-            document.getElementById('le9ec-card').style.display = 'none';
+            const card = document.getElementById('le9ec-card'); if (card) { card.style.display = 'none'; card.hidden = true; card.setAttribute('aria-hidden', 'true'); }
             this.refreshCardVisibilityAvailability();
             return;
         }

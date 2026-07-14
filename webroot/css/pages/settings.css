@@ -852,3 +852,47 @@ body.theme-dark #swap-content .zram-actions-sep {
     color: #fff;
     border-color: hsla(var(--hue), 82%, 50%, 0.35);
 }
+
+/* Advanced fold (recompression etc.) */
+.advanced-fold {
+    margin-top: 4px;
+}
+.advanced-fold-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    cursor: pointer;
+    user-select: none;
+}
+.advanced-fold-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.advanced-fold-header .expand-icon {
+    font-size: 12px;
+    color: var(--text-dim);
+    transition: transform 0.2s ease;
+    transform: rotate(90deg);
+    flex-shrink: 0;
+}
+.advanced-fold-header.expanded .expand-icon {
+    transform: rotate(270deg);
+}
+.advanced-fold-body {
+    display: block;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    padding-bottom: 0;
+}
+.advanced-fold-header .expand-icon {
+    transition: transform 0.22s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+#zram-recomp-section[hidden],
+#zstd-level-section[hidden] {
+    display: none !important;
+}

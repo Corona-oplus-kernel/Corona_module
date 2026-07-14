@@ -4,10 +4,8 @@
   if (window.CoronaFeatureScripts["settings-memory-page"]) return;
   Object.assign(CoronaAddon.prototype, {
     async loadMemoryPageTextResources() {
-        if (this.memoryPageTextsLoaded) return this.memoryPageTexts || {};
-        this.memoryPageTextsLoaded = true;
         try {
-            const response = await fetch(`translations/zh-CN.json?v=2026070601`, { cache: 'no-store' });
+            const response = await fetch(`translations/zh-CN.json?v=2026071451`, { cache: 'no-store' });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const resources = await response.json();
             this.memoryPageTexts = resources?.memoryPage || {};
@@ -43,7 +41,7 @@
         }
         return this.memoryPageConfig;
     },
-    renderStaticOptions() { this.renderAlgorithmOptions(); this.renderReadaheadOptions(); this.renderIOAdvancedOptions(); },
+    renderStaticOptions() { this.renderAlgorithmOptions(); this.renderReadaheadOptions(); this.renderIOAdvancedOptions(); if (typeof this.initIoAdvancedFold === 'function') this.initIoAdvancedFold(); },
     renderAlgorithmOptions() {
         const container = document.getElementById('algorithm-list');
         if (!container) return;
@@ -54,12 +52,37 @@
         this.renderRecompAlgorithmOptions();
         if (typeof this.updateZstdLevelVisibility === 'function') this.updateZstdLevelVisibility();
     },
+    setFeatureVisible(el, show) {
+        if (!el) return;
+        const on = !!show;
+        el.hidden = !on;
+        el.style.display = on ? '' : 'none';
+        el.setAttribute('aria-hidden', on ? 'false' : 'true');
+    },
+    initZramRecompFold() {
+        if (typeof this.initAdvancedFold === 'function') {
+            this.initAdvancedFold('zram-recomp-toggle', 'zram-recomp-body', { defaultOpen: false });
+            return;
+        }
+        // fallback no-anim
+        const header = document.getElementById('zram-recomp-toggle');
+        const body = document.getElementById('zram-recomp-body');
+        if (!header || !body || header.dataset.bound) return;
+        header.dataset.bound = '1';
+        header.addEventListener('click', () => {
+            const open = body.dataset.open === '1';
+            body.dataset.open = open ? '0' : '1';
+            body.style.display = open ? 'none' : 'block';
+            header.classList.toggle('expanded', !open);
+        });
+    },
     renderRecompAlgorithmOptions() {
         const section = document.getElementById('zram-recomp-section');
         if (!section) return;
         const supported = !!(this.zramFeatures && this.zramFeatures.multiComp);
-        if ('hidden' in section) section.hidden = !supported; else section.style.display = supported ? '' : 'none';
+        this.setFeatureVisible(section, supported);
         if (!supported) return;
+        if (typeof this.initZramRecompFold === 'function') this.initZramRecompFold();
         const algos = ['none', ...(this.algorithms || [])];
         const labels = { none: '无' };
         for (let i = 1; i <= 3; i++) {

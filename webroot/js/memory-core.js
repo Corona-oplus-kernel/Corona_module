@@ -3,6 +3,104 @@
   window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
   if (window.CoronaFeatureScripts["memory-core"]) return;
   Object.assign(CoronaAddon.prototype, {
+
+    initAdvancedFold(headerId, bodyId, { defaultOpen = false } = {}) {
+        const header = document.getElementById(headerId);
+        const body = document.getElementById(bodyId);
+        if (!header || !body || header.dataset.bound) return;
+        header.dataset.bound = '1';
+
+        const ease = 'cubic-bezier(0.25, 0.8, 0.25, 1)';
+        const durationFor = (h) => Math.round(Math.min(360, Math.max(180, (Number(h) || 0) * 0.35 + 140)));
+
+        const setClosedInstant = () => {
+            body.hidden = false; // keep in layout flow for measuring when opening
+            body.style.display = 'block';
+            body.style.overflow = 'hidden';
+            body.style.transition = 'none';
+            body.style.maxHeight = '0px';
+            body.style.opacity = '0';
+            body.dataset.open = '0';
+            header.classList.remove('expanded');
+        };
+
+        const openAnim = () => {
+            if (body.dataset.open === '1' || body._foldAnim) return;
+            body.hidden = false;
+            body.style.display = 'block';
+            body.style.overflow = 'hidden';
+            body.style.transition = 'none';
+            body.style.maxHeight = 'none';
+            body.style.opacity = '1';
+            const target = Math.max(body.scrollHeight, 1);
+            body.style.maxHeight = '0px';
+            body.style.opacity = '0';
+            void body.offsetHeight;
+            const d = durationFor(target);
+            body.style.transition = `max-height ${d}ms ${ease}, opacity ${Math.round(d * 0.75)}ms ease`;
+            void body.offsetHeight;
+            body.style.maxHeight = target + 'px';
+            body.style.opacity = '1';
+            header.classList.add('expanded');
+            body.dataset.open = '1';
+            body._foldAnim = setTimeout(() => {
+                body._foldAnim = null;
+                if (body.dataset.open === '1') {
+                    body.style.transition = 'none';
+                    body.style.maxHeight = 'none';
+                    body.style.overflow = 'visible';
+                }
+            }, d + 40);
+        };
+
+        const closeAnim = () => {
+            if (body.dataset.open !== '1' || body._foldAnim) {
+                // still allow reverse if mid-open
+            }
+            if (body._foldAnim) {
+                clearTimeout(body._foldAnim);
+                body._foldAnim = null;
+            }
+            body.style.overflow = 'hidden';
+            body.style.transition = 'none';
+            const from = Math.max(body.getBoundingClientRect().height || body.scrollHeight || 1, 1);
+            body.style.maxHeight = from + 'px';
+            body.style.opacity = '1';
+            void body.offsetHeight;
+            const d = durationFor(from);
+            body.style.transition = `max-height ${d}ms ${ease}, opacity ${Math.round(d * 0.7)}ms ease`;
+            void body.offsetHeight;
+            body.style.maxHeight = '0px';
+            body.style.opacity = '0';
+            header.classList.remove('expanded');
+            body.dataset.open = '0';
+            body._foldAnim = setTimeout(() => {
+                body._foldAnim = null;
+                body.style.transition = 'none';
+                body.style.maxHeight = '0px';
+                body.style.overflow = 'hidden';
+            }, d + 40);
+        };
+
+        const toggle = () => {
+            if (body.dataset.open === '1') closeAnim();
+            else openAnim();
+        };
+
+        header.addEventListener('click', toggle);
+        header.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+        });
+
+        if (defaultOpen) openAnim();
+        else setClosedInstant();
+    },
+    initIoAdvancedFold() {
+        this.initAdvancedFold('io-advanced-toggle', 'io-advanced-body', { defaultOpen: false });
+    },
+    initZramRecompFold() {
+        this.initAdvancedFold('zram-recomp-toggle', 'zram-recomp-body', { defaultOpen: false });
+    },
     async getPreferredBlockDevice() {
         const device = (await this.exec("for d in /sys/block/*; do b=$(basename \"$d\"); case \"$b\" in loop*|ram*|zram*|dm-*) continue ;; esac; [ -d \"$d/queue\" ] || continue; echo \"$b\"; break; done")).trim();
         return device || '';
@@ -363,6 +461,7 @@
                 if (typeof this.initZramWriteback === 'function') this.initZramWriteback();
                 if (typeof this.initZstdLevel === 'function') this.initZstdLevel();
                 if (typeof this.initZramPath === 'function') this.initZramPath();
+                if (typeof this.initIoAdvancedFold === 'function') this.initIoAdvancedFold();
                 if (customScriptsReady && typeof this.initCustomScripts === 'function') this.initCustomScripts();
                 if (memoryOptReady && typeof this.initSystemOpt === 'function') this.initSystemOpt();
                 if (appPolicyReady && typeof this.initAppPolicy === 'function') this.initAppPolicy();
@@ -677,14 +776,16 @@
         const card = document.getElementById(cardId);
         if (!card) return;
         const items = card.querySelectorAll('.info-item');
-        const visible = [...items].some(item => !item.hidden);
+        const visible = [...items].some(item => !item.hidden && item.style.display !== 'none');
         card.hidden = !visible;
+        card.style.display = visible ? '' : 'none';
     },
     async loadHybridSwapMetrics(zramBlock) {
         const section = document.getElementById('hybridswap-metrics');
         if (!section) return;
         if (!zramBlock) {
             section.hidden = true;
+            section.style.display = 'none';
             return;
         }
         const basePath = `/sys/block/${zramBlock}`;
@@ -698,15 +799,17 @@
         const hasNode = !!(meminfoRaw || snapRaw || enableRaw || loopRaw);
         if (!hasNode) {
             section.hidden = true;
+            section.style.display = 'none';
             return;
         }
+        section.hidden = false;
+        section.style.display = '';
 
         const mem = this.parseHybridMap(meminfoRaw);
         const snap = this.parseHybridMap(snapRaw);
         const vm = this.parseHybridMap(vmstatRaw);
         const loop = String(loopRaw || '').trim();
 
-        this.setMetricValue('hyb-enable', this.summarizeHybridEnable(enableRaw));
         this.setMetricValue('hyb-loop', (loop && loop !== 'none') ? loop.replace(/^\/dev\/block\//, '').replace(/^\/dev\//, '') : '');
 
         const zst = this.parseHybridSizeToBytes(mem.ZST);
@@ -856,7 +959,10 @@
         if (!section) return;
         const supported = !!(this.zramFeatures && this.zramFeatures.zstdLevel);
         const needed = this.usesZstdAlgorithm();
-        const show = !!(supported && needed); if ('hidden' in section) section.hidden = !show; else section.style.display = show ? '' : 'none';
+        const show = !!(supported && needed);
+        section.hidden = !show;
+        section.style.display = show ? '' : 'none';
+        section.setAttribute('aria-hidden', show ? 'false' : 'true');
     },
     initZstdLevel() {
         const slider = document.getElementById('zstd-level-slider');
