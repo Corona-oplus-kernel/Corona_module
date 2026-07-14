@@ -912,7 +912,7 @@
         const statusEl = document.getElementById('zram-status');
         if (statusEl) {
             if (!isActive) statusEl.textContent = '未启用';
-            else statusEl.textContent = this.state.zramEnabled ? '模块接管' : '系统接管';
+            else statusEl.textContent = (currentAlg && currentAlg !== '--') ? currentAlg : '--';
         }
         const memBadge = document.getElementById('memory-compression-badge');
         if (memBadge) {
