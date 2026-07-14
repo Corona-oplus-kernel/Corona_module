@@ -293,8 +293,17 @@ body.setting-descriptions-hidden .section-header-row > div {
 .module-card-expand.expanded svg {
     transform: none;
 }
-.module-card-content > .switch-container {
+.module-card-content > .switch-container,
+.module-card-content > .collapsible-inner > .switch-container {
     margin-bottom: 16px;
+}
+.module-card-content > .tile-actions,
+.module-card-content > .collapsible-inner > .tile-actions {
+    margin-top: 14px;
+    margin-bottom: 12px;
+}
+#app-policy-content .tile-actions {
+    margin-top: 14px;
 }
 .module-card-content .sub-card:first-child {
     padding-top: 0;
