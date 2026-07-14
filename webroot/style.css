@@ -901,11 +901,11 @@ body.monet-decoration .bg-decoration::before {
     height: 100%;
     border-radius: 4px;
     background: linear-gradient(90deg,
-        rgba(52, 130, 255, 0.52) 0%,
-        rgba(52, 130, 255, 0.88) 28%,
-        rgba(109, 173, 255, 0.94) 54%,
-        rgba(52, 130, 255, 0.82) 74%,
-        rgba(177, 213, 255, 0.88) 100%
+        color-mix(in srgb, var(--primary) 52%, transparent) 0%,
+        color-mix(in srgb, var(--primary) 88%, white) 28%,
+        color-mix(in srgb, var(--primary) 94%, white) 54%,
+        color-mix(in srgb, var(--primary) 82%, transparent) 74%,
+        color-mix(in srgb, var(--primary) 70%, white) 100%
     );
     background-size: 200% 100%;
     animation: waveFlow 2s ease-in-out infinite;
@@ -1004,11 +1004,11 @@ body.theme-gold .progress-bar-mini .progress-fill {
     height: 100%;
     border-radius: 6px;
     background: linear-gradient(90deg,
-        rgba(140, 103, 55, 0.56) 0%,
-        rgba(140, 103, 55, 0.92) 26%,
-        rgba(188, 155, 104, 0.96) 52%,
-        rgba(140, 103, 55, 0.86) 72%,
-        rgba(214, 193, 156, 0.92) 100%
+        color-mix(in srgb, var(--primary) 56%, transparent) 0%,
+        color-mix(in srgb, var(--primary) 92%, white) 26%,
+        color-mix(in srgb, var(--primary) 96%, white) 52%,
+        color-mix(in srgb, var(--primary) 86%, transparent) 72%,
+        color-mix(in srgb, var(--primary) 72%, white) 100%
     );
     background-size: 200% 100%;
     animation: waveFlow 2s ease-in-out infinite;
@@ -1367,7 +1367,7 @@ body.theme-gold .cpu-cluster-badge {
     left: 0;
     width: calc(50% - 4px);
     height: 100%;
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--primary-dim);
     border-radius: 16px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     transition: transform var(--motion-slow) var(--motion-ease), box-shadow var(--motion-fast) ease;
@@ -2208,7 +2208,7 @@ body.theme-dark .detail-overlay.no-close-btn.show {
 }
 
 .chart-btn.active {
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--primary-dim);
     border-color: rgba(255, 255, 255, 0.08);
     color: var(--primary);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -3455,6 +3455,7 @@ body.theme-dark .section-marker::after {
 }
 
 .section-marker span {
+    color: var(--primary);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.24em;
@@ -4291,3 +4292,60 @@ body.theme-dark .color-live-swatch {
 }
 
 
+
+/* Color picker — home-like preview */
+.color-live-home {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-surface);
+}
+.color-live-home-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-sub);
+    margin-bottom: 8px;
+}
+.color-live-home-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.color-live-home-row:last-child { margin-bottom: 0; }
+.color-live-home-label {
+    font-size: 12px;
+    color: var(--text-main);
+    font-weight: 600;
+}
+.color-live-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--primary-dim);
+    color: var(--primary);
+}
+.color-live-bar {
+    flex: 1;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.06);
+    overflow: hidden;
+}
+body.theme-dark .color-live-bar { background: rgba(255,255,255,0.08); }
+.color-live-bar > i {
+    display: block;
+    height: 100%;
+    width: 62%;
+    border-radius: inherit;
+    background: var(--primary);
+}
+.color-live-kicker {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--primary);
+}

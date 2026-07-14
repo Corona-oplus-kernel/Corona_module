@@ -256,6 +256,17 @@
                             <span class="color-live-btn" id="picker-live-btn">主按钮</span>
                             <span class="color-live-dot" id="picker-live-dot"></span>
                         </div>
+                        <div class="color-live-home">
+                            <div class="color-live-home-title">主页效果</div>
+                            <div class="color-live-home-row">
+                                <span class="color-live-kicker" id="picker-live-kicker">设备状态</span>
+                                <span class="color-live-badge" id="picker-live-badge">ZRAM</span>
+                            </div>
+                            <div class="color-live-home-row">
+                                <span class="color-live-home-label">运行内存</span>
+                                <span class="color-live-bar"><i id="picker-live-bar"></i></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="preset-colors">
@@ -288,9 +299,13 @@
         const liveBtn = dialog.querySelector('#picker-live-btn');
         const liveDot = dialog.querySelector('#picker-live-dot');
 
+        const liveKicker = dialog.querySelector('#picker-live-kicker');
+        const liveBadge = dialog.querySelector('#picker-live-badge');
+        const liveBar = dialog.querySelector('#picker-live-bar');
+
         const paintLocalPreview = (value, primary, dim) => {
             if (liveSwatch) liveSwatch.style.background = primary;
-            if (liveDesc) liveDesc.textContent = `色调 ${value}°`;
+            if (liveDesc) liveDesc.textContent = `色调 ${value}° · 主页与配置同步`;
             if (liveChip) {
                 liveChip.style.background = dim;
                 liveChip.style.color = primary;
@@ -298,6 +313,21 @@
             }
             if (liveBtn) liveBtn.style.background = primary;
             if (liveDot) liveDot.style.background = primary;
+            if (liveKicker) liveKicker.style.color = primary;
+            if (liveBadge) {
+                liveBadge.style.background = dim;
+                liveBadge.style.color = primary;
+            }
+            if (liveBar) liveBar.style.background = primary;
+            // refresh home progress bars live while dragging
+            document.querySelectorAll('.progress-fill, .progress-bar-mini .progress-fill').forEach(() => {});
+            if (typeof this.updateSliderProgress === 'function') {
+                document.querySelectorAll('.range-slider').forEach(el => this.updateSliderProgress(el));
+            }
+            // redraw chart with new primary if on home
+            if (typeof this.drawChart === 'function') {
+                try { this.drawChart(); } catch (e) {}
+            }
         };
 
         const previewHue = (hue) => {
