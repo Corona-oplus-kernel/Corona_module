@@ -102,7 +102,7 @@ class CoronaAddon {
             'battery-level', 'battery-capacity', 'battery-temp', 'cpu-temp',
             'system-version', 'kernel-version', 'history-chart',
             'zram-current-alg', 'zram-current-size', 'zram-current-swappiness', 'zram-status',
-            'zram-raw-size', 'zram-compr-size', 'zram-mem-used', 'zram-compr-ratio', 'zram-backing-dev', 'zram-bd-io',
+            'zram-raw-size', 'zram-bd-write', 'zram-bd-read', 'zram-bd-count', 'zram-total-writes', 'zram-total-reads', 'zram-compr-size', 'zram-mem-used', 'zram-compr-ratio', 'zram-backing-dev', 'zram-bd-io',
             'hyb-enable', 'hyb-loop', 'hyb-zst', 'hyb-zsu', 'hyb-est', 'hyb-esu', 'hyb-reclaimin', 'hyb-batchout', 'hyb-swapd-wakeup',
             'zstd-level-slider', 'zstd-level-value',
             'swap-status', 'swap-current-status', 'swap-current-size', 'swap-size-value', 'swap-io-in', 'swap-io-out',

@@ -764,13 +764,14 @@
         if (!el) return false;
         const item = el.closest('.info-item');
         const empty = this.isEmptyMetric(value);
-        const text = empty ? '--' : String(value);
+        // when always (runtime active), keep zero values like "0 B" visible
+        const text = (!always && empty) ? '--' : (value === undefined || value === null || value === '' ? '--' : String(value));
         el.textContent = text;
         if (item) {
             if (always) item.hidden = false;
             else item.hidden = empty;
         }
-        return !empty;
+        return always || !empty;
     },
     refreshMetricCard(cardId) {
         const card = document.getElementById(cardId);
@@ -836,14 +837,15 @@
         const zramPath = detectedPath || this.state.zramPath;
         const zramBlock = this.getZramBlockName(zramPath);
         const pageSize = 4096;
-        const [algRaw, disksize, swappiness, swapInfo, mmStatRaw, bdStatRaw, backingDevRaw] = await Promise.all([
+        const [algRaw, disksize, swappiness, swapInfo, mmStatRaw, bdStatRaw, backingDevRaw, blockStatRaw] = await Promise.all([
             zramBlock ? this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`) : '',
             zramBlock ? this.exec(`cat /sys/block/${zramBlock}/disksize 2>/dev/null`) : '',
             this.exec('cat /proc/sys/vm/swappiness 2>/dev/null'),
             this.getActiveSwapInfo(zramPath),
             zramBlock ? this.exec(`cat /sys/block/${zramBlock}/mm_stat 2>/dev/null`) : '',
             zramBlock ? this.exec(`cat /sys/block/${zramBlock}/bd_stat 2>/dev/null`) : '',
-            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/backing_dev 2>/dev/null`) : ''
+            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/backing_dev 2>/dev/null`) : '',
+            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/stat 2>/dev/null`) : ''
         ]);
         const currentAlg = algRaw.match(/\[([^\]]+)\]/)?.[1] || algRaw.split(' ')[0] || '--';
         const sizeGB = disksize ? (parseInt(disksize) / 1024 / 1024 / 1024).toFixed(1) : '0';
@@ -864,12 +866,26 @@
         const bdRead = Number(bdStat[1] || 0) * pageSize;
         const bdWrite = Number(bdStat[2] || 0) * pageSize;
 
-        this.setMetricValue('zram-raw-size', rawDataSize > 0 ? this.formatBytes(rawDataSize) : '');
-        this.setMetricValue('zram-compr-size', compressedSize > 0 ? this.formatBytes(compressedSize) : '');
-        this.setMetricValue('zram-mem-used', physicalMemoryUsed > 0 ? this.formatBytes(physicalMemoryUsed) : '');
-        this.setMetricValue('zram-compr-ratio', compressionRatio !== '--' ? compressionRatio : '');
+        // block layer stat: read_sectors / write_sectors (512-byte units)
+        const blockStat = this.parseNumericList(blockStatRaw);
+        const totalReadBytes = Number(blockStat[2] || 0) * 512;
+        const totalWriteBytes = Number(blockStat[6] || 0) * 512;
+        const bdCount = Number(bdStat[0] || 0);
+
+        const runtime = !!(disksize && parseInt(disksize, 10) > 0);
+        const opt = { always: runtime };
+        this.setMetricValue('zram-raw-size', this.formatBytes(rawDataSize), opt);
+        this.setMetricValue('zram-compr-size', this.formatBytes(compressedSize), opt);
+        this.setMetricValue('zram-mem-used', this.formatBytes(physicalMemoryUsed), opt);
+        this.setMetricValue('zram-compr-ratio', compressionRatio !== '--' ? compressionRatio : '0:1', opt);
+        this.setMetricValue('zram-total-reads', this.formatBytes(totalReadBytes), opt);
+        this.setMetricValue('zram-total-writes', this.formatBytes(totalWriteBytes), opt);
         this.setMetricValue('zram-backing-dev', (backingDevice && backingDevice !== '--') ? backingDevice : '');
-        this.setMetricValue('zram-bd-io', (bdRead > 0 || bdWrite > 0) ? `R ${this.formatBytes(bdRead)} / W ${this.formatBytes(bdWrite)}` : '');
+        const hasWb = !!(backingDevice || (bdStatRaw && String(bdStatRaw).trim()));
+        const wbOpt = { always: hasWb };
+        this.setMetricValue('zram-bd-count', hasWb ? String(bdCount) : '', wbOpt);
+        this.setMetricValue('zram-bd-read', hasWb ? this.formatBytes(bdRead) : '', wbOpt);
+        this.setMetricValue('zram-bd-write', hasWb ? this.formatBytes(bdWrite) : '', wbOpt);
         this.refreshMetricCard('zram-status-card');
 
         const isActive = !!swapInfo;
