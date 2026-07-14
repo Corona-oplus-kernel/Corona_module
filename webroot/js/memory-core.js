@@ -903,14 +903,12 @@
         const statusEl = document.getElementById('zram-status');
         if (statusEl) {
             if (!isActive) statusEl.textContent = '未启用';
-            else if (compressionRatio && compressionRatio !== '--') statusEl.textContent = `${this.state.zramEnabled ? '模块' : '系统'}:${compressionRatio}`;
-            else statusEl.textContent = `${this.state.zramEnabled ? '模块' : '系统'}:${(currentAlg || '--').toUpperCase()}`;
+            else statusEl.textContent = this.state.zramEnabled ? '模块接管' : '系统接管';
         }
         const memBadge = document.getElementById('memory-compression-badge');
         if (memBadge) {
             if (!isActive) memBadge.textContent = '未配置';
-            else if (compressionRatio && compressionRatio !== '--') memBadge.textContent = `ZRAM ${compressionRatio}`;
-            else memBadge.textContent = this.state.zramEnabled ? 'ZRAM: 模块接管' : 'ZRAM: 系统默认';
+            else memBadge.textContent = this.state.zramEnabled ? 'ZRAM: 模块接管' : 'ZRAM: 系统接管';
         }
 
         await this.loadHybridSwapMetrics(zramBlock);
