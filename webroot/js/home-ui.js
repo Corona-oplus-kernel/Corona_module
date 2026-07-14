@@ -97,184 +97,177 @@
     expandPanelContent(content, toggle, { icon = null, cardEl = null, onExpand = null } = {}) {
         if (!content) return;
         this.ensureCollapsible(content);
-        content._panelState = 'opening';
-        if (typeof this.releasePanelScrollLock === 'function') this.releasePanelScrollLock();
-
-        // cancel in-flight anim — then reverse from CURRENT height (no snap to 0)
+        content._panelState = "opening";
+        if (typeof this.releasePanelScrollLock === "function") this.releasePanelScrollLock();
         if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
-        if (content._anim) { try { content.removeEventListener('transitionend', content._anim); } catch (e) {} content._anim = null; }
+        if (content._wa) { try { content._wa.cancel(); } catch (e) {} content._wa = null; }
+        if (content._anim) { try { content.removeEventListener("transitionend", content._anim); } catch (e) {} content._anim = null; }
 
         const currentH = Math.max(content.getBoundingClientRect().height || 0, 0);
+        content.classList.remove("hidden");
+        content.classList.add("expanded");
+        content.style.pointerEvents = "";
+        content.style.overflow = "hidden";
+        content.style.opacity = "1";
+        content.style.transform = "none";
+        content.style.transition = "none";
 
-        content.classList.remove('hidden');
-        content.classList.add('expanded');
-        content.style.pointerEvents = '';
-        content.style.overflow = 'hidden';
-        content.style.opacity = '1';
-        content.style.transform = 'none';
-        content.style.transition = 'none';
-
-        // measure full open height
-        content.style.maxHeight = 'none';
+        content.style.maxHeight = "none";
         const target = Math.max(content.scrollHeight, 1);
         content._openHeight = target;
-
-        // start from where we are (interrupted mid-close resumes from middle)
-        const from = Math.min(currentH || 0, target);
-        content.style.maxHeight = from + 'px';
+        const from = Math.max(0, Math.min(currentH, target));
+        content.style.maxHeight = from + "px";
         void content.offsetHeight;
 
-        const duration = this.getPanelAnimMs(Math.max(target - from, target * 0.35));
+        const dist = Math.max(target - from, from === 0 ? target : 8);
+        const duration = this.getPanelAnimMs(dist);
+        const ease = "cubic-bezier(0.25, 0.8, 0.25, 1)";
 
-        // arrow open with height
-        if (toggle) toggle.classList.add('expanded');
-        if (icon) icon.classList.add('expanded');
-        const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
-        if (header) header.classList.add('expanded');
+        if (toggle) {
+            toggle.style.transition = `transform ${duration}ms ${ease}`;
+            toggle.classList.add("expanded");
+            const svg = toggle.querySelector && toggle.querySelector("svg");
+            if (svg) { svg.style.transition = "none"; svg.style.transform = "none"; }
+        }
+        if (icon) {
+            icon.style.transition = `transform ${duration}ms ${ease}`;
+            icon.classList.add("expanded");
+        }
+        const header = toggle && (toggle.closest(".module-card-header") || toggle.closest(".sub-card-header"));
+        if (header) header.classList.add("expanded");
 
         let finished = false;
         const finish = () => {
             if (finished) return;
             finished = true;
-            if (content._anim) content.removeEventListener('transitionend', content._anim);
             clearTimeout(content._animTimer);
-            content._anim = null;
             content._animTimer = null;
-            this.clearPanelTransition(content);
-            if (content.classList.contains('expanded')) {
-                content.style.maxHeight = 'none';
-                content.style.overflow = 'visible';
-                content.style.opacity = '1';
-                content.style.transform = 'none';
+            if (content._wa) { try { content._wa.cancel(); } catch (e) {} content._wa = null; }
+            content.style.transition = "none";
+            content.style.willChange = "auto";
+            if (toggle) toggle.style.removeProperty("transition");
+            if (icon) icon.style.removeProperty("transition");
+            if (content.classList.contains("expanded") && content._panelState !== "closing") {
+                content.style.maxHeight = "none";
+                content.style.overflow = "visible";
                 content._openHeight = Math.max(content.getBoundingClientRect().height || target, 1);
-                content._panelState = 'open';
+                content._panelState = "open";
             }
-            if (cardEl) cardEl.classList.remove('expanding');
-            content.style.willChange = 'auto';
-            if (typeof endExpand === 'function') endExpand();
-            if (typeof onExpand === 'function') {
+            if (cardEl) cardEl.classList.remove("expanding");
+            if (typeof endExpand === "function") endExpand();
+            if (typeof onExpand === "function" && content._panelState === "open") {
                 Promise.resolve().then(() => onExpand()).catch(() => {});
             }
         };
-        const onEnd = (e) => {
-            if (e && e.target !== content) return;
-            if (e && e.propertyName && e.propertyName !== 'max-height') return;
-            finish();
-        };
-        content._anim = onEnd;
-        content.addEventListener('transitionend', onEnd);
 
-        // transition then reflow then open
-        content.style.willChange = 'max-height';
-        this.setPanelTransition(content, duration, 'height');
-        void content.offsetHeight;
-        content.style.maxHeight = target + 'px';
-        content._animTimer = setTimeout(finish, duration + 80);
+        if (typeof content.animate === "function") {
+            content._wa = content.animate(
+                [{ maxHeight: from + "px" }, { maxHeight: target + "px" }],
+                { duration, easing: ease, fill: "forwards" }
+            );
+            content._wa.onfinish = finish;
+            content._animTimer = setTimeout(finish, duration + 60);
+        } else {
+            content.style.transition = `max-height ${duration}ms ${ease}`;
+            void content.offsetHeight;
+            content.style.maxHeight = target + "px";
+            content._animTimer = setTimeout(finish, duration + 60);
+        }
     },
     collapsePanelContent(content, toggle, { icon = null, cardEl = null, onCollapse = null, beforeCollapse = null } = {}) {
         if (!content) return;
         this.ensureCollapsible(content);
-        content._panelState = 'closing';
-        if (typeof this.releasePanelScrollLock === 'function') this.releasePanelScrollLock();
-
-        // cancel in-flight anim — reverse from CURRENT height (no snap to full then close)
+        content._panelState = "closing";
+        if (typeof this.releasePanelScrollLock === "function") this.releasePanelScrollLock();
         if (content._animTimer) { clearTimeout(content._animTimer); content._animTimer = null; }
-        if (content._anim) { try { content.removeEventListener('transitionend', content._anim); } catch (e) {} content._anim = null; }
+        if (content._wa) { try { content._wa.cancel(); } catch (e) {} content._wa = null; }
+        if (content._anim) { try { content.removeEventListener("transitionend", content._anim); } catch (e) {} content._anim = null; }
 
         const currentH = Math.max(content.getBoundingClientRect().height || 0, 0);
-        if (currentH < 2 && !content.classList.contains('expanded')) {
-            // already closed
-            content.classList.add('hidden');
-            content.classList.remove('expanded');
+        if (currentH < 2 && content.classList.contains("hidden")) {
+            content.classList.remove("expanded");
+            content._panelState = "closed";
             return;
         }
 
-        content.classList.add('expanded');
-        content.classList.remove('hidden');
-        content.style.pointerEvents = 'none';
-        content.style.overflow = 'hidden';
-        content.style.opacity = '1';
-        content.style.transform = 'none';
-        content.style.transition = 'none';
+        content.classList.add("expanded");
+        content.classList.remove("hidden");
+        content.style.pointerEvents = "none";
+        content.style.overflow = "hidden";
+        content.style.opacity = "1";
+        content.style.transform = "none";
+        content.style.transition = "none";
 
-        // 箭头随收起
-        if (toggle) toggle.classList.remove('expanded');
-        if (icon) icon.classList.remove('expanded');
-        const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
-        if (header) header.classList.remove('expanded');
-
-        if (content.id === 'app-settings-content') {
-            const visList = document.getElementById('card-visibility-list');
-            const visToggle = document.getElementById('card-visibility-toggle');
-            if (visList) {
-                visList.style.transition = 'none';
-                visList.classList.remove('expanded');
-            }
-            if (visToggle) visToggle.classList.remove('expanded');
-        }
-
-        // pin FROM current visual height (interrupted mid-open resumes from middle)
-        let from = currentH;
+        let from = currentH > 1 ? currentH : (Number(content._openHeight) || 0);
         if (!(from > 1)) {
-            from = Number(content._openHeight) || 0;
-            if (!(from > 1)) {
-                content.style.maxHeight = 'none';
-                from = Math.max(content.scrollHeight || 1, 1);
-            }
+            content.style.maxHeight = "none";
+            from = Math.max(content.scrollHeight || 1, 1);
         }
-        content.style.maxHeight = from + 'px';
+        content.style.maxHeight = from + "px";
         void content.offsetHeight;
 
         const duration = this.getPanelAnimMs(from);
+        const ease = "cubic-bezier(0.25, 0.8, 0.25, 1)";
 
-        if (typeof onCollapse === 'function') {
-            try { onCollapse(); } catch (e) {}
+        if (toggle) {
+            toggle.style.transition = `transform ${duration}ms ${ease}`;
+            toggle.classList.remove("expanded");
+            const svg = toggle.querySelector && toggle.querySelector("svg");
+            if (svg) { svg.style.transition = "none"; svg.style.transform = "none"; }
         }
+        if (icon) {
+            icon.style.transition = `transform ${duration}ms ${ease}`;
+            icon.classList.remove("expanded");
+        }
+        const header = toggle && (toggle.closest(".module-card-header") || toggle.closest(".sub-card-header"));
+        if (header) header.classList.remove("expanded");
+
+        if (content.id === "app-settings-content") {
+            const visList = document.getElementById("card-visibility-list");
+            const visToggle = document.getElementById("card-visibility-toggle");
+            if (visList) { visList.style.transition = "none"; visList.classList.remove("expanded"); }
+            if (visToggle) visToggle.classList.remove("expanded");
+        }
+        if (typeof onCollapse === "function") { try { onCollapse(); } catch (e) {} }
 
         let finished = false;
         const finish = () => {
             if (finished) return;
             finished = true;
-            if (content._anim) content.removeEventListener('transitionend', content._anim);
             clearTimeout(content._animTimer);
-            content._anim = null;
             content._animTimer = null;
-
-            content.style.transition = 'none';
-            content.style.maxHeight = '0px';
-            content.classList.remove('expanded');
-            content.classList.add('hidden');
-            content.style.overflow = 'hidden';
-            content.style.opacity = '1';
-            content.style.transform = 'none';
-            content.style.pointerEvents = '';
+            if (content._wa) { try { content._wa.cancel(); } catch (e) {} content._wa = null; }
+            content.style.transition = "none";
+            content.style.maxHeight = "0px";
+            content.classList.remove("expanded");
+            content.classList.add("hidden");
+            content.style.overflow = "hidden";
+            content.style.pointerEvents = "";
+            content.style.willChange = "auto";
             content._openHeight = 0;
-            content._panelState = 'closed';
-
-            if (cardEl) cardEl.classList.remove('expanding');
-            content.style.willChange = 'auto';
-            if (typeof endExpand === 'function') endExpand();
-
-            if (typeof beforeCollapse === 'function') {
-                requestAnimationFrame(() => {
-                    try { beforeCollapse(); } catch (e) {}
-                });
+            content._panelState = "closed";
+            if (toggle) toggle.style.removeProperty("transition");
+            if (icon) icon.style.removeProperty("transition");
+            if (cardEl) cardEl.classList.remove("expanding");
+            if (typeof endExpand === "function") endExpand();
+            if (typeof beforeCollapse === "function") {
+                requestAnimationFrame(() => { try { beforeCollapse(); } catch (e) {} });
             }
         };
 
-        const onEnd = (e) => {
-            if (e && e.target !== content) return;
-            if (e && e.propertyName && e.propertyName !== 'max-height') return;
-            finish();
-        };
-        content._anim = onEnd;
-        content.addEventListener('transitionend', onEnd);
-
-        content.style.willChange = 'max-height';
-        this.setPanelTransition(content, duration, 'height');
-        void content.offsetHeight;
-        content.style.maxHeight = '0px';
-        content._animTimer = setTimeout(finish, duration + 80);
+        if (typeof content.animate === "function") {
+            content._wa = content.animate(
+                [{ maxHeight: from + "px" }, { maxHeight: "0px" }],
+                { duration, easing: ease, fill: "forwards" }
+            );
+            content._wa.onfinish = finish;
+            content._animTimer = setTimeout(finish, duration + 60);
+        } else {
+            content.style.transition = `max-height ${duration}ms ${ease}`;
+            void content.offsetHeight;
+            content.style.maxHeight = "0px";
+            content._animTimer = setTimeout(finish, duration + 60);
+        }
     },
 
     initChart() {
@@ -418,8 +411,14 @@
             if (!toggle || !content) return;
             this.ensureCollapsible(content);
             content.classList.remove('hidden', 'expanded');
+            content._panelState = 'closed';
             toggle.classList.remove('expanded');
-            toggle.addEventListener('click', () => {
+            const headerEl = toggle.closest('.module-card-header') || toggle;
+            if (headerEl.dataset.expandBound === '1') return;
+            headerEl.dataset.expandBound = '1';
+            headerEl.style.cursor = 'pointer';
+            headerEl.addEventListener('click', (ev) => {
+                if (ev.target.closest('input, button, a, .switch, label.switch')) return;
                 // opening/open -> collapse; closing/closed -> expand (supports reverse mid-anim)
                 const state = content._panelState || (content.classList.contains('expanded') && !content.classList.contains('hidden') ? 'open' : 'closed');
                 const shouldClose = state === 'open' || state === 'opening';

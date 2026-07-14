@@ -1200,17 +1200,18 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
 }
 
 .io-advanced-group {
-    margin-top: 20px;
-    padding: 16px 14px 14px;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    border-radius: 16px;
-    background: rgba(0, 0, 0, 0.02);
+    margin-top: 12px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
-.io-advanced-group-header {
-    margin-bottom: 14px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+.io-advanced-group .setting-section {
+    border: none;
+    background: transparent;
+    box-shadow: none;
 }
 
 .io-advanced-group .setting-section:first-child .section-label {
@@ -1221,13 +1222,10 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
     margin-bottom: 0;
 }
 
+body.theme-dark .io-advanced-group,
 body.theme-gold .io-advanced-group {
-    border-color: rgba(140, 103, 55, 0.12);
-    background: rgba(140, 103, 55, 0.04);
-}
-
-body.theme-gold .io-advanced-group-header {
-    border-bottom-color: rgba(140, 103, 55, 0.12);
+    border: none;
+    background: transparent;
 }
 
 .section-header {
@@ -4291,3 +4289,5 @@ body.theme-dark .color-live-swatch {
     background: var(--primary);
     box-shadow: 0 0 0 3px var(--primary-dim);
 }
+
+
