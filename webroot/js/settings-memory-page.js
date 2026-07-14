@@ -4,20 +4,8 @@
   if (window.CoronaFeatureScripts["settings-memory-page"]) return;
   Object.assign(CoronaAddon.prototype, {
     async loadMemoryPageTextResources() {
-        try {
-            const response = await fetch(`translations/zh-CN.json?v=2026071451`, { cache: 'no-store' });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const resources = await response.json();
-            this.memoryPageTexts = resources?.memoryPage || {};
-            const selectorTexts = this.memoryPageTexts.selectorTexts || {};
-            Object.entries(selectorTexts).forEach(([selector, value]) => {
-                const element = document.querySelector(selector);
-                if (element && typeof value === 'string') element.textContent = value;
-            });
-        } catch (error) {
-            console.warn('loadMemoryPageTextResources failed', error);
-            this.memoryPageTexts = this.memoryPageTexts || {};
-        }
+        // translations removed; UI strings stay in HTML
+        this.memoryPageTexts = {};
         return this.memoryPageTexts;
     },
     async loadMemoryPageConfig() {
