@@ -139,7 +139,12 @@ CoronaAddon.prototype.scheduleAppPolicySync = function() {
     }, 80);
 };
 CoronaAddon.prototype.saveAppRulesConfig = async function(showToastText = '', options = {}) {
-    await this.writeConfig('app_rules.conf', this.buildAppRulesConfig());
+    const updates = {};
+    if (options.changedKey === 'monitor_enabled') updates.monitor_enabled = this.appPolicy.monitorEnabled ? '1' : '0';
+    if (options.changedKey === 'notify_enabled') updates.notify_enabled = this.appPolicy.notifyEnabled ? '1' : '0';
+    if (Object.keys(updates).length > 0) {
+        await this.mergeConfigFile('app_rules.conf', updates, ['monitor_enabled', 'notify_enabled']);
+    }
     if (options.syncNow) {
         await this.syncAppPolicyDaemon();
     } else {
@@ -148,12 +153,12 @@ CoronaAddon.prototype.saveAppRulesConfig = async function(showToastText = '', op
     this.renderAppPolicySummary();
     if (showToastText) this.showToast(showToastText);
 };
-CoronaAddon.prototype.persistAppRulesSoon = function(showToastText = '') {
+CoronaAddon.prototype.persistAppRulesSoon = function(changedKey, showToastText = '') {
     if (showToastText) this.showToast(showToastText);
     this.renderAppPolicySummary();
     if (this.appRulesPersistTimer) clearTimeout(this.appRulesPersistTimer);
     this.appRulesPersistTimer = setTimeout(() => {
-        this.saveAppRulesConfig('', { syncNow: false }).catch(() => {});
+        this.saveAppRulesConfig('', { syncNow: false, changedKey }).catch(() => {});
         this.appRulesPersistTimer = null;
     }, 100);
 };
@@ -165,14 +170,14 @@ CoronaAddon.prototype.initAppPolicy = function() {
         monitorSwitch.dataset.bound = '1';
         monitorSwitch.addEventListener('change', () => {
             this.appPolicy.monitorEnabled = monitorSwitch.checked;
-            this.persistAppRulesSoon(`应用预设自动切换已${monitorSwitch.checked ? '开启' : '关闭'}`);
+            this.persistAppRulesSoon('monitor_enabled', `应用预设自动切换已${monitorSwitch.checked ? '开启' : '关闭'}`);
         });
     }
     if (notifySwitch && !notifySwitch.dataset.bound) {
         notifySwitch.dataset.bound = '1';
         notifySwitch.addEventListener('change', () => {
             this.appPolicy.notifyEnabled = notifySwitch.checked;
-            this.persistAppRulesSoon(`切换通知已${notifySwitch.checked ? '开启' : '关闭'}`);
+            this.persistAppRulesSoon('notify_enabled', `切换通知已${notifySwitch.checked ? '开启' : '关闭'}`);
         });
     }
     const buttons = {

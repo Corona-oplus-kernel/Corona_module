@@ -240,17 +240,25 @@ init_zram() {
   local has_writeback=0
   local has_swappiness=0
   local has_path=0
+  local has_recomp=0
+  local has_zstd=0
   [ -f "$zram_conf" ] && grep -q '^size=' "$zram_conf" && has_size=1
   [ -f "$zram_conf" ] && grep -q '^algorithm=' "$zram_conf" && has_algorithm=1
   if [ -f "$loop_conf" ]; then
-    has_writeback=1
+    local loop_enabled=$(corona_get loop.conf enabled)
+    local loop_size=$(corona_get loop.conf size_mb)
+    if [ "$loop_enabled" = "0" ] || { [ "$loop_enabled" = "1" ] && [ -n "$loop_size" ]; }; then
+      has_writeback=1
+    fi
   else
     [ -f "$zram_conf" ] && grep -q '^zram_writeback=' "$zram_conf" && has_writeback=1
   fi
   [ -f "$zram_conf" ] && grep -q '^swappiness=' "$zram_conf" && has_swappiness=1
   [ -f "$zram_conf" ] && grep -q '^zram_path=' "$zram_conf" && has_path=1
+  [ -f "$zram_conf" ] && grep -Eq '^recomp_algorithm[123]=' "$zram_conf" && has_recomp=1
+  [ -f "$zram_conf" ] && grep -q '^zstd_compression_level=' "$zram_conf" && has_zstd=1
 
-  if [ "$has_size" -eq 0 ] && [ "$has_algorithm" -eq 0 ] && [ "$has_writeback" -eq 0 ] && [ "$has_swappiness" -eq 0 ] && [ "$has_path" -eq 0 ]; then
+  if [ "$has_size" -eq 0 ] && [ "$has_algorithm" -eq 0 ] && [ "$has_writeback" -eq 0 ] && [ "$has_swappiness" -eq 0 ] && [ "$has_path" -eq 0 ] && [ "$has_recomp" -eq 0 ] && [ "$has_zstd" -eq 0 ]; then
     return
   fi
 
@@ -288,7 +296,7 @@ init_zram() {
     setprop persist.sys.oplus.hybridswap_app_uid_memcg true
   fi
 
-  if [ "$has_size" -eq 1 ] || [ "$has_algorithm" -eq 1 ] || [ "$has_writeback" -eq 1 ] || [ "$has_path" -eq 1 ]; then
+  if [ "$has_size" -eq 1 ] || [ "$has_algorithm" -eq 1 ] || [ "$has_writeback" -eq 1 ] || [ "$has_path" -eq 1 ] || [ "$has_recomp" -eq 1 ]; then
     /system/bin/swapoff "$zram_path" 2>/dev/null
     echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
     if [ -n "$target_algorithm" ]; then
@@ -302,6 +310,8 @@ init_zram() {
     fi
     /system/bin/mkswap "$zram_path" 2>/dev/null || return
     /system/bin/swapon "$zram_path" -p "$current_priority" 2>/dev/null || return
+  elif [ "$has_zstd" -eq 1 ]; then
+    apply_zstd_compression_level
   fi
 
   [ "$has_swappiness" -eq 1 ] && write_zram_swappiness "$corona_swappiness"

@@ -675,7 +675,32 @@
       "text_e9b935b5": "正在加载",
       "text_2c306b0a": "清理前可用",
       "text_21363f8b": "清理后可用",
-      "text_0bb4a1b4": "已释放内存"
+      "text_0bb4a1b4": "已释放内存",
+      "resetSettings": "重置设置",
+      "cancel": "取消",
+      "resetSettingsDesc": "选择要清除的配置，应用预设默认保留",
+      "resetSelectTitle": "选择要重置的设置",
+      "resetSelectDesc": "仅清除勾选项目；应用预设默认保留。",
+      "resetMemorySettings": "内存与交换设置",
+      "resetMemorySettingsDesc": "ZRAM、Loop、Swap、VM 与内存相关参数",
+      "resetSystemSettings": "系统优化设置",
+      "resetSystemSettingsDesc": "I/O、CPU、TCP 与内核优化参数",
+      "resetCustomScripts": "自定义脚本",
+      "resetCustomScriptsDesc": "清除脚本配置和生成的后台脚本",
+      "resetAppPolicy": "应用策略设置",
+      "resetAppPolicyDesc": "清除白名单、保护和优先级，保留应用预设",
+      "resetUiPreferences": "界面偏好",
+      "resetUiPreferencesDesc": "主题、语言、颜色和卡片显示偏好",
+      "resetSnapshots": "参数快照",
+      "resetSnapshotsDesc": "删除已保存的参数快照",
+      "resetAllAppSettings": "删除所有应用设置与预设",
+      "resetAllAppSettingsDesc": "包括全部独立应用预设，此项不可恢复",
+      "resetRestartNote": "清除系统配置后设备会自动重启。",
+      "resetSelected": "重置所选项目",
+      "resetSelectAtLeastOne": "请至少选择一个要重置的项目",
+      "resetConfirmSelected": "确定要清除以下项目吗？",
+      "resetDoneRebooting": "所选配置已清除，正在重启...",
+      "resetDoneReloading": "所选设置已清除，正在刷新界面..."
     }
   };
   window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};

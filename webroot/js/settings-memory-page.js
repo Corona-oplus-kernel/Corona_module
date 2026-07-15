@@ -35,7 +35,7 @@
         if (!container) return;
         container.innerHTML = this.algorithms.map(alg => `<div class="option-item ${alg === this.state.algorithm ? 'selected' : ''}" data-value="${alg}">${alg}</div>`).join('');
         container.querySelectorAll('.option-item').forEach(item => {
-            item.addEventListener('click', (e) => { container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.algorithm = e.currentTarget.dataset.value; if (typeof this.updateZstdLevelVisibility === 'function') this.updateZstdLevelVisibility(); if (typeof this.markZramDirty === 'function') this.markZramDirty(); });
+            item.addEventListener('click', (e) => { container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.algorithm = e.currentTarget.dataset.value; if (typeof this.updateZstdLevelVisibility === 'function') this.updateZstdLevelVisibility(); if (typeof this.markZramDirty === 'function') this.markZramDirty('algorithm'); });
         });
         this.renderRecompAlgorithmOptions();
         if (typeof this.updateZstdLevelVisibility === 'function') this.updateZstdLevelVisibility();
@@ -176,7 +176,12 @@
                         return;
                     }
                     if (typeof this.updateZstdLevelVisibility === 'function') this.updateZstdLevelVisibility();
-                    if (typeof this.markZramDirty === 'function') this.markZramDirty();
+                    if (typeof this.markZramDirty === 'function') {
+                        this.markZramDirty(`recomp_algorithm${i}`);
+                        if (this.state[key] === 'none') {
+                            for (let j = i + 1; j <= 3; j++) this.markZramDirty(`recomp_algorithm${j}`);
+                        }
+                    }
                 });
             });
         }

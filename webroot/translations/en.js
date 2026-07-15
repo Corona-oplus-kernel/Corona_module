@@ -675,7 +675,32 @@
       "text_e9b935b5": "Loading",
       "text_2c306b0a": "Available Before Cleanup",
       "text_21363f8b": "Available After Cleanup",
-      "text_0bb4a1b4": "Memory Freed"
+      "text_0bb4a1b4": "Memory Freed",
+      "resetSettings": "Reset Settings",
+      "cancel": "Cancel",
+      "resetSettingsDesc": "Choose which configuration to clear; app profiles are preserved by default",
+      "resetSelectTitle": "Choose Settings to Reset",
+      "resetSelectDesc": "Only selected items are cleared. App profiles are preserved by default.",
+      "resetMemorySettings": "Memory and Swap Settings",
+      "resetMemorySettingsDesc": "ZRAM, Loop, Swap, VM, and memory-related parameters",
+      "resetSystemSettings": "System Optimization Settings",
+      "resetSystemSettingsDesc": "I/O, CPU, TCP, and kernel optimization parameters",
+      "resetCustomScripts": "Custom Scripts",
+      "resetCustomScriptsDesc": "Clear script configuration and generated background scripts",
+      "resetAppPolicy": "App Policy Settings",
+      "resetAppPolicyDesc": "Clear whitelist, protection, and priority settings while preserving app profiles",
+      "resetUiPreferences": "Interface Preferences",
+      "resetUiPreferencesDesc": "Theme, language, color, and card visibility preferences",
+      "resetSnapshots": "Parameter Snapshots",
+      "resetSnapshotsDesc": "Delete saved parameter snapshots",
+      "resetAllAppSettings": "Delete All App Settings and Profiles",
+      "resetAllAppSettingsDesc": "Includes every per-app profile and cannot be undone",
+      "resetRestartNote": "The device restarts after system configuration is cleared.",
+      "resetSelected": "Reset Selected Items",
+      "resetSelectAtLeastOne": "Select at least one item to reset",
+      "resetConfirmSelected": "Clear the following selected items?",
+      "resetDoneRebooting": "Selected configuration cleared. Rebooting...",
+      "resetDoneReloading": "Selected settings cleared. Reloading the interface..."
     }
   };
   window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};

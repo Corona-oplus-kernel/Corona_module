@@ -1456,9 +1456,9 @@
                     </div>
                     <div class="setting-section danger-section">
                         <span class="section-label">危险操作</span>
-                        <div class="action-desc">清除所有配置并重启设备</div>
+                        <div class="action-desc" data-i18n="resetSettingsDesc">选择要清除的配置，应用预设默认保留</div>
                         <button class="action-btn action-btn-danger reset-all-btn" id="reset-all-btn">
-                            <span class="reset-all-btn-text">一键重置</span>
+                            <span class="reset-all-btn-text" data-i18n="resetSettings">重置设置</span>
                         </button>
                     </div>
                 </div>
@@ -1750,6 +1750,49 @@
             <div class="confirm-dialog-actions">
                 <button class="action-btn" id="confirm-dialog-cancel">取消</button>
                 <button class="action-btn action-btn-danger" id="confirm-dialog-ok">确定</button>
+            </div>
+        </div>
+    </div>
+    <div class="detail-overlay hidden no-close-btn" id="reset-settings-overlay">
+        <div class="detail-card reset-settings-card">
+            <div class="detail-header">
+                <span class="detail-title" data-i18n="resetSelectTitle">选择要重置的设置</span>
+            </div>
+            <div class="reset-settings-copy" data-i18n="resetSelectDesc">仅清除勾选项目；应用预设默认保留。</div>
+            <div class="reset-settings-list">
+                <label class="reset-settings-option">
+                    <input type="checkbox" data-reset-scope="memory" checked>
+                    <span><strong data-i18n="resetMemorySettings">内存与交换设置</strong><small data-i18n="resetMemorySettingsDesc">ZRAM、Loop、Swap、VM 与内存相关参数</small></span>
+                </label>
+                <label class="reset-settings-option">
+                    <input type="checkbox" data-reset-scope="system" checked>
+                    <span><strong data-i18n="resetSystemSettings">系统优化设置</strong><small data-i18n="resetSystemSettingsDesc">I/O、CPU、TCP 与内核优化参数</small></span>
+                </label>
+                <label class="reset-settings-option">
+                    <input type="checkbox" data-reset-scope="scripts" checked>
+                    <span><strong data-i18n="resetCustomScripts">自定义脚本</strong><small data-i18n="resetCustomScriptsDesc">清除脚本配置和生成的后台脚本</small></span>
+                </label>
+                <label class="reset-settings-option">
+                    <input type="checkbox" data-reset-scope="app-policy">
+                    <span><strong data-i18n="resetAppPolicy">应用策略设置</strong><small data-i18n="resetAppPolicyDesc">清除白名单、保护和优先级，保留应用预设</small></span>
+                </label>
+                <label class="reset-settings-option">
+                    <input type="checkbox" data-reset-scope="ui">
+                    <span><strong data-i18n="resetUiPreferences">界面偏好</strong><small data-i18n="resetUiPreferencesDesc">主题、语言、颜色和卡片显示偏好</small></span>
+                </label>
+                <label class="reset-settings-option">
+                    <input type="checkbox" data-reset-scope="snapshots">
+                    <span><strong data-i18n="resetSnapshots">参数快照</strong><small data-i18n="resetSnapshotsDesc">删除已保存的参数快照</small></span>
+                </label>
+                <label class="reset-settings-option reset-settings-danger">
+                    <input type="checkbox" data-reset-scope="all-apps">
+                    <span><strong data-i18n="resetAllAppSettings">删除所有应用设置与预设</strong><small data-i18n="resetAllAppSettingsDesc">包括全部独立应用预设，此项不可恢复</small></span>
+                </label>
+            </div>
+            <div class="reset-settings-note" data-i18n="resetRestartNote">清除系统配置后设备会自动重启。</div>
+            <div class="detail-actions reset-settings-actions">
+                <button class="action-btn" id="reset-settings-cancel" data-i18n="cancel">取消</button>
+                <button class="action-btn action-btn-danger" id="reset-settings-confirm" data-i18n="resetSelected">重置所选项目</button>
             </div>
         </div>
     </div>

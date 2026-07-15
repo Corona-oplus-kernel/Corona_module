@@ -63,16 +63,21 @@ loop_conf="$MODPATH/config/loop.conf"
 if [ ! -f "$loop_conf" ] && [ -f "$zram_conf" ]; then
     legacy_loop=$(get_config_value "$zram_conf" zram_writeback)
     legacy_size=$(get_config_value "$zram_conf" writeback_size_mb)
-    case "$legacy_loop" in true|1) loop_enabled=1 ;; *) loop_enabled=0 ;; esac
-    case "$legacy_size" in ''|*[!0-9]*) legacy_size=4096 ;; esac
-    printf 'enabled=%s\nsize_mb=%s\n' "$loop_enabled" "$legacy_size" > "$loop_conf"
+    : > "$loop_conf"
+    case "$legacy_loop" in
+        true|1) printf 'enabled=1\n' >> "$loop_conf" ;;
+        false|0) printf 'enabled=0\n' >> "$loop_conf" ;;
+    esac
+    case "$legacy_size" in ''|*[!0-9]*) ;; *) printf 'size_mb=%s\n' "$legacy_size" >> "$loop_conf" ;; esac
+    [ -s "$loop_conf" ] || rm -f "$loop_conf"
 fi
 if [ -f "$loop_conf" ]; then
     loop_enabled=$(get_config_value "$loop_conf" enabled)
     loop_size=$(get_config_value "$loop_conf" size_mb)
-    [ "$loop_enabled" = "1" ] || loop_enabled=0
-    case "$loop_size" in ''|*[!0-9]*) loop_size=4096 ;; esac
-    printf 'enabled=%s\nsize_mb=%s\n' "$loop_enabled" "$loop_size" > "$loop_conf"
+    : > "$loop_conf"
+    case "$loop_enabled" in 1|0) printf 'enabled=%s\n' "$loop_enabled" >> "$loop_conf" ;; esac
+    case "$loop_size" in ''|*[!0-9]*) ;; *) printf 'size_mb=%s\n' "$loop_size" >> "$loop_conf" ;; esac
+    [ -s "$loop_conf" ] || rm -f "$loop_conf"
 fi
 [ -f "$zram_conf" ] && sed -i '/^zram_writeback=/d;/^writeback_size_mb=/d' "$zram_conf"
 

@@ -2756,6 +2756,93 @@ body.theme-dark .confirm-dialog-body #confirm-dialog-message.preview-message {
     flex: 1;
 }
 
+.reset-settings-card {
+    width: min(520px, calc(100vw - 28px));
+    max-height: min(82vh, 680px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.reset-settings-copy,
+.reset-settings-note {
+    padding: 0 18px 12px;
+    color: var(--text-sub);
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.reset-settings-list {
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    gap: 8px;
+    padding: 2px 14px 14px;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+}
+
+.reset-settings-option {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 12px 13px;
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    background: var(--glass-card-bg);
+    cursor: pointer;
+    transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.reset-settings-option:active {
+    transform: scale(0.988);
+}
+
+.reset-settings-option:has(input:checked) {
+    border-color: var(--primary-border);
+    background: var(--primary-soft);
+}
+
+.reset-settings-option input {
+    width: 19px;
+    height: 19px;
+    accent-color: var(--primary);
+}
+
+.reset-settings-option span {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.reset-settings-option strong {
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+.reset-settings-option small {
+    color: var(--text-sub);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.reset-settings-option.reset-settings-danger:has(input:checked) {
+    border-color: rgba(239, 68, 68, 0.45);
+    background: rgba(239, 68, 68, 0.10);
+}
+
+.reset-settings-option.reset-settings-danger input {
+    accent-color: var(--danger);
+}
+
+.reset-settings-actions {
+    display: grid;
+    grid-template-columns: 1fr 1.25fr;
+    gap: 10px;
+    padding: 0 14px 14px;
+}
+
 @keyframes overlayFadeIn {
     from { opacity: 0; }
     to { opacity: 1; }

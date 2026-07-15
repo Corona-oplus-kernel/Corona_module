@@ -655,7 +655,7 @@ class CoronaAddon {
         document.getElementById('zram-switch').addEventListener('change', (e) => {
             this.state.zramEnabled = e.target.checked;
             this.toggleZramSettings(e.target.checked);
-            this.markZramDirty();
+            this.markZramDirty('enabled');
         });
         document.getElementById('zram-size-slider').addEventListener('input', (e) => {
             this.state.zramSize = parseFloat(e.target.value);
@@ -663,7 +663,7 @@ class CoronaAddon {
         });
         document.getElementById('zram-size-slider').addEventListener('change', (e) => {
             this.state.zramSize = parseFloat(e.target.value);
-            this.markZramDirty();
+            this.markZramDirty('size');
         });
         document.getElementById('swappiness-slider').addEventListener('input', (e) => {
             this.state.swappiness = parseInt(e.target.value);
@@ -671,7 +671,7 @@ class CoronaAddon {
         });
         document.getElementById('swappiness-slider').addEventListener('change', (e) => {
             this.state.swappiness = parseInt(e.target.value);
-            this.markZramDirty();
+            this.markZramDirty('swappiness');
         });
         document.getElementById('zram-apply-btn').addEventListener('click', async (e) => {
             e.stopPropagation();
@@ -693,7 +693,6 @@ class CoronaAddon {
         document.getElementById('cpu-switch')?.addEventListener('change', async (e) => {
             this.state.cpuEnabled = e.target.checked;
             await this.applyCpuGovernorImmediate('enabled', true);
-            if (this.state.cpuEnabled) await this.applyCpuHotplugConfigImmediate();
             const el = document.getElementById('cpu-gov-current');
             if (el && !this.state.cpuEnabled) el.textContent = '已禁用';
         });

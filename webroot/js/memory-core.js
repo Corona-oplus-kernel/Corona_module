@@ -716,7 +716,7 @@
             this.updateSliderProgress(slider);
         }
         if (value) value.textContent = `${this.state.loopSizeGb.toFixed(1)} GB`;
-        if (!loopConfig && (enabledMatch || sizeMatch)) await this.persistLoopConfig();
+        if (!loopConfig && (enabledMatch || sizeMatch)) await this.persistLoopConfig('loop');
     },
     parseNumericList(text) {
         return String(text || '')
@@ -1105,17 +1105,17 @@
             slider.dataset.userTouched = '1';
             this.state.zstdCompressionLevel = parseInt(e.target.value, 10) || 1;
             if (valueEl) valueEl.textContent = this.state.zstdCompressionLevel;
-            this.markZramDirty();
+            this.markZramDirty('zstd_compression_level');
         });
     },
-    markZramDirty() {
+    markZramDirty(changedField) {
         this._zramDirty = true;
         const btn = document.getElementById('zram-apply-btn');
         if (btn && !btn.dataset.dirtyHint) {
             btn.dataset.dirtyHint = '1';
             btn.textContent = this.t('applyZramDirty');
         }
-        this.persistZramConfig().catch(() => this.showToast('ZRAM 配置保存失败'));
+        if (changedField) this.persistZramConfig(changedField).catch(() => this.showToast('ZRAM 配置保存失败'));
     },
     clearZramDirty() {
         this._zramDirty = false;
@@ -1125,29 +1125,27 @@
             btn.textContent = this.t('applyZram');
         }
     },
-    markSwapDirty() {
+    markSwapDirty(changedField) {
         this._swapDirty = true;
         const btn = document.getElementById('swap-apply-btn');
         if (btn) btn.textContent = '应用 Swap 配置 *';
-        this.persistSwapConfig().catch(() => this.showToast('Swap 配置保存失败'));
+        if (changedField) this.persistSwapConfig(changedField).catch(() => this.showToast('Swap 配置保存失败'));
     },
     clearSwapDirty() {
         this._swapDirty = false;
         const btn = document.getElementById('swap-apply-btn');
         if (btn) btn.textContent = '应用 Swap 配置';
     },
-    getZramFieldUpdates(changedField = 'zram') {
+    getZramFieldUpdates(changedField = 'enabled') {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
-        const field = changedField || 'zram';
+        const field = changedField || 'enabled';
         const updates = {};
         if (field === 'zram' || field === 'enabled') updates.enabled = this.state.zramEnabled ? '1' : '0';
         if (field === 'zram' || field === 'algorithm') updates.algorithm = this.state.algorithm;
         if (field === 'zram' || field === 'zstd_compression_level') updates.zstd_compression_level = String(this.state.zstdCompressionLevel || 1);
-        if (field === 'zram' || field === 'recomp_algorithm1' || field === 'recomp_algorithm2' || field === 'recomp_algorithm3') {
-            updates.recomp_algorithm1 = this.state.recompAlgorithm1 || 'none';
-            updates.recomp_algorithm2 = this.state.recompAlgorithm2 || 'none';
-            updates.recomp_algorithm3 = this.state.recompAlgorithm3 || 'none';
-        }
+        if (field === 'zram' || field === 'recomp_algorithm1') updates.recomp_algorithm1 = this.state.recompAlgorithm1 || 'none';
+        if (field === 'zram' || field === 'recomp_algorithm2') updates.recomp_algorithm2 = this.state.recompAlgorithm2 || 'none';
+        if (field === 'zram' || field === 'recomp_algorithm3') updates.recomp_algorithm3 = this.state.recompAlgorithm3 || 'none';
         if (field === 'zram' || field === 'size') updates.size = String(sizeBytes);
         if (field === 'zram' || field === 'swappiness') updates.swappiness = String(this.state.swappiness);
         if (field === 'zram' || field === 'zram_path') updates.zram_path = this.state.zramPath;
@@ -1156,12 +1154,11 @@
     getZramConfigKeys() {
         return ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_path'];
     },
-    persistLoopConfig() {
+    persistLoopConfig(changedField = 'enabled') {
         const save = this.withLock('loop-config', async () => {
-            const updates = {
-                enabled: this.state.loopEnabled ? '1' : '0',
-                size_mb: String(Math.round(this.state.loopSizeGb * 1024))
-            };
+            const updates = {};
+            if (changedField === 'loop' || changedField === 'enabled') updates.enabled = this.state.loopEnabled ? '1' : '0';
+            if (changedField === 'loop' || changedField === 'size_mb') updates.size_mb = String(Math.round(this.state.loopSizeGb * 1024));
             await this.mergeConfigFile('loop.conf', updates, ['enabled', 'size_mb']);
             await this.removeConfigKeys('zram.conf', ['zram_writeback', 'writeback_size_mb'], this.getZramConfigKeys());
             return true;
@@ -1176,7 +1173,12 @@
             let succeeded = false;
             try {
                 if (command === 'start') this.state.loopEnabled = true;
-                await this.persistLoopConfig();
+                await this.persistLoopConfig('enabled');
+                const configured = this.parseIoConfig(await this.readConfig('loop.conf'));
+                if (command === 'start' && !configured.size_mb) {
+                    this.showToast('Loop 已启用，但未设置大小，未修改当前系统');
+                    return false;
+                }
                 if (button) button.disabled = true;
                 this.showLoading(true);
                 const script = this.shellQuote(`${this.modDir}/scripts/apply-loop.sh`);
@@ -1195,7 +1197,7 @@
             return succeeded;
         });
     },
-    persistZramConfig(changedField = 'zram') {
+    persistZramConfig(changedField = 'enabled') {
         const save = this.withLock('zram-config', async () => {
             await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates(changedField), this.getZramConfigKeys());
             await this.updateModuleDescription();
@@ -1204,7 +1206,7 @@
         this._zramConfigSavePromise = save;
         return save;
     },
-    async saveZramConfig(changedField = 'zram', skipPreview = false) {
+    async saveZramConfig(changedField = 'enabled', skipPreview = false) {
         const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates(changedField), this.getZramConfigKeys());
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
@@ -1229,6 +1231,7 @@
         const checkSize = options.checkSize !== false;
         const checkSwap = options.checkSwappiness !== false;
         const checkZstd = options.checkZstd === true || (this.usesZstdAlgorithm && this.usesZstdAlgorithm() && this.zramFeatures && this.zramFeatures.zstdLevel);
+        const checkRecomp = options.checkRecomp === true;
 
         // wait a bit for nandswap/mm-sys chain to settle
         await this.sleep(options.delayMs || 800);
@@ -1286,7 +1289,7 @@
         }
 
         // soft check recomp: if configured non-none, recomp node should mention algo (best-effort)
-        if (this.zramFeatures && this.zramFeatures.multiComp) {
+        if (checkRecomp && this.zramFeatures && this.zramFeatures.multiComp) {
             for (let i = 1; i <= 3; i++) {
                 const want = this.state[`recompAlgorithm${i}`];
                 if (!want || want === 'none') continue;
@@ -1308,15 +1311,16 @@
     },
     async applyZramImmediate(manageLoading = true) {
       return this.withLock('zram', async () => {
-        const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
         const requestedAlgorithm = this.state.algorithm;
-        await this.persistZramConfig('zram');
+        if (this._zramConfigSavePromise) await this._zramConfigSavePromise.catch(() => {});
+        const configured = this.parseIoConfig(await this.readConfig('zram.conf'));
         if (manageLoading) {
             this.showLoading(true);
             await this.sleep(0);
         }
         await this.exec(`/system/bin/sh ${this.modDir}/scripts/apply-zram.sh >/dev/null 2>&1`);
-        const savedAlgorithm = (await this.exec(`sed -n 's/^algorithm=//p' ${this.shellQuote(`${this.configDir}/zram.conf`)} 2>/dev/null | head -n1`)).trim();
+        const appliedConfig = this.parseIoConfig(await this.readConfig('zram.conf'));
+        const savedAlgorithm = appliedConfig.algorithm || '';
         const fallbackApplied = !!(savedAlgorithm && savedAlgorithm !== requestedAlgorithm);
         if (fallbackApplied) {
             this.state.algorithm = savedAlgorithm;
@@ -1329,12 +1333,21 @@
             setTimeout(() => this.loadZramStatus(), 200);
             return true;
         }
+        const actionableKeys = ['algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_path'];
+        if (!actionableKeys.some(key => configured[key] !== undefined)) {
+            this.showToast('ZRAM 已启用，但未配置参数，未修改当前系统');
+            return true;
+        }
         const ok = await this.verifyZramApplyResult({
-            algorithm: this.state.algorithm,
-            sizeBytes: sizeBytes,
-            swappiness: this.state.swappiness,
-            zstdLevel: this.state.zstdCompressionLevel,
-            checkZstd: !!(this.usesZstdAlgorithm && this.usesZstdAlgorithm())
+            algorithm: appliedConfig.algorithm,
+            sizeBytes: configured.size ? parseInt(configured.size, 10) : undefined,
+            swappiness: configured.swappiness,
+            zstdLevel: configured.zstd_compression_level,
+            checkAlgorithm: !!appliedConfig.algorithm,
+            checkSize: configured.size !== undefined,
+            checkSwappiness: configured.swappiness !== undefined,
+            checkZstd: configured.zstd_compression_level !== undefined,
+            checkRecomp: ['recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3'].some(key => configured[key] !== undefined)
         });
         if (ok) {
             this.showToast(fallbackApplied
@@ -1468,7 +1481,7 @@
     async applyCpuGovernorImmediate(changedField = 'governor', skipPreview = false) {
       return this.withLock('governor', async () => {
         const updates = {};
-        if (changedField === 'governor' || changedField === 'cpu' || changedField === 'enabled') updates.enabled = this.state.cpuEnabled ? '1' : '0';
+        if (changedField === 'cpu' || changedField === 'enabled') updates.enabled = this.state.cpuEnabled ? '1' : '0';
         if (changedField === 'governor' || changedField === 'cpu') updates.governor = this.state.cpuGovernor;
         const config = await this.buildMergedConfigContent('cpu_governor.conf', updates, ['enabled', 'governor']);
         const writes = [];
@@ -1533,7 +1546,7 @@
     async applyTcpImmediate(changedField = 'congestion', skipPreview = false) {
       return this.withLock('tcp', async () => {
         const updates = {};
-        if (changedField === 'congestion' || changedField === 'tcp' || changedField === 'enabled') updates.enabled = this.state.tcpEnabled ? '1' : '0';
+        if (changedField === 'tcp' || changedField === 'enabled') updates.enabled = this.state.tcpEnabled ? '1' : '0';
         if (changedField === 'congestion' || changedField === 'tcp') updates.congestion = this.state.tcp;
         const config = await this.buildMergedConfigContent('tcp.conf', updates, ['enabled', 'congestion']);
         const writes = [];
@@ -1612,7 +1625,7 @@
                     core.online = !core.online;
                     item.className = `cpu-core ${core.online ? 'online' : 'offline'}`;
                     document.getElementById(`cpu-load-${cpuId}`).textContent = core.online ? '--' : 'OFF';
-                    await this.saveCpuHotplugConfig();
+                    await this.saveCpuHotplugConfig(cpuId);
                     await this.updateModuleDescription();
                     this.showToast(`CPU${cpuId} 配置已保存（禁用状态）`);
                     return;
@@ -1621,7 +1634,7 @@
                 core.online = !core.online;
                 item.className = `cpu-core ${core.online ? 'online' : 'offline'}`;
                 document.getElementById(`cpu-load-${cpuId}`).textContent = core.online ? '--' : 'OFF';
-                await this.saveCpuHotplugConfig();
+                await this.saveCpuHotplugConfig(cpuId);
                 await this.updateModuleDescription();
                 this.showToast(`CPU${cpuId} 已${core.online ? '启用' : '禁用'}`);
             });
@@ -1660,9 +1673,15 @@
             core.load = `${usage}%`;
         }
     },
-    async saveCpuHotplugConfig() {
-        const config = this.cpuCores.map(c => `cpu${c.id}=${c.online ? '1' : '0'}`).join('\n');
-        await this.writeConfig('cpu_hotplug.conf', config);
+    async saveCpuHotplugConfig(cpuId = null) {
+        if (cpuId === null || cpuId === undefined) {
+            const updates = Object.fromEntries(this.cpuCores.map(core => [`cpu${core.id}`, core.online ? '1' : '0']));
+            await this.mergeConfigFile('cpu_hotplug.conf', updates, Object.keys(updates));
+            return;
+        }
+        const core = this.cpuCores.find(item => item.id === Number(cpuId));
+        if (!core) return;
+        await this.mergeConfigFile('cpu_hotplug.conf', { [`cpu${core.id}`]: core.online ? '1' : '0' }, [`cpu${core.id}`]);
     },
     async applyCpuHotplugConfigImmediate() {
         const writes = this.cpuCores.filter(core => core.id !== 0).map(core => this.exec(`echo ${core.online ? '1' : '0'} > /sys/devices/system/cpu/cpu${core.id}/online 2>/dev/null`));
@@ -1968,7 +1987,7 @@
                 this.state.loopEnabled = toggle.checked;
                 if (typeof this.updateLoopControlState === 'function') this.updateLoopControlState();
                 try {
-                    await this.persistLoopConfig();
+                    await this.persistLoopConfig('enabled');
                     if (!toggle.checked && this._loopActive) await this.applyLoopImmediate('stop');
                 } catch (error) {
                     this.state.loopEnabled = previous;
@@ -1988,7 +2007,7 @@
                 this.updateSliderProgress(sizeSlider);
                 if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
             });
-            sizeSlider.addEventListener('change', () => this.persistLoopConfig().catch(() => this.showToast(this.t('loopConfigSaveFailed'), 'error')));
+            sizeSlider.addEventListener('change', () => this.persistLoopConfig('size_mb').catch(() => this.showToast(this.t('loopConfigSaveFailed'), 'error')));
         }
         const loopRefresh = document.getElementById('zram-loop-device-refresh');
         if (loopRefresh && !loopRefresh.dataset.bound) {
@@ -2021,7 +2040,7 @@
                         pathInput.value = devices[0];
                         this.state.zramPath = devices[0];
                         if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
-                        this.markZramDirty();
+                        this.markZramDirty('zram_path');
                         this.showToast(`检测到: ${devices[0]}`);
                     } else if (devices.length > 1) {
                         this.showZramDeviceSelector(devices, pathInput);
@@ -2038,7 +2057,7 @@
             if (!val) { this.showToast('路径不能为空'); return; }
             this.state.zramPath = val;
             if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
-            this.markZramDirty();
+            this.markZramDirty('zram_path');
             this.showToast('路径已保存，点应用生效');
         });
         }
@@ -2067,7 +2086,7 @@
                 pathInput.value = opt.dataset.path;
                 this.state.zramPath = opt.dataset.path;
                 if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
-                if (typeof this.markZramDirty === 'function') this.markZramDirty();
+                if (typeof this.markZramDirty === 'function') this.markZramDirty('zram_path');
                 overlay.classList.remove('show');
                 setTimeout(() => overlay.remove(), 300);
                 this.showToast(`已选择并保存: ${opt.dataset.path}（点应用生效）`);
@@ -2088,7 +2107,7 @@
             swapSwitch.addEventListener('change', (e) => {
                 this.state.swapEnabled = e.target.checked;
                 this.toggleSwapSettings(e.target.checked);
-                this.markSwapDirty();
+                this.markSwapDirty('enabled');
             });
         }
         if (swapSizeSlider) {
@@ -2098,7 +2117,7 @@
             });
             swapSizeSlider.addEventListener('change', (e) => {
                 this.state.swapSize = parseInt(e.target.value);
-                this.markSwapDirty();
+                this.markSwapDirty('size');
             });
         }
         if (priorityList) {
@@ -2107,7 +2126,7 @@
                     priorityList.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                     item.classList.add('selected');
                     this.state.swapPriority = parseInt(item.dataset.value);
-                    this.markSwapDirty();
+                    this.markSwapDirty('priority');
                 });
             });
         }
@@ -2158,7 +2177,7 @@
         }
         await this.loadSwapStatus();
     },
-    getSwapFieldUpdates(changedField = 'swap') {
+    getSwapFieldUpdates(changedField = 'enabled') {
         const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
         const updates = {};
         if (changedField === 'swap' || changedField === 'enabled') updates.enabled = this.state.swapEnabled ? '1' : '0';
@@ -2167,7 +2186,7 @@
         if (changedField === 'swap' || changedField === 'path') updates.path = swapPath;
         return updates;
     },
-    persistSwapConfig(changedField = 'swap') {
+    persistSwapConfig(changedField = 'enabled') {
         const save = this.withLock('swap-config', async () => {
             await this.mergeConfigFile('swap.conf', this.getSwapFieldUpdates(changedField), ['enabled', 'size', 'priority', 'path']);
             return true;
@@ -2175,7 +2194,7 @@
         this._swapConfigSavePromise = save;
         return save;
     },
-    async saveSwapConfig(changedField = 'swap', skipPreview = false) {
+    async saveSwapConfig(changedField = 'enabled', skipPreview = false) {
         const config = await this.buildMergedConfigContent('swap.conf', this.getSwapFieldUpdates(changedField), ['enabled', 'size', 'priority', 'path']);
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
@@ -2193,9 +2212,12 @@
     },
     async applySwapImmediate() {
       return this.withLock('swap', async () => {
-        const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
+        if (this._swapConfigSavePromise) await this._swapConfigSavePromise.catch(() => {});
+        const configured = this.parseIoConfig(await this.readConfig('swap.conf'));
+        const swapPath = configured.path || `${this.modDir}/swapfile.img`;
+        const configuredSize = parseInt(configured.size, 10);
+        const configuredPriority = parseInt(configured.priority, 10);
         const q = this.shellQuote(swapPath);
-        await this.persistSwapConfig('swap');
         if (!this.state.swapEnabled) {
             this.showLoading(true);
             await this.exec(`swapoff ${q} 2>/dev/null`);
@@ -2206,18 +2228,22 @@
             await this.loadSwapStatus();
             return true;
         }
+        if (!Number.isFinite(configuredSize) || configuredSize <= 0) {
+            this.showToast('Swap 已启用，但未设置大小，未修改当前系统');
+            return true;
+        }
         this.showLoading(true);
         try {
             await this.exec(`swapoff ${q} 2>/dev/null`);
             await this.exec(`rm -f ${q} 2>/dev/null`);
             const free = parseInt((await this.exec(`df -k ${this.shellQuote(swapPath.substring(0, swapPath.lastIndexOf('/')) || '/data')} 2>/dev/null | awk 'NR==2{print $4}'`)).trim()) || 0;
-            const needKb = this.state.swapSize * 1024;
+            const needKb = configuredSize * 1024;
             if (free && free < needKb + 51200) {
-                this.showToast(`Swap 创建失败：剩余空间不足（需 ${this.state.swapSize}MB，剩 ${Math.floor(free/1024)}MB）`);
+                this.showToast(`Swap 创建失败：剩余空间不足（需 ${configuredSize}MB，剩 ${Math.floor(free/1024)}MB）`);
                 await this.loadSwapStatus();
                 return false;
             }
-            const allocOut = await this.exec(`(fallocate -l ${this.state.swapSize}M ${q} 2>&1 || dd if=/dev/zero of=${q} bs=1M count=${this.state.swapSize} 2>&1) ; ls -l ${q} 2>/dev/null`);
+            const allocOut = await this.exec(`(fallocate -l ${configuredSize}M ${q} 2>&1 || dd if=/dev/zero of=${q} bs=1M count=${configuredSize} 2>&1) ; ls -l ${q} 2>/dev/null`);
             if (!allocOut.includes(swapPath)) {
                 this.showToast(`Swap 文件创建失败`);
                 await this.exec(`rm -f ${q} 2>/dev/null`);
@@ -2233,8 +2259,8 @@
                 return false;
             }
             let onOut;
-            if (this.state.swapPriority !== 0) {
-                onOut = await this.exec(`swapon ${q} -p ${this.state.swapPriority} 2>&1`);
+            if (Number.isFinite(configuredPriority) && configuredPriority !== 0) {
+                onOut = await this.exec(`swapon ${q} -p ${configuredPriority} 2>&1`);
             } else {
                 onOut = await this.exec(`swapon ${q} 2>&1`);
             }
@@ -2243,7 +2269,7 @@
                 await this.loadSwapStatus();
                 return false;
             }
-            this.showToast(`Swap 已启用 (${this.state.swapSize} MB)`);
+            this.showToast(`Swap 已启用 (${configuredSize} MB)`);
             await this.loadSwapStatus();
             return true;
         } finally {

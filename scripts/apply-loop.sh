@@ -15,7 +15,7 @@ get_conf_value() {
 enabled=$(get_conf_value "$LOOP_CONF" enabled)
 size_mb=$(get_conf_value "$LOOP_CONF" size_mb)
 case "$enabled" in 1) ;; *) enabled=0 ;; esac
-case "$size_mb" in ''|*[!0-9]*) size_mb=4096 ;; esac
+case "$size_mb" in ''|*[!0-9]*) size_mb=0 ;; esac
 zram_path=$(get_conf_value "$ZRAM_CONF" zram_path)
 [ -n "$zram_path" ] || zram_path=/dev/block/zram0
 zram_block=${zram_path##*/}
@@ -29,6 +29,7 @@ esac
 
 case "$ACTION" in
     start)
+        [ "$size_mb" -gt 0 ] || exit 0
         /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" true "$size_mb"
         ;;
     stop)
@@ -36,6 +37,7 @@ case "$ACTION" in
         ;;
     apply)
         if [ "$enabled" = "1" ]; then
+            [ "$size_mb" -gt 0 ] || exit 0
             /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" true "$size_mb"
         else
             /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" false "$size_mb"

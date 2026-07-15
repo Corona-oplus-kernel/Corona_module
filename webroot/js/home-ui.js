@@ -900,15 +900,93 @@
         btn.dataset.bound = '1';
         btn.addEventListener('click', () => this.resetAllSettings());
     },
+    showResetSettingsDialog() {
+        return new Promise(resolve => {
+            const overlay = document.getElementById('reset-settings-overlay');
+            const cancel = document.getElementById('reset-settings-cancel');
+            const confirm = document.getElementById('reset-settings-confirm');
+            if (!overlay || !cancel || !confirm) {
+                resolve([]);
+                return;
+            }
+            const defaultScopes = new Set(['memory', 'system', 'scripts']);
+            overlay.querySelectorAll('[data-reset-scope]').forEach(input => {
+                input.checked = defaultScopes.has(input.dataset.resetScope);
+            });
+            const cleanup = (selection) => {
+                this.hideOverlay('reset-settings-overlay');
+                cancel.removeEventListener('click', onCancel);
+                confirm.removeEventListener('click', onConfirm);
+                resolve(selection);
+            };
+            const onCancel = () => cleanup([]);
+            const onConfirm = () => {
+                const selection = [...overlay.querySelectorAll('[data-reset-scope]:checked')].map(input => input.dataset.resetScope);
+                if (selection.length === 0) {
+                    this.showToast(this.t('resetSelectAtLeastOne'), 'warning');
+                    return;
+                }
+                cleanup(selection);
+            };
+            cancel.addEventListener('click', onCancel);
+            confirm.addEventListener('click', onConfirm);
+            this.showOverlay('reset-settings-overlay');
+        });
+    },
+    getResetScopeFiles(scope) {
+        const groups = {
+            memory: ['zram.conf', 'loop.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'le9ec.conf', 'lmk.conf', 'reclaim.conf', 'kswapd.conf'],
+            system: ['io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'corona_kernel.conf', 'device.conf', 'protect.conf', 'fstrim.conf'],
+            scripts: ['custom_scripts.b64'],
+            snapshots: ['parameter_snapshots.b64'],
+            'app-policy': ['app_rules.conf', 'app_whitelist.list', 'app_protect.list', 'process_priority.conf', 'thread_priority.conf'],
+            'all-apps': ['app_rules.conf', 'app_whitelist.list', 'app_protect.list', 'app_profiles.list', 'process_priority.conf', 'thread_priority.conf', 'app_meta_cache.b64']
+        };
+        return groups[scope] || [];
+    },
+    clearUiPreferences() {
+        ['corona_theme', 'corona_color_hue', 'corona_accent', 'corona_language', 'corona_card_visibility', 'corona_category_config_toggles', 'corona_change_preview', 'corona_setting_descriptions']
+            .forEach(key => localStorage.removeItem(key));
+    },
     async resetAllSettings() {
-        const confirmed = await this.showConfirm('确定要重置所有设置吗？\n\n此操作将删除所有配置文件并立刻重启，且不可撤销！', '一键重置');
+        const scopes = await this.showResetSettingsDialog();
+        if (scopes.length === 0) return;
+        const removesAllApps = scopes.includes('all-apps');
+        const selectedLabels = scopes.map(scope => this.t({
+            memory: 'resetMemorySettings',
+            system: 'resetSystemSettings',
+            scripts: 'resetCustomScripts',
+            'app-policy': 'resetAppPolicy',
+            ui: 'resetUiPreferences',
+            snapshots: 'resetSnapshots',
+            'all-apps': 'resetAllAppSettings'
+        }[scope] || scope));
+        const confirmed = await this.showConfirm(`${this.t('resetConfirmSelected')}\n\n${selectedLabels.map(label => `• ${label}`).join('\n')}`, this.t('resetSelected'), {
+            okText: this.t('resetSelected'),
+            cancelText: this.t('cancel')
+        });
         if (!confirmed) return;
         this.showLoading(true);
-        await this.exec(`rm -rf ${this.configDir}`);
+        const files = [...new Set(scopes.flatMap(scope => this.getResetScopeFiles(scope)))];
+        if (files.length > 0) {
+            await this.exec(`rm -f ${files.map(filename => this.shellQuote(`${this.configDir}/${filename}`)).join(' ')}`);
+        }
+        if (scopes.includes('scripts')) {
+            await this.exec(`find ${this.shellQuote(`${this.modDir}/scripts.d`)} -mindepth 1 -maxdepth 1 ! -name .placeholder -exec rm -rf {} + 2>/dev/null`);
+        }
+        if (removesAllApps) {
+            await this.exec(`rm -rf ${this.shellQuote(`${this.configDir}/app_profiles`)}`);
+        }
+        if (scopes.includes('app-policy') || removesAllApps) {
+            await this.exec(`sh ${this.shellQuote(`${this.modDir}/app_policy.sh`)} daemon-stop`).catch(() => {});
+        }
+        if (scopes.includes('ui')) this.clearUiPreferences();
         await this.exec(`sed -i 's/^description=.*/description=等待首次设置……/' '${this.modDir}/module.prop' 2>/dev/null`);
-        this.showToast('配置已重置，正在重启...');
+        const needsReboot = scopes.some(scope => !['ui', 'snapshots'].includes(scope));
+        this.showToast(this.t(needsReboot ? 'resetDoneRebooting' : 'resetDoneReloading'));
         await this.sleep(500);
-        await this.exec('reboot');
+        if (needsReboot) await this.exec('reboot');
+        else window.location.reload();
     },
     renderKernelWorkflowBuild() {
         const section = document.getElementById('kernel-build-section');

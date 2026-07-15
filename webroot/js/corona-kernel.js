@@ -112,7 +112,8 @@
     },
     async toggleCoronaKernelModule(mod, on) {
         const v = on ? '1' : '0';
-        const snapshot = this.buildCoronaKernelConfigSnapshot();
+        const configKey = `${mod}_enabled`;
+        const snapshot = await this.buildMergedConfigContent('corona_kernel.conf', { [configKey]: v }, [...this.coronaKernelMods.map(item => `${item}_enabled`), 'user_window_ms', 'slack_off_ms']);
         const confirmed = await this.confirmChangePreview('变更预览', {
             summary: `即将${on ? '启用' : '禁用'} ${mod}。`,
             configs: [{ filename: 'corona_kernel.conf', content: snapshot }],
@@ -123,7 +124,7 @@
         if (!confirmed) return false;
         await this.exec(`echo ${v} > /sys/module/${mod}/parameters/enabled 2>/dev/null`);
         if (this.coronaKernelLive) this.coronaKernelLive[mod] = v;
-        await this.persistCoronaKernelConfig();
+        await this.persistCoronaKernelConfig(configKey, v);
         this.loadCoronaKernelConfig();
         this.showToast(on ? `${mod} 已启用` : `${mod} 已禁用`);
         return true;
@@ -135,7 +136,7 @@
         } else if (key === 'slack_off_ms') {
             writes.push({ path: '/sys/module/suspend_timerslack/parameters/slack_off_ns', value: String(value * 1000 * 1000) });
         }
-        const snapshot = this.buildCoronaKernelConfigSnapshot();
+        const snapshot = await this.buildMergedConfigContent('corona_kernel.conf', { [key]: String(value) }, [...this.coronaKernelMods.map(item => `${item}_enabled`), 'user_window_ms', 'slack_off_ms']);
         const confirmed = await this.confirmChangePreview('变更预览', {
             summary: `即将保存 ${key}。`,
             configs: [{ filename: 'corona_kernel.conf', content: snapshot }],
@@ -153,23 +154,13 @@
             const ns = value * 1000 * 1000;
             await this.exec(`[ -f /sys/module/suspend_timerslack/parameters/slack_off_ns ] && echo ${ns} > /sys/module/suspend_timerslack/parameters/slack_off_ns 2>/dev/null`);
         }
-        await this.persistCoronaKernelConfig();
+        await this.persistCoronaKernelConfig(key, String(value));
         this.showToast('已保存');
         return true;
     },
-    async persistCoronaKernelConfig() {
-        const lines = [];
-        for (const mod of this.coronaKernelMods) {
-            if (this.coronaKernelPresent && !this.coronaKernelPresent[mod]) continue;
-            const sw = document.querySelector(`.ck-switch[data-mod="${mod}"]`);
-            if (!sw) continue;
-            lines.push(`${mod}_enabled=${sw.checked ? '1' : '0'}`);
-        }
-        const ws = document.getElementById('ck-user-window-slider');
-        if (ws) lines.push(`user_window_ms=${ws.value}`);
-        const ss = document.getElementById('ck-slack-off-slider');
-        if (ss) lines.push(`slack_off_ms=${ss.value}`);
-        await this.writeConfig('corona_kernel.conf', lines.join('\n'));
+    async persistCoronaKernelConfig(key, value) {
+        if (!key) return;
+        await this.mergeConfigFile('corona_kernel.conf', { [key]: value }, [...this.coronaKernelMods.map(item => `${item}_enabled`), 'user_window_ms', 'slack_off_ms']);
     }
   });
   window.CoronaFeatureScripts["corona-kernel"] = true;
