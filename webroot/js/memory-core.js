@@ -1014,6 +1014,7 @@
             btn.textContent = base.includes('应用') ? `${base.replace('应用 ZRAM 配置', '应用 ZRAM 配置')} *` : `${base} *`;
             if (!btn.textContent.includes('*')) btn.textContent = '应用 ZRAM 配置 *';
         }
+        this.persistZramConfig().catch(() => this.showToast('ZRAM 配置保存失败'));
     },
     clearZramDirty() {
         this._zramDirty = false;
@@ -1027,6 +1028,7 @@
         this._swapDirty = true;
         const btn = document.getElementById('swap-apply-btn');
         if (btn) btn.textContent = '应用 Swap 配置 *';
+        this.persistSwapConfig().catch(() => this.showToast('Swap 配置保存失败'));
     },
     clearSwapDirty() {
         this._swapDirty = false;
@@ -1051,6 +1053,15 @@
         if (field === 'zram' || field === 'zram_path') updates.zram_path = this.state.zramPath;
         return updates;
     },
+    persistZramConfig(changedField = 'zram') {
+        const save = this.withLock('zram-config', async () => {
+            await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
+            await this.updateModuleDescription();
+            return true;
+        });
+        this._zramConfigSavePromise = save;
+        return save;
+    },
     async saveZramConfig(changedField = 'zram', skipPreview = false) {
         const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
         if (!skipPreview) {
@@ -1063,8 +1074,7 @@
             });
             if (!confirmed) return false;
         }
-        await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
-        await this.updateModuleDescription();
+        await this.persistZramConfig(changedField);
         this.showToast('ZRAM 配置已保存');
         return true;
     },
@@ -1154,34 +1164,19 @@
         if (options.toastSuccess) this.showToast(options.toastSuccess);
         return true;
     },
-    async applyZramImmediate(manageLoading = true, skipPreview = false) {
+    async applyZramImmediate(manageLoading = true) {
       return this.withLock('zram', async () => {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
-        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates('zram'), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
-        if (!skipPreview) {
-            const confirmed = await this.confirmChangePreview('变更预览', {
-                summary: '即将通过官方初始化链应用 ZRAM。',
-                configs: [{ filename: 'zram.conf', content: config }],
-                actions: ['执行模块内 apply-zram helper', '先跑官方 nandswap，再叠加模块 mm-sys 显式参数'],
-                notes: ['不依赖系统挂载，只使用系统原生入口 + 模块内脚本。']
-            }, {
-                onCancel: () => this.loadZramConfig()
-            });
-            if (!confirmed) return false;
-        }
+        await this.persistZramConfig('zram');
         if (manageLoading) {
             this.showLoading(true);
             await this.sleep(0);
         }
-        await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates('zram'), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
-        if (this.state.zramEnabled) {
-            await this.exec(`/system/bin/sh ${this.modDir}/scripts/apply-zram.sh >/dev/null 2>&1`);
-        }
-        await this.updateModuleDescription();
+        await this.exec(`/system/bin/sh ${this.modDir}/scripts/apply-zram.sh >/dev/null 2>&1`);
         if (typeof this.clearZramDirty === 'function') this.clearZramDirty();
         if (manageLoading) this.showLoading(false);
         if (!this.state.zramEnabled) {
-            this.showToast('ZRAM 配置已保存（未启用）');
+            this.showToast('ZRAM 已恢复系统默认配置');
             setTimeout(() => this.loadZramStatus(), 200);
             return true;
         }
@@ -1812,6 +1807,7 @@
                     if (devices.length === 1) {
                         pathInput.value = devices[0];
                         this.state.zramPath = devices[0];
+                        this.markZramDirty();
                         this.showToast(`检测到: ${devices[0]}`);
                     } else if (devices.length > 1) {
                         this.showZramDeviceSelector(devices, pathInput);
@@ -1828,7 +1824,7 @@
             if (!val) { this.showToast('路径不能为空'); return; }
             this.state.zramPath = val;
             this.markZramDirty();
-            this.showToast('路径已记录，点应用生效');
+            this.showToast('路径已保存，点应用生效');
         });
         }
     },
@@ -1858,7 +1854,7 @@
                 if (typeof this.markZramDirty === 'function') this.markZramDirty();
                 overlay.classList.remove('show');
                 setTimeout(() => overlay.remove(), 300);
-                this.showToast(`已选择: ${opt.dataset.path}（点应用生效）`);
+                this.showToast(`已选择并保存: ${opt.dataset.path}（点应用生效）`);
             });
         });
         overlay.addEventListener('click', (e) => {
@@ -1955,60 +1951,47 @@
         if (changedField === 'swap' || changedField === 'path') updates.path = swapPath;
         return updates;
     },
+    persistSwapConfig(changedField = 'swap') {
+        const save = this.withLock('swap-config', async () => {
+            await this.mergeConfigFile('swap.conf', this.getSwapFieldUpdates(changedField), ['enabled', 'size', 'priority', 'path']);
+            return true;
+        });
+        this._swapConfigSavePromise = save;
+        return save;
+    },
     async saveSwapConfig(changedField = 'swap', skipPreview = false) {
-        const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
         const config = await this.buildMergedConfigContent('swap.conf', this.getSwapFieldUpdates(changedField), ['enabled', 'size', 'priority', 'path']);
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
-                summary: this.state.swapEnabled ? '即将保存 Swap 配置。' : '即将关闭 Swap。',
+                summary: '即将保存 Swap 配置。',
                 configs: [{ filename: 'swap.conf', content: config }],
-                actions: !this.state.swapEnabled ? [`swapoff ${swapPath}`, `rm -f ${swapPath}`] : [],
-                notes: this.state.swapEnabled ? ['仅保存配置，不立即创建 Swap 文件。'] : []
+                notes: ['仅保存配置，点击应用后才修改当前系统。']
             }, {
                 onCancel: () => this.loadSwapConfig()
             });
             if (!confirmed) return false;
         }
-        await this.mergeConfigFile('swap.conf', this.getSwapFieldUpdates(changedField), ['enabled', 'size', 'priority', 'path']);
-        if (!this.state.swapEnabled) {
-            await this.exec(`swapoff ${this.shellQuote(swapPath)} 2>/dev/null`);
-            await this.exec(`rm -f ${this.shellQuote(swapPath)} 2>/dev/null`);
-            this.showToast('Swap 已关闭');
-            await this.loadSwapStatus();
-        } else {
-            this.showToast('Swap 配置已保存');
-        }
+        await this.persistSwapConfig(changedField);
+        this.showToast('Swap 配置已保存');
         return true;
     },
-    async applySwapImmediate(skipPreview = false) {
+    async applySwapImmediate() {
       return this.withLock('swap', async () => {
         const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
         const q = this.shellQuote(swapPath);
+        await this.persistSwapConfig('swap');
         if (!this.state.swapEnabled) {
-            const ok = await this.saveSwapConfig('swap', skipPreview);
-            if (ok && typeof this.clearSwapDirty === 'function') this.clearSwapDirty();
-            return ok;
-        }
-        if (!skipPreview) {
-            const config = await this.buildMergedConfigContent('swap.conf', this.getSwapFieldUpdates('swap'), ['enabled', 'size', 'priority', 'path']);
-            const confirmed = await this.confirmChangePreview('变更预览', {
-                summary: '即将创建并启用 Swap。',
-                configs: [{ filename: 'swap.conf', content: config }],
-                actions: [
-                    `swapoff ${swapPath}`,
-                    `rm -f ${swapPath}`,
-                    `创建 ${this.state.swapSize}MB Swap 文件`,
-                    `mkswap ${swapPath}`,
-                    this.state.swapPriority !== 0 ? `swapon ${swapPath} -p ${this.state.swapPriority}` : `swapon ${swapPath}`
-                ]
-            }, {
-                onCancel: () => this.loadSwapConfig()
-            });
-            if (!confirmed) return false;
+            this.showLoading(true);
+            await this.exec(`swapoff ${q} 2>/dev/null`);
+            await this.exec(`rm -f ${q} 2>/dev/null`);
+            this.showLoading(false);
+            if (typeof this.clearSwapDirty === 'function') this.clearSwapDirty();
+            this.showToast('Swap 已关闭');
+            await this.loadSwapStatus();
+            return true;
         }
         this.showLoading(true);
         try {
-            await this.mergeConfigFile('swap.conf', this.getSwapFieldUpdates('swap'), ['enabled', 'size', 'priority', 'path']);
             await this.exec(`swapoff ${q} 2>/dev/null`);
             await this.exec(`rm -f ${q} 2>/dev/null`);
             const free = parseInt((await this.exec(`df -k ${this.shellQuote(swapPath.substring(0, swapPath.lastIndexOf('/')) || '/data')} 2>/dev/null | awk 'NR==2{print $4}'`)).trim()) || 0;
