@@ -207,13 +207,14 @@ body.theme-dark .lru-switch {
 }
 
 .module-card {
-    background: var(--glass-surface);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    background: var(--glass-card-bg);
+    backdrop-filter: blur(var(--glass-blur-card));
+    -webkit-backdrop-filter: blur(var(--glass-blur-card));
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-card);
     margin-bottom: 12px;
     box-shadow: var(--glass-shadow);
+    transition: var(--glass-motion);
     overflow: hidden;
 }
 .module-card.card-hidden {
@@ -312,8 +313,8 @@ body.setting-descriptions-hidden .section-header-row > div {
     padding-top: 0;
 }
 body.theme-dark .module-card {
-    background: rgba(30, 30, 35, 0.45);
-    border-color: rgba(255, 255, 255, 0.08);
+    background: var(--glass-card-bg);
+    border-color: var(--glass-border);
 }
 
 .card-visibility-settings-section {
@@ -526,18 +527,18 @@ body.theme-dark .floating-header {
 body.theme-dark .card,
 body.theme-dark .module-card,
 body.theme-dark .banner-image {
-    background: rgba(24, 29, 40, 0.55);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-color: rgba(255, 255, 255, 0.08);
+    background: var(--glass-card-bg);
+    backdrop-filter: blur(var(--glass-blur-card));
+    -webkit-backdrop-filter: blur(var(--glass-blur-card));
+    border-color: var(--glass-border);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
 }
 
 body.theme-dark .tab-bar-container {
-    background: var(--floating-bar-bg);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-color: rgba(255, 255, 255, 0.08);
+    background: var(--glass-floating-bg);
+    backdrop-filter: blur(var(--glass-blur-floating));
+    -webkit-backdrop-filter: blur(var(--glass-blur-floating));
+    border-color: var(--glass-border);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
     transform: translateX(-50%) translateZ(0);
     -webkit-transform: translateX(-50%) translateZ(0);
@@ -549,10 +550,10 @@ body.theme-dark .sub-card {
 }
 
 body.theme-dark .detail-card {
-    background: rgba(24, 29, 40, 0.65);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-color: rgba(255, 255, 255, 0.08);
+    background: var(--glass-dialog-bg);
+    backdrop-filter: blur(var(--glass-blur-dialog));
+    -webkit-backdrop-filter: blur(var(--glass-blur-dialog));
+    border-color: var(--glass-border);
     box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.3);
 }
 
@@ -563,8 +564,8 @@ body.theme-dark .option-item {
 }
 
 body.theme-dark .toast {
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(var(--glass-blur-floating));
+    -webkit-backdrop-filter: blur(var(--glass-blur-floating));
 }
 
 body.theme-dark .loading-overlay {

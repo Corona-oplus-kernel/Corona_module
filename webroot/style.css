@@ -6,6 +6,13 @@
     --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.06);
     --glass-shadow-lg: 0 18px 40px rgba(0, 0, 0, 0.10);
     --floating-bar-bg: rgba(255, 255, 255, 0.35);
+    --glass-card-bg: var(--glass-surface);
+    --glass-dialog-bg: var(--glass-surface-strong);
+    --glass-floating-bg: var(--floating-bar-bg);
+    --glass-blur-floating: 10px;
+    --glass-blur-card: 14px;
+    --glass-blur-dialog: 16px;
+    --glass-motion: background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease, backdrop-filter 220ms ease;
     --hue: 214;
     --primary: hsl(var(--hue), 82%, 50%);
     --primary-dim: hsla(var(--hue), 82%, 50%, 0.14);
@@ -58,6 +65,8 @@ body.theme-dark {
     --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
     --glass-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.36);
     --floating-bar-bg: rgba(24, 29, 40, 0.55);
+    --glass-card-bg: rgba(24, 29, 40, 0.55);
+    --glass-dialog-bg: rgba(24, 29, 40, 0.65);
     --primary: hsl(var(--hue), 78%, 62%);
     --primary-dim: hsla(var(--hue), 78%, 62%, 0.18);
     --primary-light: hsla(var(--hue), 78%, 62%, 0.12);
@@ -170,12 +179,13 @@ body.theme-dark .color-pref-swatch {
 .color-picker-dialog {
     width: min(92vw, 400px);
     border-radius: 18px;
-    background: var(--glass-surface-strong);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: var(--glass-dialog-bg);
+    backdrop-filter: blur(var(--glass-blur-dialog));
+    -webkit-backdrop-filter: blur(var(--glass-blur-dialog));
     border: 1px solid var(--glass-border);
     color: var(--text-main);
     box-shadow: var(--glass-shadow-lg);
+    transition: var(--glass-motion);
     overflow: hidden;
     animation: coronaDialogIn 0.28s cubic-bezier(0.22, 0.78, 0.18, 1);
 }
@@ -1212,13 +1222,14 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
     width: calc(100% - 32px);
     max-width: 396px;
     z-index: 100;
-    background: rgba(255, 255, 255, 0.35);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: var(--glass-floating-bg);
+    backdrop-filter: blur(var(--glass-blur-floating));
+    -webkit-backdrop-filter: blur(var(--glass-blur-floating));
     border-radius: 24px;
     padding: 8px;
     box-shadow: var(--glass-shadow);
     border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: var(--glass-motion);
 }
 
 .tab-bar {
@@ -1282,9 +1293,9 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
     left: 50%;
     transform: translateX(-50%) translateY(20px);
     border: 1px solid rgba(17, 24, 39, 0.14);
-    background: var(--floating-bar-bg);
-    backdrop-filter: blur(18px) saturate(1.18);
-    -webkit-backdrop-filter: blur(18px) saturate(1.18);
+    background: var(--glass-floating-bg);
+    backdrop-filter: blur(var(--glass-blur-floating)) saturate(1.18);
+    -webkit-backdrop-filter: blur(var(--glass-blur-floating)) saturate(1.18);
     color: var(--text-main);
     padding: 12px 24px;
     border-radius: 50px;
@@ -1298,7 +1309,7 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
     align-items: center;
     gap: 9px;
     max-width: min(86vw, 520px);
-    transition: opacity 180ms ease, transform 180ms ease, background 180ms ease;
+    transition: opacity 180ms ease, transform 180ms ease, var(--glass-motion);
 }
 
 .toast::before {
@@ -1337,7 +1348,7 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
 
 body.theme-dark .toast {
     border-color: rgba(255, 255, 255, 0.14);
-    background: var(--floating-bar-bg);
+    background: var(--glass-floating-bg);
     box-shadow: 0 14px 38px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
