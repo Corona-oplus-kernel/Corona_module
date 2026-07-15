@@ -1523,7 +1523,7 @@
                     </div>
                     <div class="setting-section danger-section">
                         <span class="section-label">危险操作</span>
-                        <div class="action-desc" data-i18n="resetSettingsDesc">选择要清除的配置，应用预设默认保留</div>
+                        <div class="action-desc" data-i18n="resetSettingsDesc">点击按类别选择，长按选择具体配置；应用预设默认保留</div>
                         <button class="action-btn action-btn-danger reset-all-btn" id="reset-all-btn">
                             <span class="reset-all-btn-text" data-i18n="resetSettings">重置设置</span>
                         </button>
@@ -1826,7 +1826,7 @@
                 <span class="detail-title" data-i18n="resetSelectTitle">选择要重置的设置</span>
             </div>
             <div class="reset-settings-copy" data-i18n="resetSelectDesc">仅清除勾选项目；应用预设默认保留。</div>
-            <div class="reset-settings-list">
+            <div class="reset-settings-list" id="reset-settings-scope-list">
                 <label class="reset-settings-option">
                     <input type="checkbox" data-reset-scope="memory" checked>
                     <span><strong data-i18n="resetMemorySettings">内存与交换设置</strong><small data-i18n="resetMemorySettingsDesc">ZRAM、Loop、Swap、VM 与内存相关参数</small></span>
@@ -1856,6 +1856,7 @@
                     <span><strong data-i18n="resetAllAppSettings">删除所有应用设置与预设</strong><small data-i18n="resetAllAppSettingsDesc">包括全部独立应用预设，此项不可恢复</small></span>
                 </label>
             </div>
+            <div class="reset-settings-list hidden" id="reset-settings-config-list"></div>
             <div class="reset-settings-note" data-i18n="resetRestartNote">清除系统配置后设备会自动重启。</div>
             <div class="detail-actions reset-settings-actions">
                 <button class="action-btn" id="reset-settings-cancel" data-i18n="cancel">取消</button>

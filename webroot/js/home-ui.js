@@ -899,35 +899,113 @@
         const btn = document.getElementById('reset-all-btn');
         if (!btn || btn.dataset.bound) return;
         btn.dataset.bound = '1';
-        btn.addEventListener('click', () => this.resetAllSettings());
+        let timer = null;
+        let longPressed = false;
+        let startX = 0;
+        let startY = 0;
+        const cancelLongPress = () => {
+            if (timer) clearTimeout(timer);
+            timer = null;
+            btn.classList.remove('long-pressing');
+        };
+        btn.addEventListener('pointerdown', event => {
+            if (event.button !== undefined && event.button !== 0) return;
+            longPressed = false;
+            startX = event.clientX;
+            startY = event.clientY;
+            btn.classList.add('long-pressing');
+            timer = setTimeout(() => {
+                timer = null;
+                longPressed = true;
+                btn.classList.remove('long-pressing');
+                if (navigator.vibrate) navigator.vibrate(25);
+                this.resetAllSettings({ detailed: true });
+            }, 560);
+        });
+        btn.addEventListener('pointermove', event => {
+            if (Math.abs(event.clientX - startX) > 10 || Math.abs(event.clientY - startY) > 10) cancelLongPress();
+        });
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach(type => btn.addEventListener(type, cancelLongPress));
+        btn.addEventListener('contextmenu', event => event.preventDefault());
+        btn.addEventListener('click', event => {
+            if (longPressed) {
+                event.preventDefault();
+                event.stopPropagation();
+                longPressed = false;
+                return;
+            }
+            this.resetAllSettings();
+        });
     },
-    showResetSettingsDialog() {
+    getDetailedResetConfigs() {
+        return [
+            { key: 'resetConfigZram', files: ['zram.conf'] },
+            { key: 'resetConfigLoop', files: ['loop.conf'] },
+            { key: 'resetConfigPressure', files: ['memory_pressure.conf'] },
+            { key: 'resetConfigSwap', files: ['swap.conf'] },
+            { key: 'resetConfigVm', files: ['vm.conf', 'kernel.conf'] },
+            { key: 'resetConfigReclaim', files: ['le9ec.conf', 'lmk.conf', 'reclaim.conf', 'kswapd.conf'] },
+            { key: 'resetConfigIo', files: ['io_scheduler.conf'] },
+            { key: 'resetConfigCpu', files: ['cpu_governor.conf', 'cpu_hotplug.conf'] },
+            { key: 'resetConfigNetwork', files: ['tcp.conf'] },
+            { key: 'resetConfigKernel', files: ['corona_kernel.conf', 'device.conf', 'protect.conf', 'fstrim.conf'] },
+            { key: 'resetConfigScripts', files: ['custom_scripts.b64'] },
+            { key: 'resetConfigAppPolicy', files: ['app_rules.conf', 'app_whitelist.list', 'app_protect.list', 'process_priority.conf', 'thread_priority.conf'] }
+        ];
+    },
+    showResetSettingsDialog({ detailed = false } = {}) {
         return new Promise(resolve => {
             const overlay = document.getElementById('reset-settings-overlay');
             const cancel = document.getElementById('reset-settings-cancel');
             const confirm = document.getElementById('reset-settings-confirm');
+            const title = overlay?.querySelector('.detail-title');
+            const description = overlay?.querySelector('.reset-settings-copy');
+            const scopeList = document.getElementById('reset-settings-scope-list');
+            const configList = document.getElementById('reset-settings-config-list');
             if (!overlay || !cancel || !confirm) {
-                resolve([]);
+                resolve(null);
                 return;
             }
-            const defaultScopes = new Set(['memory', 'system', 'scripts']);
-            overlay.querySelectorAll('[data-reset-scope]').forEach(input => {
-                input.checked = defaultScopes.has(input.dataset.resetScope);
-            });
+            const detailedConfigs = this.getDetailedResetConfigs();
+            if (title) title.textContent = this.t(detailed ? 'resetConfigSelectTitle' : 'resetSelectTitle');
+            if (description) description.textContent = this.t(detailed ? 'resetConfigSelectDesc' : 'resetSelectDesc');
+            if (scopeList) scopeList.classList.toggle('hidden', detailed);
+            if (configList) {
+                configList.classList.toggle('hidden', !detailed);
+                configList.innerHTML = detailed ? detailedConfigs.map((config, index) => `
+                    <label class="reset-settings-option">
+                        <input type="checkbox" data-reset-config="${index}">
+                        <span><strong>${this.escapeHtml(this.t(config.key))}</strong><small>${this.escapeHtml(config.files.join(' · '))}</small></span>
+                    </label>
+                `).join('') : '';
+            }
+            if (!detailed) {
+                const defaultScopes = new Set(['memory', 'system', 'scripts']);
+                overlay.querySelectorAll('[data-reset-scope]').forEach(input => {
+                    input.checked = defaultScopes.has(input.dataset.resetScope);
+                });
+            }
             const cleanup = (selection) => {
                 this.hideOverlay('reset-settings-overlay');
                 cancel.removeEventListener('click', onCancel);
                 confirm.removeEventListener('click', onConfirm);
                 resolve(selection);
             };
-            const onCancel = () => cleanup([]);
+            const onCancel = () => cleanup(null);
             const onConfirm = () => {
-                const selection = [...overlay.querySelectorAll('[data-reset-scope]:checked')].map(input => input.dataset.resetScope);
-                if (selection.length === 0) {
+                const scopes = detailed ? [] : [...overlay.querySelectorAll('[data-reset-scope]:checked')].map(input => input.dataset.resetScope);
+                const selectedConfigs = detailed
+                    ? [...overlay.querySelectorAll('[data-reset-config]:checked')].map(input => detailedConfigs[Number(input.dataset.resetConfig)]).filter(Boolean)
+                    : [];
+                if (scopes.length === 0 && selectedConfigs.length === 0) {
                     this.showToast(this.t('resetSelectAtLeastOne'), 'warning');
                     return;
                 }
-                cleanup(selection);
+                cleanup({
+                    scopes,
+                    files: selectedConfigs.flatMap(config => config.files),
+                    labels: selectedConfigs.map(config => this.t(config.key))
+                });
             };
             cancel.addEventListener('click', onCancel);
             confirm.addEventListener('click', onConfirm);
@@ -949,11 +1027,13 @@
         ['corona_theme', 'corona_color_hue', 'corona_accent', 'corona_language', 'corona_card_visibility', 'corona_category_config_toggles', 'corona_change_preview', 'corona_setting_descriptions']
             .forEach(key => localStorage.removeItem(key));
     },
-    async resetAllSettings() {
-        const scopes = await this.showResetSettingsDialog();
-        if (scopes.length === 0) return;
+    async resetAllSettings(options = {}) {
+        const selection = await this.showResetSettingsDialog(options);
+        if (!selection) return;
+        const scopes = selection.scopes || [];
+        const detailedFiles = selection.files || [];
         const removesAllApps = scopes.includes('all-apps');
-        const selectedLabels = scopes.map(scope => this.t({
+        const selectedLabels = [...scopes.map(scope => this.t({
             memory: 'resetMemorySettings',
             system: 'resetSystemSettings',
             scripts: 'resetCustomScripts',
@@ -961,29 +1041,30 @@
             ui: 'resetUiPreferences',
             snapshots: 'resetSnapshots',
             'all-apps': 'resetAllAppSettings'
-        }[scope] || scope));
+        }[scope] || scope)), ...(selection.labels || [])];
         const confirmed = await this.showConfirm(`${this.t('resetConfirmSelected')}\n\n${selectedLabels.map(label => `• ${label}`).join('\n')}`, this.t('resetSelected'), {
             okText: this.t('resetSelected'),
             cancelText: this.t('cancel')
         });
         if (!confirmed) return;
         this.showLoading(true);
-        const files = [...new Set(scopes.flatMap(scope => this.getResetScopeFiles(scope)))];
+        const files = [...new Set([...scopes.flatMap(scope => this.getResetScopeFiles(scope)), ...detailedFiles])];
         if (files.length > 0) {
             await this.exec(`rm -f ${files.map(filename => this.shellQuote(`${this.configDir}/${filename}`)).join(' ')}`);
         }
-        if (scopes.includes('scripts')) {
+        if (scopes.includes('scripts') || files.includes('custom_scripts.b64')) {
             await this.exec(`find ${this.shellQuote(`${this.modDir}/scripts.d`)} -mindepth 1 -maxdepth 1 ! -name .placeholder -exec rm -rf {} + 2>/dev/null`);
         }
         if (removesAllApps) {
             await this.exec(`rm -rf ${this.shellQuote(`${this.configDir}/app_profiles`)}`);
         }
-        if (scopes.includes('app-policy') || removesAllApps) {
+        const appPolicyFiles = new Set(this.getResetScopeFiles('app-policy'));
+        if (scopes.includes('app-policy') || removesAllApps || files.some(filename => appPolicyFiles.has(filename))) {
             await this.exec(`sh ${this.shellQuote(`${this.modDir}/app_policy.sh`)} daemon-stop`).catch(() => {});
         }
         if (scopes.includes('ui')) this.clearUiPreferences();
         await this.exec(`sed -i 's/^description=.*/description=等待首次设置……/' '${this.modDir}/module.prop' 2>/dev/null`);
-        const needsReboot = scopes.some(scope => !['ui', 'snapshots'].includes(scope));
+        const needsReboot = detailedFiles.length > 0 || scopes.some(scope => !['ui', 'snapshots'].includes(scope));
         this.showToast(this.t(needsReboot ? 'resetDoneRebooting' : 'resetDoneReloading'));
         await this.sleep(500);
         if (needsReboot) await this.exec('reboot');

@@ -1800,7 +1800,11 @@
                 if (!this.state.cpuEnabled) {
                     core.online = !core.online;
                     item.className = `cpu-core ${core.online ? 'online' : 'offline'}`;
-                    document.getElementById(`cpu-load-${cpuId}`).textContent = core.online ? '--' : 'OFF';
+                    const load = document.getElementById(`cpu-load-${cpuId}`);
+                    if (load) {
+                        load.textContent = core.online ? '--' : 'OFF';
+                        load.classList.remove('has-usage');
+                    }
                     await this.saveCpuHotplugConfig(cpuId);
                     await this.updateModuleDescription();
                     this.showToast(`CPU${cpuId} 配置已保存（禁用状态）`);
@@ -1809,7 +1813,11 @@
                 await this.exec(`echo ${newState} > /sys/devices/system/cpu/cpu${cpuId}/online`);
                 core.online = !core.online;
                 item.className = `cpu-core ${core.online ? 'online' : 'offline'}`;
-                document.getElementById(`cpu-load-${cpuId}`).textContent = core.online ? '--' : 'OFF';
+                const load = document.getElementById(`cpu-load-${cpuId}`);
+                if (load) {
+                    load.textContent = core.online ? '--' : 'OFF';
+                    load.classList.remove('has-usage');
+                }
                 await this.saveCpuHotplugConfig(cpuId);
                 await this.updateModuleDescription();
                 this.showToast(`CPU${cpuId} 已${core.online ? '启用' : '禁用'}`);
@@ -1836,7 +1844,11 @@
         for (const core of this.cpuCores) {
             const el = document.querySelector(`.cpu-core[data-cpu="${core.id}"] .cpu-core-load`);
             if (!el) continue;
-            if (!core.online) { el.textContent = 'OFF'; continue; }
+            if (!core.online) {
+                el.textContent = 'OFF';
+                el.classList.remove('has-usage');
+                continue;
+            }
             const s1 = await this.getCpuStat(core.id);
             if (!s1) continue;
             if (!this.cpuStats[core.id]) { this.cpuStats[core.id] = s1; continue; }
@@ -1846,6 +1858,7 @@
             const activeDiff = s1.active - prev.active;
             const usage = totalDiff > 0 ? Math.round((activeDiff / totalDiff) * 100) : 0;
             el.textContent = `${usage}%`;
+            el.classList.add('has-usage');
             core.load = `${usage}%`;
         }
     },
