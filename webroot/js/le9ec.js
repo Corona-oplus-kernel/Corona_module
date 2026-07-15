@@ -105,7 +105,6 @@
         setTimeout(() => this.loadLe9ecStatus(), 500);
         return true;
     },
-    toggleZramSettings(show) { const settings = document.getElementById('zram-settings'); if (show) { settings.classList.remove('hidden'); this.loadZramStatus(); } else { settings.classList.add('hidden'); } }
   });
   window.CoronaFeatureScripts["le9ec"] = true;
 })();
