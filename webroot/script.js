@@ -131,7 +131,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071533` : '';
+        return map[name] ? `${map[name]}?v=2026071534` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -222,9 +222,12 @@ class CoronaAddon {
             this.initLanguageSelector();
             this.applyTranslations();
             this.startTranslationObserver();
-            this.updateInitOverlayMessage(this.t('initDevice'));
-            await this.loadDeviceInfo();
-            await this.loadModuleVersion();
+            this.updateInitOverlayMessage(this.t('initSettings'));
+            await Promise.all([
+                this.ensureSettingsPageReady(),
+                this.loadDeviceInfo(),
+                this.loadModuleVersion()
+            ]);
             this.initDetailOverlays();
             this.initHomeCardClicks();
             this.initChart();
@@ -246,15 +249,6 @@ class CoronaAddon {
             this.scheduleDeferredInit();
         } else if (typeof this.initEasterEgg === 'function') {
             try { this.initEasterEgg(); } catch (e) {}
-        }
-        const warmSettings = () => {
-            if (typeof this.ensureSettingsPageReady !== 'function') return;
-            this.ensureSettingsPageReady().catch(e => console.error('settings warmup failed', e));
-        };
-        if (typeof window.requestIdleCallback === 'function') {
-            window.requestIdleCallback(warmSettings, { timeout: 1200 });
-        } else {
-            setTimeout(warmSettings, 320);
         }
     }
     updateSliderProgress(slider) {

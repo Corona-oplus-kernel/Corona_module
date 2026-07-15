@@ -4238,6 +4238,8 @@ body.theme-dark .mini-switch-row input:checked {
     display: grid;
     grid-template-columns: repeat(2, minmax(72px, 1fr));
     flex: 0 0 auto;
+    box-sizing: border-box;
+    overflow: hidden;
     gap: 3px;
     padding: 3px;
     border-radius: 11px;
@@ -4249,6 +4251,7 @@ body.theme-dark .mini-switch-row input:checked {
     position: absolute;
     inset: 3px auto 3px 3px;
     width: calc((100% - 9px) / 2);
+    box-sizing: border-box;
     border-radius: 8px;
     background: var(--card-bg);
     border: 1px solid var(--glass-border);
@@ -4264,6 +4267,7 @@ html[lang="en"] .language-segmented::before {
     position: relative;
     z-index: 1;
     min-height: 34px;
+    min-width: 0;
     padding: 0 13px;
     border: 0;
     border-radius: 8px;
@@ -4280,7 +4284,7 @@ html[lang="en"] .language-segmented::before {
     background: transparent;
     color: var(--primary);
     box-shadow: none;
-    transform: scale(1.025);
+    transform: none;
 }
 
 @media (max-width: 420px) {
