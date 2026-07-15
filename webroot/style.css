@@ -4555,3 +4555,141 @@ body.theme-dark .color-live-bar { background: rgba(255,255,255,0.08); }
         display: none;
     }
 }
+
+/* Language refresh and external navigation */
+body.language-switching .page.active,
+body.language-switching .floating-header,
+body.language-switching .tab-bar,
+body.language-switching .detail-overlay.show {
+    animation: coronaLanguageRefresh 300ms var(--motion-ease);
+}
+
+@keyframes coronaLanguageRefresh {
+    0% { opacity: 0.42; filter: blur(1.5px); }
+    55% { opacity: 0.78; filter: blur(0.5px); }
+    100% { opacity: 1; filter: blur(0); }
+}
+
+.link-transition-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 32000;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(8, 10, 16, 0.28);
+    backdrop-filter: blur(0);
+    -webkit-backdrop-filter: blur(0);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 180ms ease, visibility 180ms ease, backdrop-filter 180ms ease;
+}
+
+.link-transition-overlay.show {
+    opacity: 1;
+    visibility: visible;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.link-transition-overlay.leaving {
+    opacity: 0;
+}
+
+.link-transition-card {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-width: 170px;
+    padding: 14px 18px;
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    background: var(--glass-surface-strong);
+    color: var(--text-main);
+    box-shadow: var(--glass-shadow-lg);
+    transform: translateY(10px) scale(0.96);
+    transition: transform 220ms var(--motion-ease);
+}
+
+.link-transition-overlay.show .link-transition-card {
+    transform: translateY(0) scale(1);
+}
+
+.link-transition-icon {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 10px;
+    background: var(--primary-dim);
+    color: var(--primary);
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.link-transition-label {
+    font-size: 13px;
+    font-weight: 650;
+}
+
+body.color-refreshing .module-card,
+body.color-refreshing .card,
+body.color-refreshing .action-btn,
+body.color-refreshing .option-item,
+body.color-refreshing .tab-slider,
+body.color-refreshing .range-slider,
+body.color-refreshing .color-global-preview,
+body.color-refreshing .color-picker-header,
+body.color-refreshing .color-preview-card,
+body.color-refreshing .current-badge {
+    transition: background-color 150ms linear, border-color 150ms linear, color 150ms linear, box-shadow 150ms linear;
+}
+
+.module-card-info,
+.module-card-title,
+.module-card-desc,
+.switch-info,
+.card-title,
+.info-label,
+.setting-control-label {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+html[lang="en"] .section-label {
+    letter-spacing: 0.08em;
+    text-transform: none;
+}
+
+html[lang="en"] .module-card-title,
+html[lang="en"] .card-title {
+    line-height: 1.25;
+}
+
+html[lang="en"] .action-btn,
+html[lang="en"] .dialog-button,
+html[lang="en"] .btn-small {
+    height: auto;
+    min-height: 40px;
+    line-height: 1.25;
+    white-space: normal;
+}
+
+html[lang="en"] .color-picker-dialog .preset-colors {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.language-switching .page.active,
+    body.language-switching .floating-header,
+    body.language-switching .tab-bar,
+    body.language-switching .detail-overlay.show {
+        animation: none;
+    }
+
+    .link-transition-overlay,
+    .link-transition-card {
+        transition: none;
+    }
+}

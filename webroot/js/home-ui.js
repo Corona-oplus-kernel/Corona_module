@@ -326,18 +326,18 @@
         const textSub = styles.getPropertyValue('--text-sub').trim() || '#6E6E6E';
         const primaryColor = styles.getPropertyValue('--primary').trim() || '#3482FF';
         const primaryDim = styles.getPropertyValue('--primary-dim').trim() || 'rgba(52, 130, 255, 0.2)';
-        let data = [], maxVal = 100, unit = '%', color1 = primaryColor, color2 = primaryDim, label = 'CPU 使用率';
-        if (this.chartType === 'cpu') { data = this.historyData.cpu.map(d => d.value); label = 'CPU 使用率'; }
-        else if (this.chartType === 'mem') { data = this.historyData.mem.map(d => d.value); label = '内存使用率'; color1 = primaryColor; color2 = primaryDim; }
+        let data = [], maxVal = 100, unit = '%', color1 = primaryColor, color2 = primaryDim, label = this.localizeMessage('CPU 使用率');
+        if (this.chartType === 'cpu') { data = this.historyData.cpu.map(d => d.value); label = this.localizeMessage('CPU 使用率'); }
+        else if (this.chartType === 'mem') { data = this.historyData.mem.map(d => d.value); label = this.localizeMessage('内存使用率'); color1 = primaryColor; color2 = primaryDim; }
         else if (this.chartType === 'temp') {
             const cpuData = this.historyData.cpuTemp.map(d => d.value);
             const battData = this.historyData.batteryTemp.map(d => d.value);
             maxVal = Math.max(60, ...cpuData, ...battData);
             unit = '°C';
-            this.drawMultiLineChart(ctx, width, height, [{ data: cpuData, color: '#F44336', label: 'CPU' }, { data: battData, color: '#FF9800', label: '电池' }], maxVal, unit);
+            this.drawMultiLineChart(ctx, width, height, [{ data: cpuData, color: '#F44336', label: 'CPU' }, { data: battData, color: '#FF9800', label: this.localizeMessage('电池') }], maxVal, unit);
             return;
         }
-        if (data.length < 2) { ctx.fillStyle = textSub; ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('收集数据中...', width / 2, height / 2); return; }
+        if (data.length < 2) { ctx.fillStyle = textSub; ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(this.localizeMessage('收集数据中...'), width / 2, height / 2); return; }
         const padding = { top: 10, right: 10, bottom: 25, left: 35 };
         const chartWidth = width - padding.left - padding.right;
         const chartHeight = height - padding.top - padding.bottom;
@@ -900,6 +900,10 @@
     openKernelReleasePage() {
         const url = this.kernelUpdateInfo?.url || 'https://github.com/wswzgdg/Corona-5.15-action/releases/latest';
         if (!url) return;
+        if (typeof this.openAnimatedExternalUrl === 'function') {
+            this.openAnimatedExternalUrl(url);
+            return;
+        }
         if (typeof window !== 'undefined' && typeof window.open === 'function') {
             const opened = window.open(url, '_blank');
             if (opened) return;

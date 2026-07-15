@@ -68,7 +68,8 @@
                  moduleManagedZram: 'ZRAM: Module Managed',
                  systemManagedZram: 'ZRAM: System Managed'
    };
-  window.CoronaI18nEn = {
+  window.CoronaI18n = window.CoronaI18n || {};
+  window.CoronaI18n.en = {
     'Corona 控制台': 'Corona Console',
     '处理器 >': 'Processor >',
     '运行内存 >': 'Memory >',
@@ -77,6 +78,11 @@
     '电池与温度 >': 'Battery & Temperature >',
     '内核有新的更新': 'A new kernel update is available',
     '设备状态': 'Device Status',
+    'CPU 使用率': 'CPU Usage',
+    '内存使用率': 'Memory Usage',
+    '收集数据中...': 'Collecting data...',
+    '电池': 'Battery',
+    '正在打开链接': 'Opening Link',
     '实时查看内存、温度与系统信息': 'Live memory, temperature, and system information',
     '设备型号': 'Device Model',
     '运行状态': 'Runtime Status',
@@ -278,6 +284,58 @@
     '选中项': 'Selected',
     '主按钮': 'Primary Button',
     '完成': 'Done',
+    '模块制作感谢名单': 'Module Acknowledgements',
+    '致谢爱人❤️然(≧ω≦)/': 'With love and thanks to Ran ❤️ (≧ω≦)/',
+    '感谢使用': 'Thanks for using ',
+    'orona模块': 'orona Module',
+    '打开然的主页': "Open Ran's profile",
+    '充电类型': 'Charging Type',
+    '充电状态': 'Charging Status',
+    '电池电压': 'Battery Voltage',
+    '电池技术': 'Battery Technology',
+    '电池健康度': 'Battery Health',
+    '健康状态': 'Health Status',
+    '循环次数': 'Cycle Count',
+    '选择 ZRAM 设备': 'Select ZRAM Device',
+    'I/O 设置': 'I/O Settings',
+    '编辑': 'Edit',
+    '编辑规则': 'Edit Rule',
+    '改名': 'Rename',
+    '删除': 'Delete',
+    '恢复': 'Restore',
+    '继续': 'Continue',
+    '加入': 'Add',
+    '开启': 'Enable',
+    '关闭': 'Close',
+    '移出': 'Remove',
+    '处理应用': 'Process Apps',
+    '应用列表': 'Application List',
+    '没有匹配的应用': 'No Matching Applications',
+    '暂无参数快照': 'No Parameter Snapshots',
+    '暂无自定义脚本': 'No Custom Scripts',
+    '暂无优先级规则': 'No Priority Rules',
+    '未找到进程': 'No Process Found',
+    '加载中...': 'Loading...',
+    '应用进程': 'Application Processes',
+    '系统进程': 'System Processes',
+    '其他进程': 'Other Processes',
+    '管理线程规则': 'Manage Thread Rules',
+    '自定义线程亲和性、调度策略与优先级': 'Customize thread affinity, scheduling policy, and priority',
+    '清除应用预设': 'Clear App Preset',
+    '删除该应用的独立预设，下次切回默认配置': 'Delete this app preset and return to defaults next time',
+    '紧急回收时跳过这个应用': 'Skip this app during emergency reclaim',
+    '尝试持续保活并迁入受保护内存组': 'Keep this app alive and move it into the protected memory group',
+    '将当前 config 下的已保存参数写入该应用独立预设目录': 'Copy the saved configuration into this app preset',
+    '该应用还没有线程规则，可以切到自定义标签新建一个入口': 'This app has no thread rules. Switch to the custom tab to create one.',
+    '(空)': '(Empty)',
+    'ZRAM 是 Linux 内核的一个功能，它在内存中创建一个压缩的块设备作为交换空间。\n\n当物理内存不足时，系统会将不常用的内存页压缩后存储到 ZRAM 中，从而有效扩展可用内存容量。\n\nSwap 文件则是在存储设备上创建的交换空间，可以作为 ZRAM 的补充，适合内存较小的设备使用。': 'ZRAM creates a compressed block device in memory for swap.\n\nWhen physical memory runs low, inactive pages are compressed into ZRAM to extend available memory.\n\nA swap file provides additional swap space on storage and can complement ZRAM on memory-constrained devices.',
+    'CPU 调频器控制处理器频率的调节策略，直接影响设备的性能表现和电池续航。\n\n不同的调频策略在性能和功耗之间有不同的侧重，可以根据实际使用需求选择合适的调频器。': 'CPU governors control processor frequency scaling and directly affect performance and battery life.\n\nDifferent governors balance performance and power consumption differently. Choose one based on your usage needs.',
+    'IO 调度器决定了磁盘读写请求的处理顺序和优先级。\n\n不同的调度算法适合不同的使用场景，选择合适的调度器可以提升存储设备的读写性能和响应速度。\n\n预读大小控制系统预先读取的数据量，适当的预读可以提高顺序读取的性能。': 'I/O schedulers determine the order and priority of storage requests.\n\nDifferent schedulers suit different workloads and can improve throughput and responsiveness.\n\nRead-ahead controls how much data is prefetched and can improve sequential read performance.',
+    'TCP 拥塞控制算法影响网络数据传输的效率和稳定性。\n\n不同的算法在各种网络环境下表现不同，选择合适的算法可以提升网络连接的速度和可靠性。': 'TCP congestion control affects network transfer efficiency and stability.\n\nAlgorithms behave differently across network conditions. Choosing a suitable one can improve speed and reliability.',
+    'LE9EC 是一个内核补丁，用于保护工作集内存不被过度回收。\n\n通过设置匿名页和文件页的保护阈值（以KB为单位），可以防止系统在内存压力下过度回收正在使用的内存，从而避免频繁的页面换入换出导致的系统卡顿和假死。\n\n此功能需要内核支持，未打补丁的内核将自动隐藏此选项。': 'LE9EC is a kernel patch that protects working-set memory from excessive reclaim.\n\nAnonymous-page and file-page thresholds prevent active memory from being reclaimed too aggressively under pressure, reducing stalls caused by frequent swapping.\n\nThis feature requires kernel support and is hidden automatically when unavailable.',
+    '一系列系统级优化选项，包括低内存杀手调优、后台进程保护、厂商回收抑制等功能。\n\n这些优化可以减少后台应用被杀、提升系统流畅度、保持存储性能。\n\n部分功能可能与特定厂商系统有关，请根据实际效果选择启用。': 'System-level optimizations include low-memory-killer tuning, background-process protection, and vendor reclaim controls.\n\nThey can reduce background app termination, improve responsiveness, and maintain storage performance.\n\nSome options are vendor-specific; enable them according to actual results.',
+    '在此添加您自己的 Shell 脚本，模块启动时会以 root 权限自动执行。\n\n可以用于个性化的系统调优、自动化任务等场景。\n\n注意：请确保脚本语法正确，避免执行可能导致系统不稳定的命令。': 'Add custom shell scripts that run automatically as root when the module starts.\n\nThey can be used for personalized system tuning and automation.\n\nMake sure scripts are valid and avoid commands that may destabilize the system.',
+    'Corona 模块的全局设置，包括主题切换、功能卡片显示控制、一键内存清理等功能。\n\n可以根据个人喜好自定义界面显示和快捷操作。': 'Global Corona settings include theme selection, feature-card visibility, and one-tap memory cleanup.\n\nCustomize the interface and shortcuts to your preferences.',
     '全局主题颜色': 'Global Theme Color',
     '调整后立即同步到整个 WebUI': 'Changes are applied across the entire WebUI immediately',
     '全局生效': 'Global',
@@ -621,9 +679,10 @@
     '已释放内存': 'Memory Freed'
   };
 
-  window.CoronaI18nDynamicEn = function(input) {
+  window.CoronaI18nDynamic = window.CoronaI18nDynamic || {};
+  window.CoronaI18nDynamic.en = function(input) {
     let text = String(input || '');
-    const exact = window.CoronaI18nEn[text];
+    const exact = window.CoronaI18n.en[text];
     if (exact) return exact;
     const replacements = [
       [/^已保存$/, 'Saved'],
@@ -726,6 +785,7 @@
       ,[/^色调 (\d+)°$/, 'Hue $1°']
       ,[/^色调 (\d+)° · 主页与配置同步$/, 'Hue $1° · Synced across Home and Settings']
       ,[/^色调 (\d+)° · 全局同步$/, 'Hue $1° · Synced Globally']
+      ,[/^打开 (.+) 的主页$/, "Open $1's profile"]
       ,[/^共 (\d+) 个快照；当前仅恢复配置状态，不会自动全量立即应用。$/, '$1 snapshots; restoration changes configuration state only and does not immediately apply everything.']
       ,[/^快照 (\d+)$/, 'Snapshot $1']
       ,[/^即将保存参数快照 (.+)。$/, 'Save parameter snapshot $1.']
@@ -743,6 +803,8 @@
     return text;
   };
 
+  window.CoronaI18nEn = window.CoronaI18n.en;
+  window.CoronaI18nDynamicEn = window.CoronaI18nDynamic.en;
   window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
   window.CoronaFeatureScripts['i18n-en'] = true;
 })();

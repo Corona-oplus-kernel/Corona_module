@@ -55,6 +55,14 @@
     },
     setLanguage(language, persist = true) {
         const normalized = language === 'en' ? 'en' : 'zh';
+        const changed = this.state.language !== normalized;
+        if (changed && document.body) {
+            document.body.classList.remove('language-switching');
+            void document.body.offsetWidth;
+            document.body.classList.add('language-switching');
+            if (this._languageSwitchTimer) clearTimeout(this._languageSwitchTimer);
+            this._languageSwitchTimer = setTimeout(() => document.body.classList.remove('language-switching'), 320);
+        }
         this.state.language = normalized;
         document.documentElement.lang = normalized === 'en' ? 'en' : 'zh-CN';
         if (persist) localStorage.setItem('corona_language', normalized);
@@ -85,15 +93,21 @@
     },
     localizeMessage(message) {
         const text = String(message || '');
-        if (this.state.language !== 'en') return text;
+        const language = this.state.language === 'en' ? 'en' : 'zh';
+        const catalog = window.CoronaI18n?.[language] || {};
+        const dynamicTranslator = window.CoronaI18nDynamic?.[language];
+        const fullTranslation = typeof dynamicTranslator === 'function'
+            ? dynamicTranslator(text)
+            : (catalog[text] || text);
+        if (fullTranslation !== text) return fullTranslation;
         const translateLine = line => {
             const match = line.match(/^(\s*(?:[-•*]\s*)?)(.*?)(\s*)$/);
             const prefix = match?.[1] || '';
             const core = match?.[2] || line;
             const suffix = match?.[3] || '';
-            const translated = typeof window.CoronaI18nDynamicEn === 'function'
-                ? window.CoronaI18nDynamicEn(core)
-                : (window.CoronaI18nEn?.[core] || core);
+            const translated = typeof dynamicTranslator === 'function'
+                ? dynamicTranslator(core)
+                : (catalog[core] || core);
             return `${prefix}${translated}${suffix}`;
         };
         return text.split('\n').map(translateLine).join('\n');
@@ -257,6 +271,11 @@
         const value = this.normalizeHue(hue);
         const persist = options.persist !== false;
         const updateState = options.updateState !== false;
+        if (options.smooth === true && document.body) {
+            document.body.classList.add('color-refreshing');
+            if (this._colorRefreshTimer) clearTimeout(this._colorRefreshTimer);
+            this._colorRefreshTimer = setTimeout(() => document.body.classList.remove('color-refreshing'), 180);
+        }
         if (animate) this.applyThemeTransition();
         document.documentElement.style.setProperty('--hue', String(value));
         document.body.style.setProperty('--hue', String(value));
@@ -425,6 +444,7 @@
                 <button type="button" class="dialog-button filled" id="close-color" style="flex:1">完成</button>
             </div>
         `;
+        this.translateDom(dialog);
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
 
@@ -441,7 +461,7 @@
 
         const paintLocalPreview = (value, primary, dim) => {
             if (headerSwatch) headerSwatch.style.background = primary;
-            if (liveDesc) liveDesc.textContent = `色调 ${value}° · 全局同步`;
+            if (liveDesc) liveDesc.textContent = this.localizeMessage(`色调 ${value}° · 全局同步`);
             if (liveChip) {
                 liveChip.style.background = dim;
                 liveChip.style.color = primary;
@@ -461,7 +481,7 @@
 
         const previewHue = (hue, { toast = false } = {}) => {
             draftHue = this.normalizeHue(hue);
-            const painted = this.applyHue(draftHue, false, { persist: true, updateState: true });
+            const painted = this.applyHue(draftHue, false, { persist: true, updateState: true, smooth: true });
             if (output) output.textContent = `${draftHue}°`;
             if (slider && String(slider.value) !== String(draftHue)) slider.value = String(draftHue);
             presets.forEach(p => {
@@ -512,6 +532,28 @@
             });
         });
         if (typeof this.initAccentSelector === 'function') this.initAccentSelector();
+    },
+    openAnimatedExternalUrl(url) {
+        if (!url) return;
+        const overlay = document.getElementById('link-transition-overlay');
+        if (overlay) {
+            const label = overlay.querySelector('.link-transition-label');
+            if (label) label.textContent = this.localizeMessage('正在打开链接');
+            overlay.classList.remove('leaving');
+            overlay.classList.add('show');
+        }
+        setTimeout(() => {
+            try {
+                const opened = window.open(url, '_blank', 'noopener,noreferrer');
+                if (!opened) window.location.href = url;
+            } catch (error) {
+                try { window.location.href = url; } catch (_) {}
+            }
+            if (overlay) {
+                overlay.classList.add('leaving');
+                setTimeout(() => overlay.classList.remove('show', 'leaving'), 220);
+            }
+        }, overlay ? 180 : 0);
     },
     initChangePreviewToggle() {
         const toggle = document.getElementById('change-preview-switch');
