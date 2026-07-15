@@ -6,7 +6,7 @@ ZRAM_CONF="$MODDIR/config/zram.conf"
 LOOP_CONF="$MODDIR/config/loop.conf"
 
 zram_enabled=$(grep -m1 '^enabled=' "$ZRAM_CONF" 2>/dev/null | cut -d'=' -f2-)
-if [ "$zram_enabled" = "1" ] && ! grep -Eq '^(algorithm|recomp_algorithm[123]|zstd_compression_level|size|swappiness|zram_path)=' "$ZRAM_CONF" 2>/dev/null; then
+if [ "$zram_enabled" = "1" ] && ! grep -Eq '^(algorithm|recomp_algorithm[123]|zstd_compression_level|size|swappiness|priority|zram_path)=' "$ZRAM_CONF" 2>/dev/null; then
   exit 0
 fi
 

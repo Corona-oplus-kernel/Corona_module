@@ -18,6 +18,7 @@ class CoronaAddon {
             zstdCompressionLevel: 1,
             zramSize: 8,
             swappiness: 100,
+            zramPriority: 32758,
             loopEnabled: false,
             loopSizeGb: 4,
             zramPath: '/dev/block/zram0',
@@ -131,7 +132,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071537` : '';
+        return map[name] ? `${map[name]}?v=2026071538` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -686,6 +687,14 @@ class CoronaAddon {
         document.getElementById('swappiness-slider').addEventListener('change', (e) => {
             this.state.swappiness = parseInt(e.target.value);
             this.markZramDirty('swappiness');
+        });
+        document.getElementById('zram-priority-list')?.querySelectorAll('.option-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.getElementById('zram-priority-list').querySelectorAll('.option-item').forEach(option => option.classList.remove('selected'));
+                item.classList.add('selected');
+                this.state.zramPriority = parseInt(item.dataset.value, 10) || 32758;
+                this.markZramDirty('priority');
+            });
         });
         document.getElementById('zram-apply-btn').addEventListener('click', async (e) => {
             e.stopPropagation();

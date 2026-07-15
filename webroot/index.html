@@ -256,6 +256,10 @@
                                         <span class="info-label">Swappiness</span>
                                         <span class="info-value" id="zram-current-swappiness">--</span>
                                     </div>
+                                    <div class="info-item" data-metric="priority">
+                                        <span class="info-label" data-i18n="swapPriority">交换优先级</span>
+                                        <span class="info-value" id="zram-current-priority">--</span>
+                                    </div>
                                     <div class="info-item" data-metric="path">
                                         <span class="info-label" data-i18n="devicePath">设备路径</span>
                                         <span class="info-value" id="zram-current-path">--</span>
@@ -415,6 +419,15 @@
                                     </div>
                                 </div>
                                 <div class="setting-section">
+                                    <span class="section-label" data-i18n="zramPriority">ZRAM 优先级</span>
+                                    <div class="option-grid" id="zram-priority-list">
+                                        <div class="option-item" data-value="100" data-i18n="priorityBalanced">均衡 (100)</div>
+                                        <div class="option-item" data-value="1000" data-i18n="priorityHigh">高 (1000)</div>
+                                        <div class="option-item selected" data-value="32758" data-i18n="prioritySystemHigh">系统高优先级 (32758)</div>
+                                    </div>
+                                    <div class="setting-hint" data-i18n="zramPriorityDesc">优先使用 ZRAM；数值应高于文件 Swap</div>
+                                </div>
+                                <div class="setting-section">
                                     <span class="section-label">设备路径</span>
                                     <div class="zram-path-container">
                                         <input type="text" class="text-input" id="zram-path-input" placeholder="/dev/block/zram0" value="/dev/block/zram0">
@@ -438,6 +451,7 @@
                         <div id="zram-loop-body" class="sub-expandable-content">
                             <div class="loop-card-body-inner">
                                 <div class="setting-hint loop-card-description" data-i18n="loopWritebackDesc">为 ZRAM 自动创建 Loop 回写空间</div>
+                                <div class="setting-hint" data-i18n="loopPriorityDesc">Loop 是 ZRAM 回写后端，不是独立 Swap 设备，因此跟随 ZRAM 优先级。</div>
                                 <div class="loop-parameter-card">
                                     <div class="loop-parameter-title" data-i18n="loopParameters">Loop 参数配置</div>
                                     <div class="loop-parameter-grid">
@@ -563,7 +577,7 @@
                                     <div class="option-grid" id="swap-priority-list">
                                         <div class="option-item" data-value="-2">低 (-2)</div>
                                         <div class="option-item selected" data-value="0">默认 (0)</div>
-                                        <div class="option-item" data-value="5">高 (5)</div>
+                                        <div class="option-item" data-value="100">高 (100)</div>
                                     </div>
                                 </div>
                             </div>

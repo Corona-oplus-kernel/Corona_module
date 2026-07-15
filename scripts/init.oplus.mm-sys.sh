@@ -239,6 +239,7 @@ init_zram() {
   local has_algorithm=0
   local has_writeback=0
   local has_swappiness=0
+  local has_priority=0
   local has_path=0
   local has_recomp=0
   local has_zstd=0
@@ -254,11 +255,12 @@ init_zram() {
     [ -f "$zram_conf" ] && grep -q '^zram_writeback=' "$zram_conf" && has_writeback=1
   fi
   [ -f "$zram_conf" ] && grep -q '^swappiness=' "$zram_conf" && has_swappiness=1
+  [ -f "$zram_conf" ] && grep -q '^priority=' "$zram_conf" && has_priority=1
   [ -f "$zram_conf" ] && grep -q '^zram_path=' "$zram_conf" && has_path=1
   [ -f "$zram_conf" ] && grep -Eq '^recomp_algorithm[123]=' "$zram_conf" && has_recomp=1
   [ -f "$zram_conf" ] && grep -q '^zstd_compression_level=' "$zram_conf" && has_zstd=1
 
-  if [ "$has_size" -eq 0 ] && [ "$has_algorithm" -eq 0 ] && [ "$has_writeback" -eq 0 ] && [ "$has_swappiness" -eq 0 ] && [ "$has_path" -eq 0 ] && [ "$has_recomp" -eq 0 ] && [ "$has_zstd" -eq 0 ]; then
+  if [ "$has_size" -eq 0 ] && [ "$has_algorithm" -eq 0 ] && [ "$has_writeback" -eq 0 ] && [ "$has_swappiness" -eq 0 ] && [ "$has_priority" -eq 0 ] && [ "$has_path" -eq 0 ] && [ "$has_recomp" -eq 0 ] && [ "$has_zstd" -eq 0 ]; then
     return
   fi
 
@@ -282,11 +284,14 @@ init_zram() {
     corona_writeback_size=$(corona_get loop.conf size_mb)
   fi
   local corona_swappiness=$(corona_get zram.conf swappiness)
+  local corona_priority=$(corona_get zram.conf priority)
 
   local target_size="$current_size"
   local target_algorithm="$current_algorithm"
+  local target_priority="$current_priority"
   [ "$has_size" -eq 1 ] && [ -n "$corona_size" ] && target_size="$corona_size"
   [ "$has_algorithm" -eq 1 ] && [ -n "$corona_algorithm" ] && target_algorithm="$corona_algorithm"
+  [ "$has_priority" -eq 1 ] && [ -n "$corona_priority" ] && target_priority="$corona_priority"
 
   if [[ ! -d /dev/memcg ]] || [[ ! -e /proc/oplus_mem/hybridswap_enable ]]; then
     write_hybridswap_errcode $HYB_ERR_UNSUPPORTED
@@ -309,7 +314,10 @@ init_zram() {
       /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" "$corona_writeback" "$corona_writeback_size" 2>/dev/null
     fi
     /system/bin/mkswap "$zram_path" 2>/dev/null || return
-    /system/bin/swapon "$zram_path" -p "$current_priority" 2>/dev/null || return
+    /system/bin/swapon "$zram_path" -p "$target_priority" 2>/dev/null || return
+  elif [ "$has_priority" -eq 1 ]; then
+    /system/bin/swapoff "$zram_path" 2>/dev/null
+    /system/bin/swapon "$zram_path" -p "$target_priority" 2>/dev/null || return
   elif [ "$has_zstd" -eq 1 ]; then
     apply_zstd_compression_level
   fi

@@ -558,12 +558,19 @@ apply_zram_config() {
     algorithm=$(get_conf_value "$CONFIG_DIR/zram.conf" algorithm)
     size=$(get_conf_value "$CONFIG_DIR/zram.conf" size)
     swappiness=$(get_conf_value "$CONFIG_DIR/zram.conf" swappiness)
+    zram_priority=$(get_conf_value "$CONFIG_DIR/zram.conf" priority)
+    [ -n "$zram_priority" ] || zram_priority=32758
     zram_writeback=$(get_loop_mode)
     writeback_size_mb=$(get_loop_size_mb)
     zram_path=$(get_conf_value "$CONFIG_DIR/zram.conf" zram_path)
     zram_path=$(normalize_zram_path "$zram_path") || return
     zram_block=$(get_zram_block "$zram_path") || return
-    [ -z "$size" ] && return
+    if [ -z "$size" ]; then
+        [ -n "$(get_conf_value "$CONFIG_DIR/zram.conf" priority)" ] || return
+        swapoff "$zram_path" 2>/dev/null
+        swapon "$zram_path" -p "$zram_priority" 2>/dev/null
+        return
+    fi
     swapoff "$zram_path" 2>/dev/null
     echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
     if [ -n "$algorithm" ]; then
@@ -574,8 +581,8 @@ apply_zram_config() {
     echo "$size" > "/sys/block/$zram_block/disksize" 2>/dev/null
     [ -x "$WRITEBACK_HELPER" ] && /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" "$zram_writeback" "$writeback_size_mb" 2>/dev/null
     mkswap "$zram_path" 2>/dev/null || return
-    swapon "$zram_path" -p 32758 2>/dev/null || return
-    [ "$(get_swap_priority "$zram_path")" = "32758" ] || return
+    swapon "$zram_path" -p "$zram_priority" 2>/dev/null || return
+    [ "$(get_swap_priority "$zram_path")" = "$zram_priority" ] || return
     [ -n "$swappiness" ] && echo "$swappiness" > /proc/sys/vm/swappiness
 }
 

@@ -647,6 +647,7 @@
         const syncAlgorithm = fields.algorithm !== false;
         const syncSize = fields.size !== false;
         const syncSwappiness = fields.swappiness !== false;
+        const syncPriority = fields.priority !== false;
         if (syncAlgorithm && runtimeInfo.currentAlg && runtimeInfo.currentAlg !== '--') this.state.algorithm = runtimeInfo.currentAlg;
         if (syncSize && runtimeInfo.sizeBytes > 0) this.state.zramSize = runtimeInfo.sizeBytes / 1024 / 1024 / 1024;
         if (syncSwappiness && Number.isFinite(runtimeInfo.swappinessValue)) this.state.swappiness = runtimeInfo.swappinessValue;
@@ -664,7 +665,16 @@
         }
         const swValue = document.getElementById('swappiness-value');
         if (swValue && syncSwappiness) swValue.textContent = this.state.swappiness;
+        if (syncPriority && Number.isFinite(Number(runtimeInfo.priority))) this.state.zramPriority = parseInt(runtimeInfo.priority, 10);
+        if (syncPriority) this.renderZramPriorityOptions();
         if (syncAlgorithm) this.renderAlgorithmOptions();
+    },
+    renderZramPriorityOptions() {
+        const list = document.getElementById('zram-priority-list');
+        if (!list) return;
+        list.querySelectorAll('.option-item').forEach(item => {
+            item.classList.toggle('selected', parseInt(item.dataset.value, 10) === this.state.zramPriority);
+        });
     },
     async loadZramConfig() {
         const config = await this.readConfig('zram.conf');
@@ -674,18 +684,22 @@
             const swapMatch = config.match(/swappiness=(\d+)/);
             const enabledMatch = config.match(/enabled=(\d)/);
             const pathMatch = config.match(/zram_path=(\S+)/);
+            const priorityMatch = config.match(/priority=(-?\d+)/);
             this.zramConfiguredFields = {
                 algorithm: !!algMatch,
                 size: !!sizeMatch,
-                swappiness: !!swapMatch
+                swappiness: !!swapMatch,
+                priority: !!priorityMatch
             };
             if (algMatch) { this.state.algorithm = algMatch[1]; this.renderAlgorithmOptions(); }
             if (sizeMatch) { this.state.zramSize = parseInt(sizeMatch[1]) / 1024 / 1024 / 1024; }
             if (swapMatch) { this.state.swappiness = parseInt(swapMatch[1]); }
+            if (priorityMatch) this.state.zramPriority = parseInt(priorityMatch[1], 10);
             this.syncZramControlsFromRuntime({}, {
                 algorithm: false,
                 size: !!sizeMatch,
-                swappiness: !!swapMatch
+                swappiness: !!swapMatch,
+                priority: !!priorityMatch
             });
             if (enabledMatch) {
                 this.state.zramEnabled = enabledMatch[1] === '1';
@@ -971,6 +985,7 @@
         this.setMetricValue('zram-current-alg', currentAlg && currentAlg !== '--' ? currentAlg : '', { always: true });
         this.setMetricValue('zram-current-size', disksize && parseInt(disksize, 10) > 0 ? `${sizeGB} GB` : '', { always: true });
         this.setMetricValue('zram-current-swappiness', (swappiness || '').trim() || '', { always: true });
+        this.setMetricValue('zram-current-priority', swapInfo?.priority || '', { always: true });
         this.setMetricValue('zram-current-path', zramPath || '', { always: true });
 
         // mm_stat / bd_stat — hide empties
@@ -1026,6 +1041,7 @@
             currentAlg,
             sizeBytes: parseInt(disksize || '0', 10) || 0,
             swappinessValue,
+            priority: swapInfo?.priority,
             isActive,
             path: zramPath,
             compressionRatio,
@@ -1035,7 +1051,8 @@
         this.syncZramControlsFromRuntime(runtimeInfo, {
             algorithm: !this.state.zramEnabled || !configuredFields.algorithm,
             size: !this.state.zramEnabled || !configuredFields.size,
-            swappiness: !this.state.zramEnabled || !configuredFields.swappiness
+            swappiness: !this.state.zramEnabled || !configuredFields.swappiness,
+            priority: !this.state.zramEnabled || !configuredFields.priority
         });
 
         const statusEl = document.getElementById('zram-status');
@@ -1144,7 +1161,7 @@
     },
     markZramDirty(changedField) {
         this._zramDirty = true;
-        if (['algorithm', 'size', 'swappiness'].includes(changedField)) {
+        if (['algorithm', 'size', 'swappiness', 'priority'].includes(changedField)) {
             this.zramConfiguredFields = this.zramConfiguredFields || {};
             this.zramConfiguredFields[changedField] = true;
         }
@@ -1206,11 +1223,12 @@
         if (field === 'zram' || field === 'recomp_algorithm3') updates.recomp_algorithm3 = this.state.recompAlgorithm3 || 'none';
         if (field === 'zram' || field === 'size') updates.size = String(sizeBytes);
         if (field === 'zram' || field === 'swappiness') updates.swappiness = String(this.state.swappiness);
+        if (field === 'zram' || field === 'priority') updates.priority = String(this.state.zramPriority);
         if (field === 'zram' || field === 'zram_path') updates.zram_path = this.state.zramPath;
         return updates;
     },
     getZramConfigKeys() {
-        return ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_path'];
+        return ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'priority', 'zram_path'];
     },
     persistLoopConfig(changedField = 'enabled') {
         const save = this.withLock('loop-config', async () => {
@@ -1285,11 +1303,13 @@
         const expectSize = options.sizeBytes !== undefined ? options.sizeBytes : Math.round(this.state.zramSize * 1024 * 1024 * 1024);
         const expectSwap = options.swappiness !== undefined ? options.swappiness : this.state.swappiness;
         const expectZstd = options.zstdLevel !== undefined ? options.zstdLevel : this.state.zstdCompressionLevel;
+        const expectPriority = options.priority !== undefined ? options.priority : this.state.zramPriority;
         const checkAlg = options.checkAlgorithm !== false;
         const checkSize = options.checkSize !== false;
         const checkSwap = options.checkSwappiness !== false;
         const checkZstd = options.checkZstd === true || (this.usesZstdAlgorithm && this.usesZstdAlgorithm() && this.zramFeatures && this.zramFeatures.zstdLevel);
         const checkRecomp = options.checkRecomp === true;
+        const checkPriority = options.checkPriority === true;
 
         // wait a bit for nandswap/mm-sys chain to settle
         await this.sleep(options.delayMs || 800);
@@ -1302,14 +1322,15 @@
         }
 
         const mismatches = [];
-        const [algRaw, disksizeRaw, swapRaw, zstdRaw, recompRaw] = await Promise.all([
+        const [algRaw, disksizeRaw, swapRaw, zstdRaw, recompRaw, priorityRaw] = await Promise.all([
             this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`),
             this.exec(`cat /sys/block/${zramBlock}/disksize 2>/dev/null`),
             this.exec('cat /proc/sys/vm/swappiness 2>/dev/null'),
             checkZstd ? this.exec('cat /sys/module/zstd/parameters/compression_level 2>/dev/null') : Promise.resolve(''),
             this.zramFeatures && this.zramFeatures.multiComp
                 ? this.exec(`cat /sys/block/${zramBlock}/recomp_algorithm 2>/dev/null`)
-                : Promise.resolve('')
+                : Promise.resolve(''),
+            checkPriority ? this.exec(`awk -v path=${this.shellQuote(zramPath)} 'NR > 1 && $1 == path { print $5; exit }' /proc/swaps 2>/dev/null`) : Promise.resolve('')
         ]);
 
         if (checkAlg && expectAlg) {
@@ -1344,6 +1365,12 @@
             if (Number.isFinite(now) && Number.isFinite(want) && now !== want) {
                 mismatches.push(`zstd ${now}≠${want}`);
             }
+        }
+
+        if (checkPriority) {
+            const now = parseInt(String(priorityRaw || '').trim(), 10);
+            const want = parseInt(expectPriority, 10);
+            if (Number.isFinite(now) && Number.isFinite(want) && now !== want) mismatches.push(`优先级 ${now}≠${want}`);
         }
 
         // soft check recomp: if configured non-none, recomp node should mention algo (best-effort)
@@ -1391,7 +1418,7 @@
             setTimeout(() => this.loadZramStatus(), 200);
             return true;
         }
-        const actionableKeys = ['algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_path'];
+        const actionableKeys = ['algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'priority', 'zram_path'];
         if (!actionableKeys.some(key => configured[key] !== undefined)) {
             this.showToast('ZRAM 已启用，但未配置参数，未修改当前系统');
             return true;
@@ -1404,6 +1431,8 @@
             checkAlgorithm: !!appliedConfig.algorithm,
             checkSize: configured.size !== undefined,
             checkSwappiness: configured.swappiness !== undefined,
+            priority: configured.priority,
+            checkPriority: configured.priority !== undefined,
             checkZstd: configured.zstd_compression_level !== undefined,
             checkRecomp: ['recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3'].some(key => configured[key] !== undefined)
         });
