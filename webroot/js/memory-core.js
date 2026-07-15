@@ -438,24 +438,10 @@
         if (this.settingsInitPromise) return this.settingsInitPromise;
         if (!silent) this.showLoading(true);
         this.settingsInitPromise = (async () => {
-            const featureNames = ['app-policy', 'priority-thread', 'memory-opt', 'custom-scripts', 'corona-kernel', 'le9ec'];
-            const featureResults = await Promise.allSettled(featureNames.map(name => this.ensureFeatureScript(name)));
-            const featureReady = Object.fromEntries(featureNames.map((name, index) => {
-                const result = featureResults[index];
-                if (result.status === 'rejected') console.error(`ensureFeatureScript(${name}) failed`, result.reason);
-                return [name, result.status === 'fulfilled'];
-            }));
-            const appPolicyReady = featureReady['app-policy'];
-            const priorityThreadReady = featureReady['priority-thread'];
-            const memoryOptReady = featureReady['memory-opt'];
-            const customScriptsReady = featureReady['custom-scripts'];
-            const coronaKernelReady = featureReady['corona-kernel'];
-            const le9ecReady = featureReady.le9ec;
             if (!this.settingsUiInitialized) {
                 if (typeof this.loadMemoryPageTextResources === 'function') await this.loadMemoryPageTextResources();
                 if (typeof this.loadMemoryPageConfig === 'function') await this.loadMemoryPageConfig();
                 if (typeof this.renderStaticOptions === 'function') this.renderStaticOptions();
-                if (priorityThreadReady && typeof this.initPerformanceMode === 'function') this.initPerformanceMode();
                 if (typeof this.initExpandableCards === 'function') this.initExpandableCards();
                 if (typeof this.initThemeSelector === 'function') this.initThemeSelector();
                 if (typeof this.initChangePreviewToggle === 'function') this.initChangePreviewToggle();
@@ -469,37 +455,19 @@
                 if (typeof this.initZstdLevel === 'function') this.initZstdLevel();
                 if (typeof this.initZramPath === 'function') this.initZramPath();
                 if (typeof this.initIoAdvancedFold === 'function') this.initIoAdvancedFold();
-                if (customScriptsReady && typeof this.initCustomScripts === 'function') this.initCustomScripts();
-                if (memoryOptReady && typeof this.initSystemOpt === 'function') this.initSystemOpt();
-                if (appPolicyReady && typeof this.initAppPolicy === 'function') this.initAppPolicy();
-                if (coronaKernelReady && typeof this.initCoronaKernel === 'function') this.initCoronaKernel();
-                if (le9ecReady && typeof this.loadLe9ecConfig === 'function' && !this.le9ecSupported) {
-                    // noop: allow later status/config loading to probe support without blocking init
-                }
                 this.settingsUiInitialized = true;
             }
             if (!this.settingsDataLoaded) {
                 const configTasks = [
                     ['loadAllConfigs', () => this.loadAllConfigs()],
                     ['loadDualCellConfig', () => this.loadDualCellConfig()],
-                    ['detectKernelFeatures', () => this.detectKernelFeatures()],
-                    ['loadParameterSnapshots', () => this.loadParameterSnapshots()]
+                    ['detectKernelFeatures', () => this.detectKernelFeatures()]
                 ];
                 const configResults = await Promise.allSettled(configTasks.map(([, task]) => task()));
                 configResults.forEach((result, index) => {
                     if (result.status === 'rejected') console.error(`${configTasks[index][0]} failed`, result.reason);
                 });
                 this.initKernelFeatures();
-                const statusTasks = [
-                    ['detectZramFeatures', () => this.detectZramFeatures()],
-                    ['loadZramStatus', () => this.loadZramStatus()],
-                    ['loadLe9ecStatus', () => this.loadLe9ecStatus()],
-                    ...(appPolicyReady && typeof this.loadAppRulesConfig === 'function' ? [['loadAppRulesConfig', () => this.loadAppRulesConfig()]] : [])
-                ];
-                const statusResults = await Promise.allSettled(statusTasks.map(([, task]) => task()));
-                statusResults.forEach((result, index) => {
-                    if (result.status === 'rejected') console.error(`${statusTasks[index][0]} failed`, result.reason);
-                });
                 this.settingsDataLoaded = true;
             }
         })();
@@ -515,6 +483,52 @@
             }
             if (!silent) this.showLoading(false);
         }
+    },
+    ensureSettingsSectionReady(section) {
+        if (!this.settingsSectionPromises) this.settingsSectionPromises = {};
+        if (this.settingsSectionPromises[section]) return this.settingsSectionPromises[section];
+        const load = async () => {
+            if (section === 'memory-compression') {
+                await Promise.all([this.detectZramFeatures(), this.loadZramStatus()]);
+                return;
+            }
+            if (section === 'le9ec') {
+                await this.ensureFeatureScript('le9ec');
+                await this.loadLe9ecConfig();
+                return;
+            }
+            if (section === 'app-policy') {
+                await Promise.all([this.ensureFeatureScript('app-policy'), this.ensureFeatureScript('priority-thread')]);
+                this.initPerformanceMode();
+                this.initAppPolicy();
+                await Promise.all([this.loadPerformanceModeConfig(), this.loadAppRulesConfig()]);
+                return;
+            }
+            if (section === 'custom-scripts') {
+                await this.ensureFeatureScript('custom-scripts');
+                this.initCustomScripts();
+                return;
+            }
+            if (section === 'system-opt') {
+                await this.ensureFeatureScript('memory-opt');
+                this.initSystemOpt();
+                return;
+            }
+            if (section === 'corona-kernel') {
+                await this.ensureFeatureScript('corona-kernel');
+                this.initCoronaKernel();
+                return;
+            }
+            if (section === 'app-settings') {
+                await this.loadParameterSnapshots();
+            }
+        };
+        const promise = load().catch(error => {
+            delete this.settingsSectionPromises[section];
+            throw error;
+        });
+        this.settingsSectionPromises[section] = promise;
+        return promise;
     },
     updateBatteryInfo(level, temp) {
         const levelElement = document.getElementById('battery-level');
@@ -581,16 +595,12 @@
     async loadAllConfigs() {
         const tasks = [
             this.loadZramConfig(),
-            this.loadLe9ecConfig(),
             this.loadIOConfig(),
             this.loadCpuGovernorConfig(),
             this.loadTCPConfig(),
             this.loadCpuCores(),
             this.loadSwapStatus()
         ];
-        if (typeof this.loadPerformanceModeConfig === 'function') {
-            tasks.push(this.loadPerformanceModeConfig());
-        }
         await Promise.all(tasks);
         await this.updateModuleDescription();
         this.updateClusterBadge();

@@ -441,17 +441,21 @@
         });
     },
     initExpandableCards() {
+        const loadSection = section => () => {
+            if (typeof this.ensureSettingsSectionReady !== 'function') return;
+            this.ensureSettingsSectionReady(section).catch(() => this.showToast('模块加载失败', 'error'));
+        };
         const cards = [
-            { toggle: 'memory-compression-toggle', content: 'memory-compression-content', onExpand: null },
-            { toggle: 'le9ec-toggle', content: 'le9ec-content', onExpand: () => this.loadLe9ecStatus() },
+            { toggle: 'memory-compression-toggle', content: 'memory-compression-content', onExpand: loadSection('memory-compression') },
+            { toggle: 'le9ec-toggle', content: 'le9ec-content', onExpand: loadSection('le9ec') },
             { toggle: 'io-scheduler-toggle', content: 'io-scheduler-content', onExpand: null },
             { toggle: 'cpu-governor-toggle', content: 'cpu-governor-content', onExpand: null },
-            { toggle: 'app-policy-toggle', content: 'app-policy-content', onExpand: null },
+            { toggle: 'app-policy-toggle', content: 'app-policy-content', onExpand: loadSection('app-policy') },
             { toggle: 'tcp-toggle', content: 'tcp-content', onExpand: null },
-            { toggle: 'custom-scripts-toggle', content: 'custom-scripts-content', onExpand: null },
-            { toggle: 'system-opt-toggle', content: 'system-opt-content', onExpand: null },
-            { toggle: 'corona-kernel-toggle', content: 'corona-kernel-content', onExpand: () => { setTimeout(() => this.loadCoronaKernelConfig(), 0); } },
-            { toggle: 'app-settings-toggle', content: 'app-settings-content', onExpand: null }
+            { toggle: 'custom-scripts-toggle', content: 'custom-scripts-content', onExpand: loadSection('custom-scripts') },
+            { toggle: 'system-opt-toggle', content: 'system-opt-content', onExpand: loadSection('system-opt') },
+            { toggle: 'corona-kernel-toggle', content: 'corona-kernel-content', onExpand: loadSection('corona-kernel') },
+            { toggle: 'app-settings-toggle', content: 'app-settings-content', onExpand: loadSection('app-settings') }
         ];
         cards.forEach(card => {
             const toggle = document.getElementById(card.toggle);
