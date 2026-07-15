@@ -9,28 +9,50 @@ normalize_foreground_package() {
 }
 
 get_foreground_package() {
-    dump=$(dumpsys window windows 2>/dev/null)
-    pkg=$(printf '%s
-' "$dump" | sed -n 's/.*mCurrentFocus=.* \([^ /][^ /]*\)\/.*/\1/p' | while IFS= read -r line; do normalize_foreground_package "$line"; done | tail -n1)
+    pkg=$(dumpsys activity activities 2>/dev/null | awk '
+        /topResumedActivity=|mResumedActivity:/ {
+            for (i = 1; i <= NF; i++) {
+                if ($i ~ /^[A-Za-z0-9_.-]+\//) {
+                    split($i, component, "/")
+                    print component[1]
+                    exit
+                }
+            }
+        }
+    ')
     [ -n "$pkg" ] && {
-        printf '%s\n' "$pkg"
-        return 0
+        normalize_foreground_package "$pkg" && return 0
     }
-    pkg=$(printf '%s
-' "$dump" | sed -n 's/.*mFocusedApp=.* \([^ /][^ /]*\)\/.*/\1/p' | while IFS= read -r line; do normalize_foreground_package "$line"; done | tail -n1)
-    [ -n "$pkg" ] && printf '%s\n' "$pkg"
+    dumpsys window windows 2>/dev/null | awk '
+        /mCurrentFocus=|mFocusedApp=/ {
+            for (i = 1; i <= NF; i++) {
+                if ($i ~ /^[A-Za-z0-9_.-]+\//) {
+                    split($i, component, "/")
+                    print component[1]
+                    exit
+                }
+            }
+        }
+    ' | while IFS= read -r candidate; do normalize_foreground_package "$candidate"; done
+}
+
+runtime_package_pids() {
+    pkg="$1"
+    [ -n "$pkg" ] || return 0
+    pattern=$(printf '%s' "$pkg" | sed 's/[][\\.^$*+?(){}|]/\\&/g')
+    pgrep -f "^${pattern}(:[^ ]*)?([[:space:]]|$)" 2>/dev/null
 }
 
 protect_package() {
     pkg="$1"
     [ -d /dev/memcg/system/active_fg ] || return 0
-    package_pids "$pkg" | while IFS= read -r pid; do
+    runtime_package_pids "$pkg" | while IFS= read -r pid; do
         [ -n "$pid" ] && echo "$pid" > /dev/memcg/system/active_fg/cgroup.procs 2>/dev/null
     done
 }
 
 apply_protection_once() {
-    load_rules
+    [ "$1" = "cached" ] || load_rules
     [ -d /dev/memcg/system ] || return 0
     mkdir -p /dev/memcg/system/active_fg
     echo 0 > /dev/memcg/system/active_fg/memory.swappiness 2>/dev/null
@@ -98,14 +120,7 @@ run_memclean() {
 }
 
 package_pids_for_name() {
-    target="$1"
-    for d in /proc/[0-9]*; do
-        [ -r "$d/cmdline" ] || continue
-        cmdline=$(tr '\0' ' ' < "$d/cmdline" 2>/dev/null)
-        case "$cmdline" in
-            "$target"*|*" $target"*|*"$target:"*|*"$target/"*) basename "$d" ;;
-        esac
-    done | sort -u
+    runtime_package_pids "$1"
 }
 
 list_package_threads() {
@@ -301,7 +316,33 @@ EOF2
 profile_exists() {
     pkg="$1"
     csv_contains "$pkg" "$profiles_csv" && return 0
-    [ -d "$PROFILES_DIR/$pkg" ] && find "$PROFILES_DIR/$pkg" -maxdepth 1 -type f | grep -q .
+    check_dir="$PROFILES_DIR/$pkg"
+    [ -d "$check_dir" ] || return 1
+    for profile_file in "$check_dir"/*; do
+        [ -f "$profile_file" ] && return 0
+    done
+    return 1
+}
+
+cleanup_daemon() {
+    rm -f "$PIDFILE" "$STATEFILE"
+}
+
+request_rules_reload() {
+    rules_reload_requested=1
+    [ -n "$daemon_sleep_pid" ] && kill "$daemon_sleep_pid" 2>/dev/null
+}
+
+stop_daemon() {
+    [ -n "$daemon_sleep_pid" ] && kill "$daemon_sleep_pid" 2>/dev/null
+    exit 0
+}
+
+daemon_sleep() {
+    sleep "$1" &
+    daemon_sleep_pid=$!
+    wait "$daemon_sleep_pid" 2>/dev/null
+    daemon_sleep_pid=
 }
 
 ensure_singleton() {
@@ -315,7 +356,9 @@ ensure_singleton() {
         fi
     fi
     echo $$ > "$PIDFILE"
-    trap 'rm -f "$PIDFILE" "$STATEFILE"' EXIT INT TERM
+    trap cleanup_daemon EXIT
+    trap stop_daemon INT TERM
+    trap request_rules_reload HUP
 }
 
 monitor_daemon() {
@@ -323,8 +366,19 @@ monitor_daemon() {
     last_profile=""
     last_foreground=""
     slow_tick=0
+    rules_tick=0
+    daemon_sleep_pid=
+    rules_reload_requested=1
     while true; do
-        load_rules
+        rules_tick=$((rules_tick + 1))
+        if [ "$rules_tick" -ge 10 ]; then
+            rules_reload_requested=1
+            rules_tick=0
+        fi
+        if [ "$rules_reload_requested" = "1" ]; then
+            load_rules
+            rules_reload_requested=0
+        fi
         current_pkg=$(get_foreground_package)
         target_profile=base
         profile_dir=
@@ -358,12 +412,12 @@ profile=%s
         slow_tick=$((slow_tick + 1))
         if [ "$slow_tick" -ge 5 ]; then
             slow_tick=0
-            [ -n "$protect_csv" ] && apply_protection_once
+            [ -n "$protect_csv" ] && apply_protection_once cached
         fi
         if [ "$foreground_changed" -eq 0 ] && [ "$profile_changed" -eq 0 ] && [ "$target_profile" = "base" ]; then
-            sleep 5
+            daemon_sleep 6
         else
-            sleep 3
+            daemon_sleep 4
         fi
     done
 }

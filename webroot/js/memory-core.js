@@ -312,23 +312,35 @@
     formatClusterInfo() { const parts = []; if (this.cpuClusterInfo.little > 0) parts.push(this.cpuClusterInfo.little); if (this.cpuClusterInfo.mid > 0) parts.push(this.cpuClusterInfo.mid); if (this.cpuClusterInfo.big > 0) parts.push(this.cpuClusterInfo.big); if (this.cpuClusterInfo.prime > 0) parts.push(this.cpuClusterInfo.prime); return parts.length === 0 ? '' : parts.join('+'); },
     getTotalCoreCount() { return this.cpuClusterInfo.little + this.cpuClusterInfo.mid + this.cpuClusterInfo.big + this.cpuClusterInfo.prime; },
     startRealtimeMonitor() {
-        if (this.realtimeTimer) clearInterval(this.realtimeTimer);
-        this.realtimeTimer = setInterval(() => this.updateRealtimeData(false), this.realtimeIntervalMs);
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                if (this.realtimeTimer) clearInterval(this.realtimeTimer);
+        this.stopRealtimeMonitor();
+        const schedule = (delay = this.realtimeIntervalMs) => {
+            if (document.hidden || this.realtimeTimer) return;
+            this.realtimeTimer = setTimeout(async () => {
                 this.realtimeTimer = null;
-                return;
-            }
-            this.updateRealtimeData(false);
-            if (!this.realtimeTimer) {
-                this.realtimeTimer = setInterval(() => this.updateRealtimeData(false), this.realtimeIntervalMs);
-            }
-        });
+                await this.updateRealtimeData(false);
+                schedule();
+            }, delay);
+        };
+        this._scheduleRealtimeUpdate = schedule;
+        schedule();
+        if (!this.realtimeVisibilityBound) {
+            this.realtimeVisibilityBound = true;
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    this.stopRealtimeMonitor();
+                    return;
+                }
+                this.updateRealtimeData(false).finally(() => this._scheduleRealtimeUpdate?.());
+            });
+        }
+    },
+    stopRealtimeMonitor() {
+        if (!this.realtimeTimer) return;
+        clearTimeout(this.realtimeTimer);
+        this.realtimeTimer = null;
     },
     async awaitInitialRealtimeReady() {
         await this.updateRealtimeData(true);
-        requestAnimationFrame(() => { this.updateRealtimeData(true); });
     },
     async updateRealtimeData(forceHeavy) {
         if (this.realtimeBusy) return;
@@ -336,19 +348,15 @@
         this.realtimeTick += 1;
         try {
             const runHeavy = forceHeavy || (this.realtimeTick % 2 === 0);
-            const [batteryTemp, memData, cpuData] = await Promise.all([
-                this.updateBatteryInfo(),
-                this.updateMemoryInfo(),
-                this.updateCpuUsage()
-            ]);
+            const snapshot = await this.readRealtimeSnapshot(runHeavy);
+            const batteryTemp = this.updateBatteryInfo(snapshot.batteryLevel, snapshot.batteryTemp);
+            const memData = this.updateMemoryInfo(snapshot.memory);
+            const cpuData = this.updateCpuUsage(snapshot.cpuStat);
             let cpuTemp = 0;
             if (runHeavy) {
-                const [, , cpuTempVal] = await Promise.all([
-                    this.updateSwapInfo(),
-                    this.updateStorageInfo(),
-                    this.updateCpuTemp()
-                ]);
-                cpuTemp = cpuTempVal || 0;
+                this.updateSwapInfo(snapshot.swap);
+                this.updateStorageInfo(snapshot.storage);
+                cpuTemp = this.updateCpuTemp(snapshot.cpuTemp) || 0;
             } else {
                 cpuTemp = parseFloat((this.$('cpu-temp') || {}).textContent) || 0;
             }
@@ -362,8 +370,24 @@
             this.realtimeBusy = false;
         }
     },
-    async updateCpuUsage() {
-        const stat = await this.exec('cat /proc/stat | head -1');
+    async readRealtimeSnapshot(includeHeavy = false) {
+        const heavy = includeHeavy ? `awk '/^SwapTotal:/ { total=$2 } /^SwapFree:/ { free=$2 } END { printf "SWAP %s %s\\n", total+0, free+0 }' /proc/meminfo; df /data 2>/dev/null | awk 'END { printf "STORAGE %s %s %s\\n", $2+0, $3+0, $4+0 }'; temp=; for node in /sys/class/thermal/thermal_zone0/temp /sys/devices/virtual/thermal/thermal_zone0/temp /sys/class/hwmon/hwmon0/temp1_input; do [ -r "$node" ] || continue; read temp < "$node"; [ -n "$temp" ] && break; done; printf 'TEMP %s\\n' "\${temp:-0}";` : '';
+        const command = `printf 'CPU '; sed -n '1p' /proc/stat 2>/dev/null; level=; temp=; [ -r /sys/class/power_supply/battery/capacity ] && read level < /sys/class/power_supply/battery/capacity; [ -r /sys/class/power_supply/battery/temp ] && read temp < /sys/class/power_supply/battery/temp; printf 'BATTERY %s %s\\n' "\${level:-0}" "\${temp:-0}"; awk '/^MemTotal:/ { total=$2 } /^MemAvailable:/ { available=$2 } /^MemFree:/ { free=$2 } /^Buffers:/ { buffers=$2 } /^Cached:/ { cached=$2 } END { printf "MEM %s %s %s %s %s\\n", total+0, available+0, free+0, buffers+0, cached+0 }' /proc/meminfo; ${heavy}`;
+        const output = await this.exec(command);
+        const snapshot = { cpuStat: '', batteryLevel: '', batteryTemp: '', memory: [], swap: [], storage: [], cpuTemp: '' };
+        String(output || '').split('\n').forEach(line => {
+            const parts = line.trim().split(/\s+/);
+            const tag = parts.shift();
+            if (tag === 'CPU') snapshot.cpuStat = parts.join(' ');
+            else if (tag === 'BATTERY') [snapshot.batteryLevel, snapshot.batteryTemp] = parts;
+            else if (tag === 'MEM') snapshot.memory = parts.map(Number);
+            else if (tag === 'SWAP') snapshot.swap = parts.map(Number);
+            else if (tag === 'STORAGE') snapshot.storage = parts.map(Number);
+            else if (tag === 'TEMP') snapshot.cpuTemp = parts[0] || '';
+        });
+        return snapshot;
+    },
+    updateCpuUsage(stat = '') {
         const parse = (line) => {
             const parts = line.split(/\s+/).slice(1).map(Number);
             const idle = parts[3] + (parts[4] || 0);
@@ -371,6 +395,7 @@
             return { idle, total };
         };
         const current = parse(stat);
+        if (!Number.isFinite(current.total) || current.total <= 0) return 0;
         if (!this.prevCpuStat) {
             this.prevCpuStat = current;
             const lastPoint = this.historyData.cpu.length ? this.historyData.cpu[this.historyData.cpu.length - 1].value : 0;
@@ -413,48 +438,19 @@
         if (this.settingsInitPromise) return this.settingsInitPromise;
         if (!silent) this.showLoading(true);
         this.settingsInitPromise = (async () => {
-            let appPolicyReady = false;
-            let priorityThreadReady = false;
-            let memoryOptReady = false;
-            let customScriptsReady = false;
-            let coronaKernelReady = false;
-            let le9ecReady = false;
-            try {
-                await this.ensureFeatureScript('app-policy');
-                appPolicyReady = true;
-            } catch (e) {
-                console.error('ensureFeatureScript(app-policy) failed', e);
-            }
-            try {
-                await this.ensureFeatureScript('priority-thread');
-                priorityThreadReady = true;
-            } catch (e) {
-                console.error('ensureFeatureScript(priority-thread) failed', e);
-            }
-            try {
-                await this.ensureFeatureScript('memory-opt');
-                memoryOptReady = true;
-            } catch (e) {
-                console.error('ensureFeatureScript(memory-opt) failed', e);
-            }
-            try {
-                await this.ensureFeatureScript('custom-scripts');
-                customScriptsReady = true;
-            } catch (e) {
-                console.error('ensureFeatureScript(custom-scripts) failed', e);
-            }
-            try {
-                await this.ensureFeatureScript('corona-kernel');
-                coronaKernelReady = true;
-            } catch (e) {
-                console.error('ensureFeatureScript(corona-kernel) failed', e);
-            }
-            try {
-                await this.ensureFeatureScript('le9ec');
-                le9ecReady = true;
-            } catch (e) {
-                console.error('ensureFeatureScript(le9ec) failed', e);
-            }
+            const featureNames = ['app-policy', 'priority-thread', 'memory-opt', 'custom-scripts', 'corona-kernel', 'le9ec'];
+            const featureResults = await Promise.allSettled(featureNames.map(name => this.ensureFeatureScript(name)));
+            const featureReady = Object.fromEntries(featureNames.map((name, index) => {
+                const result = featureResults[index];
+                if (result.status === 'rejected') console.error(`ensureFeatureScript(${name}) failed`, result.reason);
+                return [name, result.status === 'fulfilled'];
+            }));
+            const appPolicyReady = featureReady['app-policy'];
+            const priorityThreadReady = featureReady['priority-thread'];
+            const memoryOptReady = featureReady['memory-opt'];
+            const customScriptsReady = featureReady['custom-scripts'];
+            const coronaKernelReady = featureReady['corona-kernel'];
+            const le9ecReady = featureReady.le9ec;
             if (!this.settingsUiInitialized) {
                 if (typeof this.loadMemoryPageTextResources === 'function') await this.loadMemoryPageTextResources();
                 if (typeof this.loadMemoryPageConfig === 'function') await this.loadMemoryPageConfig();
@@ -520,68 +516,67 @@
             if (!silent) this.showLoading(false);
         }
     },
-    async updateBatteryInfo() {
-        const [level, temp] = await Promise.all([this.exec('cat /sys/class/power_supply/battery/capacity'), this.exec('cat /sys/class/power_supply/battery/temp')]);
-        document.getElementById('battery-level').textContent = `${level}%`;
+    updateBatteryInfo(level, temp) {
+        const levelElement = document.getElementById('battery-level');
+        if (levelElement) levelElement.textContent = `${level || '--'}%`;
         if (temp && !isNaN(temp)) {
             const tempC = (parseInt(temp) / 10).toFixed(1);
-            document.getElementById('battery-temp').textContent = `${tempC}°C`;
+            const tempElement = document.getElementById('battery-temp');
+            if (tempElement) tempElement.textContent = `${tempC}°C`;
             return parseFloat(tempC) || 0;
         }
         return 0;
     },
-    async updateCpuTemp() {
-        const tempPaths = ['/sys/class/thermal/thermal_zone0/temp', '/sys/devices/virtual/thermal/thermal_zone0/temp', '/sys/class/hwmon/hwmon0/temp1_input'];
-        for (const path of tempPaths) {
-            const temp = await this.exec(`cat ${path} 2>/dev/null`);
-            if (temp && !isNaN(temp)) {
-                const val = parseInt(temp);
-                const tempC = (val > 1000 ? val / 1000 : val).toFixed(1);
-                document.getElementById('cpu-temp').textContent = `${tempC}°C`;
-                return parseFloat(tempC) || 0;
-            }
+    updateCpuTemp(temp) {
+        const element = document.getElementById('cpu-temp');
+        if (temp && !isNaN(temp)) {
+            const value = parseInt(temp);
+            const tempC = (value > 1000 ? value / 1000 : value).toFixed(1);
+            if (element) element.textContent = `${tempC}°C`;
+            return parseFloat(tempC) || 0;
         }
-        document.getElementById('cpu-temp').textContent = '--';
+        if (element) element.textContent = '--';
         return 0;
     },
-    async updateMemoryInfo() {
-        const meminfo = await this.exec('cat /proc/meminfo');
-        let total = 0, available = 0, free = 0, buffers = 0, cached = 0;
-        for (const line of meminfo.split('\n')) { const match = line.match(/^(\w+):\s+(\d+)/); if (!match) continue; const [, key, value] = match; const kb = parseInt(value); if (key === 'MemTotal') total = kb; else if (key === 'MemAvailable') available = kb; else if (key === 'MemFree') free = kb; else if (key === 'Buffers') buffers = kb; else if (key === 'Cached') cached = kb; }
+    updateMemoryInfo(memory = []) {
+        let [total = 0, available = 0, free = 0, buffers = 0, cached = 0] = memory;
         if (!available) available = free + buffers + cached;
-        const used = total - available; const percent = ((used / total) * 100).toFixed(1);
-        document.getElementById('mem-total').textContent = this.formatBytes(total * 1024);
-        document.getElementById('mem-used').textContent = this.formatBytes(used * 1024);
-        document.getElementById('mem-available').textContent = this.formatBytes(available * 1024);
+        const used = Math.max(0, total - available);
+        const percent = total > 0 ? ((used / total) * 100).toFixed(1) : '0';
+        const totalElement = document.getElementById('mem-total');
+        const usedElement = document.getElementById('mem-used');
+        const availableElement = document.getElementById('mem-available');
+        if (totalElement) totalElement.textContent = this.formatBytes(total * 1024);
+        if (usedElement) usedElement.textContent = this.formatBytes(used * 1024);
+        if (availableElement) availableElement.textContent = this.formatBytes(available * 1024);
         const progressEl = document.getElementById('mem-progress');
-        progressEl.style.width = `${percent}%`; progressEl.className = `progress-fill${percent > 85 ? ' danger' : ''}`;
+        if (progressEl) { progressEl.style.width = `${percent}%`; progressEl.className = `progress-fill${Number(percent) > 85 ? ' danger' : ''}`; }
         return parseFloat(percent);
     },
-    async updateStorageInfo() {
-        const dfOutput = await this.exec('df /data 2>/dev/null | tail -1');
-        if (dfOutput) {
-            const parts = dfOutput.split(/\s+/);
-            if (parts.length >= 4) {
-                const total = parseInt(parts[1]) * 1024; const used = parseInt(parts[2]) * 1024; const available = parseInt(parts[3]) * 1024;
-                const percent = total > 0 ? ((used / total) * 100).toFixed(1) : 0;
-                const totalEl = document.getElementById('storage-total'); const usedEl = document.getElementById('storage-used');
-                const availableEl = document.getElementById('storage-available'); const progressEl = document.getElementById('storage-progress');
-                if (totalEl) totalEl.textContent = this.formatBytes(total);
-                if (usedEl) usedEl.textContent = this.formatBytes(used);
-                if (availableEl) availableEl.textContent = this.formatBytes(available);
-                if (progressEl) { progressEl.style.width = `${percent}%`; progressEl.className = `progress-fill storage${percent > 85 ? ' danger' : ''}`; }
-            }
-        }
+    updateStorageInfo(storage = []) {
+        const [totalKb = 0, usedKb = 0, availableKb = 0] = storage;
+        const total = totalKb * 1024;
+        const used = usedKb * 1024;
+        const available = availableKb * 1024;
+        const percent = total > 0 ? ((used / total) * 100).toFixed(1) : 0;
+        const totalEl = document.getElementById('storage-total'); const usedEl = document.getElementById('storage-used');
+        const availableEl = document.getElementById('storage-available'); const progressEl = document.getElementById('storage-progress');
+        if (totalEl) totalEl.textContent = this.formatBytes(total);
+        if (usedEl) usedEl.textContent = this.formatBytes(used);
+        if (availableEl) availableEl.textContent = this.formatBytes(available);
+        if (progressEl) { progressEl.style.width = `${percent}%`; progressEl.className = `progress-fill storage${Number(percent) > 85 ? ' danger' : ''}`; }
     },
-    async updateSwapInfo() {
-        const swapinfo = await this.exec('cat /proc/meminfo | grep Swap');
-        let total = 0, free = 0;
-        for (const line of swapinfo.split('\n')) { if (line.startsWith('SwapTotal:')) total = parseInt(line.match(/\d+/)?.[0] || 0); else if (line.startsWith('SwapFree:')) free = parseInt(line.match(/\d+/)?.[0] || 0); }
+    updateSwapInfo(swap = []) {
+        const [total = 0, free = 0] = swap;
         const used = total - free; const percent = total > 0 ? ((used / total) * 100).toFixed(1) : 0;
-        document.getElementById('swap-total').textContent = total > 0 ? this.formatBytes(total * 1024) : '未启用';
-        document.getElementById('swap-used').textContent = total > 0 ? this.formatBytes(used * 1024) : '--';
-        document.getElementById('swap-free').textContent = total > 0 ? this.formatBytes(free * 1024) : '--';
-        document.getElementById('swap-progress').style.width = `${percent}%`;
+        const totalElement = document.getElementById('swap-total');
+        const usedElement = document.getElementById('swap-used');
+        const freeElement = document.getElementById('swap-free');
+        const progressElement = document.getElementById('swap-progress');
+        if (totalElement) totalElement.textContent = total > 0 ? this.formatBytes(total * 1024) : this.t('inactive');
+        if (usedElement) usedElement.textContent = total > 0 ? this.formatBytes(used * 1024) : '--';
+        if (freeElement) freeElement.textContent = total > 0 ? this.formatBytes(free * 1024) : '--';
+        if (progressElement) progressElement.style.width = `${percent}%`;
     },
     async loadAllConfigs() {
         const tasks = [
@@ -806,10 +801,10 @@
         const empty = this.isEmptyMetric(value);
         // when always (runtime active), keep zero values like "0 B" visible
         const text = (!always && empty) ? '--' : (value === undefined || value === null || value === '' ? '--' : String(value));
-        el.textContent = text;
+        if (el.textContent !== text) el.textContent = text;
         if (item) {
-            if (always) item.hidden = false;
-            else item.hidden = empty;
+            const hidden = always ? false : empty;
+            if (item.hidden !== hidden) item.hidden = hidden;
         }
         return always || !empty;
     },
@@ -873,6 +868,15 @@
         this.refreshMetricCard('hybridswap-metrics');
     },
     async loadZramStatus() {
+        if (this.zramStatusBusy) return;
+        this.zramStatusBusy = true;
+        try {
+            return await this.loadZramStatusSnapshot();
+        } finally {
+            this.zramStatusBusy = false;
+        }
+    },
+    async loadZramStatusSnapshot() {
         const detectedPath = await this.detectActiveZramPath();
         const zramPath = detectedPath || this.state.zramPath;
         const zramBlock = this.getZramBlockName(zramPath);
@@ -969,7 +973,7 @@
         await this.loadHybridSwapMetrics(zramBlock);
         this.updateZramModeHint(this.state.zramEnabled ? 'module' : (isActive ? 'system' : 'off'), runtimeInfo);
     },
-    startZramMetricsRefresh(intervalMs = 4000) {
+    startZramMetricsRefresh(intervalMs = 8000) {
         this.stopZramMetricsRefresh();
         if (!this.zramMetricsVisibilityBound) {
             this.zramMetricsVisibilityBound = true;
@@ -977,7 +981,7 @@
                 if (document.hidden) return;
                 const content = document.getElementById('zram-content');
                 if (content && content.classList.contains('expanded') && typeof this.loadZramStatus === 'function') {
-                    this.loadZramStatus();
+                    this.loadZramStatus().finally(() => this._scheduleZramMetrics?.());
                 }
             });
         }
@@ -985,19 +989,23 @@
         setTimeout(() => {
             if (typeof this.loadZramStatus === 'function') this.loadZramStatus();
         }, 60);
-        this.zramMetricsTimer = setInterval(() => {
-            const content = document.getElementById('zram-content');
-            if (!content || !content.classList.contains('expanded')) {
-                this.stopZramMetricsRefresh();
-                return;
-            }
-            if (document.hidden) return;
-            this.loadZramStatus();
-        }, intervalMs);
+        const schedule = () => {
+            if (this.zramMetricsTimer || document.hidden) return;
+            this.zramMetricsTimer = setTimeout(async () => {
+                this.zramMetricsTimer = null;
+                const content = document.getElementById('zram-content');
+                if (!content || !content.classList.contains('expanded')) return;
+                if (document.hidden) return;
+                await this.loadZramStatus();
+                schedule();
+            }, intervalMs);
+        };
+        this._scheduleZramMetrics = schedule;
+        schedule();
     },
     stopZramMetricsRefresh() {
         if (this.zramMetricsTimer) {
-            clearInterval(this.zramMetricsTimer);
+            clearTimeout(this.zramMetricsTimer);
             this.zramMetricsTimer = null;
         }
     },

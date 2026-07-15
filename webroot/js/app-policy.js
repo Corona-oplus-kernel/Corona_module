@@ -116,17 +116,16 @@ CoronaAddon.prototype.loadAppRulesConfig = async function() {
 };
 CoronaAddon.prototype.syncAppPolicyDaemon = async function() {
     const shouldRun = !!this.appPolicy.monitorEnabled || (this.appPolicy.protect || []).length > 0 || (this.appPolicy.profiles || []).length > 0 || this.getThreadRulePackages().length > 0;
-    const pidFile = `${this.modDir}/.app_policy_daemon.pid`;
     if (shouldRun) {
         const runningPid = (await this.exec(this.getAppPolicyScript('daemon-status'))).trim();
         if (!runningPid) {
             await this.exec(`${this.getAppPolicyScript('daemon')} >/dev/null 2>&1 &`);
+        } else {
+            await this.exec(this.getAppPolicyScript('daemon-reload'));
         }
         return;
     }
-    const pid = (await this.exec(`cat ${this.shellQuote(pidFile)} 2>/dev/null`)).trim();
-    if (pid) await this.exec(`kill ${pid} 2>/dev/null`);
-    await this.exec(`rm -f ${this.shellQuote(pidFile)} ${this.shellQuote(`${this.modDir}/.app_policy_state`)}`);
+    await this.exec(this.getAppPolicyScript('daemon-stop'));
     // skip full service.sh re-apply here; rules file already written, daemon stop is enough for UI path
 };
 CoronaAddon.prototype.scheduleAppPolicySync = function() {
@@ -186,7 +185,13 @@ CoronaAddon.prototype.initAppPolicy = function() {
     const search = document.getElementById('app-policy-search');
     if (search && !search.dataset.bound) {
         search.dataset.bound = '1';
-        search.addEventListener('input', () => this.renderAppPolicyList());
+        search.addEventListener('input', () => {
+            if (this.appPolicySearchTimer) clearTimeout(this.appPolicySearchTimer);
+            this.appPolicySearchTimer = setTimeout(() => {
+                this.appPolicySearchTimer = null;
+                this.renderAppPolicyList();
+            }, 120);
+        });
     }
     ['app-policy-overlay', 'app-profile-overlay'].forEach(id => {
         const overlay = document.getElementById(id);

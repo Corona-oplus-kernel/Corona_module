@@ -802,7 +802,10 @@ start_app_policy_daemon() {
     should_start_app_policy || return
     if [ -f "$MODDIR/.app_policy_daemon.pid" ]; then
         daemon_pid=$(cat "$MODDIR/.app_policy_daemon.pid" 2>/dev/null)
-        [ -n "$daemon_pid" ] && [ -d "/proc/$daemon_pid" ] && return
+        if [ -n "$daemon_pid" ] && [ -d "/proc/$daemon_pid" ]; then
+            kill -HUP "$daemon_pid" 2>/dev/null
+            return
+        fi
     fi
     sh "$APP_POLICY_SH" daemon >/dev/null 2>&1 &
 }

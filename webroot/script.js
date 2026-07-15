@@ -79,6 +79,7 @@ class CoronaAddon {
         this.realtimeIntervalMs = 6000;
         this.realtimeTimer = null;
         this.zramMetricsTimer = null;
+        this.zramStatusBusy = false;
         this.realtimeBusy = false;
         this.realtimeTick = 0;
         this.isInitializing = true;
@@ -129,7 +130,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071525` : '';
+        return map[name] ? `${map[name]}?v=2026071526` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -181,13 +182,17 @@ class CoronaAddon {
     }
     async init() {
         await this.resolvePaths();
-        await this.ensureFeatureScript('i18n-zh');
-        await this.ensureFeatureScript('i18n-en');
+        await Promise.all([
+            this.ensureFeatureScript('i18n-zh'),
+            this.ensureFeatureScript('i18n-en')
+        ]);
         await this.ensureFeatureScript('i18n-runtime');
-        await this.ensureFeatureScript('settings-ui');
-        await this.ensureFeatureScript('home-ui');
-        await this.ensureFeatureScript('memory-core');
-        await this.ensureFeatureScript('settings-memory-page');
+        await Promise.all([
+            this.ensureFeatureScript('settings-ui'),
+            this.ensureFeatureScript('home-ui'),
+            this.ensureFeatureScript('memory-core'),
+            this.ensureFeatureScript('settings-memory-page')
+        ]);
         this.initLanguage();
         this.showInitOverlay(true, this.t('initDefault'));
         try {
@@ -219,8 +224,6 @@ class CoronaAddon {
             this.initDetailOverlays();
             this.initHomeCardClicks();
             this.initChart();
-            this.updateInitOverlayMessage(this.t('initSettings'));
-            await this.ensureSettingsPageReady(true);
             this.initStaticHeader();
             this.initScrollEffect();
             this.initModuleIntro();
