@@ -130,7 +130,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071526` : '';
+        return map[name] ? `${map[name]}?v=2026071529` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -214,6 +214,9 @@ class CoronaAddon {
             this.initChangePreviewPreference();
             this.initSettingDescriptionPreference();
             this.initCategoryConfigVisibilityPreference();
+            if (typeof this.setCategoryConfigVisibility === 'function') {
+                this.setCategoryConfigVisibility(this.state.showCategoryConfigToggles);
+            }
             this.bindAllEvents();
             this.initLanguageSelector();
             this.applyTranslations();
