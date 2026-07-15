@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" id="theme-color-meta" content="#1783e8">
     <title>Corona 控制台</title>
-    <link rel="stylesheet" href="style.css?v=2026071523">
-    <link rel="stylesheet" href="css/components.css?v=2026071523">
-    <link rel="stylesheet" href="css/pages/settings.css?v=2026071523">
+    <link rel="stylesheet" href="style.css?v=2026071524">
+    <link rel="stylesheet" href="css/components.css?v=2026071524">
+    <link rel="stylesheet" href="css/pages/settings.css?v=2026071524">
     <link rel="stylesheet" href="css/animations.css?v=2026071464">
     <script>
     (function () {
@@ -438,6 +438,31 @@
                         <div id="zram-loop-body" class="sub-expandable-content">
                             <div class="loop-card-body-inner">
                                 <div class="setting-hint loop-card-description" data-i18n="loopWritebackDesc">为 ZRAM 自动创建 Loop 回写空间</div>
+                                <div class="loop-parameter-card">
+                                    <div class="loop-parameter-title" data-i18n="loopParameters">Loop 参数配置</div>
+                                    <div class="loop-parameter-grid">
+                                        <div class="loop-parameter-item">
+                                            <span data-i18n="configStatus">配置状态</span>
+                                            <strong id="loop-param-config">--</strong>
+                                        </div>
+                                        <div class="loop-parameter-item">
+                                            <span data-i18n="configuredCapacity">配置容量</span>
+                                            <strong id="loop-param-size">--</strong>
+                                        </div>
+                                        <div class="loop-parameter-item">
+                                            <span data-i18n="targetZram">目标 ZRAM</span>
+                                            <strong id="loop-param-zram">--</strong>
+                                        </div>
+                                        <div class="loop-parameter-item">
+                                            <span data-i18n="backingFile">回写文件</span>
+                                            <strong id="loop-param-file">--</strong>
+                                        </div>
+                                        <div class="loop-parameter-item loop-parameter-wide">
+                                            <span data-i18n="runtimeDevice">运行设备</span>
+                                            <strong id="loop-param-device">--</strong>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div class="switch-container loop-writeback-switch" id="zram-writeback-switch-container">
                                     <div class="switch-info">
                                         <span class="switch-label" data-i18n="enableLoop">启用 Loop 配置</span>
@@ -1782,6 +1807,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071523" defer></script>
+    <script src="script.js?v=2026071524" defer></script>
 </body>
 </html>

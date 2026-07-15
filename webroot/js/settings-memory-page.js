@@ -65,7 +65,21 @@
             this.setFeatureVisible(hint, !supported);
         }
         if (!supported && this.state.zramWriteback === 'true') this.state.zramWriteback = 'default';
+        this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
         if (typeof this.refreshZramLoopDevice === 'function') this.refreshZramLoopDevice(false);
+    },
+    updateLoopParameterDisplay(loopDevice = '') {
+        const values = {
+            'loop-param-config': this.t(this.state.zramWriteback === 'true' ? 'enabled' : 'disabled'),
+            'loop-param-size': `${Number(this.state.zramWritebackSize || 4).toFixed(1)} GB`,
+            'loop-param-zram': this.state.zramPath || '/dev/block/zram0',
+            'loop-param-file': '/data/nandswap/corona_swapfile',
+            'loop-param-device': loopDevice || this.t('notAssigned')
+        };
+        Object.entries(values).forEach(([id, value]) => {
+            const element = document.getElementById(id);
+            if (element) element.textContent = value;
+        });
     },
     async refreshZramLoopDevice(notify = false) {
         const valueElement = document.getElementById('zram-loop-device-value');
@@ -81,6 +95,7 @@
         valueElement.textContent = display;
         valueElement.classList.toggle('active', !!loopDevice);
         this._loopActive = !!loopDevice;
+        this.updateLoopParameterDisplay(loopDevice);
         const status = document.getElementById('zram-loop-status');
         if (status) {
             status.textContent = this.t(loopDevice ? 'active' : 'inactive');

@@ -1943,6 +1943,7 @@
                 this.state.zramWritebackSize = parseFloat(event.target.value) || 4;
                 if (sizeValue) sizeValue.textContent = `${this.state.zramWritebackSize.toFixed(1)} GB`;
                 this.updateSliderProgress(sizeSlider);
+                if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
             });
             sizeSlider.addEventListener('change', () => this.persistLoopConfig().catch(() => this.showToast(this.t('loopConfigSaveFailed'), 'error')));
         }
@@ -1976,6 +1977,7 @@
                     if (devices.length === 1) {
                         pathInput.value = devices[0];
                         this.state.zramPath = devices[0];
+                        if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
                         this.markZramDirty();
                         this.showToast(`检测到: ${devices[0]}`);
                     } else if (devices.length > 1) {
@@ -1992,6 +1994,7 @@
             const val = (pathInput && pathInput.value || '').trim();
             if (!val) { this.showToast('路径不能为空'); return; }
             this.state.zramPath = val;
+            if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
             this.markZramDirty();
             this.showToast('路径已保存，点应用生效');
         });
@@ -2020,6 +2023,7 @@
             opt.addEventListener('click', () => {
                 pathInput.value = opt.dataset.path;
                 this.state.zramPath = opt.dataset.path;
+                if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
                 if (typeof this.markZramDirty === 'function') this.markZramDirty();
                 overlay.classList.remove('show');
                 setTimeout(() => overlay.remove(), 300);
