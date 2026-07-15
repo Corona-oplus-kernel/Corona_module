@@ -52,6 +52,19 @@
             }
         }
     },
+    normalizeScriptTag(tag) {
+        return ({ '性能': 'performance', '省电': 'power', '网络': 'network', '内存': 'memory', '其他': 'other' })[tag] || tag || 'other';
+    },
+    getScriptTagLabel(tag) {
+        const key = ({
+            performance: 'text_c1db7ae1',
+            power: 'text_d7cbc83b',
+            network: 'text_9a2fa260',
+            memory: 'text_9f1c1848',
+            other: 'text_301739cd'
+        })[this.normalizeScriptTag(tag)] || 'text_301739cd';
+        return this.t(key);
+    },
     renderScriptsList() {
         const container = document.getElementById('scripts-list');
         const scripts = Object.entries(this.customScripts);
@@ -59,12 +72,14 @@
             container.innerHTML = '<div class="scripts-empty">暂无自定义脚本</div>';
             return;
         }
-        container.innerHTML = scripts.map(([id, script]) => `
+        container.innerHTML = scripts.map(([id, script]) => {
+            const normalizedTag = this.normalizeScriptTag(script.tag);
+            return `
             <div class="script-item ${script.enabled ? '' : 'disabled'}" data-id="${id}">
                 <div class="script-info">
                     <div class="script-header">
                         <span class="script-name">${this.escapeHtml(script.name)}</span>
-                        <span class="script-tag-badge tag-${script.tag}">${script.tag}</span>
+                        <span class="script-tag-badge tag-${normalizedTag}">${this.escapeHtml(this.getScriptTagLabel(normalizedTag))}</span>
                     </div>
                     <div class="script-preview">${this.escapeHtml(script.code.split('\n')[0])}</div>
                 </div>
@@ -74,7 +89,8 @@
                     <button class="script-action-btn delete" data-id="${id}" title="删除">✕</button>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
         container.querySelectorAll('.script-action-btn.toggle').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -117,7 +133,7 @@
             codeInput.value = script.code;
             enabledSwitch.checked = script.enabled;
             document.querySelectorAll('#script-tags .script-tag').forEach(t => {
-                t.classList.toggle('selected', t.dataset.tag === script.tag);
+                t.classList.toggle('selected', t.dataset.tag === this.normalizeScriptTag(script.tag));
             });
         } else {
             titleEl.textContent = '添加脚本';
@@ -139,7 +155,7 @@
         const selectedTag = document.querySelector('#script-tags .script-tag.selected');
         const name = nameInput.value.trim();
         const code = codeInput.value.trim();
-        const tag = selectedTag ? selectedTag.dataset.tag : '其他';
+        const tag = selectedTag ? selectedTag.dataset.tag : 'other';
         const enabled = enabledSwitch.checked;
         if (!name) {
             this.showToast('请输入脚本名称');

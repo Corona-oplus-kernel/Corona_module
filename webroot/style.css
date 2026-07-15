@@ -3125,11 +3125,11 @@ body.theme-dark #io-scheduler-content .setting-section {
     background: hsla(var(--hue), 82%, 50%, 0.15);
     color: var(--primary);
 }
-.script-tag-badge.tag-性能 { background: rgba(255, 87, 34, 0.15); color: #FF5722; }
-.script-tag-badge.tag-省电 { background: rgba(76, 175, 80, 0.15); color: #4CAF50; }
-.script-tag-badge.tag-网络 { background: rgba(33, 150, 243, 0.15); color: #2196F3; }
-.script-tag-badge.tag-内存 { background: rgba(156, 39, 176, 0.15); color: var(--primary); }
-.script-tag-badge.tag-其他 { background: rgba(158, 158, 158, 0.15); color: #9E9E9E; }
+.script-tag-badge.tag-performance, .script-tag-badge.tag-性能 { background: rgba(255, 87, 34, 0.15); color: #FF5722; }
+.script-tag-badge.tag-power, .script-tag-badge.tag-省电 { background: rgba(76, 175, 80, 0.15); color: #4CAF50; }
+.script-tag-badge.tag-network, .script-tag-badge.tag-网络 { background: rgba(33, 150, 243, 0.15); color: #2196F3; }
+.script-tag-badge.tag-memory, .script-tag-badge.tag-内存 { background: rgba(156, 39, 176, 0.15); color: var(--primary); }
+.script-tag-badge.tag-other, .script-tag-badge.tag-其他 { background: rgba(158, 158, 158, 0.15); color: #9E9E9E; }
 .script-preview {
     font-size: 11px;
     color: var(--text-dim);

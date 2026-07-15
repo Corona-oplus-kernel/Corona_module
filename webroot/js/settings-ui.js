@@ -74,6 +74,7 @@
             if (this._languageSwitchToken !== token) return false;
             document.body.classList.remove('language-switch-out');
             this.applyTranslations();
+            if (this.customScripts && typeof this.renderScriptsList === 'function') this.renderScriptsList();
             void document.body.offsetWidth;
             document.body.classList.add('language-switch-in');
             if (typeof this.updateLoopControlState === 'function') this.updateLoopControlState();
@@ -84,6 +85,7 @@
             return true;
         }
         this.applyTranslations();
+        if (this.customScripts && typeof this.renderScriptsList === 'function') this.renderScriptsList();
         if (typeof this.updateLoopControlState === 'function') this.updateLoopControlState();
         return changed;
     },
@@ -169,7 +171,7 @@
             translations = {};
             this._translationAttributeTranslated.set(element, translations);
         }
-        ['placeholder', 'title', 'aria-label'].forEach(attribute => {
+        ['placeholder', 'title', 'aria-label', 'alt'].forEach(attribute => {
             if (!element.hasAttribute(attribute)) return;
             const current = element.getAttribute(attribute);
             if (!(attribute in originals)) originals[attribute] = current;
@@ -218,6 +220,12 @@
         };
         document.querySelectorAll('[data-i18n]').forEach(el => {
             el.textContent = this.t(el.dataset.i18n);
+        });
+        ['placeholder', 'title', 'aria-label', 'alt'].forEach(attribute => {
+            const dataAttribute = `data-i18n-${attribute}`;
+            document.querySelectorAll(`[${dataAttribute}]`).forEach(element => {
+                element.setAttribute(attribute, this.t(element.getAttribute(dataAttribute)));
+            });
         });
         setText('.tab-item[data-page="home"] .tab-label', this.t('tabHome'));
         setText('.tab-item[data-page="settings"] .tab-label', this.t('tabSettings'));

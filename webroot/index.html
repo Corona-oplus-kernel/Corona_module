@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" id="theme-color-meta" content="#1783e8">
-    <title>Corona 控制台</title>
-    <link rel="stylesheet" href="style.css?v=2026071542">
+    <title data-i18n="text_3f923c3a"></title>
+    <link rel="stylesheet" href="style.css?v=2026071543">
     <link rel="stylesheet" href="css/components.css?v=2026071533">
     <link rel="stylesheet" href="css/pages/settings.css?v=2026071542">
     <link rel="stylesheet" href="css/animations.css?v=2026071464">
@@ -49,15 +49,15 @@
     <div class="link-transition-overlay" id="link-transition-overlay" aria-hidden="true">
         <div class="link-transition-card">
             <span class="link-transition-icon">↗</span>
-            <span class="link-transition-label">正在打开链接</span>
+            <span class="link-transition-label" data-i18n="text_f7fb736c"></span>
         </div>
     </div>
     <div class="floating-header" id="floating-header">
-        <button class="floating-header-link" id="floating-header-link" type="button" aria-label="打开 Corona 内核发布页">
+        <button class="floating-header-link" id="floating-header-link" type="button" data-i18n-aria-label="text_d059501a" aria-label="">
             <span class="floating-header-title">Corona</span>
             <span class="floating-update-block hidden" id="floating-update-block">
-                <span class="floating-update-top"><span class="cpu-brand-badge snapdragon" id="floating-header-new">NEW</span><span class="floating-update-arrow">&gt;</span></span>
-                <span class="floating-update-copy">内核有新的更新</span>
+                <span class="floating-update-top"><span class="cpu-brand-badge snapdragon" id="floating-header-new" data-i18n="newBadge"></span><span class="floating-update-arrow">&gt;</span></span>
+                <span class="floating-update-copy" data-i18n="text_8e61d0bb"></span>
             </span>
         </button>
     </div>
@@ -65,39 +65,39 @@
     <div class="container">
         <div class="page active" id="page-home">
             <div class="corona-title-container">
-                <div class="title-overline">CORONA MEMORY CONTROL</div>
+                <div class="title-overline" data-i18n="pageOverline"></div>
                 <h1 class="corona-title" id="corona-title">Corona</h1>
             </div>
             <div class="page-lead">
-                <span class="page-lead-kicker">设备状态</span>
-                <span class="page-lead-copy">实时查看内存、温度与系统信息</span>
+                <span class="page-lead-kicker" data-i18n="text_43a33017"></span>
+                <span class="page-lead-copy" data-i18n="text_42d9e4b4"></span>
             </div>
             <div class="banner-image">
-                <img src="images/001.png" alt="Banner" loading="lazy" decoding="async">
+                <img src="images/001.png" data-i18n-alt="bannerAlt" alt="" loading="lazy" decoding="async">
             </div>
             <div class="card-row">
                 <div class="card-col-left">
                     <div class="card card-device">
-                        <div class="card-title">设备型号</div>
+                        <div class="card-title" data-i18n="text_2a5ba004"></div>
                         <div class="card-content">
                             <div class="device-brand" id="device-brand">--</div>
                             <div class="device-model" id="device-model">--</div>
                         </div>
                         <div class="device-image" id="device-image-container">
-                            <img src="images/002.png" alt="Device" id="device-image" loading="lazy" decoding="async">
+                            <img src="images/002.png" data-i18n-alt="deviceImageAlt" alt="" id="device-image" loading="lazy" decoding="async">
                         </div>
                     </div>
                 </div>
                 <div class="card-col-right">
                     <div class="card card-small card-clickable" id="cpu-card">
-                        <div class="card-title">处理器 ><span class="cpu-brand-badge hidden" id="cpu-brand-badge"></span></div>
+                        <div class="card-title"><span data-i18n="text_40edc473"></span><span class="cpu-brand-badge hidden" id="cpu-brand-badge"></span></div>
                         <div class="cpu-info-line">
                             <span class="info-primary" id="cpu-info">--</span>
                             <span class="info-secondary" id="cpu-cluster-info">--</span>
                         </div>
                     </div>
                     <div class="card card-small card-clickable" id="mem-card">
-                        <div class="card-title">运行内存 ></div>
+                        <div class="card-title" data-i18n="text_b4b31b56"></div>
                         <div class="info-primary" id="mem-total">--</div>
                         <div class="info-secondary"><span id="mem-used">--</span> / <span id="mem-available">--</span></div>
                         <div class="progress-bar-mini">
@@ -106,16 +106,16 @@
                     </div>
                 </div>
             </div>
-            <div class="section-marker"><span>运行状态</span></div>
+            <div class="section-marker"><span data-i18n="runtimeStatus"></span></div>
             <div class="card card-clickable" id="swap-card">
-                <div class="card-title">交换分区 / ZRAM ></div>
+                <div class="card-title" data-i18n="text_de55c19a"></div>
                 <div class="info-list">
                     <div class="info-item">
-                        <span class="info-label">总容量</span>
+                        <span class="info-label" data-i18n="text_ab59dba2"></span>
                         <span class="info-value" id="swap-total">--</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">已用 / 空闲</span>
+                        <span class="info-label" data-i18n="text_8facadf6"></span>
                         <span class="info-value"><span id="swap-used">--</span> / <span id="swap-free">--</span></span>
                     </div>
                     <div class="progress-bar">
@@ -124,18 +124,18 @@
                 </div>
             </div>
             <div class="card card-clickable" id="storage-card">
-                <div class="card-title">储存空间 ></div>
+                <div class="card-title" data-i18n="text_a8d51625"></div>
                 <div class="info-list">
                     <div class="info-item">
-                        <span class="info-label">总容量</span>
+                        <span class="info-label" data-i18n="text_ab59dba2"></span>
                         <span class="info-value" id="storage-total">--</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">已用空间</span>
+                        <span class="info-label" data-i18n="usedSpace"></span>
                         <span class="info-value" id="storage-used">--</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">可用空间</span>
+                        <span class="info-label" data-i18n="text_b2f28914"></span>
                         <span class="info-value" id="storage-available">--</span>
                     </div>
                     <div class="progress-bar">
@@ -144,45 +144,45 @@
                 </div>
             </div>
             <div class="card card-clickable" id="battery-card">
-                <div class="card-title">电池与温度 ><span class="refresh-indicator"></span></div>
+                <div class="card-title"><span data-i18n="text_4837fffb"></span><span class="refresh-indicator"></span></div>
                 <div class="info-list">
                     <div class="info-item">
-                        <span class="info-label">电池电量</span>
+                        <span class="info-label" data-i18n="text_34ff15d0"></span>
                         <span class="info-value" id="battery-level">--</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">电池容量</span>
+                        <span class="info-label" data-i18n="text_209e8e8c"></span>
                         <span class="info-value" id="battery-capacity">--</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">电池温度</span>
+                        <span class="info-label" data-i18n="text_f59610a7"></span>
                         <span class="info-value" id="battery-temp">--</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">CPU 温度</span>
+                        <span class="info-label" data-i18n="text_c945eb00"></span>
                         <span class="info-value" id="cpu-temp">--</span>
                     </div>
                 </div>
             </div>
             <div class="card" id="system-info-card">
-                <div class="card-title">系统信息</div>
+                <div class="card-title" data-i18n="text_ac84f26f"></div>
                 <div class="info-list">
                     <div class="info-item">
-                        <span class="info-label">系统版本</span>
+                        <span class="info-label" data-i18n="text_69ffb31b"></span>
                         <span class="info-value" id="system-version">--</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">内核版本</span>
+                        <span class="info-label" data-i18n="text_80f3a2a4"></span>
                         <span class="info-value" id="kernel-version">--</span>
                     </div>
                 </div>
                 <div class="chart-section">
                     <div class="chart-header">
-                        <span class="chart-title">实时监控</span>
+                        <span class="chart-title" data-i18n="text_7a0ff6b1"></span>
                         <span class="chart-toggle-btns">
                             <span class="chart-btn active" data-type="cpu">CPU</span>
-                            <span class="chart-btn" data-type="mem">内存</span>
-                            <span class="chart-btn" data-type="temp">温度</span>
+                            <span class="chart-btn" data-type="mem" data-i18n="text_9f1c1848"></span>
+                            <span class="chart-btn" data-type="temp" data-i18n="text_4e683b86"></span>
                         </span>
                     </div>
                     <div class="chart-container">
@@ -192,26 +192,26 @@
             </div>
             <div class="card card-author" id="author-card">
                 <div class="author-row">
-                    <span class="author-label">模块作者</span>
-                    <div class="author-meta"><span class="author-name">Frost_Bai</span><button class="author-link-btn" id="author-link-btn" aria-label="打开作者主页">&gt;</button></div>
+                    <span class="author-label" data-i18n="text_e2ed1026"></span>
+                    <div class="author-meta"><span class="author-name">Frost_Bai</span><button class="author-link-btn" id="author-link-btn" data-i18n-aria-label="text_1299b711" aria-label="">&gt;</button></div>
                 </div>
             </div>
         </div>
         <div class="page" id="page-settings">
             <div class="corona-title-container">
-                <div class="title-overline">CORONA MEMORY CONTROL</div>
+                <div class="title-overline" data-i18n="pageOverline"></div>
                 <h1 class="corona-title" id="corona-title-settings">Corona</h1>
             </div>
             <div class="page-lead settings-lead">
-                <span class="page-lead-kicker">模块设置</span>
-                <span class="page-lead-copy">调整内存、调度和模块功能</span>
+                <span class="page-lead-kicker" data-i18n="moduleSettings"></span>
+                <span class="page-lead-copy" data-i18n="text_402f0f91"></span>
             </div>
-            <div class="section-marker section-marker-settings"><span>内存设置</span></div>
+            <div class="section-marker section-marker-settings"><span data-i18n="text_769bae44"></span></div>
             <div class="module-card" id="memory-compression-card" data-card-key="memory-compression">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title" data-module="memory-compression">内存压缩</div>
-                        <div class="module-card-desc">ZRAM / Swap / LRU / VM参数</div>
+                        <div class="module-card-title" data-module="memory-compression" data-i18n="text_1f30bb70"></div>
+                        <div class="module-card-desc" data-i18n="text_9f954203"></div>
                         <span class="module-card-badge" id="memory-compression-badge">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -223,85 +223,85 @@
                 <div id="memory-compression-content" class="module-card-content hidden">
                     <div class="sub-card" id="zram-sub">
                         <div class="sub-card-header" id="zram-toggle">
-                            <span class="sub-card-title" data-i18n="zramManagement">ZRAM 管理</span>
+                            <span class="sub-card-title" data-i18n="zramManagement"></span>
                             <span class="current-badge" id="zram-status">--</span>
                             <span class="expand-icon">❯</span>
                         </div>
                         <div id="zram-content" class="sub-expandable-content">
                             <div class="zram-overview-card" id="zram-overview-card">
                                 <div class="zram-overview-header">
-                                    <span data-i18n="zramOverview">ZRAM 总览</span>
+                                    <span data-i18n="zramOverview"></span>
                                     <span class="zram-overview-state" id="zram-overview-state">--</span>
                                 </div>
                                 <div class="zram-overview-grid">
-                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="usedSpace">已用空间</span><strong id="zram-overview-used">--</strong></div>
-                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="physicalUsage">物理占用</span><strong id="zram-overview-memory">--</strong></div>
-                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="compressionRatio">压缩比</span><strong id="zram-overview-ratio">--</strong></div>
-                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="writebackDevice">回写设备</span><strong id="zram-overview-backing">--</strong></div>
+                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="usedSpace"></span><strong id="zram-overview-used">--</strong></div>
+                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="physicalUsage"></span><strong id="zram-overview-memory">--</strong></div>
+                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="compressionRatio"></span><strong id="zram-overview-ratio">--</strong></div>
+                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="writebackDevice"></span><strong id="zram-overview-backing">--</strong></div>
                                 </div>
                                 <div class="zram-overview-progress"><span id="zram-overview-progress"></span></div>
                             </div>
 <div class="zram-status-card" id="zram-status-card">
-                                <div class="zram-status-title" data-i18n="runtimeStatus">运行状态</div>
+                                <div class="zram-status-title" data-i18n="runtimeStatus"></div>
                                 <div class="info-list" id="zram-status-list">
                                     <div class="info-item" data-metric="alg">
-                                        <span class="info-label" data-i18n="algorithm">算法</span>
+                                        <span class="info-label" data-i18n="algorithm"></span>
                                         <span class="info-value" id="zram-current-alg">--</span>
                                     </div>
                                     <div class="info-item" data-metric="size">
-                                        <span class="info-label" data-i18n="size">大小</span>
+                                        <span class="info-label" data-i18n="size"></span>
                                         <span class="info-value" id="zram-current-size">--</span>
                                     </div>
                                     <div class="info-item" data-metric="swappiness">
-                                        <span class="info-label">Swappiness</span>
+                                        <span class="info-label" data-i18n="swappinessLabel"></span>
                                         <span class="info-value" id="zram-current-swappiness">--</span>
                                     </div>
                                     <div class="info-item" data-metric="priority">
-                                        <span class="info-label" data-i18n="swapPriority">交换优先级</span>
+                                        <span class="info-label" data-i18n="swapPriority"></span>
                                         <span class="info-value" id="zram-current-priority">--</span>
                                     </div>
                                     <div class="info-item" data-metric="path">
-                                        <span class="info-label" data-i18n="devicePath">设备路径</span>
+                                        <span class="info-label" data-i18n="devicePath"></span>
                                         <span class="info-value" id="zram-current-path">--</span>
                                     </div>
                                     <div class="info-item" data-metric="raw" hidden>
-                                        <span class="info-label" data-i18n="rawData">原始数据</span>
+                                        <span class="info-label" data-i18n="rawData"></span>
                                         <span class="info-value" id="zram-raw-size">--</span>
                                     </div>
                                     <div class="info-item" data-metric="compr" hidden>
-                                        <span class="info-label" data-i18n="compressedData">压缩后</span>
+                                        <span class="info-label" data-i18n="compressedData"></span>
                                         <span class="info-value" id="zram-compr-size">--</span>
                                     </div>
                                     <div class="info-item" data-metric="mem" hidden>
-                                        <span class="info-label" data-i18n="physicalUsage">物理占用</span>
+                                        <span class="info-label" data-i18n="physicalUsage"></span>
                                         <span class="info-value" id="zram-mem-used">--</span>
                                     </div>
                                     <div class="info-item" data-metric="ratio" hidden>
-                                        <span class="info-label" data-i18n="compressionRatio">压缩比</span>
+                                        <span class="info-label" data-i18n="compressionRatio"></span>
                                         <span class="info-value" id="zram-compr-ratio">--</span>
                                     </div>
                                     <div class="info-item" data-metric="reads" hidden>
-                                        <span class="info-label" data-i18n="totalReads">总读取</span>
+                                        <span class="info-label" data-i18n="totalReads"></span>
                                         <span class="info-value" id="zram-total-reads">--</span>
                                     </div>
                                     <div class="info-item" data-metric="writes" hidden>
-                                        <span class="info-label" data-i18n="totalWrites">总写入</span>
+                                        <span class="info-label" data-i18n="totalWrites"></span>
                                         <span class="info-value" id="zram-total-writes">--</span>
                                     </div>
                                     <div class="info-item" data-metric="backing" hidden>
-                                        <span class="info-label" data-i18n="writebackDevice">回写设备</span>
+                                        <span class="info-label" data-i18n="writebackDevice"></span>
                                         <span class="info-value" id="zram-backing-dev">--</span>
                                     </div>
                                     <div class="info-item" data-metric="bdcount" hidden>
-                                        <span class="info-label">回写页数</span>
+                                        <span class="info-label" data-i18n="text_5c3961d5"></span>
                                         <span class="info-value" id="zram-bd-count">--</span>
                                     </div>
                                     <div class="info-item" data-metric="bdread" hidden>
-                                        <span class="info-label">回写读取</span>
+                                        <span class="info-label" data-i18n="text_954c5b4d"></span>
                                         <span class="info-value" id="zram-bd-read">--</span>
                                     </div>
                                     <div class="info-item" data-metric="bdwrite" hidden>
-                                        <span class="info-label">回写写入</span>
+                                        <span class="info-label" data-i18n="text_0bbe7612"></span>
                                         <span class="info-value" id="zram-bd-write">--</span>
                                     </div>
                                 </div>
@@ -311,35 +311,35 @@
                                 <div class="zram-status-title">HybridSwap</div>
                                 <div class="info-list" id="hybridswap-list">
                                     <div class="info-item" data-metric="hyb-loop" hidden>
-                                        <span class="info-label">回写环</span>
+                                        <span class="info-label" data-i18n="text_76d57225"></span>
                                         <span class="info-value" id="hyb-loop">--</span>
                                     </div>
                                     <div class="info-item" data-metric="hyb-zst" hidden>
-                                        <span class="info-label">ZRAM 池</span>
+                                        <span class="info-label" data-i18n="text_5e555183"></span>
                                         <span class="info-value" id="hyb-zst">--</span>
                                     </div>
                                     <div class="info-item" data-metric="hyb-zsu" hidden>
-                                        <span class="info-label">ZRAM 占用</span>
+                                        <span class="info-label" data-i18n="text_0ad48a31"></span>
                                         <span class="info-value" id="hyb-zsu">--</span>
                                     </div>
                                     <div class="info-item" data-metric="hyb-est" hidden>
-                                        <span class="info-label">ESwap 池</span>
+                                        <span class="info-label" data-i18n="text_3fb0bedb"></span>
                                         <span class="info-value" id="hyb-est">--</span>
                                     </div>
                                     <div class="info-item" data-metric="hyb-esu" hidden>
-                                        <span class="info-label">ESwap 占用</span>
+                                        <span class="info-label" data-i18n="text_b2c3cc89"></span>
                                         <span class="info-value" id="hyb-esu">--</span>
                                     </div>
                                     <div class="info-item" data-metric="hyb-reclaimin" hidden>
-                                        <span class="info-label">回写入</span>
+                                        <span class="info-label" data-i18n="text_bca6a657"></span>
                                         <span class="info-value" id="hyb-reclaimin">--</span>
                                     </div>
                                     <div class="info-item" data-metric="hyb-batchout" hidden>
-                                        <span class="info-label">读回出</span>
+                                        <span class="info-label" data-i18n="text_672af442"></span>
                                         <span class="info-value" id="hyb-batchout">--</span>
                                     </div>
                                     <div class="info-item" data-metric="hyb-swapd" hidden>
-                                        <span class="info-label">swapd 唤醒</span>
+                                        <span class="info-label" data-i18n="text_e4621518"></span>
                                         <span class="info-value" id="hyb-swapd-wakeup">--</span>
                                     </div>
                                 </div>
@@ -348,45 +348,45 @@
                             
                             <div class="switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label" data-i18n="enableZram">启用 ZRAM</span>
-                                    <span class="switch-desc" id="zram-switch-desc" data-i18n="enableZramDesc">压缩内存块，扩展可用RAM</span>
+                                    <span class="switch-label" data-i18n="enableZram"></span>
+                                    <span class="switch-desc" id="zram-switch-desc" data-i18n="enableZramDesc"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="zram-switch">
                                     <span class="slider"></span>
                                 </label>
                             </div>
-                            <div class="setting-hint" id="zram-mode-hint">未检测到运行状态</div>
+                            <div class="setting-hint" id="zram-mode-hint" data-i18n="text_779c5931"></div>
 <div id="zram-settings" class="sub-settings hidden">
                                 <div class="setting-section">
-                                    <span class="section-label">压缩算法</span>
+                                    <span class="section-label" data-i18n="text_24ecdf4d"></span>
                                     <div class="option-grid" id="algorithm-list"></div>
                                 </div>
                                 <div class="setting-section advanced-fold" id="zram-recomp-section" hidden style="display:none">
                                     <div class="advanced-fold-header" id="zram-recomp-toggle" role="button" tabindex="0">
                                         <div class="advanced-fold-titles">
-                                            <span class="section-label">重压缩（高级）</span>
-                                            <span class="setting-hint">多数场景无需修改，点此展开</span>
+                                            <span class="section-label" data-i18n="text_76e5a604"></span>
+                                            <span class="setting-hint" data-i18n="text_b80ea077"></span>
                                         </div>
                                         <span class="expand-icon">❯</span>
                                     </div>
                                     <div class="advanced-fold-body" id="zram-recomp-body">
                                         <div class="setting-section" style="margin-top:10px">
-                                            <span class="section-label">重压缩 1</span>
+                                            <span class="section-label" data-i18n="text_f0a190c3"></span>
                                             <div class="option-grid" id="recomp-algorithm-list-1"></div>
                                         </div>
                                         <div class="setting-section">
-                                            <span class="section-label">重压缩 2</span>
+                                            <span class="section-label" data-i18n="text_f1a19256"></span>
                                             <div class="option-grid" id="recomp-algorithm-list-2"></div>
                                         </div>
                                         <div class="setting-section">
-                                            <span class="section-label">重压缩 3</span>
+                                            <span class="section-label" data-i18n="text_f2a193e9"></span>
                                             <div class="option-grid" id="recomp-algorithm-list-3"></div>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="setting-section" id="zstd-level-section" hidden style="display:none">
-                                    <span class="section-label">ZSTD 压缩级别</span>
+                                    <span class="section-label" data-i18n="text_66c2442c"></span>
                                     <div class="slider-container">
                                         <input type="range" class="range-slider" id="zstd-level-slider" min="1" max="22" step="1" value="1">
                                         <div class="slider-labels">
@@ -397,7 +397,7 @@
                                     </div>
                                 </div>
                                 <div class="setting-section">
-                                    <span class="section-label" data-i18n="zramSize">ZRAM 大小</span>
+                                    <span class="section-label" data-i18n="zramSize"></span>
                                     <div class="slider-container">
                                         <input type="range" class="range-slider" id="zram-size-slider" min="0" max="24" step="0.25" value="8">
                                         <div class="slider-labels">
@@ -408,7 +408,7 @@
                                     </div>
                                 </div>
                                 <div class="setting-section">
-                                    <span class="section-label">Swappiness</span>
+                                    <span class="section-label" data-i18n="swappinessLabel"></span>
                                     <div class="slider-container">
                                         <input type="range" class="range-slider" id="swappiness-slider" min="0" max="200" step="1" value="100">
                                         <div class="slider-labels">
@@ -419,68 +419,68 @@
                                     </div>
                                 </div>
                                 <div class="setting-section">
-                                    <span class="section-label" data-i18n="zramPriority">ZRAM 优先级</span>
+                                    <span class="section-label" data-i18n="zramPriority"></span>
                                     <div class="option-grid" id="zram-priority-list">
-                                        <div class="option-item" data-value="100" data-i18n="priorityBalanced">均衡 (100)</div>
-                                        <div class="option-item" data-value="1000" data-i18n="priorityHigh">高 (1000)</div>
-                                        <div class="option-item selected" data-value="32758" data-i18n="prioritySystemHigh">系统高优先级 (32758)</div>
+                                        <div class="option-item" data-value="100" data-i18n="priorityBalanced"></div>
+                                        <div class="option-item" data-value="1000" data-i18n="priorityHigh"></div>
+                                        <div class="option-item selected" data-value="32758" data-i18n="prioritySystemHigh"></div>
                                     </div>
-                                    <div class="setting-hint" data-i18n="zramPriorityDesc">优先使用 ZRAM；数值应高于文件 Swap</div>
+                                    <div class="setting-hint" data-i18n="zramPriorityDesc"></div>
                                 </div>
                                 <div class="setting-section">
-                                    <span class="section-label">设备路径</span>
+                                    <span class="section-label" data-i18n="devicePath"></span>
                                     <div class="zram-path-container">
                                         <input type="text" class="text-input" id="zram-path-input" placeholder="/dev/block/zram0" value="/dev/block/zram0">
                                         <div class="zram-path-buttons">
-                                            <button class="btn-small" id="zram-path-detect">检测</button>
-                                            <button class="btn-small btn-primary" id="zram-path-save">保存</button>
+                                            <button class="btn-small" id="zram-path-detect" data-i18n="text_1ee8a9fc"></button>
+                                            <button class="btn-small btn-primary" id="zram-path-save" data-i18n="text_ad5b82b0"></button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="zram-actions-sep"></div>
-                            <button class="action-btn" id="zram-apply-btn" style="width:100%" data-i18n="applyZram">应用 ZRAM 配置</button>
+                            <button class="action-btn" id="zram-apply-btn" style="width:100%" data-i18n="applyZram"></button>
                         </div>
                     </div>
                     <div class="sub-card" id="loop-sub">
                         <div class="sub-card-header" id="zram-loop-toggle">
-                            <span class="sub-card-title" data-i18n="loopWriteback">Loop 回写</span>
-                            <span class="current-badge" id="zram-loop-status" data-i18n="inactive">未启用</span>
+                            <span class="sub-card-title" data-i18n="loopWriteback"></span>
+                            <span class="current-badge" id="zram-loop-status" data-i18n="inactive"></span>
                             <span class="expand-icon">❯</span>
                         </div>
                         <div id="zram-loop-body" class="sub-expandable-content">
                             <div class="loop-card-body-inner">
-                                <div class="setting-hint loop-card-description" data-i18n="loopWritebackDesc">为 ZRAM 自动创建 Loop 回写空间</div>
-                                <div class="setting-hint" data-i18n="loopPriorityDesc">Loop 是 ZRAM 回写后端，不是独立 Swap 设备，因此跟随 ZRAM 优先级。</div>
+                                <div class="setting-hint loop-card-description" data-i18n="loopWritebackDesc"></div>
+                                <div class="setting-hint" data-i18n="loopPriorityDesc"></div>
                                 <div class="loop-parameter-card">
-                                    <div class="loop-parameter-title" data-i18n="loopParameters">Loop 参数配置</div>
+                                    <div class="loop-parameter-title" data-i18n="loopParameters"></div>
                                     <div class="loop-parameter-grid">
                                         <div class="loop-parameter-item">
-                                            <span data-i18n="configStatus">配置状态</span>
+                                            <span data-i18n="configStatus"></span>
                                             <strong id="loop-param-config">--</strong>
                                         </div>
                                         <div class="loop-parameter-item">
-                                            <span data-i18n="configuredCapacity">配置容量</span>
+                                            <span data-i18n="configuredCapacity"></span>
                                             <strong id="loop-param-size">--</strong>
                                         </div>
                                         <div class="loop-parameter-item">
-                                            <span data-i18n="targetZram">目标 ZRAM</span>
+                                            <span data-i18n="targetZram"></span>
                                             <strong id="loop-param-zram">--</strong>
                                         </div>
                                         <div class="loop-parameter-item">
-                                            <span data-i18n="backingFile">回写文件</span>
+                                            <span data-i18n="backingFile"></span>
                                             <strong id="loop-param-file">--</strong>
                                         </div>
                                         <div class="loop-parameter-item loop-parameter-wide">
-                                            <span data-i18n="runtimeDevice">运行设备</span>
+                                            <span data-i18n="runtimeDevice"></span>
                                             <strong id="loop-param-device">--</strong>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="switch-container loop-writeback-switch" id="zram-writeback-switch-container">
                                     <div class="switch-info">
-                                        <span class="switch-label" data-i18n="enableLoop">启用 Loop 配置</span>
-                                        <span class="switch-desc" data-i18n="enableLoopDesc">保存后可单独启动或停止，不重置 ZRAM 参数</span>
+                                        <span class="switch-label" data-i18n="enableLoop"></span>
+                                        <span class="switch-desc" data-i18n="enableLoopDesc"></span>
                                     </div>
                                     <label class="switch">
                                         <input type="checkbox" id="zram-writeback-switch">
@@ -491,7 +491,7 @@
                                 <div class="loop-dependent-settings" id="zram-loop-settings">
                                     <div class="loop-dependent-inner">
                                         <div class="setting-section" id="zram-writeback-size-section">
-                                            <span class="section-label" data-i18n="writebackSpace">回写空间</span>
+                                            <span class="section-label" data-i18n="writebackSpace"></span>
                                             <div class="slider-container">
                                                 <input type="range" class="range-slider" id="zram-writeback-size-slider" min="0.5" max="16" step="0.5" value="4">
                                                 <div class="slider-labels">
@@ -502,16 +502,16 @@
                                             </div>
                                         </div>
                                         <div class="setting-section zram-loop-device-section" id="zram-loop-device-section">
-                                            <span class="section-label" data-i18n="loopDevice">Loop 设备</span>
+                                            <span class="section-label" data-i18n="loopDevice"></span>
                                             <div class="loop-device-card">
                                                 <div class="loop-device-copy">
-                                                    <span class="loop-device-value" id="zram-loop-device-value" data-i18n="notAssigned">未分配</span>
-                                                    <span class="loop-device-desc" data-i18n="loopDeviceDesc">回写启用后自动分配，无需手动填写设备节点</span>
+                                                    <span class="loop-device-value" id="zram-loop-device-value" data-i18n="notAssigned"></span>
+                                                    <span class="loop-device-desc" data-i18n="loopDeviceDesc"></span>
                                                 </div>
-                                                <button type="button" class="btn-small loop-device-refresh" id="zram-loop-device-refresh" data-i18n="refresh">刷新</button>
+                                                <button type="button" class="btn-small loop-device-refresh" id="zram-loop-device-refresh" data-i18n="refresh"></button>
                                             </div>
                                         </div>
-                                        <button type="button" class="action-btn loop-action-btn" id="zram-loop-action" data-i18n="startLoop">启动 Loop</button>
+                                        <button type="button" class="action-btn loop-action-btn" id="zram-loop-action" data-i18n="startLoop"></button>
                                     </div>
                                 </div>
                             </div>
@@ -519,27 +519,27 @@
                     </div>
                     <div class="sub-card" id="memory-pressure-sub">
                         <div class="sub-card-header" id="memory-pressure-toggle">
-                            <span class="sub-card-title" data-i18n="pressureProtection">内存压力保护</span>
-                            <span class="current-badge" id="memory-pressure-status" data-i18n="inactive">未启用</span>
+                            <span class="sub-card-title" data-i18n="pressureProtection"></span>
+                            <span class="current-badge" id="memory-pressure-status" data-i18n="inactive"></span>
                             <span class="expand-icon">❯</span>
                         </div>
                         <div id="memory-pressure-content" class="sub-expandable-content">
                             <div class="zram-status-card">
                                 <div class="info-list">
                                     <div class="info-item">
-                                        <span class="info-label" data-i18n="pressurePsiAvg10">PSI 平均压力 (10 秒)</span>
+                                        <span class="info-label" data-i18n="pressurePsiAvg10"></span>
                                         <span class="info-value" id="memory-pressure-psi">--</span>
                                     </div>
                                     <div class="info-item">
-                                        <span class="info-label">Swappiness</span>
+                                        <span class="info-label" data-i18n="swappinessLabel"></span>
                                         <span class="info-value" id="memory-pressure-swappiness">--</span>
                                     </div>
                                 </div>
                             </div>
                             <div class="switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label" data-i18n="enablePressureProtection">启用压力保护</span>
-                                    <span class="switch-desc" data-i18n="pressureProtectionDesc">根据 PSI 压力临时提高交换积极性，关闭后恢复原值</span>
+                                    <span class="switch-label" data-i18n="enablePressureProtection"></span>
+                                    <span class="switch-desc" data-i18n="pressureProtectionDesc"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="memory-pressure-switch">
@@ -548,55 +548,55 @@
                             </div>
                             <div id="memory-pressure-settings" class="sub-settings hidden">
                                 <div class="setting-section">
-                                    <span class="section-label" data-i18n="pressureSensitivity">响应灵敏度</span>
+                                    <span class="section-label" data-i18n="pressureSensitivity"></span>
                                     <div class="option-grid" id="memory-pressure-profile-list">
-                                        <div class="option-item" data-value="sensitive" data-i18n="pressureSensitive">灵敏</div>
-                                        <div class="option-item selected" data-value="balanced" data-i18n="pressureBalanced">均衡</div>
-                                        <div class="option-item" data-value="conservative" data-i18n="pressureConservative">保守</div>
+                                        <div class="option-item" data-value="sensitive" data-i18n="pressureSensitive"></div>
+                                        <div class="option-item selected" data-value="balanced" data-i18n="pressureBalanced"></div>
+                                        <div class="option-item" data-value="conservative" data-i18n="pressureConservative"></div>
                                     </div>
-                                    <div class="setting-hint" data-i18n="pressureProfileDesc">仅在持续内存压力下调整，低压力时保持系统原值</div>
+                                    <div class="setting-hint" data-i18n="pressureProfileDesc"></div>
                                 </div>
-                                <button type="button" class="action-btn" id="memory-pressure-apply" style="width:100%" data-i18n="applyPressureProtection">应用压力保护</button>
+                                <button type="button" class="action-btn" id="memory-pressure-apply" style="width:100%" data-i18n="applyPressureProtection"></button>
                             </div>
                         </div>
                     </div>
                     <div class="sub-card" id="swap-sub">
                         <div class="sub-card-header" id="swap-toggle">
-                            <span class="sub-card-title">Swap 文件</span>
-                            <span class="current-badge" id="swap-status">未启用</span>
+                            <span class="sub-card-title" data-i18n="text_3b472ed3"></span>
+                            <span class="current-badge" id="swap-status" data-i18n="inactive"></span>
                             <span class="expand-icon">❯</span>
                         </div>
                         <div id="swap-content" class="sub-expandable-content">
                             <div class="zram-status-card" id="swap-status-card">
                                 <div class="info-list" id="swap-status-list">
                                     <div class="info-item">
-                                        <span class="info-label">当前状态</span>
+                                        <span class="info-label" data-i18n="text_01385cf0"></span>
                                         <span class="info-value" id="swap-current-status">--</span>
                                     </div>
                                     <div class="info-item">
-                                        <span class="info-label">当前大小</span>
+                                        <span class="info-label" data-i18n="text_73d599b3"></span>
                                         <span class="info-value" id="swap-current-size">--</span>
                                     </div>
                                     <div class="info-item">
-                                        <span class="info-label">换入 (pswpin)</span>
+                                        <span class="info-label" data-i18n="text_f62c1a00"></span>
                                         <span class="info-value" id="swap-io-in">--</span>
                                     </div>
                                     <div class="info-item">
-                                        <span class="info-label">换出 (pswpout)</span>
+                                        <span class="info-label" data-i18n="text_5e378984"></span>
                                         <span class="info-value" id="swap-io-out">--</span>
                                     </div>
                                 </div>
                             </div>
                             <div class="setting-section" id="swap-devices-section" style="margin-top:8px" hidden>
-                                <span class="section-label">已启用 Swap 设备</span>
+                                <span class="section-label" data-i18n="text_b0f46ca0"></span>
                                 <div id="swap-devices-list" class="swap-devices-list">
-                                    <div class="setting-hint">未检测到 Swap 设备</div>
+                                    <div class="setting-hint" data-i18n="text_c330b46a"></div>
                                 </div>
                             </div>
                             <div class="switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label">启用 Swap</span>
-                                    <span class="switch-desc">使用文件作为交换空间</span>
+                                    <span class="switch-label" data-i18n="text_6c19d941"></span>
+                                    <span class="switch-desc" data-i18n="text_8c7f2bf5"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="swap-switch">
@@ -605,7 +605,7 @@
                             </div>
                             <div id="swap-settings" class="sub-settings hidden">
                                 <div class="setting-section">
-                                    <span class="section-label">Swap 大小</span>
+                                    <span class="section-label" data-i18n="text_f4e5b2c8"></span>
                                     <div class="slider-container">
                                         <input type="range" class="range-slider" id="swap-size-slider" min="512" max="16384" step="512" value="2048">
                                         <div class="slider-labels">
@@ -616,29 +616,29 @@
                                     </div>
                                 </div>
                                 <div class="setting-section">
-                                    <span class="section-label">Swap 优先级</span>
+                                    <span class="section-label" data-i18n="text_a2f117e7"></span>
                                     <div class="option-grid" id="swap-priority-list">
-                                        <div class="option-item" data-value="-2">低 (-2)</div>
-                                        <div class="option-item selected" data-value="0">默认 (0)</div>
-                                        <div class="option-item" data-value="100">高 (100)</div>
+                                        <div class="option-item" data-value="-2" data-i18n="text_1664ef81"></div>
+                                        <div class="option-item selected" data-value="0" data-i18n="text_b35b7e56"></div>
+                                        <div class="option-item" data-value="100" data-i18n="swapPriorityHigh"></div>
                                     </div>
                                 </div>
                             </div>
                             <div class="zram-actions-sep"></div>
-                            <button class="action-btn" id="swap-apply-btn" style="width:100%">应用 Swap 配置</button>
+                            <button class="action-btn" id="swap-apply-btn" style="width:100%" data-i18n="text_1a698b97"></button>
                         </div>
                     </div>
                     <div class="sub-card" id="lru-sub">
                         <div class="sub-card-header" id="lru-toggle">
-                            <span class="sub-card-title">LRU 相关</span>
+                            <span class="sub-card-title" data-i18n="text_8c41a693"></span>
                             <span class="current-badge" id="lru-status">--</span>
                             <span class="expand-icon">❯</span>
                         </div>
                         <div id="lru-content" class="sub-expandable-content">
                             <div class="lru-switch" id="lru-gen-container" style="display:none;">
                                 <div class="switch-info">
-                                    <span class="switch-label">多代 LRU (MGLRU)</span>
-                                    <span class="switch-desc">改进的页面回收算法，提升性能</span>
+                                    <span class="switch-label" data-i18n="text_6bc440bf"></span>
+                                    <span class="switch-desc" data-i18n="text_99fe0cc1"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="lru-gen-switch">
@@ -646,18 +646,18 @@
                                 </label>
                             </div>
                             <div class="lru-setting" id="thp-container" style="display:none;">
-                                <span class="section-label">透明大页 (THP)</span>
-                                <span class="section-desc">自动使用大页面提升内存访问效率</span>
+                                <span class="section-label" data-i18n="text_7f3682ef"></span>
+                                <span class="section-desc" data-i18n="text_b0453202"></span>
                                 <div class="option-grid" id="thp-list">
-                                    <div class="option-item" data-value="always">始终</div>
-                                    <div class="option-item" data-value="madvise">按需</div>
-                                    <div class="option-item selected" data-value="never">禁用</div>
+                                    <div class="option-item" data-value="always" data-i18n="text_feb38566"></div>
+                                    <div class="option-item" data-value="madvise" data-i18n="text_0c9b9cac"></div>
+                                    <div class="option-item selected" data-value="never" data-i18n="disabled"></div>
                                 </div>
                             </div>
                             <div class="lru-switch" id="ksm-container" style="display:none;">
                                 <div class="switch-info">
-                                    <span class="switch-label">内存页合并 (KSM)</span>
-                                    <span class="switch-desc">合并相同内存页节省内存</span>
+                                    <span class="switch-label" data-i18n="text_ef46fd15"></span>
+                                    <span class="switch-desc" data-i18n="text_3e782991"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="ksm-switch">
@@ -666,8 +666,8 @@
                             </div>
                             <div class="lru-switch" id="compaction-container" style="display:none;">
                                 <div class="switch-info">
-                                    <span class="switch-label">主动内存压缩</span>
-                                    <span class="switch-desc">后台压缩内存碎片</span>
+                                    <span class="switch-label" data-i18n="text_4cd64523"></span>
+                                    <span class="switch-desc" data-i18n="text_a3eb16c5"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="compaction-switch">
@@ -675,21 +675,21 @@
                                 </label>
                             </div>
                             <div class="kernel-features-empty" id="kernel-features-empty">
-                                <span>未检测到可配置的 LRU 特性</span>
+                                <span data-i18n="text_42bb4999"></span>
                             </div>
                         </div>
                     </div>
                     <div class="sub-card" id="vm-sub">
                         <div class="sub-card-header" id="vm-toggle">
-                            <span class="sub-card-title">虚拟内存参数</span>
-                            <span class="current-badge" id="vm-status">默认</span>
+                            <span class="sub-card-title" data-i18n="text_0855e2b9"></span>
+                            <span class="current-badge" id="vm-status" data-i18n="text_fd739bb9"></span>
                             <span class="expand-icon">❯</span>
                         </div>
                         <div id="vm-content" class="sub-expandable-content">
                             <div class="switch-container category-config-toggle">
                                 <div class="switch-info">
-                                    <span class="switch-label">启用 VM 配置</span>
-                                    <span class="switch-desc">关闭后仅保存虚拟内存参数，不会立即写入，也不会在开机时自动应用</span>
+                                    <span class="switch-label" data-i18n="text_09e249e2"></span>
+                                    <span class="switch-desc" data-i18n="text_6f6fbf9c"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="vm-switch">
@@ -697,7 +697,7 @@
                                 </label>
                             </div>
                             <div class="setting-section">
-                                <span class="section-label">内存回收水位线 (watermark_scale_factor)</span>
+                                <span class="section-label" data-i18n="text_2ccc6666"></span>
                                 <div class="slider-container">
                                     <input type="range" class="range-slider" id="watermark-slider" min="1" max="1000" step="1" value="100">
                                     <div class="slider-labels">
@@ -708,7 +708,7 @@
                                 </div>
                             </div>
                             <div class="setting-section">
-                                <span class="section-label">额外空闲内存 (extra_free_kbytes)</span>
+                                <span class="section-label" data-i18n="text_235ce13e"></span>
                                 <div class="slider-container">
                                     <input type="range" class="range-slider" id="extra-free-slider" min="0" max="262144" step="4096" value="0">
                                     <div class="slider-labels">
@@ -719,7 +719,7 @@
                                 </div>
                             </div>
                             <div class="setting-section">
-                                <span class="section-label">脏页比例 (dirty_ratio)</span>
+                                <span class="section-label" data-i18n="text_fb05851b"></span>
                                 <div class="slider-container">
                                     <input type="range" class="range-slider" id="dirty-ratio-slider" min="5" max="90" step="1" value="20">
                                     <div class="slider-labels">
@@ -730,7 +730,7 @@
                                 </div>
                             </div>
                             <div class="setting-section">
-                                <span class="section-label">后台脏页比例 (dirty_background_ratio)</span>
+                                <span class="section-label" data-i18n="text_8055e8b2"></span>
                                 <div class="slider-container">
                                     <input type="range" class="range-slider" id="dirty-bg-slider" min="1" max="50" step="1" value="10">
                                     <div class="slider-labels">
@@ -741,7 +741,7 @@
                                 </div>
                             </div>
                             <div class="setting-section">
-                                <span class="section-label">VFS缓存压力 (vfs_cache_pressure)</span>
+                                <span class="section-label" data-i18n="text_62b03644"></span>
                                 <div class="slider-container">
                                     <input type="range" class="range-slider" id="vfs-pressure-slider" min="0" max="500" step="10" value="100">
                                     <div class="slider-labels">
@@ -755,12 +755,12 @@
                     </div>
                 </div>
             </div>
-            <div class="section-marker section-marker-settings"><span>系统调度</span></div>
+            <div class="section-marker section-marker-settings"><span data-i18n="text_47fdc9b6"></span></div>
             <div class="module-card" id="le9ec-card" data-card-key="le9ec">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title" data-module="le9ec">LE9EC 内存保护</div>
-                        <div class="module-card-desc">防止工作集被过度回收</div>
+                        <div class="module-card-title" data-module="le9ec" data-i18n="text_530a5b6b"></div>
+                        <div class="module-card-desc" data-i18n="text_f35c3026"></div>
                         <span class="module-card-badge" id="le9ec-badge">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -771,21 +771,21 @@
                 </div>
                 <div id="le9ec-content" class="module-card-content hidden">
                     <div class="info-item">
-                        <span class="info-label">匿名页保护</span>
+                        <span class="info-label" data-i18n="text_9043920d"></span>
                         <span class="info-value" id="le9ec-anon-current">--</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">文件页软保护</span>
+                        <span class="info-label" data-i18n="text_8899db29"></span>
                         <span class="info-value" id="le9ec-clean-low-current">--</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">文件页硬保护</span>
+                        <span class="info-label" data-i18n="text_fa9c5e48"></span>
                         <span class="info-value" id="le9ec-clean-min-current">--</span>
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">启用 LE9EC</span>
-                            <span class="switch-desc">保护工作集，防止内存抖动</span>
+                            <span class="switch-label" data-i18n="text_985cbcdc"></span>
+                            <span class="switch-desc" data-i18n="text_951d3bc4"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="le9ec-switch">
@@ -794,8 +794,8 @@
                     </div>
                     <div id="le9ec-settings" class="sub-settings hidden">
                         <div class="setting-section">
-                            <span class="section-label">vm.anon_min_kbytes (匿名页硬保护)</span>
-                            <span class="section-desc">防止匿名页过度换出到ZRAM</span>
+                            <span class="section-label" data-i18n="text_1e1941af"></span>
+                            <span class="section-desc" data-i18n="text_ab9739dd"></span>
                             <div class="slider-container">
                                 <input type="range" class="range-slider" id="le9ec-anon-slider" min="0" max="4096" step="64" value="512">
                                 <div class="slider-labels">
@@ -806,8 +806,8 @@
                             </div>
                         </div>
                         <div class="setting-section">
-                            <span class="section-label">vm.clean_low_kbytes (文件页软保护)</span>
-                            <span class="section-desc">除非OOM否则不回收低于此值的干净文件页</span>
+                            <span class="section-label" data-i18n="text_c238a3b6"></span>
+                            <span class="section-desc" data-i18n="text_d7ab8f92"></span>
                             <div class="slider-container">
                                 <input type="range" class="range-slider" id="le9ec-clean-low-slider" min="0" max="4096" step="64" value="0">
                                 <div class="slider-labels">
@@ -818,8 +818,8 @@
                             </div>
                         </div>
                         <div class="setting-section">
-                            <span class="section-label">vm.clean_min_kbytes (文件页硬保护)</span>
-                            <span class="section-desc">绝不回收低于此值的干净文件页</span>
+                            <span class="section-label" data-i18n="text_97cd56cf"></span>
+                            <span class="section-desc" data-i18n="text_e974c6a9"></span>
                             <div class="slider-container">
                                 <input type="range" class="range-slider" id="le9ec-clean-min-slider" min="0" max="4096" step="64" value="512">
                                 <div class="slider-labels">
@@ -835,8 +835,8 @@
             <div class="module-card" id="io-scheduler-card" data-card-key="io-scheduler">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title" data-module="io-scheduler">IO 调度器</div>
-                        <div class="module-card-desc">磁盘读写调度与预读取</div>
+                        <div class="module-card-title" data-module="io-scheduler" data-i18n="text_95940d8e"></div>
+                        <div class="module-card-desc" data-i18n="text_18bcf1ca"></div>
                         <span class="module-card-badge" id="io-current">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -848,8 +848,8 @@
                 <div id="io-scheduler-content" class="module-card-content hidden">
                     <div class="switch-container category-config-toggle">
                         <div class="switch-info">
-                            <span class="switch-label">启用 IO 配置</span>
-                            <span class="switch-desc">关闭后仅保存参数，不会立即写入，也不会在开机时自动应用</span>
+                            <span class="switch-label" data-i18n="text_bcc8d549"></span>
+                            <span class="switch-desc" data-i18n="text_b7b3928e"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="io-switch">
@@ -857,26 +857,26 @@
                         </label>
                     </div>
                     <div class="setting-section io-scheduler-options-section">
-                        <span class="section-desc">决定块设备请求的派发策略，影响顺序读写、混合负载下的吞吐与延迟表现</span>
+                        <span class="section-desc" data-i18n="text_39690e5c"></span>
                         <div class="option-list" id="io-scheduler-list"></div>
                     </div>
                     <div class="setting-section">
-                        <span class="section-label">预读取大小 (KB)</span>
-                        <span class="section-desc">提前读取连续数据，顺序读取更积极，但过大也会增加无效缓存占用</span>
+                        <span class="section-label" data-i18n="text_e1dbfa30"></span>
+                        <span class="section-desc" data-i18n="text_27a00db2"></span>
                         <div class="option-grid cols-4" id="readahead-list"></div>
                     </div>
                     <div class="io-advanced-group advanced-fold" id="io-advanced-section">
                         <div class="advanced-fold-header" id="io-advanced-toggle" role="button" tabindex="0">
                             <div class="advanced-fold-titles">
-                                <span class="section-label">高级队列参数</span>
-                                <span class="setting-hint">多数场景无需修改，点此展开</span>
+                                <span class="section-label" data-i18n="text_a7db421c"></span>
+                                <span class="setting-hint" data-i18n="text_b80ea077"></span>
                             </div>
                             <span class="expand-icon">❯</span>
                         </div>
                         <div class="advanced-fold-body" id="io-advanced-body">
 <div class="setting-section">
                             <span class="section-label">nr_requests</span>
-                            <span class="section-desc">限制队列可挂起的请求数量，值更大更偏吞吐，值更小更偏响应</span>
+                            <span class="section-desc" data-i18n="text_728c56cc"></span>
                             <div class="option-grid cols-4" id="io-nr-requests-list">
                                 <div class="option-item" data-value="64">64</div>
                                 <div class="option-item selected" data-value="128">128</div>
@@ -888,7 +888,7 @@
                         </div>
                         <div class="setting-section">
                             <span class="section-label">rq_affinity</span>
-                            <span class="section-desc">控制请求完成回调尽量回到提交它的 CPU，常用于平衡延迟与 CPU 本地性</span>
+                            <span class="section-desc" data-i18n="text_a9816b7d"></span>
                             <div class="option-grid cols-4" id="io-rq-affinity-list">
                                 <div class="option-item" data-value="0">0</div>
                                 <div class="option-item selected" data-value="1">1</div>
@@ -897,7 +897,7 @@
                         </div>
                         <div class="setting-section">
                             <span class="section-label">nomerges</span>
-                            <span class="section-desc">控制块层请求合并强度，减少合并更直接，保留合并更省队列开销</span>
+                            <span class="section-desc" data-i18n="text_491df80c"></span>
                             <div class="option-grid cols-4" id="io-nomerges-list">
                                 <div class="option-item selected" data-value="0">0</div>
                                 <div class="option-item" data-value="1">1</div>
@@ -907,7 +907,7 @@
                         <div class="switch-container" id="io-iostats-container">
                             <div class="switch-info">
                                 <span class="switch-label">iostats</span>
-                                <span class="switch-desc">统计块层 I/O 活动，方便观察负载变化；关闭可减少少量统计开销</span>
+                                <span class="switch-desc" data-i18n="text_9d21f233"></span>
                             </div>
                             <label class="switch">
                                 <input type="checkbox" id="io-iostats-switch">
@@ -922,8 +922,8 @@
             <div class="module-card" id="cpu-governor-card" data-card-key="cpu-governor">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title" data-module="cpu-governor">CPU 调频器</div>
-                        <div class="module-card-desc">调频器 / 核心管理</div>
+                        <div class="module-card-title" data-module="cpu-governor" data-i18n="text_22f9b599"></div>
+                        <div class="module-card-desc" data-i18n="text_5f5f4038"></div>
                         <span class="module-card-badge" id="cpu-gov-current">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -935,8 +935,8 @@
                 <div id="cpu-governor-content" class="module-card-content hidden">
                     <div class="switch-container category-config-toggle">
                         <div class="switch-info">
-                            <span class="switch-label">启用 CPU 配置</span>
-                            <span class="switch-desc">关闭后仅保存调频器与核心状态，不会立即写入，也不会在开机时自动应用</span>
+                            <span class="switch-label" data-i18n="text_acaafb83"></span>
+                            <span class="switch-desc" data-i18n="text_9eb3386e"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="cpu-switch">
@@ -946,19 +946,19 @@
                     <div class="option-list" id="cpu-governor-list"></div>
                     <div class="setting-section">
                         <div class="section-header">
-                            <span class="section-label">核心管理 (点击切换)</span>
+                            <span class="section-label" data-i18n="text_7d7ebd25"></span>
                             <span class="cpu-cluster-badge" id="cpu-cluster-badge">--</span>
                         </div>
                         <div class="cpu-grid" id="cpu-cores-list"></div>
                     </div>
                 </div>
             </div>
-            <div class="section-marker section-marker-settings"><span>进程与网络设置</span></div>
+            <div class="section-marker section-marker-settings"><span data-i18n="text_5992ca96"></span></div>
             <div class="module-card" id="app-policy-card" data-card-key="app-policy">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title" data-module="app-policy">应用策略</div>
-                        <div class="module-card-desc">白名单 / 保护进程 / 应用预设 / 优先级</div>
+                        <div class="module-card-title" data-module="app-policy" data-i18n="text_410072c0"></div>
+                        <div class="module-card-desc" data-i18n="text_141ef3bf"></div>
                         <span class="module-card-badge" id="app-policy-badge">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -970,8 +970,8 @@
                 <div id="app-policy-content" class="module-card-content hidden">
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">应用预设自动切换</span>
-                            <span class="switch-desc">检测到前台打开指定应用后，自动套用独立预设；离开后恢复默认配置</span>
+                            <span class="switch-label" data-i18n="text_bafafe48"></span>
+                            <span class="switch-desc" data-i18n="text_7da77b69"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="app-monitor-switch">
@@ -979,16 +979,16 @@
                         </label>
                     </div>
                     <div class="tile-actions">
-                        <button class="action-btn" id="app-policy-manage-btn">应用列表 <span id="app-policy-manage-count">0</span></button>
+                        <button class="action-btn" id="app-policy-manage-btn"><span data-i18n="text_01d8b3ce"></span> <span id="app-policy-manage-count">0</span></button>
                     </div>
-                    <div class="tile-status" id="app-policy-status">统一管理白名单、保护进程、应用预设与优先级；优先级直接在应用列表中为应用设置。</div>
+                    <div class="tile-status" id="app-policy-status" data-i18n="text_c770cf1b"></div>
                 </div>
             </div>
             <div class="module-card" id="tcp-card" data-card-key="tcp">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title" data-module="tcp">TCP 拥塞算法</div>
-                        <div class="module-card-desc">网络传输拥塞控制</div>
+                        <div class="module-card-title" data-module="tcp" data-i18n="text_e653e38b"></div>
+                        <div class="module-card-desc" data-i18n="text_3a688c87"></div>
                         <span class="module-card-badge" id="tcp-current">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -1000,8 +1000,8 @@
                 <div id="tcp-content" class="module-card-content hidden">
                     <div class="switch-container category-config-toggle">
                         <div class="switch-info">
-                            <span class="switch-label">启用网络配置</span>
-                            <span class="switch-desc">关闭后仅保存拥塞控制参数，不会立即写入，也不会在开机时自动应用</span>
+                            <span class="switch-label" data-i18n="text_5456e9b8"></span>
+                            <span class="switch-desc" data-i18n="text_fa76a47c"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="tcp-switch">
@@ -1011,13 +1011,13 @@
                     <div class="option-list" id="tcp-list"></div>
                 </div>
             </div>
-            <div class="section-marker section-marker-settings"><span>其他设置</span></div>
+            <div class="section-marker section-marker-settings"><span data-i18n="text_d9209e25"></span></div>
             <div class="module-card" id="custom-scripts-card" data-card-key="custom-scripts">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title" data-module="custom-scripts">自定义脚本</div>
-                        <div class="module-card-desc">开机自动执行的Shell脚本</div>
-                        <span class="module-card-badge" id="scripts-count">0 个</span>
+                        <div class="module-card-title" data-module="custom-scripts" data-i18n="resetCustomScripts"></div>
+                        <div class="module-card-desc" data-i18n="text_70bfe166"></div>
+                        <span class="module-card-badge" id="scripts-count" data-i18n="text_6f3b8b95"></span>
                     </div>
                     <div class="module-card-actions">
                         <div class="module-card-expand" id="custom-scripts-toggle">
@@ -1026,18 +1026,18 @@
                     </div>
                 </div>
                 <div id="custom-scripts-content" class="module-card-content hidden">
-                    <div class="scripts-desc">添加自定义Shell脚本，开机时自动执行</div>
+                    <div class="scripts-desc" data-i18n="text_0d9b54fa"></div>
                     <div class="scripts-list-container" id="scripts-list">
-                        <div class="scripts-empty">暂无自定义脚本</div>
+                        <div class="scripts-empty" data-i18n="text_ba204bfc"></div>
                     </div>
-                    <button class="action-btn scripts-add-btn" id="scripts-add-btn"><span class="add-icon">+</span> 添加脚本</button>
+                    <button class="action-btn scripts-add-btn" id="scripts-add-btn"><span class="add-icon">+</span> <span data-i18n="text_cc5c9530"></span></button>
                 </div>
             </div>
             <div class="module-card" id="system-opt-card" data-card-key="system-opt">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title" data-module="system-opt">系统优化</div>
-                        <div class="module-card-desc">LMK / 回收控制 / 进程保护</div>
+                        <div class="module-card-title" data-module="system-opt" data-i18n="text_35b00769"></div>
+                        <div class="module-card-desc" data-i18n="text_3d10e665"></div>
                         <span class="module-card-badge" id="system-opt-badge">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -1049,8 +1049,8 @@
                 <div id="system-opt-content" class="module-card-content hidden">
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">LMK 优化</span>
-                            <span class="switch-desc">根据内存大小自动配置 minfree_levels</span>
+                            <span class="switch-label" data-i18n="text_eeb02617"></span>
+                            <span class="switch-desc" data-i18n="text_44e107d0"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="lmk-switch">
@@ -1059,8 +1059,8 @@
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">解锁后台限制</span>
-                            <span class="switch-desc">max_cached_processes 设为 32768</span>
+                            <span class="switch-label" data-i18n="text_2f539be1"></span>
+                            <span class="switch-desc" data-i18n="text_035bb8de"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="device-config-switch">
@@ -1069,8 +1069,8 @@
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">禁用激进回收</span>
-                            <span class="switch-desc">禁用 DAMON/process_reclaim</span>
+                            <span class="switch-label" data-i18n="text_d7f080cd"></span>
+                            <span class="switch-desc" data-i18n="text_1375ad61"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="reclaim-switch">
@@ -1079,8 +1079,8 @@
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">kswapd 优化</span>
-                            <span class="switch-desc">将 kswapd 放入前台 cpuset</span>
+                            <span class="switch-label" data-i18n="text_80afe3b7"></span>
+                            <span class="switch-desc" data-i18n="text_1d6bfb5f"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="kswapd-switch">
@@ -1089,8 +1089,8 @@
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">关键进程保护</span>
-                            <span class="switch-desc">保护 SystemUI/Launcher 等进程</span>
+                            <span class="switch-label" data-i18n="text_839f355b"></span>
+                            <span class="switch-desc" data-i18n="text_4ca9ecdd"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="protect-switch">
@@ -1099,8 +1099,8 @@
                     </div>
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">开机 fstrim</span>
-                            <span class="switch-desc">开机时自动执行 fstrim</span>
+                            <span class="switch-label" data-i18n="text_b40e10f6"></span>
+                            <span class="switch-desc" data-i18n="text_9cc3f8b5"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="fstrim-switch">
@@ -1112,8 +1112,8 @@
             <div class="module-card" id="corona-kernel-card" data-card-key="corona-kernel">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title" data-module="corona-kernel">Corona 内核优化</div>
-                        <div class="module-card-desc">挂起省电 / 唤醒响应 / 后台空闲</div>
+                        <div class="module-card-title" data-module="corona-kernel" data-i18n="text_06b5ab4c"></div>
+                        <div class="module-card-desc" data-i18n="text_c54be8c9"></div>
                         <span class="module-card-badge" id="corona-kernel-badge">--</span>
                     </div>
                     <div class="module-card-actions">
@@ -1124,12 +1124,12 @@
                 </div>
                 <div id="corona-kernel-content" class="module-card-content hidden">
                     <div class="kernel-features-empty" id="corona-kernel-empty" style="display:none;">
-                        <span>未检测到 Corona 内核，此卡片仅在 Corona 内核下生效</span>
+                        <span data-i18n="text_782b23d5"></span>
                     </div>
                     <div id="corona-kernel-body">
                         <div class="setting-section">
-                            <span class="section-label">用户在场窗口 (user_window_ms)</span>
-                            <span class="section-desc">息屏后这段时间内的自动唤醒会跳过 restore，省掉存/恢复抖动</span>
+                            <span class="section-label" data-i18n="text_6b1779b0"></span>
+                            <span class="section-desc" data-i18n="text_4aabe494"></span>
                             <div class="slider-container">
                                 <input type="range" class="range-slider" id="ck-user-window-slider" min="0" max="300000" step="5000" value="60000">
                                 <div class="slider-labels">
@@ -1140,8 +1140,8 @@
                             </div>
                         </div>
                         <div class="setting-section">
-                            <span class="section-label">挂起态 timer slack (slack_off_ms)</span>
-                            <span class="section-desc">PM_SUSPEND_PREPARE 时把全体用户态任务的 timer_slack 抬到此值，提升 hrtimer 合并率</span>
+                            <span class="section-label" data-i18n="text_a738324e"></span>
+                            <span class="section-desc" data-i18n="text_d6df2e61"></span>
                             <div class="slider-container">
                                 <input type="range" class="range-slider" id="ck-slack-off-slider" min="10" max="500" step="10" value="100">
                                 <div class="slider-labels">
@@ -1152,11 +1152,11 @@
                             </div>
                         </div>
                         <div class="setting-section">
-                            <span class="section-label">用户在场闸 (基础)</span>
+                            <span class="section-label" data-i18n="text_11d47353"></span>
                             <div class="switch-container" data-ck-mod="wake_aware">
                                 <div class="switch-info">
                                     <span class="switch-label">wake_aware</span>
-                                    <span class="switch-desc">输入驱动的用户在场广播，被下方挂起类模块订阅</span>
+                                    <span class="switch-desc" data-i18n="text_b8ef3317"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="wake_aware">
@@ -1165,11 +1165,11 @@
                             </div>
                         </div>
                         <div class="setting-section">
-                            <span class="section-label">挂起省电</span>
+                            <span class="section-label" data-i18n="text_a0a01a60"></span>
                             <div class="switch-container" data-ck-mod="suspend_swappiness_zero">
                                 <div class="switch-info">
                                     <span class="switch-label">suspend_swappiness_zero</span>
-                                    <span class="switch-desc">挂起时把 vm_swappiness 钳到 0，避免 kswapd 在 suspend 尾声压缩匿名页</span>
+                                    <span class="switch-desc" data-i18n="text_72958441"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="suspend_swappiness_zero">
@@ -1179,7 +1179,7 @@
                             <div class="switch-container" data-ck-mod="suspend_dirty_freeze">
                                 <div class="switch-info">
                                     <span class="switch-label">suspend_dirty_freeze</span>
-                                    <span class="switch-desc">挂起时拉高脏页阈值，挡掉 flusher 在 suspend 尾声写盘</span>
+                                    <span class="switch-desc" data-i18n="text_160138c7"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="suspend_dirty_freeze">
@@ -1189,7 +1189,7 @@
                             <div class="switch-container" data-ck-mod="suspend_compact_freeze">
                                 <div class="switch-info">
                                     <span class="switch-label">suspend_compact_freeze</span>
-                                    <span class="switch-desc">挂起时关掉主动 compaction，避免 kcompactd 拖延 freeze</span>
+                                    <span class="switch-desc" data-i18n="text_88826e5d"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="suspend_compact_freeze">
@@ -1199,7 +1199,7 @@
                             <div class="switch-container" data-ck-mod="suspend_net_quiesce">
                                 <div class="switch-info">
                                     <span class="switch-label">suspend_net_quiesce</span>
-                                    <span class="switch-desc">挂起时静默非 wakeup 网卡的 NAPI 与 RPS</span>
+                                    <span class="switch-desc" data-i18n="text_8c9a4cff"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="suspend_net_quiesce">
@@ -1209,7 +1209,7 @@
                             <div class="switch-container" data-ck-mod="suspend_softlockup_disable">
                                 <div class="switch-info">
                                     <span class="switch-label">suspend_softlockup_disable</span>
-                                    <span class="switch-desc">挂起时拆 watchdog 每 CPU hrtimer，省掉每 CPU 的 4s 周期唤醒</span>
+                                    <span class="switch-desc" data-i18n="text_f884a484"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="suspend_softlockup_disable">
@@ -1219,7 +1219,7 @@
                             <div class="switch-container" data-ck-mod="suspend_timerslack">
                                 <div class="switch-info">
                                     <span class="switch-label">suspend_timerslack</span>
-                                    <span class="switch-desc">挂起时一次性把全体用户态任务 timer_slack 抬到 100 ms</span>
+                                    <span class="switch-desc" data-i18n="text_f56f74f2"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="suspend_timerslack">
@@ -1229,7 +1229,7 @@
                             <div class="switch-container" data-ck-mod="suspend_sched_slack">
                                 <div class="switch-info">
                                     <span class="switch-label">suspend_sched_slack</span>
-                                    <span class="switch-desc">挂起时拉高调度 latency / migration_cost，加大 idle 概率</span>
+                                    <span class="switch-desc" data-i18n="text_78196833"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="suspend_sched_slack">
@@ -1239,7 +1239,7 @@
                             <div class="switch-container" data-ck-mod="suspend_pm_tunables">
                                 <div class="switch-info">
                                     <span class="switch-label">suspend_pm_tunables</span>
-                                    <span class="switch-desc">挂起时压一波 pm_qos / cpufreq 上限，保险对待心跳唤醒</span>
+                                    <span class="switch-desc" data-i18n="text_8172ffdf"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="suspend_pm_tunables">
@@ -1249,7 +1249,7 @@
                             <div class="switch-container" data-ck-mod="suspend_rcu_normalize">
                                 <div class="switch-info">
                                     <span class="switch-label">suspend_rcu_normalize</span>
-                                    <span class="switch-desc">挂起时关掉 expedited RCU，让 grace period 走慢路径</span>
+                                    <span class="switch-desc" data-i18n="text_ada506fd"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="suspend_rcu_normalize">
@@ -1258,11 +1258,11 @@
                             </div>
                         </div>
                         <div class="setting-section">
-                            <span class="section-label">唤醒响应</span>
+                            <span class="section-label" data-i18n="text_aea4048a"></span>
                             <div class="switch-container" data-ck-mod="resume_freq_burst">
                                 <div class="switch-info">
                                     <span class="switch-label">resume_freq_burst</span>
-                                    <span class="switch-desc">真实用户唤醒时短暂拉高 cpufreq 下限，吃掉首屏延迟</span>
+                                    <span class="switch-desc" data-i18n="text_a1348dac"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="resume_freq_burst">
@@ -1271,11 +1271,11 @@
                             </div>
                         </div>
                         <div class="setting-section">
-                            <span class="section-label">后台空闲</span>
+                            <span class="section-label" data-i18n="text_75b9c6db"></span>
                             <div class="switch-container" data-ck-mod="swappiness_pressure_throttle">
                                 <div class="switch-info">
                                     <span class="switch-label">swappiness_pressure_throttle</span>
-                                    <span class="switch-desc">RAM 吃紧时把 vm_swappiness 从 ceiling 钳到 floor，缓解后释放；带 PSI/wake_aware/熄屏+充电/温控自适应</span>
+                                    <span class="switch-desc" data-i18n="text_763cefe3"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="swappiness_pressure_throttle">
@@ -1285,7 +1285,7 @@
                             <div class="switch-container" data-ck-mod="idle_writeback">
                                 <div class="switch-info">
                                     <span class="switch-label">idle_writeback</span>
-                                    <span class="switch-desc">系统空闲时机会性回写 zram，减少 LRU 抖动</span>
+                                    <span class="switch-desc" data-i18n="text_183ff890"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="idle_writeback">
@@ -1295,7 +1295,7 @@
                             <div class="switch-container" data-ck-mod="idle_vmstat">
                                 <div class="switch-info">
                                     <span class="switch-label">idle_vmstat</span>
-                                    <span class="switch-desc">空闲期合并 vmstat 同步，降低周期性 wake</span>
+                                    <span class="switch-desc" data-i18n="text_42fa2ce7"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="ck-switch" data-mod="idle_vmstat">
@@ -1309,7 +1309,7 @@
             <div class="module-card" id="app-settings-card" data-card-key="app-settings">
                 <div class="module-card-header">
                     <div class="module-card-info">
-                        <div class="module-card-title" data-module="module-settings">模块设置</div>
+                        <div class="module-card-title" data-module="module-settings" data-i18n="moduleSettings"></div>
                     </div>
                     <div class="module-card-actions">
                         <div class="module-card-expand" id="app-settings-toggle">
@@ -1321,38 +1321,38 @@
                     <div class="theme-options" id="theme-options">
                         <div class="theme-option selected" data-theme="light">
                             <div class="theme-preview light-preview"></div>
-                            <span>浅色模式</span>
+                            <span data-i18n="lightTheme"></span>
                         </div>
                         <div class="theme-option" data-theme="dark">
                             <div class="theme-preview dark-preview"></div>
-                            <span>深色模式</span>
+                            <span data-i18n="darkTheme"></span>
                         </div>
                     </div>
                     <div class="setting-section theme-color-section">
                         <button type="button" class="color-pref-button" id="color-picker-btn">
                             <div class="color-pref-swatch" id="color-pref-swatch"></div>
                             <div class="color-pref-text">
-                                <span class="color-pref-label">颜色选择器</span>
-                                <span class="color-pref-desc" id="color-pref-desc">调整界面主色</span>
+                                <span class="color-pref-label" data-i18n="text_32dd41af"></span>
+                                <span class="color-pref-desc" id="color-pref-desc" data-i18n="text_153d9381"></span>
                             </div>
                             <span class="color-pref-arrow">›</span>
                         </button>
-                        <button type="button" class="action-btn" id="theme-reset-btn" style="margin-top:12px;width:100%">恢复默认界面</button>
+                        <button type="button" class="action-btn" id="theme-reset-btn" style="margin-top:12px;width:100%" data-i18n="text_b3d7a246"></button>
                     </div>
                     <div class="setting-section language-setting-section">
                         <div class="language-setting-copy">
-                            <span class="section-label" data-i18n="language">界面语言</span>
-                            <span class="section-desc" data-i18n="languageDesc">切换后立即更新主要界面文字</span>
+                            <span class="section-label" data-i18n="language"></span>
+                            <span class="section-desc" data-i18n="languageDesc"></span>
                         </div>
-                        <div class="language-segmented" id="language-options" role="group" aria-label="界面语言">
-                            <button type="button" class="language-option selected" data-language="zh">中文</button>
-                            <button type="button" class="language-option" data-language="en">English</button>
+                        <div class="language-segmented" id="language-options" role="group" data-i18n-aria-label="language" aria-label="">
+                            <button type="button" class="language-option selected" data-language="zh" data-i18n="languageChinese"></button>
+                            <button type="button" class="language-option" data-language="en" data-i18n="languageEnglish"></button>
                         </div>
                     </div>
                     <div class="switch-container ui-pref-switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">变更预览</span>
-                            <span class="switch-desc">关闭后跳过变更预览，直接应用设置</span>
+                            <span class="switch-label" data-i18n="changePreview"></span>
+                            <span class="switch-desc" data-i18n="changePreviewDesc"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="change-preview-switch">
@@ -1361,8 +1361,8 @@
                     </div>
                     <div class="switch-container ui-pref-switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">设置说明</span>
-                            <span class="switch-desc">显示各项功能的用途说明，关闭后仅保留标题与操作控件</span>
+                            <span class="switch-label" data-i18n="settingDescriptions"></span>
+                            <span class="switch-desc" data-i18n="settingDescriptionsDesc"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="setting-descriptions-switch">
@@ -1371,8 +1371,8 @@
                     </div>
                     <div class="switch-container ui-pref-switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">显示分类配置</span>
-                            <span class="switch-desc">关闭后隐藏各分类配置的启用开关，不影响模块功能和已保存参数</span>
+                            <span class="switch-label" data-i18n="categoryConfig"></span>
+                            <span class="switch-desc" data-i18n="categoryConfigDesc"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="category-config-visibility-switch">
@@ -1382,16 +1382,16 @@
                     <div class="setting-section card-visibility-settings-section">
                         <div class="card-visibility-header" id="card-visibility-toggle">
                             <div class="card-visibility-heading-row">
-                                <span class="section-label">模块卡片显示</span>
-                                <span class="section-desc">关闭后仅隐藏配置页卡片，不影响模块功能和已保存参数</span>
+                                <span class="section-label" data-i18n="cardVisibility"></span>
+                                <span class="section-desc" data-i18n="cardVisibilityDesc"></span>
                             </div>
                             <span class="expand-icon">❯</span>
                         </div>
                         <div class="card-visibility-switches" id="card-visibility-list">
                             <div class="switch-container card-visibility-switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label">内存压缩</span>
-                                    <span class="switch-desc">ZRAM / Swap / LRU / VM 参数</span>
+                                    <span class="switch-label" data-i18n="text_1f30bb70"></span>
+                                    <span class="switch-desc" data-i18n="text_659546b1"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="card-visibility-switch" data-card="memory-compression" checked>
@@ -1400,8 +1400,8 @@
                             </div>
                             <div class="switch-container card-visibility-switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label">LE9EC 内存保护</span>
-                                    <span class="switch-desc">内存保护与页面缓存控制</span>
+                                    <span class="switch-label" data-i18n="text_530a5b6b"></span>
+                                    <span class="switch-desc" data-i18n="text_1498fa88"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="card-visibility-switch" data-card="le9ec" checked>
@@ -1410,8 +1410,8 @@
                             </div>
                             <div class="switch-container card-visibility-switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label">IO 调度器</span>
-                                    <span class="switch-desc">磁盘调度器与预读取设置</span>
+                                    <span class="switch-label" data-i18n="text_95940d8e"></span>
+                                    <span class="switch-desc" data-i18n="text_076cb954"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="card-visibility-switch" data-card="io-scheduler" checked>
@@ -1420,8 +1420,8 @@
                             </div>
                             <div class="switch-container card-visibility-switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label">CPU 调频器</span>
-                                    <span class="switch-desc">CPU 调频策略与核心状态</span>
+                                    <span class="switch-label" data-i18n="text_22f9b599"></span>
+                                    <span class="switch-desc" data-i18n="text_555cf9d4"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="card-visibility-switch" data-card="cpu-governor" checked>
@@ -1430,8 +1430,8 @@
                             </div>
                             <div class="switch-container card-visibility-switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label">应用策略</span>
-                                    <span class="switch-desc">白名单、保护、线程规则与应用预设</span>
+                                    <span class="switch-label" data-i18n="text_410072c0"></span>
+                                    <span class="switch-desc" data-i18n="text_1f842f86"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="card-visibility-switch" data-card="app-policy" checked>
@@ -1440,8 +1440,8 @@
                             </div>
                             <div class="switch-container card-visibility-switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label">TCP 拥塞算法</span>
-                                    <span class="switch-desc">网络拥塞控制与实时状态</span>
+                                    <span class="switch-label" data-i18n="text_e653e38b"></span>
+                                    <span class="switch-desc" data-i18n="text_ab2d7245"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="card-visibility-switch" data-card="tcp" checked>
@@ -1450,8 +1450,8 @@
                             </div>
                             <div class="switch-container card-visibility-switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label">自定义脚本</span>
-                                    <span class="switch-desc">管理附加脚本与开机执行项</span>
+                                    <span class="switch-label" data-i18n="resetCustomScripts"></span>
+                                    <span class="switch-desc" data-i18n="text_008d5226"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="card-visibility-switch" data-card="custom-scripts" checked>
@@ -1460,8 +1460,8 @@
                             </div>
                             <div class="switch-container card-visibility-switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label">系统优化</span>
-                                    <span class="switch-desc">系统级调优与附加优化项</span>
+                                    <span class="switch-label" data-i18n="text_35b00769"></span>
+                                    <span class="switch-desc" data-i18n="text_835d58d4"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="card-visibility-switch" data-card="system-opt" checked>
@@ -1470,8 +1470,8 @@
                             </div>
                             <div class="switch-container card-visibility-switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label">Corona 内核优化</span>
-                                    <span class="switch-desc">内核增强模块与附加开关</span>
+                                    <span class="switch-label" data-i18n="text_06b5ab4c"></span>
+                                    <span class="switch-desc" data-i18n="text_c9d540c7"></span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="card-visibility-switch" data-card="corona-kernel" checked>
@@ -1483,49 +1483,49 @@
                     <div class="setting-section config-validation-section">
                         <div class="section-header-row">
                             <div>
-                                <span class="section-label" data-i18n="configValidation">参数冲突检查</span>
-                                <span class="section-desc" data-i18n="configValidationDesc">检查内存比例、交换优先级、存储空间和算法冲突</span>
+                                <span class="section-label" data-i18n="configValidation"></span>
+                                <span class="section-desc" data-i18n="configValidationDesc"></span>
                             </div>
                         </div>
-                        <div class="config-validation-status" id="config-validation-status" data-i18n="validationNotRun">尚未检查</div>
-                        <button type="button" class="action-btn" id="config-validation-btn" data-i18n="runValidation">立即检查</button>
+                        <div class="config-validation-status" id="config-validation-status" data-i18n="validationNotRun"></div>
+                        <button type="button" class="action-btn" id="config-validation-btn" data-i18n="runValidation"></button>
                     </div>
                     <div class="setting-section snapshot-section">
                         <div class="section-header-row">
                             <div>
-                                <span class="section-label">参数快照</span>
-                                <span class="section-desc">保存当前参数组合，后续可快速恢复</span>
+                                <span class="section-label" data-i18n="resetSnapshots"></span>
+                                <span class="section-desc" data-i18n="text_f499e253"></span>
                             </div>
                         </div>
                         <div class="backup-actions">
-                            <button class="action-btn" id="snapshot-save-btn">保存当前快照</button>
+                            <button class="action-btn" id="snapshot-save-btn" data-i18n="text_1a98b496"></button>
                         </div>
-                        <div class="backup-info" id="snapshot-status">当前仅保存配置状态，恢复后不会自动全量立即应用。</div>
+                        <div class="backup-info" id="snapshot-status" data-i18n="text_03902832"></div>
                         <div class="scripts-list-container snapshot-list-container" id="snapshot-list">
-                            <div class="scripts-empty">暂无参数快照</div>
+                            <div class="scripts-empty" data-i18n="text_adbd9307"></div>
                         </div>
                     </div>
                     <div class="setting-section update-section">
                         <div class="section-header-row">
                             <div>
-                                <span class="section-label">模块版本</span>
-                                <span class="section-meta-text" id="current-version-text">当前版本：--</span>
+                                <span class="section-label" data-i18n="text_ea9383e5"></span>
+                                <span class="section-meta-text" id="current-version-text" data-i18n="text_530c1663"></span>
                             </div>
                         </div>
                     </div>
                     <div class="setting-section update-section hidden" id="kernel-build-section">
                         <div class="section-header-row">
                             <div>
-                                <span class="section-label">内核迭代次数</span>
-                                <span class="section-meta-text" id="kernel-build-text">当前迭代：--</span>
+                                <span class="section-label" data-i18n="text_5dbbdf2d"></span>
+                                <span class="section-meta-text" id="kernel-build-text" data-i18n="text_8fa0ed93"></span>
                             </div>
                         </div>
                     </div>
                     <div class="setting-section danger-section">
-                        <span class="section-label">危险操作</span>
-                        <div class="action-desc" data-i18n="resetSettingsDesc">点击按类别选择，长按选择具体配置；应用预设默认保留</div>
+                        <span class="section-label" data-i18n="text_60b4c5ae"></span>
+                        <div class="action-desc" data-i18n="resetSettingsDesc"></div>
                         <button class="action-btn action-btn-danger reset-all-btn" id="reset-all-btn">
-                            <span class="reset-all-btn-text" data-i18n="resetSettings">重置设置</span>
+                            <span class="reset-all-btn-text" data-i18n="resetSettings"></span>
                         </button>
                     </div>
                 </div>
@@ -1535,30 +1535,30 @@
             <nav class="tab-bar">
                 <div class="tab-slider" id="tab-slider"></div>
                 <div class="tab-item active" data-page="home">
-                    <span class="tab-label" data-i18n="tabHome">主页</span>
+                    <span class="tab-label" data-i18n="tabHome"></span>
                 </div>
                 <div class="tab-item" data-page="settings">
-                    <span class="tab-label" data-i18n="tabSettings">配置</span>
+                    <span class="tab-label" data-i18n="tabSettings"></span>
                 </div>
             </nav>
         </div>
     <div class="toast" id="toast"></div>
     <div class="loading-overlay" id="loading">
         <div class="loading-spinner"></div>
-        <span class="loading-text">处理中...</span>
+        <span class="loading-text" data-i18n="processing"></span>
     </div>
     <div class="easter-egg-overlay" id="easter-egg-overlay">
         <div class="easter-egg-card" id="easter-egg-card">
             <div class="easter-egg-content" id="easter-egg-content">
-                <div class="rainbow-text">感谢使用<span class="corona-c-rainbow">C</span>orona模块</div>
-                <div class="rainbow-text ciallo">Ciallo~(∠・ω< )⌒★</div>
+                <div class="rainbow-text"><span data-i18n="text_a07deb8b"></span><span class="corona-c-rainbow">C</span><span data-i18n="text_0cdce678"></span></div>
+                <div class="rainbow-text ciallo" data-i18n="easterEggCiallo"></div>
             </div>
         </div>
     </div>
     <div class="detail-overlay hidden no-close-btn" id="battery-detail-overlay">
         <div class="detail-card">
             <div class="detail-header">
-                <span class="detail-title">电池详情</span>
+                <span class="detail-title" data-i18n="text_a4e87c85"></span>
             </div>
             <div class="detail-content" id="battery-detail-content"></div>
         </div>
@@ -1566,7 +1566,7 @@
     <div class="detail-overlay hidden no-close-btn" id="ufs-detail-overlay">
         <div class="detail-card">
             <div class="detail-header">
-                <span class="detail-title">UFS 寿命</span>
+                <span class="detail-title" data-i18n="text_f081defd"></span>
             </div>
             <div class="detail-content" id="ufs-detail-content"></div>
         </div>
@@ -1574,51 +1574,51 @@
     <div class="detail-overlay hidden no-close-btn" id="storage-detail-overlay">
         <div class="detail-card">
             <div class="detail-header">
-                <span class="detail-title">储存管理</span>
+                <span class="detail-title" data-i18n="text_9f4f7eb6"></span>
             </div>
             <div class="detail-content" id="storage-detail-content">
                 <div class="action-section">
-                    <div class="action-title">垃圾回收 (GC)</div>
-                    <div class="action-desc">执行F2FS文件系统垃圾回收</div>
-                    <button class="action-btn" id="gc-btn">执行 GC</button>
+                    <div class="action-title" data-i18n="text_9b7b1e71"></div>
+                    <div class="action-desc" data-i18n="text_a43bdd9b"></div>
+                    <button class="action-btn" id="gc-btn" data-i18n="text_cd8e2a8c"></button>
                 </div>
                 <div class="action-section" id="memclean-section">
-                    <div class="action-title">内存清理</div>
-                    <div class="action-desc">释放系统缓存与后台进程内存</div>
+                    <div class="action-title" data-i18n="text_27c6aa23"></div>
+                    <div class="action-desc" data-i18n="text_8ed24527"></div>
                     <div class="memclean-options" id="memclean-options">
                         <div class="memclean-option" data-mode="drop-caches">
-                            <div class="memclean-name">清理缓存</div>
-                            <div class="memclean-desc">释放页面缓存</div>
+                            <div class="memclean-name" data-i18n="text_4f37ed31"></div>
+                            <div class="memclean-desc" data-i18n="text_5e994a91"></div>
                         </div>
                         <div class="memclean-option" data-mode="drop-all">
-                            <div class="memclean-name">深度清理</div>
-                            <div class="memclean-desc">释放所有可回收内存</div>
+                            <div class="memclean-name" data-i18n="text_a7b1e2f5"></div>
+                            <div class="memclean-desc" data-i18n="text_b2739cf6"></div>
                         </div>
                         <div class="memclean-option" data-mode="compact">
-                            <div class="memclean-name">内存整理</div>
-                            <div class="memclean-desc">压缩内存碎片</div>
+                            <div class="memclean-name" data-i18n="text_b71b3676"></div>
+                            <div class="memclean-desc" data-i18n="text_73ef1edb"></div>
                         </div>
                         <div class="memclean-option" data-mode="kill-bg">
-                            <div class="memclean-name">清理后台</div>
-                            <div class="memclean-desc">终止后台应用</div>
+                            <div class="memclean-name" data-i18n="text_ed6cebcc"></div>
+                            <div class="memclean-desc" data-i18n="text_c6e0d0cd"></div>
                         </div>
                         <div class="memclean-option" data-mode="emergency-reclaim">
-                            <div class="memclean-name">紧急回收</div>
-                            <div class="memclean-desc">缓存回收 + 内存整理 + 后台清理</div>
+                            <div class="memclean-name" data-i18n="text_0392e4c9"></div>
+                            <div class="memclean-desc" data-i18n="text_ea501080"></div>
                         </div>
                     </div>
                     <div class="memclean-progress-container hidden" id="memclean-progress">
                         <div class="memclean-progress-header">
-                            <span class="memclean-progress-title">清理进度</span>
+                            <span class="memclean-progress-title" data-i18n="text_efad1397"></span>
                             <span class="memclean-progress-percent" id="memclean-percent">0%</span>
                         </div>
                         <div class="memclean-progress-bar">
                             <div class="memclean-progress-fill" id="memclean-fill" style="width: 0%"></div>
                         </div>
-                        <div class="memclean-progress-status" id="memclean-status">准备中...</div>
+                        <div class="memclean-progress-status" id="memclean-status" data-i18n="text_9cf9f109"></div>
                     </div>
                     <div class="memclean-result hidden" id="memclean-result">
-                        <div class="memclean-result-title">清理结果</div>
+                        <div class="memclean-result-title" data-i18n="text_984c417d"></div>
                         <div class="memclean-result-content" id="memclean-result-content"></div>
                     </div>
                 </div>
@@ -1627,83 +1627,83 @@
     </div>
     <div class="detail-overlay hidden no-close-btn" id="xinran-overlay">
         <div class="detail-card xinran-card">
-            <img src="images/003.png" alt="Xinran" class="xinran-image" loading="lazy" decoding="async">
+            <img src="images/003.png" data-i18n-alt="xinranImageAlt" alt="" class="xinran-image" loading="lazy" decoding="async">
         </div>
     </div>
     <div class="detail-overlay hidden no-close-btn" id="priority-process-overlay">
         <div class="detail-card priority-process-card">
             <div class="detail-header">
-                <span class="detail-title">选择进程</span>
+                <span class="detail-title" data-i18n="text_0e9cae9d"></span>
             </div>
             <div class="priority-search-container">
-                <input type="text" class="priority-search" id="priority-process-search" placeholder="搜索进程...">
+                <input type="text" class="priority-search" id="priority-process-search" data-i18n-placeholder="text_85fa7e55" placeholder="">
             </div>
             <div class="priority-process-list" id="priority-process-list">
-                <div class="priority-loading">加载中...</div>
+                <div class="priority-loading" data-i18n="text_4d0530f5"></div>
             </div>
         </div>
     </div>
     <div class="detail-overlay hidden no-close-btn" id="priority-setting-overlay">
         <div class="detail-card priority-setting-card">
             <div class="detail-header">
-                <span class="detail-title">设置优先级</span>
+                <span class="detail-title" data-i18n="text_34b2b816"></span>
             </div>
             <div class="priority-process-info" id="priority-selected-process">
                 <span class="process-name">--</span>
             </div>
             <div class="priority-setting-section">
-                <div class="priority-setting-label">CPU 优先级 (nice)</div>
+                <div class="priority-setting-label" data-i18n="text_7d346354"></div>
                 <div class="priority-nice-slider-container">
                     <input type="range" class="range-slider priority-nice-slider" id="nice-slider" min="-20" max="19" step="1" value="0">
                     <div class="slider-labels">
-                        <span>-20 (最高)</span>
+                        <span data-i18n="text_12aa4509"></span>
                         <span class="slider-value" id="nice-slider-value">0</span>
-                        <span>19 (最低)</span>
+                        <span data-i18n="text_8b526510"></span>
                     </div>
                 </div>
-                <div class="priority-setting-hint">nice 值越低优先级越高 (-20 到 19)</div>
+                <div class="priority-setting-hint" data-i18n="text_b05886f1"></div>
             </div>
             <div class="priority-setting-section">
-                <div class="priority-setting-label">I/O 优先级</div>
+                <div class="priority-setting-label" data-i18n="text_9009b79b"></div>
                 <div class="priority-io-options" id="io-options">
                     <div class="io-option" data-class="1" data-level="0">
-                        <div class="io-class">实时</div>
-                        <div class="io-desc">最高优先级</div>
+                        <div class="io-class" data-i18n="text_2fddcc15"></div>
+                        <div class="io-desc" data-i18n="text_19010dae"></div>
                     </div>
                     <div class="io-option selected" data-class="2" data-level="4">
-                        <div class="io-class">尽力</div>
-                        <div class="io-desc">默认优先级</div>
+                        <div class="io-class" data-i18n="text_87b1cf89"></div>
+                        <div class="io-desc" data-i18n="text_ceb6cc32"></div>
                     </div>
                     <div class="io-option" data-class="3" data-level="7">
-                        <div class="io-class">空闲</div>
-                        <div class="io-desc">后台任务</div>
+                        <div class="io-class" data-i18n="text_95eba18d"></div>
+                        <div class="io-desc" data-i18n="text_a26845fb"></div>
                     </div>
                 </div>
-                <div class="priority-setting-hint">I/O调度类别：实时 > 尽力 > 空闲</div>
+                <div class="priority-setting-hint" data-i18n="priorityIoClassHint"></div>
             </div>
             <div class="priority-actions">
-                <button class="action-btn priority-cancel-btn" id="priority-cancel-btn">取消</button>
-                <button class="action-btn priority-save-btn" id="priority-save-btn">保存规则</button>
+                <button class="action-btn priority-cancel-btn" id="priority-cancel-btn" data-i18n="cancel"></button>
+                <button class="action-btn priority-save-btn" id="priority-save-btn" data-i18n="text_b62fa05f"></button>
             </div>
         </div>
     </div>
     <div class="detail-overlay hidden no-close-btn" id="app-policy-overlay">
         <div class="detail-card priority-process-card app-policy-detail-card">
             <div class="detail-header">
-                <span class="detail-title" id="app-policy-title">选择应用</span>
+                <span class="detail-title" id="app-policy-title" data-i18n="text_3ec10923"></span>
             </div>
             <div class="priority-search-container">
-                <input type="text" class="priority-search" id="app-policy-search" placeholder="搜索应用名或包名...">
+                <input type="text" class="priority-search" id="app-policy-search" data-i18n-placeholder="text_dcf45884" placeholder="">
             </div>
             <div class="priority-process-list freeze-app-list-select" id="app-policy-list">
-                <div class="priority-loading">加载中...</div>
+                <div class="priority-loading" data-i18n="text_4d0530f5"></div>
             </div>
         </div>
     </div>
     <div class="detail-overlay hidden no-close-btn" id="app-profile-overlay">
         <div class="detail-card app-profile-detail-card">
             <div class="detail-header">
-                <span class="detail-title" id="app-profile-title">应用动作</span>
+                <span class="detail-title" id="app-profile-title" data-i18n="text_d7e4fb85"></span>
             </div>
             <div class="doze-preset-list" id="app-profile-options"></div>
         </div>
@@ -1712,19 +1712,19 @@
     <div class="detail-overlay hidden no-close-btn" id="thread-rule-overlay">
         <div class="detail-card priority-process-card thread-rule-card">
             <div class="detail-header">
-                <span class="detail-title" id="thread-rule-title">线程规则</span>
+                <span class="detail-title" id="thread-rule-title" data-i18n="text_374e5448"></span>
             </div>
             <div class="thread-rule-flow">
                 <div class="thread-tag-form" id="thread-tag-form">
-                    <input type="text" id="thread-tag-name-input" class="priority-search" placeholder="标签名称，例如 : Ciallo～">
+                    <input type="text" id="thread-tag-name-input" class="priority-search" data-i18n-placeholder="text_21e15ede" placeholder="">
                     <div class="thread-tag-form-actions">
-                        <button class="thread-tag-primary-btn" id="thread-tag-save-btn">保存标签</button>
+                        <button class="thread-tag-primary-btn" id="thread-tag-save-btn" data-i18n="text_3d3e8771"></button>
                     </div>
                 </div>
                 <div class="thread-tag-card-list" id="thread-rule-tag-list"></div>
-                <div class="thread-rule-subtitle">已保存规则</div>
+                <div class="thread-rule-subtitle" data-i18n="text_2544388f"></div>
                 <div class="priority-process-list" id="thread-rule-list">
-                    <div class="priority-loading">加载中...</div>
+                    <div class="priority-loading" data-i18n="text_4d0530f5"></div>
                 </div>
             </div>
         </div>
@@ -1732,30 +1732,30 @@
     <div class="detail-overlay hidden no-close-btn" id="thread-rule-editor-overlay">
         <div class="detail-card priority-setting-card thread-rule-editor-card">
             <div class="detail-header">
-                <span class="detail-title" id="thread-rule-editor-title">线程规则</span>
+                <span class="detail-title" id="thread-rule-editor-title" data-i18n="text_374e5448"></span>
             </div>
             <div class="priority-process-info" id="thread-rule-selected-app">
                 <span class="process-name">--</span>
             </div>
             <div class="priority-setting-section">
-                <div class="priority-setting-label">线程名 / 模式</div>
-                <input type="text" id="thread-pattern-input" class="priority-search" placeholder="例如 RenderThread 或 Thread-*">
-                <div class="priority-setting-hint">支持通配符，如 `RenderThread`、`GLThread`、`Thread-*`</div>
+                <div class="priority-setting-label" data-i18n="text_71245969"></div>
+                <input type="text" id="thread-pattern-input" class="priority-search" data-i18n-placeholder="text_cc6ea83d" placeholder="">
+                <div class="priority-setting-hint" data-i18n="text_43609790"></div>
             </div>
             <div class="priority-setting-section">
-                <div class="priority-setting-label">规则模式</div>
+                <div class="priority-setting-label" data-i18n="text_d605d266"></div>
                 <div class="thread-mode-grid" id="thread-mode-list"></div>
             </div>
             <div class="priority-setting-section thread-rule-grid">
                 <div>
-                    <div class="priority-setting-label">CPU 亲和性</div>
-                    <input type="text" id="thread-affinity-input" class="priority-search" placeholder="例如 0-3 或 4,6,7">
-                    <div class="priority-setting-hint">将使用 `taskset -pc` 绑定到指定核心</div>
+                    <div class="priority-setting-label" data-i18n="text_27626d16"></div>
+                    <input type="text" id="thread-affinity-input" class="priority-search" data-i18n-placeholder="text_4f63b865" placeholder="">
+                    <div class="priority-setting-hint" data-i18n="text_f2c73da4"></div>
                 </div>
                 <div>
-                    <div class="priority-setting-label">Cpuset 分组</div>
+                    <div class="priority-setting-label" data-i18n="text_23fe970f"></div>
                     <select id="thread-cpuset-group" class="thread-rule-select">
-                        <option value="">不指定</option>
+                        <option value="" data-i18n="text_4f6339b5"></option>
                         <option value="top-app">top-app</option>
                         <option value="foreground">foreground</option>
                         <option value="foreground_window">foreground_window</option>
@@ -1778,7 +1778,7 @@
             </div>
             <div class="priority-setting-section thread-rule-grid">
                 <div>
-                    <div class="priority-setting-label">调度策略</div>
+                    <div class="priority-setting-label" data-i18n="text_03afa6a1"></div>
                     <select id="thread-sched-policy" class="thread-rule-select">
                         <option value="normal">normal</option>
                         <option value="batch">batch</option>
@@ -1788,111 +1788,111 @@
                     </select>
                 </div>
                 <div>
-                    <div class="priority-setting-label">实时优先级</div>
-                    <input type="number" id="thread-rt-prio" class="priority-search" min="0" max="99" value="1" placeholder="1-99，仅 fifo/rr 有效">
+                    <div class="priority-setting-label" data-i18n="text_5e90043e"></div>
+                    <input type="number" id="thread-rt-prio" class="priority-search" min="0" max="99" value="1" data-i18n-placeholder="text_14db1ff6" placeholder="">
                 </div>
             </div>
             <div class="priority-setting-section">
-                <div class="priority-setting-label">WALT 增强</div>
+                <div class="priority-setting-label" data-i18n="text_d8de62d3"></div>
                 <div class="switch-list compact-switch-list">
-                    <label class="mini-switch-row"><input type="checkbox" id="thread-walt-boost"><span class="mini-switch-copy"><span class="mini-switch-title">Per-task boost</span><span class="mini-switch-desc">提升命中线程的 WALT 任务权重</span></span></label>
-                    <label class="mini-switch-row"><input type="checkbox" id="thread-walt-pipeline"><span class="mini-switch-copy"><span class="mini-switch-title">Pipeline special</span><span class="mini-switch-desc">让渲染链路线程更容易被特殊处理</span></span></label>
+                    <label class="mini-switch-row"><input type="checkbox" id="thread-walt-boost"><span class="mini-switch-copy"><span class="mini-switch-title" data-i18n="perTaskBoost"></span><span class="mini-switch-desc" data-i18n="text_3de0bce4"></span></span></label>
+                    <label class="mini-switch-row"><input type="checkbox" id="thread-walt-pipeline"><span class="mini-switch-copy"><span class="mini-switch-title" data-i18n="pipelineSpecial"></span><span class="mini-switch-desc" data-i18n="text_ee1fe896"></span></span></label>
                 </div>
-                <div class="priority-setting-hint">会尝试打开相关 WALT 节点，并关闭 `task_reduce_affinity`</div>
+                <div class="priority-setting-hint" data-i18n="text_6c6e982d"></div>
             </div>
             <div class="priority-actions">
-                <button class="action-btn priority-cancel-btn" id="thread-rule-cancel-btn">取消</button>
-                <button class="action-btn priority-save-btn" id="thread-rule-save-btn">保存规则</button>
+                <button class="action-btn priority-cancel-btn" id="thread-rule-cancel-btn" data-i18n="cancel"></button>
+                <button class="action-btn priority-save-btn" id="thread-rule-save-btn" data-i18n="text_b62fa05f"></button>
             </div>
         </div>
     </div>
     <div class="detail-overlay hidden" id="confirm-dialog-overlay">
         <div class="detail-content confirm-dialog">
             <div class="detail-header">
-                <span id="confirm-dialog-title">确认</span>
+                <span id="confirm-dialog-title" data-i18n="text_4ad2ef8f"></span>
             </div>
             <div class="confirm-dialog-body">
                 <pre id="confirm-dialog-message"></pre>
             </div>
             <div class="confirm-dialog-actions">
-                <button class="action-btn" id="confirm-dialog-cancel">取消</button>
-                <button class="action-btn action-btn-danger" id="confirm-dialog-ok">确定</button>
+                <button class="action-btn" id="confirm-dialog-cancel" data-i18n="cancel"></button>
+                <button class="action-btn action-btn-danger" id="confirm-dialog-ok" data-i18n="text_621a8231"></button>
             </div>
         </div>
     </div>
     <div class="detail-overlay hidden no-close-btn" id="reset-settings-overlay">
         <div class="detail-card reset-settings-card">
             <div class="detail-header">
-                <span class="detail-title" data-i18n="resetSelectTitle">选择要重置的设置</span>
+                <span class="detail-title" data-i18n="resetSelectTitle"></span>
             </div>
-            <div class="reset-settings-copy" data-i18n="resetSelectDesc">仅清除勾选项目；应用预设默认保留。</div>
+            <div class="reset-settings-copy" data-i18n="resetSelectDesc"></div>
             <div class="reset-settings-list" id="reset-settings-scope-list">
                 <label class="reset-settings-option">
                     <input type="checkbox" data-reset-scope="memory" checked>
-                    <span><strong data-i18n="resetMemorySettings">内存与交换设置</strong><small data-i18n="resetMemorySettingsDesc">ZRAM、Loop、Swap、VM 与内存相关参数</small></span>
+                    <span><strong data-i18n="resetMemorySettings"></strong><small data-i18n="resetMemorySettingsDesc"></small></span>
                 </label>
                 <label class="reset-settings-option">
                     <input type="checkbox" data-reset-scope="system" checked>
-                    <span><strong data-i18n="resetSystemSettings">系统优化设置</strong><small data-i18n="resetSystemSettingsDesc">I/O、CPU、TCP 与内核优化参数</small></span>
+                    <span><strong data-i18n="resetSystemSettings"></strong><small data-i18n="resetSystemSettingsDesc"></small></span>
                 </label>
                 <label class="reset-settings-option">
                     <input type="checkbox" data-reset-scope="scripts" checked>
-                    <span><strong data-i18n="resetCustomScripts">自定义脚本</strong><small data-i18n="resetCustomScriptsDesc">清除脚本配置和生成的后台脚本</small></span>
+                    <span><strong data-i18n="resetCustomScripts"></strong><small data-i18n="resetCustomScriptsDesc"></small></span>
                 </label>
                 <label class="reset-settings-option">
                     <input type="checkbox" data-reset-scope="app-policy">
-                    <span><strong data-i18n="resetAppPolicy">应用策略设置</strong><small data-i18n="resetAppPolicyDesc">清除白名单、保护和优先级，保留应用预设</small></span>
+                    <span><strong data-i18n="resetAppPolicy"></strong><small data-i18n="resetAppPolicyDesc"></small></span>
                 </label>
                 <label class="reset-settings-option">
                     <input type="checkbox" data-reset-scope="ui">
-                    <span><strong data-i18n="resetUiPreferences">界面偏好</strong><small data-i18n="resetUiPreferencesDesc">主题、语言、颜色和卡片显示偏好</small></span>
+                    <span><strong data-i18n="resetUiPreferences"></strong><small data-i18n="resetUiPreferencesDesc"></small></span>
                 </label>
                 <label class="reset-settings-option">
                     <input type="checkbox" data-reset-scope="snapshots">
-                    <span><strong data-i18n="resetSnapshots">参数快照</strong><small data-i18n="resetSnapshotsDesc">删除已保存的参数快照</small></span>
+                    <span><strong data-i18n="resetSnapshots"></strong><small data-i18n="resetSnapshotsDesc"></small></span>
                 </label>
                 <label class="reset-settings-option reset-settings-danger">
                     <input type="checkbox" data-reset-scope="all-apps">
-                    <span><strong data-i18n="resetAllAppSettings">删除所有应用设置与预设</strong><small data-i18n="resetAllAppSettingsDesc">包括全部独立应用预设，此项不可恢复</small></span>
+                    <span><strong data-i18n="resetAllAppSettings"></strong><small data-i18n="resetAllAppSettingsDesc"></small></span>
                 </label>
             </div>
             <div class="reset-settings-list hidden" id="reset-settings-config-list"></div>
-            <div class="reset-settings-note" data-i18n="resetRestartNote">清除系统配置后设备会自动重启。</div>
+            <div class="reset-settings-note" data-i18n="resetRestartNote"></div>
             <div class="detail-actions reset-settings-actions">
-                <button class="action-btn" id="reset-settings-cancel" data-i18n="cancel">取消</button>
-                <button class="action-btn action-btn-danger" id="reset-settings-confirm" data-i18n="resetSelected">重置所选项目</button>
+                <button class="action-btn" id="reset-settings-cancel" data-i18n="cancel"></button>
+                <button class="action-btn action-btn-danger" id="reset-settings-confirm" data-i18n="resetSelected"></button>
             </div>
         </div>
     </div>
     <div class="detail-overlay hidden no-close-btn" id="script-edit-overlay">
         <div class="detail-card script-edit-card">
             <div class="detail-header">
-                <span class="detail-title" id="script-edit-title">添加脚本</span>
+                <span class="detail-title" id="script-edit-title" data-i18n="text_cc5c9530"></span>
             </div>
             <div class="script-edit-content">
                 <div class="script-edit-section">
-                    <span class="script-edit-label">脚本名称</span>
-                    <input type="text" class="script-name-input" id="script-name-input" placeholder="例如: 性能优化">
+                    <span class="script-edit-label" data-i18n="text_2062ad1e"></span>
+                    <input type="text" class="script-name-input" id="script-name-input" data-i18n-placeholder="text_7986b854" placeholder="">
                 </div>
                 <div class="script-edit-section">
-                    <span class="script-edit-label">分类标签</span>
+                    <span class="script-edit-label" data-i18n="text_d1958177"></span>
                     <div class="script-tags" id="script-tags">
-                        <div class="script-tag selected" data-tag="性能">性能</div>
-                        <div class="script-tag" data-tag="省电">省电</div>
-                        <div class="script-tag" data-tag="网络">网络</div>
-                        <div class="script-tag" data-tag="内存">内存</div>
-                        <div class="script-tag" data-tag="其他">其他</div>
+                        <div class="script-tag selected" data-tag="performance" data-i18n="text_c1db7ae1"></div>
+                        <div class="script-tag" data-tag="power" data-i18n="text_d7cbc83b"></div>
+                        <div class="script-tag" data-tag="network" data-i18n="text_9a2fa260"></div>
+                        <div class="script-tag" data-tag="memory" data-i18n="text_9f1c1848"></div>
+                        <div class="script-tag" data-tag="other" data-i18n="text_301739cd"></div>
                     </div>
                 </div>
                 <div class="script-edit-section">
-                    <span class="script-edit-label">脚本内容</span>
-                    <textarea class="script-code-input" id="script-code-input" placeholder="#!/system/bin/sh&#10;# 在此输入Shell脚本代码&#10;echo 'Hello Corona'"></textarea>
+                    <span class="script-edit-label" data-i18n="text_5fad99a1"></span>
+                    <textarea class="script-code-input" id="script-code-input" data-i18n-placeholder="text_e4168bb5" placeholder=""></textarea>
                 </div>
                 <div class="script-edit-section">
                     <div class="switch-container">
                         <div class="switch-info">
-                            <span class="switch-label">启用此脚本</span>
-                            <span class="switch-desc">关闭后开机不会执行</span>
+                            <span class="switch-label" data-i18n="text_9c533c9c"></span>
+                            <span class="switch-desc" data-i18n="text_e66b92bb"></span>
                         </div>
                         <label class="switch">
                             <input type="checkbox" id="script-enabled-switch" checked>
@@ -1901,8 +1901,8 @@
                     </div>
                 </div>
                 <div class="script-edit-actions">
-                    <button class="action-btn" id="script-cancel-btn">取消</button>
-                    <button class="action-btn script-save-btn" id="script-save-btn">保存脚本</button>
+                    <button class="action-btn" id="script-cancel-btn" data-i18n="cancel"></button>
+                    <button class="action-btn script-save-btn" id="script-save-btn" data-i18n="text_d133b136"></button>
                 </div>
             </div>
         </div>
@@ -1910,14 +1910,14 @@
     <div class="detail-overlay hidden" id="module-intro-overlay">
         <div class="detail-content module-intro-card">
             <div class="module-intro-row">
-                <span class="module-intro-label" id="module-intro-title">功能介绍</span>
+                <span class="module-intro-label" id="module-intro-title" data-i18n="text_aa2e68d1"></span>
                 <span class="module-intro-text" id="module-intro-content"></span>
             </div>
             <div class="module-intro-close-row">
-                <button class="action-btn module-intro-close-btn" id="module-intro-close">了解了</button>
+                <button class="action-btn module-intro-close-btn" id="module-intro-close" data-i18n="text_3c727438"></button>
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071532" defer></script>
+    <script src="script.js?v=2026071543" defer></script>
 </body>
 </html>
