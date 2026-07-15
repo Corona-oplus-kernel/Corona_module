@@ -1389,9 +1389,10 @@ body.theme-dark .cpu-core .cpu-core-load.has-usage {
 }
 
 body.theme-dark .toast {
-    border-color: rgba(255, 255, 255, 0.14);
-    background: var(--glass-floating-bg);
-    box-shadow: 0 14px 38px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.10);
+    background: #000000;
+    color: #ffffff;
+    box-shadow: 0 14px 38px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .toast.show {
