@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" id="theme-color-meta" content="#1783e8">
     <title>Corona 控制台</title>
-    <link rel="stylesheet" href="style.css?v=2026071522">
-    <link rel="stylesheet" href="css/components.css?v=2026071522">
-    <link rel="stylesheet" href="css/pages/settings.css?v=2026071522">
+    <link rel="stylesheet" href="style.css?v=2026071523">
+    <link rel="stylesheet" href="css/components.css?v=2026071523">
+    <link rel="stylesheet" href="css/pages/settings.css?v=2026071523">
     <link rel="stylesheet" href="css/animations.css?v=2026071464">
     <script>
     (function () {
@@ -414,58 +414,6 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="loop-control-card" id="zram-loop-card">
-                                    <button type="button" class="loop-card-header" id="zram-loop-toggle" aria-expanded="false">
-                                        <span class="loop-card-icon">↻</span>
-                                        <span class="loop-card-heading">
-                                            <strong data-i18n="loopWriteback">Loop 回写</strong>
-                                            <small data-i18n="loopWritebackDesc">为 ZRAM 自动创建 Loop 回写空间</small>
-                                        </span>
-                                        <span class="current-badge" id="zram-loop-status" data-i18n="inactive">未启用</span>
-                                        <span class="loop-card-arrow">❯</span>
-                                    </button>
-                                    <div class="loop-card-body" id="zram-loop-body" hidden>
-                                        <div class="loop-card-body-inner">
-                                            <div class="switch-container loop-writeback-switch" id="zram-writeback-switch-container">
-                                                <div class="switch-info">
-                                                    <span class="switch-label" data-i18n="enableLoop">启用 Loop 配置</span>
-                                                    <span class="switch-desc" data-i18n="enableLoopDesc">保存后可单独启动或停止，不重置 ZRAM 参数</span>
-                                                </div>
-                                                <label class="switch">
-                                                    <input type="checkbox" id="zram-writeback-switch">
-                                                    <span class="slider"></span>
-                                                </label>
-                                            </div>
-                                            <div class="feature-disabled-hint" id="zram-writeback-hint" hidden></div>
-                                            <div class="loop-dependent-settings" id="zram-loop-settings">
-                                                <div class="loop-dependent-inner">
-                                                    <div class="setting-section" id="zram-writeback-size-section">
-                                                        <span class="section-label" data-i18n="writebackSpace">回写空间</span>
-                                                        <div class="slider-container">
-                                                            <input type="range" class="range-slider" id="zram-writeback-size-slider" min="0.5" max="16" step="0.5" value="4">
-                                                            <div class="slider-labels">
-                                                                <span>0.5GB</span>
-                                                                <span class="slider-value" id="zram-writeback-size-value">4.0 GB</span>
-                                                                <span>16GB</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="setting-section zram-loop-device-section" id="zram-loop-device-section">
-                                                        <span class="section-label" data-i18n="loopDevice">Loop 设备</span>
-                                                        <div class="loop-device-card">
-                                                            <div class="loop-device-copy">
-                                                                <span class="loop-device-value" id="zram-loop-device-value" data-i18n="notAssigned">未分配</span>
-                                                                <span class="loop-device-desc" data-i18n="loopDeviceDesc">回写启用后自动分配，无需手动填写设备节点</span>
-                                                            </div>
-                                                            <button type="button" class="btn-small loop-device-refresh" id="zram-loop-device-refresh" data-i18n="refresh">刷新</button>
-                                                        </div>
-                                                    </div>
-                                                    <button type="button" class="action-btn loop-action-btn" id="zram-loop-action" data-i18n="startLoop">启动 Loop</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                                 <div class="setting-section">
                                     <span class="section-label">设备路径</span>
                                     <div class="zram-path-container">
@@ -479,6 +427,55 @@
                             </div>
                             <div class="zram-actions-sep"></div>
                             <button class="action-btn" id="zram-apply-btn" style="width:100%" data-i18n="applyZram">应用 ZRAM 配置</button>
+                        </div>
+                    </div>
+                    <div class="sub-card" id="loop-sub">
+                        <div class="sub-card-header" id="zram-loop-toggle">
+                            <span class="sub-card-title" data-i18n="loopWriteback">Loop 回写</span>
+                            <span class="current-badge" id="zram-loop-status" data-i18n="inactive">未启用</span>
+                            <span class="expand-icon">❯</span>
+                        </div>
+                        <div id="zram-loop-body" class="sub-expandable-content">
+                            <div class="loop-card-body-inner">
+                                <div class="setting-hint loop-card-description" data-i18n="loopWritebackDesc">为 ZRAM 自动创建 Loop 回写空间</div>
+                                <div class="switch-container loop-writeback-switch" id="zram-writeback-switch-container">
+                                    <div class="switch-info">
+                                        <span class="switch-label" data-i18n="enableLoop">启用 Loop 配置</span>
+                                        <span class="switch-desc" data-i18n="enableLoopDesc">保存后可单独启动或停止，不重置 ZRAM 参数</span>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="zram-writeback-switch">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="feature-disabled-hint" id="zram-writeback-hint" hidden></div>
+                                <div class="loop-dependent-settings" id="zram-loop-settings">
+                                    <div class="loop-dependent-inner">
+                                        <div class="setting-section" id="zram-writeback-size-section">
+                                            <span class="section-label" data-i18n="writebackSpace">回写空间</span>
+                                            <div class="slider-container">
+                                                <input type="range" class="range-slider" id="zram-writeback-size-slider" min="0.5" max="16" step="0.5" value="4">
+                                                <div class="slider-labels">
+                                                    <span>0.5GB</span>
+                                                    <span class="slider-value" id="zram-writeback-size-value">4.0 GB</span>
+                                                    <span>16GB</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="setting-section zram-loop-device-section" id="zram-loop-device-section">
+                                            <span class="section-label" data-i18n="loopDevice">Loop 设备</span>
+                                            <div class="loop-device-card">
+                                                <div class="loop-device-copy">
+                                                    <span class="loop-device-value" id="zram-loop-device-value" data-i18n="notAssigned">未分配</span>
+                                                    <span class="loop-device-desc" data-i18n="loopDeviceDesc">回写启用后自动分配，无需手动填写设备节点</span>
+                                                </div>
+                                                <button type="button" class="btn-small loop-device-refresh" id="zram-loop-device-refresh" data-i18n="refresh">刷新</button>
+                                            </div>
+                                        </div>
+                                        <button type="button" class="action-btn loop-action-btn" id="zram-loop-action" data-i18n="startLoop">启动 Loop</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="sub-card" id="swap-sub">
@@ -1785,6 +1782,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071522" defer></script>
+    <script src="script.js?v=2026071523" defer></script>
 </body>
 </html>

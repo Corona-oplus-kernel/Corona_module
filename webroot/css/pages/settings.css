@@ -352,13 +352,16 @@ body.theme-dark .module-card {
     max-height: 0;
     opacity: 0;
     margin-top: 0;
-    transition: max-height var(--motion-base) var(--motion-ease),
-                opacity var(--motion-fast) ease,
-                margin-top var(--motion-base) var(--motion-ease);
+    transform: translateY(-6px);
+    transform-origin: top center;
+    transition: max-height 360ms cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 240ms ease,
+                transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+                margin-top 360ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .card-visibility-switches.expanded {
-    max-height: 720px;
     opacity: 1;
+    transform: translateY(0);
     margin-top: 12px;
 }
 .card-visibility-switch-container {

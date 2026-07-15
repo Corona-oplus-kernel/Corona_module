@@ -1920,7 +1920,6 @@
     initZramWriteback() {
         const toggle = document.getElementById('zram-writeback-switch');
         if (!toggle) return;
-        if (typeof this.initAdvancedFold === 'function') this.initAdvancedFold('zram-loop-toggle', 'zram-loop-body', { defaultOpen: false });
         if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
         if (!toggle.dataset.bound) {
             toggle.dataset.bound = '1';

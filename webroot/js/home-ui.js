@@ -23,11 +23,12 @@
         content.style.removeProperty('transition-duration');
         return inner;
     },
-    getPanelAnimMs(heightPx) {
-        const h = Math.max(0, Number(heightPx) || 0);
-        // cap visual height so 模块设置等大面板动画节奏自然
-        const visual = Math.min(h, 720);
-        return Math.round(Math.min(360, Math.max(240, visual * 0.28 + 200)));
+    getPanelAnimMs(heightPx, content = null) {
+        const height = Math.max(0, Number(heightPx) || 0);
+        const largePanel = content?.id === 'app-settings-content' || content?.id === 'memory-compression-content';
+        const visual = Math.min(height, largePanel ? 1400 : 1000);
+        const maximum = largePanel ? 560 : 480;
+        return Math.round(Math.min(maximum, Math.max(280, visual * 0.2 + 240)));
     },
     setPanelTransition(content, durationMs, mode = 'both') {
         if (!content) return;
@@ -60,12 +61,14 @@
         content.style.transition = 'none';
         content.style.maxHeight = '0px';
         content.style.opacity = '0';
-        content.style.transform = 'none';
+        content.style.transform = 'translateY(-8px) scale(0.992)';
         content.style.overflow = 'hidden';
         content.style.pointerEvents = 'none';
+        content.style.willChange = 'auto';
 
         if (toggle) {
             toggle.classList.remove('expanded');
+            toggle.setAttribute('aria-expanded', 'false');
             const icon = toggle.querySelector ? toggle.querySelector('.expand-icon') : null;
             if (icon) icon.classList.remove('expanded');
             const header = (toggle.closest && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'))) || null;
@@ -105,15 +108,21 @@
         if (content._anim) { try { content.removeEventListener('transitionend', content._anim); } catch (e) {} content._anim = null; }
 
         const currentH = Math.max(content.getBoundingClientRect().height || 0, 0);
+        const currentStyle = currentH > 1 ? getComputedStyle(content) : null;
+        const currentOpacity = currentStyle ? Math.max(0, Math.min(1, parseFloat(currentStyle.opacity) || 0)) : 0;
+        const currentTransform = currentStyle?.transform && currentStyle.transform !== 'none'
+            ? currentStyle.transform
+            : (currentH > 1 ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(0.992)');
 
         content.classList.remove('hidden');
         content.classList.add('expanded');
         content.style.pointerEvents = '';
         content.style.overflow = 'hidden';
-        content.style.opacity = '1';
-        content.style.transform = 'none';
+        content.style.opacity = String(currentOpacity);
+        content.style.transform = currentTransform;
         content.style.transition = 'none';
-        content.style.removeProperty('will-change');
+        content.style.willChange = 'max-height, opacity, transform';
+        content.classList.add('panel-animating');
 
         // measure natural height
         content.style.maxHeight = 'none';
@@ -127,12 +136,13 @@
 
         // duration: use capped visual height so huge panels (模块设置) don't feel broken
         const visual = Math.min(Math.max(target - from, from === 0 ? target : 1), 720);
-        const duration = this.getPanelAnimMs(visual);
-        const ease = 'cubic-bezier(0.22, 0.82, 0.2, 1)';
+        const duration = this.getPanelAnimMs(visual, content);
+        const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
         if (toggle) {
             toggle.style.transition = `transform ${duration}ms ${ease}`;
             toggle.classList.add('expanded');
+            toggle.setAttribute('aria-expanded', 'true');
             const svg = toggle.querySelector && toggle.querySelector('svg');
             if (svg) { svg.style.transition = 'none'; svg.style.transform = 'none'; }
         }
@@ -152,6 +162,10 @@
             content._anim = null;
             content._animTimer = null;
             content.style.transition = 'none';
+            content.style.opacity = '1';
+            content.style.transform = 'none';
+            content.style.willChange = 'auto';
+            content.classList.remove('panel-animating');
             if (toggle) toggle.style.removeProperty('transition');
             if (icon) icon.style.removeProperty('transition');
             if (content.classList.contains('expanded') && content._panelState !== 'closing') {
@@ -175,9 +189,11 @@
         content.addEventListener('transitionend', onEnd);
 
         // CSS transition only (more stable than WAAPI max-height on huge panels)
-        content.style.transition = `max-height ${duration}ms ${ease}`;
+        content.style.transition = `max-height ${duration}ms ${ease}, opacity ${Math.round(duration * 0.72)}ms ease, transform ${duration}ms ${ease}`;
         void content.offsetHeight;
         content.style.maxHeight = target + 'px';
+        content.style.opacity = '1';
+        content.style.transform = 'translateY(0) scale(1)';
         content._animTimer = setTimeout(finish, duration + 50);
     },
     collapsePanelContent(content, toggle, { icon = null, cardEl = null, onCollapse = null, beforeCollapse = null } = {}) {
@@ -190,6 +206,12 @@
         if (content._anim) { try { content.removeEventListener('transitionend', content._anim); } catch (e) {} content._anim = null; }
 
         const currentH = Math.max(content.getBoundingClientRect().height || 0, 0);
+        const currentStyle = currentH > 1 ? getComputedStyle(content) : null;
+        const parsedOpacity = currentStyle ? parseFloat(currentStyle.opacity) : 1;
+        const currentOpacity = Number.isFinite(parsedOpacity) ? Math.max(0, Math.min(1, parsedOpacity)) : 1;
+        const currentTransform = currentStyle?.transform && currentStyle.transform !== 'none'
+            ? currentStyle.transform
+            : 'translateY(0) scale(1)';
         if (currentH < 2 && content.classList.contains('hidden')) {
             content.classList.remove('expanded');
             content._panelState = 'closed';
@@ -200,9 +222,11 @@
         content.classList.remove('hidden');
         content.style.pointerEvents = 'none';
         content.style.overflow = 'hidden';
-        content.style.opacity = '1';
-        content.style.transform = 'none';
+        content.style.opacity = String(currentOpacity);
+        content.style.transform = currentTransform;
         content.style.transition = 'none';
+        content.style.willChange = 'max-height, opacity, transform';
+        content.classList.add('panel-animating');
 
         let from = currentH > 1 ? currentH : (Number(content._openHeight) || 0);
         if (!(from > 1)) {
@@ -213,12 +237,13 @@
         void content.offsetHeight;
 
         const visual = Math.min(from, 720);
-        const duration = this.getPanelAnimMs(visual);
-        const ease = 'cubic-bezier(0.22, 0.82, 0.2, 1)';
+        const duration = this.getPanelAnimMs(visual, content);
+        const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
         if (toggle) {
             toggle.style.transition = `transform ${duration}ms ${ease}`;
             toggle.classList.remove('expanded');
+            toggle.setAttribute('aria-expanded', 'false');
             const svg = toggle.querySelector && toggle.querySelector('svg');
             if (svg) { svg.style.transition = 'none'; svg.style.transform = 'none'; }
         }
@@ -232,7 +257,17 @@
         if (content.id === 'app-settings-content') {
             const visList = document.getElementById('card-visibility-list');
             const visToggle = document.getElementById('card-visibility-toggle');
-            if (visList) { visList.style.transition = 'none'; visList.classList.remove('expanded'); }
+            if (visList) {
+                if (visList._visibilityTimer) clearTimeout(visList._visibilityTimer);
+                visList._visibilityTimer = null;
+                visList.style.transition = 'none';
+                visList.style.maxHeight = '0px';
+                visList.style.opacity = '0';
+                visList.style.transform = 'translateY(-6px)';
+                visList.style.overflow = 'hidden';
+                visList.dataset.open = '0';
+                visList.classList.remove('expanded');
+            }
             if (visToggle) visToggle.classList.remove('expanded');
         }
         if (typeof onCollapse === 'function') {
@@ -249,6 +284,10 @@
             content._animTimer = null;
             content.style.transition = 'none';
             content.style.maxHeight = '0px';
+            content.style.opacity = '0';
+            content.style.transform = 'translateY(-8px) scale(0.992)';
+            content.style.willChange = 'auto';
+            content.classList.remove('panel-animating');
             content.classList.remove('expanded');
             content.classList.add('hidden');
             content.style.overflow = 'hidden';
@@ -271,9 +310,11 @@
         content._anim = onEnd;
         content.addEventListener('transitionend', onEnd);
 
-        content.style.transition = `max-height ${duration}ms ${ease}`;
+        content.style.transition = `max-height ${duration}ms ${ease}, opacity ${Math.round(duration * 0.68)}ms ease, transform ${duration}ms ${ease}`;
         void content.offsetHeight;
         content.style.maxHeight = '0px';
+        content.style.opacity = '0';
+        content.style.transform = 'translateY(-8px) scale(0.992)';
         content._animTimer = setTimeout(finish, duration + 50);
     },
 
@@ -456,11 +497,57 @@
         if (toggle && list) {
             list.classList.remove('expanded');
             toggle.classList.remove('expanded');
+            list.dataset.open = '0';
+            list.style.maxHeight = '0px';
+            list.style.opacity = '0';
+            list.style.transform = 'translateY(-6px)';
             toggle.addEventListener('click', () => {
-                const isExpanded = list.classList.contains('expanded');
-                list.classList.toggle('expanded', !isExpanded);
-                toggle.classList.toggle('expanded', !isExpanded);
-                this.refreshExpandedContentHeight('app-settings-content');
+                if (list._visibilityTimer) clearTimeout(list._visibilityTimer);
+                const opening = list.dataset.open !== '1';
+                const currentHeight = Math.max(list.getBoundingClientRect().height || 0, 0);
+                list.style.transition = 'none';
+                list.style.overflow = 'hidden';
+                if (opening) {
+                    list.classList.add('expanded');
+                    list.style.maxHeight = 'none';
+                    const targetHeight = Math.max(list.scrollHeight, 1);
+                    list.style.maxHeight = `${currentHeight}px`;
+                    list.style.opacity = currentHeight > 1 ? getComputedStyle(list).opacity : '0';
+                    list.style.transform = currentHeight > 1 ? 'translateY(0)' : 'translateY(-6px)';
+                    void list.offsetHeight;
+                    const duration = this.getPanelAnimMs(targetHeight, list);
+                    list.style.transition = `max-height ${duration}ms cubic-bezier(0.22, 1, 0.36, 1), opacity ${Math.round(duration * 0.72)}ms ease, transform ${duration}ms cubic-bezier(0.22, 1, 0.36, 1), margin-top ${duration}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+                    list.style.maxHeight = `${targetHeight}px`;
+                    list.style.opacity = '1';
+                    list.style.transform = 'translateY(0)';
+                    list.dataset.open = '1';
+                    toggle.classList.add('expanded');
+                    list._visibilityTimer = setTimeout(() => {
+                        list.style.maxHeight = 'none';
+                        list.style.overflow = 'visible';
+                        list._visibilityTimer = null;
+                        this.refreshExpandedContentHeight('app-settings-content');
+                    }, duration + 40);
+                } else {
+                    const fromHeight = currentHeight || list.scrollHeight || 1;
+                    list.style.maxHeight = `${fromHeight}px`;
+                    list.style.opacity = '1';
+                    list.style.transform = 'translateY(0)';
+                    void list.offsetHeight;
+                    const duration = this.getPanelAnimMs(fromHeight, list);
+                    list.style.transition = `max-height ${duration}ms cubic-bezier(0.22, 1, 0.36, 1), opacity ${Math.round(duration * 0.68)}ms ease, transform ${duration}ms cubic-bezier(0.22, 1, 0.36, 1), margin-top ${duration}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+                    list.style.maxHeight = '0px';
+                    list.style.opacity = '0';
+                    list.style.transform = 'translateY(-6px)';
+                    list.dataset.open = '0';
+                    toggle.classList.remove('expanded');
+                    list._visibilityTimer = setTimeout(() => {
+                        list.classList.remove('expanded');
+                        list.style.overflow = 'hidden';
+                        list._visibilityTimer = null;
+                        this.refreshExpandedContentHeight('app-settings-content');
+                    }, duration + 40);
+                }
             });
         }
         const appSettingsCard = document.querySelector('.module-card[data-card-key="app-settings"]');
@@ -542,6 +629,7 @@
     initSubCards() {
         const subCards = [
             { toggle: 'zram-toggle', content: 'zram-content', onExpand: () => this.startZramMetricsRefresh(), onCollapse: () => this.stopZramMetricsRefresh() },
+            { toggle: 'zram-loop-toggle', content: 'zram-loop-body', onExpand: () => this.refreshZramLoopDevice(false) },
             { toggle: 'swap-toggle', content: 'swap-content', onExpand: () => this.loadSwapStatus() },
             { toggle: 'lru-toggle', content: 'lru-content', onExpand: null },
             { toggle: 'vm-toggle', content: 'vm-content', onExpand: null }
