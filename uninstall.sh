@@ -12,10 +12,11 @@ if [ -f "$MODPATH/.app_policy_daemon.pid" ]; then
     [ -n "$daemon_pid" ] && kill -TERM "$daemon_pid" 2>/dev/null
 fi
 [ -x "$MODPATH/scripts/apply-loop.sh" ] && /system/bin/sh "$MODPATH/scripts/apply-loop.sh" stop >/dev/null 2>&1
+[ -f "$MODPATH/scripts/memory-pressure.sh" ] && /system/bin/sh "$MODPATH/scripts/memory-pressure.sh" stop >/dev/null 2>&1
 swapoff /data/nandswap/corona_swapfile 2>/dev/null
 swapoff "$swapfile" 2>/dev/null
 rm -rf "$MODPATH/.app_policy_effective" "$MODPATH"/.app_policy_effective.next.*
-rm -f "$MODPATH/.app_policy_daemon.pid" "$MODPATH/.app_policy_state"
+rm -f "$MODPATH/.app_policy_daemon.pid" "$MODPATH/.app_policy_state" "$MODPATH/.memory_pressure.runtime.conf" "$MODPATH/.memory_pressure.pid" "$MODPATH/.memory_pressure.baseline"
 find "$CONFIG_DIR" -type f -name '*.tmp.*' -delete 2>/dev/null
 rm -rf "$CONFIG_DIR"
 rm -rf "$MODPATH/scripts.d/.logs"

@@ -517,6 +517,49 @@
                             </div>
                         </div>
                     </div>
+                    <div class="sub-card" id="memory-pressure-sub">
+                        <div class="sub-card-header" id="memory-pressure-toggle">
+                            <span class="sub-card-title" data-i18n="pressureProtection">内存压力保护</span>
+                            <span class="current-badge" id="memory-pressure-status" data-i18n="inactive">未启用</span>
+                            <span class="expand-icon">❯</span>
+                        </div>
+                        <div id="memory-pressure-content" class="sub-expandable-content">
+                            <div class="zram-status-card">
+                                <div class="info-list">
+                                    <div class="info-item">
+                                        <span class="info-label" data-i18n="pressurePsiAvg10">PSI 平均压力 (10 秒)</span>
+                                        <span class="info-value" id="memory-pressure-psi">--</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <span class="info-label">Swappiness</span>
+                                        <span class="info-value" id="memory-pressure-swappiness">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label" data-i18n="enablePressureProtection">启用压力保护</span>
+                                    <span class="switch-desc" data-i18n="pressureProtectionDesc">根据 PSI 压力临时提高交换积极性，关闭后恢复原值</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="memory-pressure-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div id="memory-pressure-settings" class="sub-settings hidden">
+                                <div class="setting-section">
+                                    <span class="section-label" data-i18n="pressureSensitivity">响应灵敏度</span>
+                                    <div class="option-grid" id="memory-pressure-profile-list">
+                                        <div class="option-item" data-value="sensitive" data-i18n="pressureSensitive">灵敏</div>
+                                        <div class="option-item selected" data-value="balanced" data-i18n="pressureBalanced">均衡</div>
+                                        <div class="option-item" data-value="conservative" data-i18n="pressureConservative">保守</div>
+                                    </div>
+                                    <div class="setting-hint" data-i18n="pressureProfileDesc">仅在持续内存压力下调整，低压力时保持系统原值</div>
+                                </div>
+                                <button type="button" class="action-btn" id="memory-pressure-apply" style="width:100%" data-i18n="applyPressureProtection">应用压力保护</button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="sub-card" id="swap-sub">
                         <div class="sub-card-header" id="swap-toggle">
                             <span class="sub-card-title">Swap 文件</span>

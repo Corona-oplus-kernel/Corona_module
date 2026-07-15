@@ -442,6 +442,7 @@
                 if (typeof this.initConfigValidation === 'function') this.initConfigValidation();
                 if (typeof this.initSliderProgress === 'function') this.initSliderProgress();
                 if (typeof this.initSwapSettings === 'function') this.initSwapSettings();
+                if (typeof this.initMemoryPressureSettings === 'function') this.initMemoryPressureSettings();
                 if (typeof this.initVmSettings === 'function') this.initVmSettings();
                 if (typeof this.initZramWriteback === 'function') this.initZramWriteback();
                 if (typeof this.initZstdLevel === 'function') this.initZstdLevel();
@@ -478,7 +479,7 @@
         if (this.settingsSectionPromises[section]) return this.settingsSectionPromises[section];
         const load = async () => {
             if (section === 'memory-compression') {
-                await Promise.all([this.detectZramFeatures(), this.loadZramStatus()]);
+                await Promise.all([this.detectZramFeatures(), this.loadZramStatus(), this.loadMemoryPressureStatus()]);
                 return;
             }
             if (section === 'le9ec') {
@@ -684,7 +685,8 @@
             this.loadCpuGovernorConfig(),
             this.loadTCPConfig(),
             this.loadCpuCores(),
-            this.loadSwapStatus()
+            this.loadSwapStatus(),
+            this.loadMemoryPressureConfig()
         ];
         await Promise.all(tasks);
         await this.updateModuleDescription();
@@ -2265,6 +2267,103 @@
                 setTimeout(() => overlay.remove(), 300);
             }
         });
+    },
+    initMemoryPressureSettings() {
+        const toggle = document.getElementById('memory-pressure-switch');
+        if (toggle && !toggle.dataset.bound) {
+            toggle.dataset.bound = '1';
+            toggle.addEventListener('change', async () => {
+                const previous = this.state.pressureEnabled;
+                this.state.pressureEnabled = toggle.checked;
+                this.toggleMemoryPressureSettings(toggle.checked);
+                try {
+                    await this.persistMemoryPressureConfig('enabled');
+                    if (toggle.checked) this.showToast(this.t('pressureConfigSaved'));
+                    else await this.applyMemoryPressureConfig();
+                } catch (error) {
+                    this.state.pressureEnabled = previous;
+                    toggle.checked = previous;
+                    this.toggleMemoryPressureSettings(previous);
+                    this.showToast(this.t('pressureConfigSaveFailed'), 'error');
+                }
+            });
+        }
+        const profiles = document.getElementById('memory-pressure-profile-list');
+        if (profiles && !profiles.dataset.bound) {
+            profiles.dataset.bound = '1';
+            profiles.querySelectorAll('.option-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    this.state.pressureProfile = item.dataset.value || 'balanced';
+                    this.renderMemoryPressureProfile();
+                    this.persistMemoryPressureConfig('profile')
+                        .then(() => this.showToast(this.t('pressureConfigSaved')))
+                        .catch(() => this.showToast(this.t('pressureConfigSaveFailed'), 'error'));
+                });
+            });
+        }
+        const applyButton = document.getElementById('memory-pressure-apply');
+        if (applyButton && !applyButton.dataset.bound) {
+            applyButton.dataset.bound = '1';
+            applyButton.addEventListener('click', () => this.applyMemoryPressureConfig());
+        }
+    },
+    toggleMemoryPressureSettings(show) {
+        const settings = document.getElementById('memory-pressure-settings');
+        if (settings) settings.classList.toggle('hidden', !show);
+    },
+    renderMemoryPressureProfile() {
+        document.querySelectorAll('#memory-pressure-profile-list .option-item').forEach(item => {
+            item.classList.toggle('selected', item.dataset.value === this.state.pressureProfile);
+        });
+    },
+    async loadMemoryPressureConfig() {
+        const config = await this.readConfig('memory_pressure.conf');
+        const enabledMatch = config.match(/^enabled=(\d)$/m);
+        const profileMatch = config.match(/^profile=(sensitive|balanced|conservative)$/m);
+        this.state.pressureEnabled = enabledMatch?.[1] === '1';
+        this.state.pressureProfile = profileMatch?.[1] || 'balanced';
+        const toggle = document.getElementById('memory-pressure-switch');
+        if (toggle) toggle.checked = this.state.pressureEnabled;
+        this.toggleMemoryPressureSettings(this.state.pressureEnabled);
+        this.renderMemoryPressureProfile();
+        await this.loadMemoryPressureStatus();
+    },
+    persistMemoryPressureConfig(changedField = 'enabled') {
+        const updates = {};
+        if (changedField === 'enabled') updates.enabled = this.state.pressureEnabled ? '1' : '0';
+        if (changedField === 'profile') updates.profile = this.state.pressureProfile;
+        return this.withLock('memory-pressure-config', () => this.mergeConfigFile('memory_pressure.conf', updates, ['enabled', 'profile']));
+    },
+    async loadMemoryPressureStatus() {
+        const status = await this.exec(`/system/bin/sh ${this.shellQuote(`${this.modDir}/scripts/memory-pressure.sh`)} status 2>/dev/null`);
+        const values = this.parseIoConfig(status);
+        const supported = (await this.exec('[ -r /proc/pressure/memory ] && echo 1 || echo 0')).trim() === '1';
+        const running = values.running === '1';
+        const badge = document.getElementById('memory-pressure-status');
+        if (badge) badge.textContent = this.t(!supported ? 'unsupported' : (running ? 'running' : 'inactive'));
+        const psi = document.getElementById('memory-pressure-psi');
+        if (psi) psi.textContent = values.avg10 ? `${values.avg10}%` : '--';
+        const swappiness = document.getElementById('memory-pressure-swappiness');
+        if (swappiness) swappiness.textContent = values.swappiness || '--';
+        const applyButton = document.getElementById('memory-pressure-apply');
+        if (applyButton) applyButton.disabled = !supported;
+        return { supported, running };
+    },
+    async applyMemoryPressureConfig() {
+        const button = document.getElementById('memory-pressure-apply');
+        if (button) button.disabled = true;
+        try {
+            await this.persistMemoryPressureConfig('enabled');
+            const result = await this.execResult(`/system/bin/sh ${this.shellQuote(`${this.modDir}/scripts/memory-pressure.sh`)} apply`);
+            await this.sleep(250);
+            const status = await this.loadMemoryPressureStatus();
+            const succeeded = result.code === 0 && (this.state.pressureEnabled ? status.running : !status.running);
+            const message = succeeded ? 'pressureApplied' : (status.supported ? 'pressureApplyFailed' : 'pressureUnsupported');
+            this.showToast(this.t(message), succeeded ? 'success' : 'error');
+            return succeeded;
+        } finally {
+            if (button) button.disabled = false;
+        }
     },
     initSwapSettings() {
         const swapSwitch = document.getElementById('swap-switch');

@@ -817,10 +817,17 @@ start_app_policy_daemon() {
     sh "$APP_POLICY_SH" daemon >/dev/null 2>&1 &
 }
 
+apply_memory_pressure_config() {
+    helper="$MODDIR/scripts/memory-pressure.sh"
+    [ -f "$helper" ] || return 0
+    CORONA_PRESSURE_CONFIG="$CONFIG_DIR/memory_pressure.conf" /system/bin/sh "$helper" apply >/dev/null 2>&1
+}
+
 apply_runtime_configs() {
     get_system_info
     mkdir -p "$CONFIG_DIR"
     apply_swap_config
+    apply_memory_pressure_config
     if ! has_mm_sys_entry; then
         apply_vm_config
         apply_kernel_features_config
@@ -840,7 +847,7 @@ apply_runtime_configs() {
     apply_protect_config
 }
 
-runtime_config_files='swap.conf vm.conf kernel.conf lmk.conf reclaim.conf kswapd.conf le9ec.conf corona_kernel.conf io_scheduler.conf cpu_governor.conf cpu_hotplug.conf tcp.conf process_priority.conf thread_priority.conf device.conf protect.conf'
+runtime_config_files='swap.conf memory_pressure.conf vm.conf kernel.conf lmk.conf reclaim.conf kswapd.conf le9ec.conf corona_kernel.conf io_scheduler.conf cpu_governor.conf cpu_hotplug.conf tcp.conf process_priority.conf thread_priority.conf device.conf protect.conf'
 
 build_effective_runtime_config() {
     target_dir="$1"
@@ -860,6 +867,7 @@ build_effective_runtime_config() {
 apply_runtime_config_name() {
     case "$1" in
         swap.conf) apply_swap_config ;;
+        memory_pressure.conf) apply_memory_pressure_config ;;
         vm.conf) has_mm_sys_entry || apply_vm_config ;;
         kernel.conf) has_mm_sys_entry || apply_kernel_features_config ;;
         lmk.conf) has_mm_sys_entry || apply_lmk_config ;;

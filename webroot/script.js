@@ -9,7 +9,7 @@ class CoronaAddon {
         this.ioNrRequestsOptions = [];
         this.ioRqAffinityOptions = [];
         this.ioNomergesOptions = [];
-        this.snapshotConfigFiles = ['zram.conf', 'loop.conf', 'le9ec.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'process_priority.conf', 'thread_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf'];
+        this.snapshotConfigFiles = ['zram.conf', 'loop.conf', 'memory_pressure.conf', 'le9ec.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'process_priority.conf', 'thread_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf'];
         this.state = {
             algorithm: 'lz4',
             recompAlgorithm1: 'none',
@@ -21,6 +21,8 @@ class CoronaAddon {
             zramPriority: 32758,
             loopEnabled: false,
             loopSizeGb: 4,
+            pressureEnabled: false,
+            pressureProfile: 'balanced',
             zramPath: '/dev/block/zram0',
             ioEnabled: false,
             ioScheduler: null,
@@ -132,7 +134,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071539` : '';
+        return map[name] ? `${map[name]}?v=2026071540` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
