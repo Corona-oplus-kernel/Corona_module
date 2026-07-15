@@ -18,7 +18,7 @@ CoronaAddon.prototype.initProcessPriority = function() {
         this.initThreadRuleUi();
     }
 CoronaAddon.prototype.loadPriorityConfig = async function() {
-        const config = await this.exec(`cat ${this.configDir}/process_priority.conf 2>/dev/null`);
+        const config = await this.readConfig('process_priority.conf');
         this.priorityRules = {};
         if (config && config.trim()) {
             const lines = config.trim().split('\n');
@@ -204,7 +204,7 @@ CoronaAddon.prototype.serializeThreadPriorityRules = function(rules = this.threa
         return (rules || []).map(rule => `${rule.packageName}|${rule.threadPattern}=${rule.nice}|${rule.ioClass}|${rule.ioLevel}|${rule.affinity || ''}|${rule.schedPolicy || 'normal'}|${rule.rtPrio ?? 1}|${rule.cpuset || ''}|${rule.waltBoost ? '1' : '0'}|${rule.waltPipeline ? '1' : '0'}|${rule.uclampMin ?? ''}|${rule.uclampMax ?? ''}`).join('\n');
     }
 CoronaAddon.prototype.loadThreadPriorityConfig = async function() {
-        const config = await this.exec(`cat ${this.configDir}/thread_priority.conf 2>/dev/null`);
+        const config = await this.readConfig('thread_priority.conf');
         this.threadPriorityRules = [];
         if (config && config.trim()) {
             config.trim().split('\n').forEach(line => {

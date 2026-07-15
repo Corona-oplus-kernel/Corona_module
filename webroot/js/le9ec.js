@@ -13,7 +13,7 @@
             this.refreshCardVisibilityAvailability();
             return;
         }
-        const config = await this.exec(`cat ${this.configDir}/le9ec.conf 2>/dev/null`);
+        const config = await this.readConfig('le9ec.conf');
         if (config) {
             const enabledMatch = config.match(/enabled=(\d)/);
             const anonMatch = config.match(/anon_min=(\d+)/);

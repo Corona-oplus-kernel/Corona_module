@@ -130,7 +130,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071529` : '';
+        return map[name] ? `${map[name]}?v=2026071530` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -382,10 +382,31 @@ class CoronaAddon {
     shellQuote(value) {
         return `'${String(value).replace(/'/g, `'\\''`)}'`;
     }
-    async writeConfig(filename, content) {
-        const path = `${this.configDir}/${filename}`;
+    normalizeConfigFilename(filename) {
+        const normalized = String(filename || '').replace(/\\/g, '/').replace(/^\.\//, '');
+        if (!normalized || normalized.startsWith('/') || normalized.split('/').includes('..')) {
+            throw new Error(`Invalid config filename: ${filename}`);
+        }
+        return normalized;
+    }
+    getConfigPath(filename) {
+        return `${this.configDir}/${this.normalizeConfigFilename(filename)}`;
+    }
+    async readConfig(filename) {
+        return this.exec(`cat ${this.shellQuote(this.getConfigPath(filename))} 2>/dev/null`);
+    }
+    async writeConfigUnlocked(filename, content) {
+        const path = this.getConfigPath(filename);
+        const parent = path.slice(0, path.lastIndexOf('/'));
         const b64 = btoa(unescape(encodeURIComponent(String(content))));
-        await this.exec(`echo '${b64}' | base64 -d > ${this.shellQuote(path)}`);
+        const quotedPath = this.shellQuote(path);
+        const result = await this.execResult(`mkdir -p ${this.shellQuote(parent)}; tmp=${quotedPath}.tmp.$$; echo '${b64}' | base64 -d > "$tmp" && mv -f "$tmp" ${quotedPath}; code=$?; [ "$code" -eq 0 ] || rm -f "$tmp"; exit "$code"`);
+        if (result.code !== 0) throw new Error(result.stderr || `Failed to write ${filename}`);
+        return String(content);
+    }
+    writeConfig(filename, content) {
+        const normalized = this.normalizeConfigFilename(filename);
+        return this.withLock(`config-file:${normalized}`, () => this.writeConfigUnlocked(normalized, content));
     }
     parseSimpleConfig(content) {
         const entries = [];
@@ -405,8 +426,7 @@ class CoronaAddon {
         return lines.length ? `${lines.join('\n')}\n` : '';
     }
     async buildMergedConfigContent(filename, updates, order = []) {
-        const path = `${this.configDir}/${filename}`;
-        const current = await this.exec(`cat ${this.shellQuote(path)} 2>/dev/null`);
+        const current = await this.readConfig(filename);
         const map = new Map(this.parseSimpleConfig(current));
         Object.entries(updates || {}).forEach(([key, value]) => {
             if (value === undefined || value === null || value === '') map.delete(key);
@@ -415,10 +435,23 @@ class CoronaAddon {
         const keys = [...new Set([...order, ...map.keys()])].filter(key => map.has(key));
         return this.buildSimpleConfig(keys.map(key => [key, map.get(key)]));
     }
-    async mergeConfigFile(filename, updates, order = []) {
-        const content = await this.buildMergedConfigContent(filename, updates, order);
-        await this.writeConfig(filename, content);
-        return content;
+    mergeConfigFile(filename, updates, order = []) {
+        const normalized = this.normalizeConfigFilename(filename);
+        return this.withLock(`config-file:${normalized}`, async () => {
+            const current = await this.readConfig(normalized);
+            const map = new Map(this.parseSimpleConfig(current));
+            Object.entries(updates || {}).forEach(([key, value]) => {
+                if (value === undefined || value === null || value === '') map.delete(key);
+                else map.set(key, String(value));
+            });
+            const keys = [...new Set([...order, ...map.keys()])].filter(key => map.has(key));
+            const content = this.buildSimpleConfig(keys.map(key => [key, map.get(key)]));
+            await this.writeConfigUnlocked(normalized, content);
+            return content;
+        });
+    }
+    removeConfigKeys(filename, keys, order = []) {
+        return this.mergeConfigFile(filename, Object.fromEntries((keys || []).map(key => [key, null])), order);
     }
     withLock(key, fn) {
         if (!this._locks) this._locks = {};

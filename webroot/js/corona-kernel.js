@@ -59,7 +59,7 @@
                 this.coronaKernelLive[parts[0]] = (parts[2] || '').trim();
             });
         }
-        const conf = await this.exec(`cat ${this.configDir}/corona_kernel.conf 2>/dev/null`);
+        const conf = await this.readConfig('corona_kernel.conf');
         const parsed = {};
         conf.split('\n').forEach(line => {
             const m = line.match(/^([^=]+)=(.*)$/);

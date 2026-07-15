@@ -835,7 +835,7 @@
         if (chargeFull && chargeFullDesign && parseInt(chargeFullDesign) > 0) healthPercent = ((parseInt(chargeFull) / parseInt(chargeFullDesign)) * 100).toFixed(1);
         content.innerHTML = `<div class="info-item"><span class="info-label">充电状态</span><span class="info-value">${statusMap[status] || status || '--'}</span></div><div class="info-item"><span class="info-label">健康状态</span><span class="info-value">${healthMap[health] || health || '--'}</span></div><div class="info-item"><span class="info-label">电池电量</span><span class="info-value">${finalCapacity || '--'}%</span></div><div class="info-item"><span class="info-label">电池电压</span><span class="info-value">${voltageV} V</span></div><div class="info-item"><span class="info-label">温度</span><span class="info-value">${tempC} °C</span></div><div class="info-item"><span class="info-label">充电类型</span><span class="info-value">${chargeType || '--'}</span></div><div class="info-item"><span class="info-label">电池技术</span><span class="info-value">${technology || '--'}</span></div><div class="info-item"><span class="info-label">循环次数</span><span class="info-value">${cycleCount || '--'}</span></div><div class="info-item"><span class="info-label">电池健康度</span><span class="info-value">${healthPercent}%</span></div>`;
     },
-    async loadDualCellConfig() { const result = await this.exec(`cat ${this.configDir}/dual_cell.conf 2>/dev/null`); if (result) this.state.dualCell = result.includes('dualCell=1'); },
+    async loadDualCellConfig() { const result = await this.readConfig('dual_cell.conf'); if (result) this.state.dualCell = result.includes('dualCell=1'); },
     async showUFSDetail() {
         this.showOverlay('ufs-detail-overlay');
         const content = document.getElementById('ufs-detail-content');

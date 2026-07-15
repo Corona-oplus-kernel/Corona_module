@@ -21,7 +21,7 @@
         this.loadCustomScripts();
     },
     async loadCustomScripts() {
-        const base64Data = await this.exec(`cat ${this.configDir}/custom_scripts.b64 2>/dev/null`);
+        const base64Data = await this.readConfig('custom_scripts.b64');
         if (base64Data && base64Data.trim()) {
             try {
                 const json = decodeURIComponent(escape(atob(base64Data.trim())));
@@ -36,7 +36,7 @@
     async saveCustomScripts() {
         const json = JSON.stringify(this.customScripts);
         const base64Data = btoa(unescape(encodeURIComponent(json)));
-        await this.exec(`echo '${base64Data}' > ${this.configDir}/custom_scripts.b64`);
+        await this.writeConfig('custom_scripts.b64', base64Data);
         await this.generateScriptsFile();
     },
     async generateScriptsFile() {

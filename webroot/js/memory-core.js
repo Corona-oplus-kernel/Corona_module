@@ -643,7 +643,7 @@
         this.renderAlgorithmOptions();
     },
     async loadZramConfig() {
-        const config = await this.exec(`cat ${this.configDir}/zram.conf 2>/dev/null`);
+        const config = await this.readConfig('zram.conf');
         if (config) {
             const algMatch = config.match(/algorithm=(\S+)/);
             const sizeMatch = config.match(/size=(\d+)/);
@@ -684,7 +684,7 @@
         await this.loadZramStatus();
     },
     async loadLoopConfig(legacyZramConfig = '') {
-        const loopConfig = await this.exec(`cat ${this.configDir}/loop.conf 2>/dev/null`);
+        const loopConfig = await this.readConfig('loop.conf');
         const source = loopConfig || legacyZramConfig;
         const enabledMatch = loopConfig
             ? loopConfig.match(/enabled=(\d)/)
@@ -1118,7 +1118,7 @@
                 size_mb: String(Math.round(this.state.loopSizeGb * 1024))
             };
             await this.mergeConfigFile('loop.conf', updates, ['enabled', 'size_mb']);
-            await this.exec(`sed -i '/^zram_writeback=/d;/^writeback_size_mb=/d' ${this.shellQuote(`${this.configDir}/zram.conf`)} 2>/dev/null`);
+            await this.removeConfigKeys('zram.conf', ['zram_writeback', 'writeback_size_mb'], this.getZramConfigKeys());
             return true;
         });
         this._loopConfigSavePromise = save;
@@ -1340,7 +1340,7 @@
         const rqAffinity = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/rq_affinity 2>/dev/null`) : '';
         const nomerges = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/nomerges 2>/dev/null`) : '';
         const iostats = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/iostats 2>/dev/null`) : '';
-        const conf = await this.exec(`cat ${this.configDir}/io_scheduler.conf 2>/dev/null`);
+        const conf = await this.readConfig('io_scheduler.conf');
         const saved = this.parseIoConfig(conf);
         this.state.ioEnabled = this.parseEnabledFlag(conf, !!conf);
         const ioSwitch = document.getElementById('io-switch');
@@ -1394,7 +1394,7 @@
     async loadCpuGovernorConfig() {
         const governorRaw = await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors 2>/dev/null');
         const currentGovernor = await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null');
-        const conf = await this.exec(`cat ${this.configDir}/cpu_governor.conf 2>/dev/null`);
+        const conf = await this.readConfig('cpu_governor.conf');
         this.state.cpuEnabled = this.parseEnabledFlag(conf, !!conf);
         const cpuSwitch = document.getElementById('cpu-switch');
         if (cpuSwitch) cpuSwitch.checked = this.state.cpuEnabled;
@@ -1462,7 +1462,7 @@
     async loadTCPConfig() {
         const tcpRaw = await this.exec('cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null');
         const currentTcp = await this.exec('cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null');
-        const conf = await this.exec(`cat ${this.configDir}/tcp.conf 2>/dev/null`);
+        const conf = await this.readConfig('tcp.conf');
         this.state.tcpEnabled = this.parseEnabledFlag(conf, !!conf);
         const tcpSwitch = document.getElementById('tcp-switch');
         if (tcpSwitch) tcpSwitch.checked = this.state.tcpEnabled;
@@ -1523,7 +1523,7 @@
         const cpuCount = parseInt(await this.exec('ls -d /sys/devices/system/cpu/cpu[0-9]* 2>/dev/null | wc -l')) || 8;
         const totalCores = this.getTotalCoreCount();
         const maxCores = totalCores > 0 ? totalCores : cpuCount;
-        const hotplugConf = await this.exec(`cat ${this.configDir}/cpu_hotplug.conf 2>/dev/null`);
+        const hotplugConf = await this.readConfig('cpu_hotplug.conf');
         const savedStates = this.parseCpuHotplugConfig(hotplugConf);
         this.cpuCores = [];
         const seenIds = new Set();
@@ -2332,7 +2332,7 @@
         this.loadVmConfig();
     },
     async loadVmConfig() {
-        const config = await this.exec(`cat ${this.configDir}/vm.conf 2>/dev/null`);
+        const config = await this.readConfig('vm.conf');
         this.state.vmEnabled = this.parseEnabledFlag(config, !!config);
         const vmSwitch = document.getElementById('vm-switch');
         if (vmSwitch) vmSwitch.checked = this.state.vmEnabled;
@@ -2455,7 +2455,7 @@
         this.loadKernelFeaturesConfig();
     },
     async loadKernelFeaturesConfig() {
-        const config = await this.exec(`cat ${this.configDir}/kernel.conf 2>/dev/null`);
+        const config = await this.readConfig('kernel.conf');
         if (config) {
             const lruMatch = config.match(/lru_gen=(\d)/);
             const thpMatch = config.match(/thp=(\w+)/);

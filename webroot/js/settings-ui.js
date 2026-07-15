@@ -683,7 +683,7 @@
     },
     async collectSnapshotFiles() {
         const entries = await Promise.all(this.snapshotConfigFiles.map(async (filename) => {
-            const content = await this.exec(`cat ${this.shellQuote(`${this.configDir}/${filename}`)} 2>/dev/null`);
+            const content = await this.readConfig(filename);
             return content && content.trim() ? [filename, content.trim()] : null;
         }));
         return Object.fromEntries(entries.filter(Boolean));

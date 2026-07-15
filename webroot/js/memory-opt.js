@@ -26,7 +26,7 @@
     };
     let enabledCount = 0;
     for (const [, cfg] of Object.entries(configs)) {
-      const content = await this.exec(`cat ${this.configDir}/${cfg.file} 2>/dev/null`);
+      const content = await this.readConfig(cfg.file);
       const sw = document.getElementById(cfg.switch);
       if (sw) {
         const enabled = content.includes('enabled=1');
