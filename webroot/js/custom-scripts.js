@@ -3,7 +3,7 @@
   window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
   if (window.CoronaFeatureScripts["custom-scripts"]) return;
   Object.assign(CoronaAddon.prototype, {
-    initCustomScripts() {
+    async initCustomScripts() {
         this.customScripts = {};
         this.editingScriptId = null;
         document.getElementById('scripts-add-btn').addEventListener('click', () => this.showScriptEditor());
@@ -18,7 +18,7 @@
                 tag.classList.add('selected');
             });
         });
-        this.loadCustomScripts();
+        await this.loadCustomScripts();
     },
     async loadCustomScripts() {
         const base64Data = await this.readConfig('custom_scripts.b64');

@@ -416,22 +416,13 @@
         const settingsTitle = document.getElementById('corona-title-settings');
         if (settingsTitle) settingsTitle.style.opacity = '1';
     },
-    scheduleDeferredInit() {
+    initializeHomeInteractions() {
         if (this.deferredHomeReady) return;
         this.deferredHomeReady = true;
-        const run = async () => {
-            try {
-                this.initBannerDrag();
-                this.initEasterEgg();
-                this.initDeviceImageInteraction();
-                this.initScrollEffect();
-            } catch (e) {}
-        };
-        if (typeof window.requestIdleCallback === 'function') {
-            window.requestIdleCallback(() => setTimeout(run, 120), { timeout: 1500 });
-        } else {
-            setTimeout(run, 600);
-        }
+        this.initBannerDrag();
+        this.initEasterEgg();
+        this.initDeviceImageInteraction();
+        this.initScrollEffect();
     },
     async ensureSettingsPageReady() {
         if (this.settingsReadyState === 'ready') return this.settingsInitPromise;
@@ -499,22 +490,22 @@
                 this.initPerformanceMode();
                 this.initAppPolicy();
                 await Promise.all([this.loadPerformanceModeConfig(), this.loadAppRulesConfig()]);
-                this.prewarmAppPolicyData().catch(() => {});
+                await this.prewarmAppPolicyData();
                 return;
             }
             if (section === 'custom-scripts') {
                 await this.ensureFeatureScript('custom-scripts');
-                this.initCustomScripts();
+                await this.initCustomScripts();
                 return;
             }
             if (section === 'system-opt') {
                 await this.ensureFeatureScript('memory-opt');
-                this.initSystemOpt();
+                await this.initSystemOpt();
                 return;
             }
             if (section === 'corona-kernel') {
                 await this.ensureFeatureScript('corona-kernel');
-                this.initCoronaKernel();
+                await this.initCoronaKernel();
                 return;
             }
             if (section === 'app-settings') {
@@ -527,6 +518,20 @@
         });
         this.settingsSectionPromises[section] = promise;
         return promise;
+    },
+    ensureAllSettingsSectionsReady() {
+        if (this.allSettingsSectionsPromise) return this.allSettingsSectionsPromise;
+        const sections = [
+            'memory-compression',
+            'le9ec',
+            'app-policy',
+            'custom-scripts',
+            'system-opt',
+            'corona-kernel',
+            'app-settings'
+        ];
+        this.allSettingsSectionsPromise = Promise.all(sections.map(section => this.ensureSettingsSectionReady(section)));
+        return this.allSettingsSectionsPromise;
     },
     updateBatteryInfo(level, temp) {
         const levelElement = document.getElementById('battery-level');

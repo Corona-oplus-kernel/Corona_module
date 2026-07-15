@@ -3,7 +3,7 @@
   window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
   if (window.CoronaFeatureScripts["memory-opt"]) return;
 
-  CoronaAddon.prototype.initSystemOpt = function () {
+  CoronaAddon.prototype.initSystemOpt = async function () {
     const switches = ['lmk', 'device-config', 'reclaim', 'kswapd', 'protect', 'fstrim'];
     switches.forEach((name) => {
       const sw = document.getElementById(`${name}-switch`);
@@ -12,7 +12,7 @@
         sw.addEventListener('change', () => this.saveAndApplySystemOpt(name));
       }
     });
-    this.loadSystemOptConfig();
+    await this.loadSystemOptConfig();
   };
 
   CoronaAddon.prototype.loadSystemOptConfig = async function () {

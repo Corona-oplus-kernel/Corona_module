@@ -3,7 +3,7 @@
   window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
   if (window.CoronaFeatureScripts["corona-kernel"]) return;
   Object.assign(CoronaAddon.prototype, {
-    initCoronaKernel() {
+    async initCoronaKernel() {
         this.coronaKernelMods = [
             'wake_aware',
             'suspend_swappiness_zero', 'suspend_dirty_freeze', 'suspend_compact_freeze',
@@ -34,7 +34,7 @@
             ss.addEventListener('input', (e) => { sv.textContent = `${e.target.value} ms`; });
             ss.addEventListener('change', (e) => this.saveCoronaKernelTunable('slack_off_ms', parseInt(e.target.value)));
         }
-        this.loadCoronaKernelConfig();
+        await this.loadCoronaKernelConfig();
     },
     async loadCoronaKernelConfig() {
         if (!this.isCoronaKernel) {

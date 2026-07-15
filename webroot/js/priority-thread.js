@@ -3,7 +3,7 @@
   window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
   if (window.CoronaFeatureScripts["priority-thread"]) return;
 CoronaAddon.prototype.initPerformanceMode = function() { this.initProcessPriority();  }
-CoronaAddon.prototype.loadPerformanceModeConfig = async function() { await this.loadPriorityConfig(); await this.loadThreadPriorityConfig();  }
+CoronaAddon.prototype.loadPerformanceModeConfig = async function() { await this.loadPriorityConfig();  }
 CoronaAddon.prototype.initProcessPriority = function() {
         this.priorityRules = {}; this.threadPriorityRules = []; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4; this.selectedThreadRuleKey = null; this.selectedThreadRulePackage = ''; this.selectedThreadRuleLabel = ''; this.selectedThreadPattern = ''; this.selectedThreadNice = 0; this.selectedThreadIoClass = 2; this.selectedThreadIoLevel = 4; this.selectedThreadAffinity = ''; this.selectedThreadCpuset = ''; this.selectedThreadUclampMin = ''; this.selectedThreadUclampMax = ''; this.selectedThreadSchedPolicy = 'normal'; this.selectedThreadRtPrio = 1; this.selectedThreadWaltBoost = false; this.selectedThreadWaltPipeline = false; this.threadPanelState = 'rules'; this.selectedThreadModePreset = 'custom'; this.threadTagEditingIndex = -1; this.pendingThreadTagName = ''; 
         document.getElementById('priority-cancel-btn').addEventListener('click', () => this.hideOverlay('priority-setting-overlay'));

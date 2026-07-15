@@ -131,7 +131,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071534` : '';
+        return map[name] ? `${map[name]}?v=2026071535` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -228,27 +228,20 @@ class CoronaAddon {
                 this.loadDeviceInfo(),
                 this.loadModuleVersion()
             ]);
+            this.updateInitOverlayMessage(this.t('initApps'));
+            await this.ensureAllSettingsSectionsReady();
             this.initDetailOverlays();
             this.initHomeCardClicks();
             this.initChart();
             this.initStaticHeader();
-            this.initScrollEffect();
             this.initModuleIntro();
+            this.initializeHomeInteractions();
             this.updateInitOverlayMessage(this.t('initRealtime'));
             await this.awaitInitialRealtimeReady();
             this.startRealtimeMonitor();
-            this.schedulePostInitWarmup();
         } finally {
             this.isInitializing = false;
             this.showInitOverlay(false);
-        }
-    }
-    schedulePostInitWarmup() {
-        // deferred home interactions (author popup, banner drag, etc.)
-        if (typeof this.scheduleDeferredInit === 'function') {
-            this.scheduleDeferredInit();
-        } else if (typeof this.initEasterEgg === 'function') {
-            try { this.initEasterEgg(); } catch (e) {}
         }
     }
     updateSliderProgress(slider) {

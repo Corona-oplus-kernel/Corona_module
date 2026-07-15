@@ -339,7 +339,7 @@ CoronaAddon.prototype.prewarmAppPolicyData = async function(force = false) {
         }
         if (lastError && apps.length === 0) throw lastError;
         this.appPolicyPrewarmDone = apps.length > 0;
-        this.refreshInstalledAppLabels(force).catch(() => {});
+        await this.refreshInstalledAppLabels(force);
         return apps;
     })();
     try {
