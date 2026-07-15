@@ -534,7 +534,7 @@ body.theme-dark .banner-image {
 }
 
 body.theme-dark .tab-bar-container {
-    background: rgba(24, 29, 40, 0.55);
+    background: var(--floating-bar-bg);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border-color: rgba(255, 255, 255, 0.08);

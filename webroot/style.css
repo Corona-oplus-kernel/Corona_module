@@ -5,6 +5,7 @@
     --glass-border: rgba(255, 255, 255, 0.28);
     --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.06);
     --glass-shadow-lg: 0 18px 40px rgba(0, 0, 0, 0.10);
+    --floating-bar-bg: rgba(255, 255, 255, 0.35);
     --hue: 214;
     --primary: hsl(var(--hue), 82%, 50%);
     --primary-dim: hsla(var(--hue), 82%, 50%, 0.14);
@@ -65,6 +66,7 @@ body.theme-dark {
     --glass-border: rgba(255, 255, 255, 0.10);
     --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
     --glass-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.36);
+    --floating-bar-bg: rgba(24, 29, 40, 0.55);
     --primary: hsl(var(--hue), 78%, 62%);
     --primary-dim: hsla(var(--hue), 78%, 62%, 0.18);
     --primary-light: hsla(var(--hue), 78%, 62%, 0.12);
@@ -368,7 +370,7 @@ body.theme-dark .corona-title {
     right: 0;
     height: 70px;
     padding-top: 30px;
-    background: rgba(255, 255, 255, 0.35);
+    background: var(--floating-bar-bg);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
@@ -1289,7 +1291,7 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
     left: 50%;
     transform: translateX(-50%) translateY(20px);
     border: 1px solid rgba(17, 24, 39, 0.14);
-    background: rgb(255 255 255 / 0.72);
+    background: var(--floating-bar-bg);
     backdrop-filter: blur(18px) saturate(1.18);
     -webkit-backdrop-filter: blur(18px) saturate(1.18);
     color: var(--text-main);
@@ -1344,7 +1346,7 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
 
 body.theme-dark .toast {
     border-color: rgba(255, 255, 255, 0.14);
-    background: rgb(27 31 39 / 0.66);
+    background: var(--floating-bar-bg);
     box-shadow: 0 14px 38px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
