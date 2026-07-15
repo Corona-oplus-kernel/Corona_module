@@ -81,8 +81,8 @@ zram_config_needs_overlay() {
         [ "$want_enabled" = "1" ] && [ -z "$now" ] && return 0
         if [ "$want_enabled" = "1" ]; then
             want_size=$(get_conf_value "$loop_conf" size_mb)
-            file_size=$(stat -c %s /data/nandswap/corona_swapfile 2>/dev/null)
-            [ -n "$want_size" ] && [ "$file_size" != "$((want_size * 1024 * 1024))" ] && return 0
+            file_size_mb=$(stat -c %s /data/nandswap/corona_swapfile 2>/dev/null | awk '{ printf "%.0f", $1 / 1048576 }')
+            [ -n "$want_size" ] && [ "$file_size_mb" != "$want_size" ] && return 0
         fi
         [ "$want_enabled" != "1" ] && [ -n "$now" ] && return 0
     elif grep -q '^zram_writeback=' "$conf"; then

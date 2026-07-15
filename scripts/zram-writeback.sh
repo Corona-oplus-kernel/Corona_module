@@ -60,8 +60,7 @@ create_backing() {
     rm -f "$BACKING_FILE"
     touch "$BACKING_FILE" || return 1
     "$NANDSWAP_TOOL" -s1 "$BACKING_FILE" >/dev/null 2>&1 || return 1
-    bytes=$((SIZE_MB * 1024 * 1024))
-    /system/bin/fallocate -l "$bytes" "$BACKING_FILE" 2>/dev/null || return 1
+    /system/bin/fallocate -l "${SIZE_MB}M" "$BACKING_FILE" 2>/dev/null || return 1
     "$NANDSWAP_TOOL" -g "$BACKING_FILE" 2>/dev/null | grep -q pinned || return 1
 
     loop_device=$(/system/bin/losetup -f -s "$BACKING_FILE" 2>/dev/null) || return 1
