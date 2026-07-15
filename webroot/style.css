@@ -77,7 +77,7 @@ body.theme-dark {
     --text-dim: #6B7280;
 }
 
-/* Soft theme / color transition - minimal */
+/* Theme and color transition */
 .theme-transition-overlay {
     position: fixed;
     inset: 0;
@@ -85,17 +85,65 @@ body.theme-dark {
     opacity: 0;
     z-index: 30000;
     background: transparent;
+    will-change: opacity, backdrop-filter;
 }
-/* no flash overlay — only quiet CSS var morph */
+
+.theme-transition-overlay[data-theme="light"] {
+    background: radial-gradient(circle at var(--theme-switch-x, 50%) var(--theme-switch-y, 50%), rgba(255, 255, 255, 0.46) 0, rgba(240, 244, 248, 0.22) 34%, transparent 72%);
+}
+
+.theme-transition-overlay[data-theme="dark"] {
+    background: radial-gradient(circle at var(--theme-switch-x, 50%) var(--theme-switch-y, 50%), rgba(20, 24, 32, 0.54) 0, rgba(11, 13, 17, 0.30) 36%, transparent 74%);
+}
+
+.theme-transition-overlay.active {
+    animation: coronaThemeWash 540ms var(--motion-ease) both;
+}
+
 body.theme-animate {
-    transition: background-color 0.28s ease, color 0.22s ease;
+    transition: background-color 0.42s var(--motion-ease), color 0.3s ease;
 }
 body.theme-animate .module-card,
 body.theme-animate .card,
 body.theme-animate .tab-bar,
+body.theme-animate .tab-bar-container,
+body.theme-animate .floating-header,
+body.theme-animate .detail-card,
+body.theme-animate .settings-section,
 body.theme-animate .action-btn,
 body.theme-animate .current-badge {
-    transition: background-color 0.28s ease, border-color 0.22s ease, color 0.22s ease, box-shadow 0.22s ease;
+    transition: background-color 0.42s var(--motion-ease), border-color 0.34s ease, color 0.3s ease, box-shadow 0.38s ease, backdrop-filter 0.38s ease;
+}
+
+body.theme-switch-out .page.active,
+body.theme-switch-out .floating-header,
+body.theme-switch-out .tab-bar-container,
+body.theme-switch-out .detail-overlay.show .detail-card {
+    animation: coronaThemeOut 100ms ease-out both;
+}
+
+body.theme-switch-in .page.active,
+body.theme-switch-in .floating-header,
+body.theme-switch-in .tab-bar-container,
+body.theme-switch-in .detail-overlay.show .detail-card {
+    animation: coronaThemeIn 380ms var(--motion-ease) both;
+}
+
+@keyframes coronaThemeWash {
+    0% { opacity: 0; backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); }
+    35% { opacity: 1; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+    100% { opacity: 0; backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); }
+}
+
+@keyframes coronaThemeOut {
+    from { opacity: 1; transform: scale(1); filter: saturate(1); }
+    to { opacity: 0.72; transform: scale(0.992); filter: saturate(0.82); }
+}
+
+@keyframes coronaThemeIn {
+    0% { opacity: 0.62; transform: scale(0.992); filter: saturate(0.84); }
+    55% { opacity: 1; transform: scale(1.002); filter: saturate(1.04); }
+    100% { opacity: 1; transform: scale(1); filter: saturate(1); }
 }
 
 
@@ -2295,6 +2343,13 @@ body.theme-dark .detail-overlay.no-close-btn.show {
     border-color: var(--primary);
     background: var(--primary-dim);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    animation: coronaOptionSelect 380ms var(--motion-ease);
+}
+
+@keyframes coronaOptionSelect {
+    0% { transform: scale(0.96); }
+    58% { transform: scale(1.025); }
+    100% { transform: scale(1); }
 }
 
 .theme-preview {
@@ -4112,6 +4167,7 @@ body.theme-dark .mini-switch-row input:checked {
 }
 
 .language-segmented {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(2, minmax(72px, 1fr));
     flex: 0 0 auto;
@@ -4121,7 +4177,25 @@ body.theme-dark .mini-switch-row input:checked {
     background: rgba(0, 0, 0, 0.06);
 }
 
+.language-segmented::before {
+    content: '';
+    position: absolute;
+    inset: 3px auto 3px 3px;
+    width: calc((100% - 9px) / 2);
+    border-radius: 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+    transition: transform 340ms var(--motion-ease), background-color 280ms ease, border-color 280ms ease, box-shadow 280ms ease;
+}
+
+html[lang="en"] .language-segmented::before {
+    transform: translateX(calc(100% + 3px));
+}
+
 .language-option {
+    position: relative;
+    z-index: 1;
     min-height: 34px;
     padding: 0 13px;
     border: 0;
@@ -4132,13 +4206,14 @@ body.theme-dark .mini-switch-row input:checked {
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+    transition: color 260ms ease, transform 260ms var(--motion-ease);
 }
 
 .language-option.selected {
-    background: var(--card-bg);
+    background: transparent;
     color: var(--primary);
-    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
+    box-shadow: none;
+    transform: scale(1.025);
 }
 
 @media (max-width: 420px) {
@@ -4787,17 +4862,29 @@ body.theme-dark .color-live-bar { background: rgba(255,255,255,0.08); }
 }
 
 /* Language refresh and external navigation */
-body.language-switching .container,
-body.language-switching .floating-header,
-body.language-switching .tab-bar,
-body.language-switching .detail-overlay.show {
-    animation: coronaLanguageRefresh 400ms var(--motion-ease) !important;
+body.language-switch-out .page.active,
+body.language-switch-out .floating-header,
+body.language-switch-out .tab-bar-container,
+body.language-switch-out .detail-overlay.show .detail-card {
+    animation: coronaLanguageOut 110ms ease-out both !important;
 }
 
-@keyframes coronaLanguageRefresh {
-    0% { opacity: 0.35; filter: blur(2px); }
-    48% { opacity: 0.72; filter: blur(0.8px); }
-    100% { opacity: 1; filter: blur(0); }
+body.language-switch-in .page.active,
+body.language-switch-in .floating-header,
+body.language-switch-in .tab-bar-container,
+body.language-switch-in .detail-overlay.show .detail-card {
+    animation: coronaLanguageIn 320ms var(--motion-ease) both !important;
+}
+
+@keyframes coronaLanguageOut {
+    from { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+    to { opacity: 0.28; transform: translateY(5px) scale(0.995); filter: blur(2px); }
+}
+
+@keyframes coronaLanguageIn {
+    0% { opacity: 0.22; transform: translateY(-6px) scale(0.995); filter: blur(2px); }
+    58% { opacity: 1; transform: translateY(1px) scale(1.001); filter: blur(0); }
+    100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 
 .link-transition-overlay {
@@ -4916,11 +5003,13 @@ html[lang="en"] .color-picker-dialog .preset-colors {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    body.language-switching .container,
-    body.language-switching .floating-header,
-    body.language-switching .tab-bar,
-    body.language-switching .detail-overlay.show {
-        animation-duration: 180ms !important;
+    .theme-transition-overlay.active,
+    body.theme-switch-out .page.active,
+    body.theme-switch-in .page.active,
+    body.language-switch-out .page.active,
+    body.language-switch-in .page.active,
+    .theme-option.selected {
+        animation-duration: 1ms !important;
     }
 
     .link-transition-overlay,

@@ -56,24 +56,36 @@
         this.state.language = saved === 'en' || saved === 'zh' ? saved : 'zh';
         document.documentElement.lang = this.state.language === 'en' ? 'en' : 'zh-CN';
     },
-    setLanguage(language, persist = true) {
+    async setLanguage(language, persist = true) {
         const normalized = language === 'en' ? 'en' : 'zh';
         const changed = this.state.language !== normalized;
-        if (changed && document.body) {
-            document.body.classList.remove('language-switching');
-            void document.body.offsetWidth;
-            document.body.classList.add('language-switching');
-            if (this._languageSwitchTimer) clearTimeout(this._languageSwitchTimer);
-            this._languageSwitchTimer = setTimeout(() => document.body.classList.remove('language-switching'), 420);
-        }
         this.state.language = normalized;
         document.documentElement.lang = normalized === 'en' ? 'en' : 'zh-CN';
         if (persist) localStorage.setItem('corona_language', normalized);
         document.querySelectorAll('#language-options .language-option').forEach(item => {
             item.classList.toggle('selected', item.dataset.language === normalized);
         });
+        if (changed && document.body) {
+            const token = (this._languageSwitchToken || 0) + 1;
+            this._languageSwitchToken = token;
+            document.body.classList.remove('language-switch-in');
+            document.body.classList.add('language-switching', 'language-switch-out');
+            await new Promise(resolve => setTimeout(resolve, 110));
+            if (this._languageSwitchToken !== token) return false;
+            document.body.classList.remove('language-switch-out');
+            this.applyTranslations();
+            void document.body.offsetWidth;
+            document.body.classList.add('language-switch-in');
+            if (typeof this.updateLoopControlState === 'function') this.updateLoopControlState();
+            await new Promise(resolve => setTimeout(resolve, 320));
+            if (this._languageSwitchToken === token) {
+                document.body.classList.remove('language-switching', 'language-switch-in');
+            }
+            return true;
+        }
         this.applyTranslations();
         if (typeof this.updateLoopControlState === 'function') this.updateLoopControlState();
+        return changed;
     },
     initLanguageSelector() {
         const options = document.querySelectorAll('#language-options .language-option');
@@ -81,8 +93,9 @@
             item.classList.toggle('selected', item.dataset.language === this.state.language);
             if (item.dataset.bound) return;
             item.dataset.bound = '1';
-            item.addEventListener('click', () => {
-                this.setLanguage(item.dataset.language, true);
+            item.addEventListener('click', async () => {
+                const changed = await this.setLanguage(item.dataset.language, true);
+                if (!changed) return;
                 if (typeof this.loadZramStatus === 'function') this.loadZramStatus();
                 this.showToast(this.t('languageChanged'), 'language');
             });
@@ -252,13 +265,29 @@
         const toggle = document.getElementById('category-config-visibility-switch');
         if (toggle) toggle.checked = normalized;
     },
-    applyThemeTransition() {
+    applyThemeTransition(theme, origin = null) {
         const body = document.body;
-        body.classList.add('theme-animate');
+        const overlay = document.getElementById('theme-transition-overlay');
+        const targetTheme = theme === 'dark' || theme === 'light'
+            ? theme
+            : (body.classList.contains('theme-dark') ? 'dark' : 'light');
+        const x = Number.isFinite(origin?.x) ? origin.x : window.innerWidth / 2;
+        const y = Number.isFinite(origin?.y) ? origin.y : window.innerHeight / 2;
+        body.style.setProperty('--theme-switch-x', `${x}px`);
+        body.style.setProperty('--theme-switch-y', `${y}px`);
+        body.classList.remove('theme-switch-in');
+        body.classList.add('theme-animate', 'theme-switching', 'theme-switch-out');
+        if (overlay) {
+            overlay.dataset.theme = targetTheme;
+            overlay.classList.remove('active');
+            void overlay.offsetWidth;
+            overlay.classList.add('active');
+        }
         if (this._themeAnimTimer) clearTimeout(this._themeAnimTimer);
         this._themeAnimTimer = setTimeout(() => {
-            body.classList.remove('theme-animate');
-        }, 300);
+            body.classList.remove('theme-animate', 'theme-switching', 'theme-switch-out', 'theme-switch-in');
+            overlay?.classList.remove('active');
+        }, 560);
     },
     normalizeHue(hue) {
         const n = parseInt(hue, 10);
@@ -274,7 +303,11 @@
             if (this._colorRefreshTimer) clearTimeout(this._colorRefreshTimer);
             this._colorRefreshTimer = setTimeout(() => document.body.classList.remove('color-refreshing'), 180);
         }
-        if (animate) this.applyThemeTransition();
+        if (animate && document.body) {
+            document.body.classList.add('theme-animate');
+            if (this._themeAnimTimer) clearTimeout(this._themeAnimTimer);
+            this._themeAnimTimer = setTimeout(() => document.body.classList.remove('theme-animate'), 440);
+        }
         document.documentElement.style.setProperty('--hue', String(value));
         document.body.style.setProperty('--hue', String(value));
         // explicit solid colors for WebView compatibility
@@ -323,15 +356,32 @@
         } catch (e) {}
         return { value, primary, dim, lite, accent, strong, soft, border, shadow, gradientEnd };
     },
-    applyTheme(theme, animate = true) {
+    async applyTheme(theme, animate = true, origin = null) {
         const body = document.body;
         const normalizedTheme = theme === 'dark' ? 'dark' : 'light';
-        if (animate) this.applyThemeTransition();
+        const token = (this._themeSwitchToken || 0) + 1;
+        this._themeSwitchToken = token;
+        if (animate) {
+            this.applyThemeTransition(normalizedTheme, origin);
+            await new Promise(resolve => setTimeout(resolve, 90));
+            if (this._themeSwitchToken !== token) return false;
+        }
         body.classList.remove('theme-light', 'theme-dark');
         body.classList.add(`theme-${normalizedTheme}`);
         const hue = this.state.hue ?? this.normalizeHue(localStorage.getItem('corona_color_hue') || 214);
         this.state.theme = normalizedTheme;
         this.applyHue(hue, false, { persist: false, updateState: false });
+        if (animate) {
+            body.classList.remove('theme-switch-out');
+            void body.offsetWidth;
+            body.classList.add('theme-switch-in');
+            await new Promise(resolve => setTimeout(resolve, 360));
+            if (this._themeSwitchToken === token) {
+                body.classList.remove('theme-animate', 'theme-switching', 'theme-switch-in');
+                document.getElementById('theme-transition-overlay')?.classList.remove('active');
+            }
+        }
+        return true;
     },
     initAccentSelector() {
         const current = this.normalizeHue(this.state.hue ?? localStorage.getItem('corona_color_hue') ?? 214);
@@ -353,7 +403,7 @@
                 document.querySelectorAll('#theme-options .theme-option').forEach(o => {
                     o.classList.toggle('selected', o.dataset.theme === 'light');
                 });
-                this.applyTheme('light', true);
+                await this.applyTheme('light', true);
                 this.applyHue(214, false);
                 this.updateColorPrefUI(214);
                 if (typeof this.resetUiLayout === 'function') this.resetUiLayout();
@@ -520,12 +570,13 @@
             else opt.classList.remove('selected');
             if (opt.dataset.bound) return;
             opt.dataset.bound = '1';
-            opt.addEventListener('click', () => {
+            opt.addEventListener('click', async (event) => {
+                if (opt.dataset.theme === this.state.theme || document.body.classList.contains('theme-switching')) return;
                 themeOptions.forEach(o => o.classList.remove('selected'));
                 opt.classList.add('selected');
-                this.state.theme = opt.dataset.theme;
-                localStorage.setItem('corona_theme', this.state.theme);
-                this.applyTheme(this.state.theme, true);
+                const nextTheme = opt.dataset.theme;
+                localStorage.setItem('corona_theme', nextTheme);
+                await this.applyTheme(nextTheme, true, { x: event.clientX, y: event.clientY });
                 this.showToast(`${this.t('themeSwitched')}: ${opt.querySelector('span').textContent}`);
             });
         });
