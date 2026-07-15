@@ -57,6 +57,8 @@
       "blueColor": "蓝色",
       "loopDevice": "Loop 设备",
       "loopDeviceDesc": "回写启用后自动分配，无需手动填写设备节点",
+      "loopWriteback": "Loop 回写",
+      "loopWritebackDesc": "为 ZRAM 自动创建 Loop 回写空间",
       "automaticAssignment": "自动分配",
       "refresh": "刷新",
       "notAssigned": "未分配",

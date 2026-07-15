@@ -738,54 +738,34 @@ body.monet-decoration .bg-decoration::before {
 }
 
 .card-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: stretch;
+    display: flex;
     gap: 12px;
     margin-bottom: 12px;
 }
 
 .card-row .card {
-    min-width: 0;
     margin-bottom: 0;
 }
 
 .card-col-left {
+    flex: 1;
     display: flex;
-    min-width: 0;
     flex-direction: column;
 }
 
 .card-col-right {
+    flex: 1;
     display: flex;
-    min-width: 0;
     flex-direction: column;
     gap: 12px;
 }
 
-.card-row .card-title {
-    position: relative;
-    width: 100%;
-    min-height: 30px;
-    justify-content: center;
-    margin-bottom: 8px;
-    text-align: center;
-    line-height: 1.2;
-    white-space: normal;
-}
-
-.card-row .cpu-brand-badge {
-    position: absolute;
-    right: 0;
-}
-
 .card-col-right .card {
-    flex: 1 1 0;
-    min-height: 0;
+    flex: 0 0 auto;
 }
 
 .card-col-right #mem-card {
-    flex: 1 1 0;
+    flex: 1;
 }
 
 .card-device {
@@ -794,23 +774,18 @@ body.monet-decoration .bg-decoration::before {
     min-height: 180px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    text-align: center;
 }
 
 .card-device .card-content {
-    display: flex;
-    width: 100%;
-    flex: 0 0 auto;
-    flex-direction: column;
-    align-items: center;
+    flex: 1;
 }
 
 .card-device .device-image {
-    position: static;
-    width: 64px;
-    height: 64px;
-    margin-top: auto;
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 80px;
+    height: 80px;
     opacity: 0.9;
 }
 
@@ -822,8 +797,6 @@ body.monet-decoration .bg-decoration::before {
 }
 
 .device-brand {
-    max-width: 100%;
-    overflow-wrap: anywhere;
     font-size: 20px;
     font-weight: 600;
     color: var(--text-main);
@@ -831,8 +804,6 @@ body.monet-decoration .bg-decoration::before {
 }
 
 .device-model {
-    max-width: 100%;
-    overflow-wrap: anywhere;
     font-size: 15px;
     color: var(--text-sub);
 }
@@ -840,9 +811,8 @@ body.monet-decoration .bg-decoration::before {
 .card-small {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
+    align-items: flex-start;
+    justify-content: flex-start;
 }
 
 .card-small .card-title {
@@ -855,14 +825,44 @@ body.monet-decoration .bg-decoration::before {
     font-weight: 700;
     color: var(--text-main);
     margin-bottom: 2px;
-    text-align: center;
+    text-align: left;
     letter-spacing: -0.5px;
 }
 
 .card-small .info-secondary {
     font-size: 13px;
     color: var(--text-sub);
-    text-align: center;
+    text-align: left;
+}
+
+html[lang="en"] .card-row .card {
+    min-width: 0;
+}
+
+html[lang="en"] .card-row .card-title {
+    line-height: 1.25;
+    white-space: normal;
+}
+
+html[lang="en"] .card-device .card-content {
+    min-width: 0;
+}
+
+html[lang="en"] .device-brand,
+html[lang="en"] .device-model {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+html[lang="en"] .card-small .info-primary {
+    max-width: 100%;
+    font-size: 20px;
+    overflow-wrap: anywhere;
+}
+
+html[lang="en"] .card-small .info-secondary {
+    max-width: 100%;
+    font-size: 12px;
 }
 
 .progress-bar-mini {
@@ -1289,7 +1289,7 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
     left: 50%;
     transform: translateX(-50%) translateY(20px);
     border: 1px solid rgba(17, 24, 39, 0.14);
-    background: rgb(255 255 255 / 0.88);
+    background: rgb(255 255 255 / 0.72);
     backdrop-filter: blur(18px) saturate(1.18);
     -webkit-backdrop-filter: blur(18px) saturate(1.18);
     color: var(--text-main);
@@ -1344,7 +1344,7 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
 
 body.theme-dark .toast {
     border-color: rgba(255, 255, 255, 0.14);
-    background: rgb(27 31 39 / 0.82);
+    background: rgb(27 31 39 / 0.66);
     box-shadow: 0 14px 38px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
@@ -4199,13 +4199,23 @@ body.theme-dark #zram-settings .option-item {
 }
 #zram-settings .option-item.selected,
 #algorithm-list .option-item.selected,
-#zram-writeback-list .option-item.selected,
 [id^="recomp-algorithm-list"] .option-item.selected {
     background: var(--primary-dim) !important;
     color: var(--primary) !important;
     font-weight: 600;
     border: none !important;
     box-shadow: none !important;
+}
+
+.loop-writeback-switch {
+    margin: 0;
+    border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--glass-border));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--primary) 4%, var(--glass-surface));
+}
+
+.loop-writeback-switch.feature-disabled {
+    opacity: 0.55;
 }
 
 .loop-device-card {

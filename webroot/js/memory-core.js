@@ -653,8 +653,8 @@
             if (writebackMatch) {
                 this.state.zramWriteback = writebackMatch[1];
                 if (this.state.zramWriteback === 'true' && !this.zramFeatures?.writebackControl) this.state.zramWriteback = 'default';
-                const list = document.getElementById('zram-writeback-list');
-                if (list) list.querySelectorAll('.option-item').forEach(i => i.classList.toggle('selected', i.dataset.value === this.state.zramWriteback));
+                const toggle = document.getElementById('zram-writeback-switch');
+                if (toggle) toggle.checked = this.state.zramWriteback === 'true';
             }
             if (writebackSizeMatch) {
                 this.state.zramWritebackSize = Math.max(0.5, parseInt(writebackSizeMatch[1], 10) / 1024);
@@ -1847,22 +1847,22 @@
         this.kernelFeatures.compaction = compaction !== '';
     },
     initZramWriteback() {
-        const list = document.getElementById('zram-writeback-list');
-        if (!list) return;
+        const toggle = document.getElementById('zram-writeback-switch');
+        if (!toggle) return;
         if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
-        list.querySelectorAll('.option-item').forEach(item => {
-            item.addEventListener('click', async () => {
-                if (item.classList.contains('feature-disabled')) {
-                    this.showToast(item.dataset.disabledReason || this.t('writebackUnsupported'), 'warning');
+        if (!toggle.dataset.bound) {
+            toggle.dataset.bound = '1';
+            toggle.addEventListener('change', () => {
+                if (!this.zramFeatures?.writebackControl) {
+                    toggle.checked = false;
+                    this.showToast(this.t('writebackUnsupported'), 'warning');
                     return;
                 }
-                list.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
-                item.classList.add('selected');
-                this.state.zramWriteback = item.dataset.value;
+                this.state.zramWriteback = toggle.checked ? 'true' : 'false';
                 if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
                 this.markZramDirty();
             });
-        });
+        }
         const sizeSlider = document.getElementById('zram-writeback-size-slider');
         const sizeValue = document.getElementById('zram-writeback-size-value');
         if (sizeSlider && !sizeSlider.dataset.bound) {

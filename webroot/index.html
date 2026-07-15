@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" id="theme-color-meta" content="#1783e8">
     <title>Corona 控制台</title>
-    <link rel="stylesheet" href="style.css?v=2026071520">
-    <link rel="stylesheet" href="css/components.css?v=2026071520">
-    <link rel="stylesheet" href="css/pages/settings.css?v=2026071520">
+    <link rel="stylesheet" href="style.css?v=2026071521">
+    <link rel="stylesheet" href="css/components.css?v=2026071521">
+    <link rel="stylesheet" href="css/pages/settings.css?v=2026071521">
     <link rel="stylesheet" href="css/animations.css?v=2026071464">
     <script>
     (function () {
@@ -416,10 +416,15 @@
                                 </div>
                                 <div class="setting-section">
                                     <span class="section-label" data-i18n="zramWriteback">ZRAM 回写</span>
-                                    <div class="option-grid" id="zram-writeback-list">
-                                        <div class="option-item selected" data-value="default" data-i18n="systemManaged">系统管理</div>
-                                        <div class="option-item" data-value="true" data-i18n="enabled">启用</div>
-                                        <div class="option-item" data-value="false" data-i18n="disabled">禁用</div>
+                                    <div class="switch-container loop-writeback-switch" id="zram-writeback-switch-container">
+                                        <div class="switch-info">
+                                            <span class="switch-label" data-i18n="loopWriteback">Loop 回写</span>
+                                            <span class="switch-desc" data-i18n="loopWritebackDesc">为 ZRAM 自动创建 Loop 回写空间</span>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="zram-writeback-switch">
+                                            <span class="slider"></span>
+                                        </label>
                                     </div>
                                     <div class="feature-disabled-hint" id="zram-writeback-hint" hidden></div>
                                 </div>
@@ -1763,6 +1768,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071520" defer></script>
+    <script src="script.js?v=2026071521" defer></script>
 </body>
 </html>

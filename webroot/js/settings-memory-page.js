@@ -48,24 +48,19 @@
         el.setAttribute('aria-hidden', on ? 'false' : 'true');
     },
     updateZramWritebackVisibility() {
-        const list = document.getElementById('zram-writeback-list');
-        if (!list) return;
-        const enableItem = list.querySelector('.option-item[data-value="true"]');
+        const toggle = document.getElementById('zram-writeback-switch');
+        const container = document.getElementById('zram-writeback-switch-container');
+        if (!toggle) return;
         const supported = !!this.zramFeatures?.writebackControl;
-        if (enableItem) {
-            enableItem.classList.toggle('feature-disabled', !supported);
-            enableItem.setAttribute('aria-disabled', supported ? 'false' : 'true');
-            enableItem.dataset.disabledReason = supported ? '' : this.t('writebackUnsupported');
-        }
+        toggle.disabled = !supported;
+        toggle.checked = supported && this.state.zramWriteback === 'true';
+        if (container) container.classList.toggle('feature-disabled', !supported);
         const hint = document.getElementById('zram-writeback-hint');
         if (hint) {
             hint.textContent = supported ? '' : this.t('writebackUnsupported');
             this.setFeatureVisible(hint, !supported);
         }
         if (!supported && this.state.zramWriteback === 'true') this.state.zramWriteback = 'default';
-        list.querySelectorAll('.option-item').forEach(item => {
-            item.classList.toggle('selected', item.dataset.value === this.state.zramWriteback);
-        });
         const sizeSection = document.getElementById('zram-writeback-size-section');
         const showSize = supported && this.state.zramWriteback === 'true';
         this.setFeatureVisible(sizeSection, showSize);

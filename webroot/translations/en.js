@@ -57,6 +57,8 @@
       "blueColor": "Blue",
       "loopDevice": "Loop Device",
       "loopDeviceDesc": "Assigned automatically when writeback is enabled; no device path is required",
+      "loopWriteback": "Loop Writeback",
+      "loopWritebackDesc": "Automatically create Loop-backed writeback space for ZRAM",
       "automaticAssignment": "Automatic",
       "refresh": "Refresh",
       "notAssigned": "Not Assigned",
