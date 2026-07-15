@@ -10,8 +10,8 @@
         if (!header || !body || header.dataset.bound) return;
         header.dataset.bound = '1';
 
-        const ease = 'cubic-bezier(0.25, 0.8, 0.25, 1)';
-        const durationFor = (h) => Math.round(Math.min(360, Math.max(180, (Number(h) || 0) * 0.35 + 140)));
+        const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
+        const durationFor = (height) => Math.round(Math.min(440, Math.max(240, (Number(height) || 0) * 0.28 + 190)));
 
         const setClosedInstant = () => {
             body.hidden = false; // keep in layout flow for measuring when opening
@@ -20,6 +20,7 @@
             body.style.transition = 'none';
             body.style.maxHeight = '0px';
             body.style.opacity = '0';
+            body.style.transform = 'translateY(-8px) scale(0.985)';
             body.dataset.open = '0';
             header.classList.remove('expanded');
         };
@@ -32,15 +33,19 @@
             body.style.transition = 'none';
             body.style.maxHeight = 'none';
             body.style.opacity = '1';
+            body.style.transform = 'none';
             const target = Math.max(body.scrollHeight, 1);
             body.style.maxHeight = '0px';
             body.style.opacity = '0';
+            body.style.transform = 'translateY(-8px) scale(0.985)';
             void body.offsetHeight;
             const d = durationFor(target);
-            body.style.transition = `max-height ${d}ms ${ease}, opacity ${Math.round(d * 0.75)}ms ease`;
+            body.style.willChange = 'max-height, opacity, transform';
+            body.style.transition = `max-height ${d}ms ${ease}, opacity ${Math.round(d * 0.72)}ms ease, transform ${d}ms ${ease}`;
             void body.offsetHeight;
             body.style.maxHeight = target + 'px';
             body.style.opacity = '1';
+            body.style.transform = 'translateY(0) scale(1)';
             header.classList.add('expanded');
             body.dataset.open = '1';
             body._foldAnim = setTimeout(() => {
@@ -49,6 +54,8 @@
                     body.style.transition = 'none';
                     body.style.maxHeight = 'none';
                     body.style.overflow = 'visible';
+                    body.style.transform = 'none';
+                    body.style.willChange = 'auto';
                 }
             }, d + 40);
         };
@@ -66,12 +73,15 @@
             const from = Math.max(body.getBoundingClientRect().height || body.scrollHeight || 1, 1);
             body.style.maxHeight = from + 'px';
             body.style.opacity = '1';
+            body.style.transform = 'translateY(0) scale(1)';
             void body.offsetHeight;
             const d = durationFor(from);
-            body.style.transition = `max-height ${d}ms ${ease}, opacity ${Math.round(d * 0.7)}ms ease`;
+            body.style.willChange = 'max-height, opacity, transform';
+            body.style.transition = `max-height ${d}ms ${ease}, opacity ${Math.round(d * 0.68)}ms ease, transform ${d}ms ${ease}`;
             void body.offsetHeight;
             body.style.maxHeight = '0px';
             body.style.opacity = '0';
+            body.style.transform = 'translateY(-8px) scale(0.985)';
             header.classList.remove('expanded');
             body.dataset.open = '0';
             body._foldAnim = setTimeout(() => {
@@ -79,6 +89,7 @@
                 body.style.transition = 'none';
                 body.style.maxHeight = '0px';
                 body.style.overflow = 'hidden';
+                body.style.willChange = 'auto';
             }, d + 40);
         };
 
@@ -688,7 +699,37 @@
             if (sw) sw.checked = false;
             this.toggleZramSettings(false);
         }
+        await this.loadLoopConfig(config);
+        if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
         await this.loadZramStatus();
+    },
+    async loadLoopConfig(legacyZramConfig = '') {
+        const loopConfig = await this.exec(`cat ${this.configDir}/loop.conf 2>/dev/null`);
+        const source = loopConfig || legacyZramConfig;
+        const enabledMatch = loopConfig
+            ? loopConfig.match(/enabled=(\d)/)
+            : source.match(/zram_writeback=(\S+)/);
+        const sizeMatch = loopConfig
+            ? loopConfig.match(/size_mb=(\d+)/)
+            : source.match(/writeback_size_mb=(\d+)/);
+        if (enabledMatch) {
+            this.state.zramWriteback = loopConfig
+                ? (enabledMatch[1] === '1' ? 'true' : 'false')
+                : enabledMatch[1];
+        } else {
+            this.state.zramWriteback = 'false';
+        }
+        if (sizeMatch) this.state.zramWritebackSize = Math.max(0.5, parseInt(sizeMatch[1], 10) / 1024);
+        const toggle = document.getElementById('zram-writeback-switch');
+        const slider = document.getElementById('zram-writeback-size-slider');
+        const value = document.getElementById('zram-writeback-size-value');
+        if (toggle) toggle.checked = this.state.zramWriteback === 'true';
+        if (slider) {
+            slider.value = this.state.zramWritebackSize;
+            this.updateSliderProgress(slider);
+        }
+        if (value) value.textContent = `${this.state.zramWritebackSize.toFixed(1)} GB`;
+        if (!loopConfig && (enabledMatch || sizeMatch)) await this.persistLoopConfig();
     },
     parseNumericList(text) {
         return String(text || '')
@@ -1075,10 +1116,40 @@
         }
         if (field === 'zram' || field === 'size') updates.size = String(sizeBytes);
         if (field === 'zram' || field === 'swappiness') updates.swappiness = String(this.state.swappiness);
-        if (field === 'zram' || field === 'zram_writeback') updates.zram_writeback = this.state.zramWriteback;
-        if (field === 'zram' || field === 'writeback_size_mb') updates.writeback_size_mb = String(Math.round(this.state.zramWritebackSize * 1024));
         if (field === 'zram' || field === 'zram_path') updates.zram_path = this.state.zramPath;
         return updates;
+    },
+    persistLoopConfig() {
+        const save = this.withLock('loop-config', async () => {
+            const updates = {
+                enabled: this.state.zramWriteback === 'true' ? '1' : '0',
+                size_mb: String(Math.round(this.state.zramWritebackSize * 1024))
+            };
+            await this.mergeConfigFile('loop.conf', updates, ['enabled', 'size_mb']);
+            await this.exec(`sed -i '/^zram_writeback=/d;/^writeback_size_mb=/d' ${this.shellQuote(`${this.configDir}/zram.conf`)} 2>/dev/null`);
+            return true;
+        });
+        this._loopConfigSavePromise = save;
+        return save;
+    },
+    async applyLoopImmediate(action) {
+        return this.withLock('loop-apply', async () => {
+            const command = action === 'stop' ? 'stop' : 'start';
+            if (command === 'start') this.state.zramWriteback = 'true';
+            await this.persistLoopConfig();
+            const button = document.getElementById('zram-loop-action');
+            if (button) button.disabled = true;
+            this.showLoading(true);
+            const result = String(await this.exec(`/system/bin/sh ${this.modDir}/scripts/apply-loop.sh ${command} >/dev/null 2>&1; echo $?`) || '').trim();
+            this.showLoading(false);
+            await this.refreshZramLoopDevice(false);
+            const succeeded = result === '0' && (command === 'stop' ? !this._loopActive : this._loopActive);
+            if (button) button.disabled = false;
+            this.showToast(this.t(succeeded
+                ? (command === 'stop' ? 'loopStopped' : 'loopStarted')
+                : (command === 'stop' ? 'loopStopFailed' : 'loopStartFailed')), succeeded ? 'success' : 'error');
+            return succeeded;
+        });
     },
     persistZramConfig(changedField = 'zram') {
         const save = this.withLock('zram-config', async () => {
@@ -1849,10 +1920,11 @@
     initZramWriteback() {
         const toggle = document.getElementById('zram-writeback-switch');
         if (!toggle) return;
+        if (typeof this.initAdvancedFold === 'function') this.initAdvancedFold('zram-loop-toggle', 'zram-loop-body', { defaultOpen: false });
         if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
         if (!toggle.dataset.bound) {
             toggle.dataset.bound = '1';
-            toggle.addEventListener('change', () => {
+            toggle.addEventListener('change', async () => {
                 if (!this.zramFeatures?.writebackControl) {
                     toggle.checked = false;
                     this.showToast(this.t('writebackUnsupported'), 'warning');
@@ -1860,7 +1932,8 @@
                 }
                 this.state.zramWriteback = toggle.checked ? 'true' : 'false';
                 if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
-                this.markZramDirty();
+                await this.persistLoopConfig();
+                if (!toggle.checked && this._loopActive) await this.applyLoopImmediate('stop');
             });
         }
         const sizeSlider = document.getElementById('zram-writeback-size-slider');
@@ -1872,7 +1945,7 @@
                 if (sizeValue) sizeValue.textContent = `${this.state.zramWritebackSize.toFixed(1)} GB`;
                 this.updateSliderProgress(sizeSlider);
             });
-            sizeSlider.addEventListener('change', () => this.markZramDirty());
+            sizeSlider.addEventListener('change', () => this.persistLoopConfig().catch(() => this.showToast(this.t('loopConfigSaveFailed'), 'error')));
         }
         const loopRefresh = document.getElementById('zram-loop-device-refresh');
         if (loopRefresh && !loopRefresh.dataset.bound) {
@@ -1880,6 +1953,11 @@
             loopRefresh.addEventListener('click', () => {
                 if (typeof this.refreshZramLoopDevice === 'function') this.refreshZramLoopDevice(true);
             });
+        }
+        const loopAction = document.getElementById('zram-loop-action');
+        if (loopAction && !loopAction.dataset.bound) {
+            loopAction.dataset.bound = '1';
+            loopAction.addEventListener('click', () => this.applyLoopImmediate(this._loopActive ? 'stop' : 'start'));
         }
     },
     initZramPath() {

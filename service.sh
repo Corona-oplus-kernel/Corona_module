@@ -71,18 +71,27 @@ zram_config_needs_overlay() {
         [ -n "$want" ] && { [ "$want" != "$now_vm" ] || [ "$want" != "$now_apps" ]; } && return 0
     fi
 
-    if grep -q '^zram_writeback=' "$conf"; then
+    loop_conf="$CONFIG_DIR/loop.conf"
+    if [ -f "$loop_conf" ]; then
+        want_enabled=$(get_conf_value "$loop_conf" enabled)
+        node="/sys/block/$block/backing_dev"
+        [ -f "/sys/block/$block/hybridswap_loop_device" ] && node="/sys/block/$block/hybridswap_loop_device"
+        now=$(cat "$node" 2>/dev/null | tr -d ' \n')
+        [ "$now" = "none" ] && now=""
+        [ "$want_enabled" = "1" ] && [ -z "$now" ] && return 0
+        if [ "$want_enabled" = "1" ]; then
+            want_size=$(get_conf_value "$loop_conf" size_mb)
+            file_size=$(stat -c %s /data/nandswap/corona_swapfile 2>/dev/null)
+            [ -n "$want_size" ] && [ "$file_size" != "$((want_size * 1024 * 1024))" ] && return 0
+        fi
+        [ "$want_enabled" != "1" ] && [ -n "$now" ] && return 0
+    elif grep -q '^zram_writeback=' "$conf"; then
         want=$(get_conf_value "$conf" zram_writeback)
         node="/sys/block/$block/backing_dev"
         [ -f "/sys/block/$block/hybridswap_loop_device" ] && node="/sys/block/$block/hybridswap_loop_device"
         now=$(cat "$node" 2>/dev/null | tr -d ' \n')
         [ "$now" = "none" ] && now=""
         [ "$want" = "true" ] && [ -z "$now" ] && return 0
-        if [ "$want" = "true" ] && grep -q '^writeback_size_mb=' "$conf"; then
-            want_size=$(get_conf_value "$conf" writeback_size_mb)
-            file_size=$(stat -c %s /data/nandswap/corona_swapfile 2>/dev/null)
-            [ -n "$want_size" ] && [ "$file_size" != "$((want_size * 1024 * 1024))" ] && return 0
-        fi
         [ "$want" = "false" ] && [ -n "$now" ] && return 0
         [ "$want" = "default" ] && [ -f /data/nandswap/corona_swapfile ] && return 0
     fi
@@ -538,8 +547,14 @@ apply_zram_config() {
     algorithm=$(get_conf_value "$CONFIG_DIR/zram.conf" algorithm)
     size=$(get_conf_value "$CONFIG_DIR/zram.conf" size)
     swappiness=$(get_conf_value "$CONFIG_DIR/zram.conf" swappiness)
-    zram_writeback=$(get_conf_value "$CONFIG_DIR/zram.conf" zram_writeback)
-    writeback_size_mb=$(get_conf_value "$CONFIG_DIR/zram.conf" writeback_size_mb)
+    loop_conf="$CONFIG_DIR/loop.conf"
+    if [ -f "$loop_conf" ]; then
+        [ "$(get_conf_value "$loop_conf" enabled)" = "1" ] && zram_writeback=true || zram_writeback=false
+        writeback_size_mb=$(get_conf_value "$loop_conf" size_mb)
+    else
+        zram_writeback=$(get_conf_value "$CONFIG_DIR/zram.conf" zram_writeback)
+        writeback_size_mb=$(get_conf_value "$CONFIG_DIR/zram.conf" writeback_size_mb)
+    fi
     zram_path=$(get_conf_value "$CONFIG_DIR/zram.conf" zram_path)
     zram_path=$(normalize_zram_path "$zram_path") || return
     zram_block=$(get_zram_block "$zram_path") || return

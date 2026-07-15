@@ -231,6 +231,7 @@ write_hybridswap_errcode() {
 init_zram() {
   local magic=32758
   local zram_conf="$CORONA_CONFIG/zram.conf"
+  local loop_conf="$CORONA_CONFIG/loop.conf"
   local corona_zram_enabled=$(corona_get zram.conf enabled)
   [ "$corona_zram_enabled" = "1" ] || return
 
@@ -241,7 +242,11 @@ init_zram() {
   local has_path=0
   [ -f "$zram_conf" ] && grep -q '^size=' "$zram_conf" && has_size=1
   [ -f "$zram_conf" ] && grep -q '^algorithm=' "$zram_conf" && has_algorithm=1
-  [ -f "$zram_conf" ] && grep -q '^zram_writeback=' "$zram_conf" && has_writeback=1
+  if [ -f "$loop_conf" ]; then
+    has_writeback=1
+  else
+    [ -f "$zram_conf" ] && grep -q '^zram_writeback=' "$zram_conf" && has_writeback=1
+  fi
   [ -f "$zram_conf" ] && grep -q '^swappiness=' "$zram_conf" && has_swappiness=1
   [ -f "$zram_conf" ] && grep -q '^zram_path=' "$zram_conf" && has_path=1
 
@@ -264,6 +269,10 @@ init_zram() {
   local corona_algorithm=$(corona_get zram.conf algorithm)
   local corona_writeback=$(corona_get zram.conf zram_writeback)
   local corona_writeback_size=$(corona_get zram.conf writeback_size_mb)
+  if [ -f "$loop_conf" ]; then
+    [ "$(corona_get loop.conf enabled)" = "1" ] && corona_writeback=true || corona_writeback=false
+    corona_writeback_size=$(corona_get loop.conf size_mb)
+  fi
   local corona_swappiness=$(corona_get zram.conf swappiness)
 
   local target_size="$current_size"

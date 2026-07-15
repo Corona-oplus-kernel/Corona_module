@@ -50,23 +50,22 @@
     updateZramWritebackVisibility() {
         const toggle = document.getElementById('zram-writeback-switch');
         const container = document.getElementById('zram-writeback-switch-container');
+        const settings = document.getElementById('zram-loop-settings');
+        const action = document.getElementById('zram-loop-action');
         if (!toggle) return;
         const supported = !!this.zramFeatures?.writebackControl;
         toggle.disabled = !supported;
         toggle.checked = supported && this.state.zramWriteback === 'true';
         if (container) container.classList.toggle('feature-disabled', !supported);
+        if (settings) settings.classList.toggle('enabled', supported && toggle.checked);
+        if (action) action.disabled = !supported;
         const hint = document.getElementById('zram-writeback-hint');
         if (hint) {
             hint.textContent = supported ? '' : this.t('writebackUnsupported');
             this.setFeatureVisible(hint, !supported);
         }
         if (!supported && this.state.zramWriteback === 'true') this.state.zramWriteback = 'default';
-        const sizeSection = document.getElementById('zram-writeback-size-section');
-        const showSize = supported && this.state.zramWriteback === 'true';
-        this.setFeatureVisible(sizeSection, showSize);
-        const loopSection = document.getElementById('zram-loop-device-section');
-        this.setFeatureVisible(loopSection, showSize);
-        if (showSize && typeof this.refreshZramLoopDevice === 'function') this.refreshZramLoopDevice(false);
+        if (typeof this.refreshZramLoopDevice === 'function') this.refreshZramLoopDevice(false);
     },
     async refreshZramLoopDevice(notify = false) {
         const valueElement = document.getElementById('zram-loop-device-value');
@@ -78,9 +77,20 @@
         const loopDevice = raw && raw !== 'none'
             ? raw.replace(/^\/dev\/block\//, '').replace(/^\/dev\//, '')
             : '';
-        const display = loopDevice || (this.state.zramWriteback === 'true' ? this.t('notAssigned') : this.t('automaticAssignment'));
+        const display = loopDevice || this.t('notAssigned');
         valueElement.textContent = display;
         valueElement.classList.toggle('active', !!loopDevice);
+        this._loopActive = !!loopDevice;
+        const status = document.getElementById('zram-loop-status');
+        if (status) {
+            status.textContent = this.t(loopDevice ? 'active' : 'inactive');
+            status.classList.toggle('active', !!loopDevice);
+        }
+        const action = document.getElementById('zram-loop-action');
+        if (action) {
+            action.textContent = this.t(loopDevice ? 'stopLoop' : 'startLoop');
+            action.classList.toggle('running', !!loopDevice);
+        }
         if (notify) this.showToast(`${this.t('loopDevice')}: ${display}`, 'info');
         return loopDevice;
     },

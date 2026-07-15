@@ -24,7 +24,20 @@ detach_backing_loop() {
     return 0
 }
 
+clear_backing_binding() {
+    [ -n "$ZRAM_BLOCK" ] || return 0
+    if [ -f "/sys/block/$ZRAM_BLOCK/hybridswap_loop_device" ]; then
+        printf '%s' none > "/sys/block/$ZRAM_BLOCK/hybridswap_loop_device" 2>/dev/null
+        [ -f "/sys/block/$ZRAM_BLOCK/hybridswap_enable" ] && echo 0 > "/sys/block/$ZRAM_BLOCK/hybridswap_enable" 2>/dev/null
+    elif [ -f "/sys/block/$ZRAM_BLOCK/backing_dev" ]; then
+        printf '%s' none > "/sys/block/$ZRAM_BLOCK/backing_dev" 2>/dev/null
+        [ -f "/sys/block/$ZRAM_BLOCK/writeback_limit_enable" ] && echo 1 > "/sys/block/$ZRAM_BLOCK/writeback_limit_enable" 2>/dev/null
+        [ -f "/sys/block/$ZRAM_BLOCK/writeback_limit" ] && echo 0 > "/sys/block/$ZRAM_BLOCK/writeback_limit" 2>/dev/null
+    fi
+}
+
 cleanup_backing() {
+    clear_backing_binding
     detach_backing_loop || return 1
     rm -f "$BACKING_FILE"
 }
