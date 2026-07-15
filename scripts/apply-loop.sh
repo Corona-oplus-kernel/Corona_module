@@ -14,6 +14,8 @@ get_conf_value() {
 
 enabled=$(get_conf_value "$LOOP_CONF" enabled)
 size_mb=$(get_conf_value "$LOOP_CONF" size_mb)
+case "$enabled" in 1) ;; *) enabled=0 ;; esac
+case "$size_mb" in ''|*[!0-9]*) size_mb=4096 ;; esac
 zram_path=$(get_conf_value "$ZRAM_CONF" zram_path)
 [ -n "$zram_path" ] || zram_path=/dev/block/zram0
 zram_block=${zram_path##*/}

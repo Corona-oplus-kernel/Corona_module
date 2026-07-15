@@ -18,8 +18,8 @@ class CoronaAddon {
             zstdCompressionLevel: 1,
             zramSize: 8,
             swappiness: 100,
-            zramWriteback: 'default',
-            zramWritebackSize: 4,
+            loopEnabled: false,
+            loopSizeGb: 4,
             zramPath: '/dev/block/zram0',
             ioEnabled: false,
             ioScheduler: null,
@@ -129,7 +129,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071524` : '';
+        return map[name] ? `${map[name]}?v=2026071525` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -343,13 +343,35 @@ class CoronaAddon {
         });
         if (typeof this.applyTranslations === 'function') this.applyTranslations();
     }
-    async exec(cmd) {
+    async execResult(cmd) {
         return new Promise((resolve) => {
             const callbackId = `cb_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
-            const timeout = setTimeout(() => { delete window[callbackId]; resolve(''); }, 12000);
-            window[callbackId] = (code, stdout, stderr) => { clearTimeout(timeout); delete window[callbackId]; resolve(stdout ? stdout.trim() : ''); };
-            try { ksu.exec(cmd, '{}', callbackId); } catch (e) { clearTimeout(timeout); delete window[callbackId]; resolve(''); }
+            const timeout = setTimeout(() => {
+                delete window[callbackId];
+                resolve({ code: -1, stdout: '', stderr: 'timeout' });
+            }, 12000);
+            window[callbackId] = (code, stdout, stderr) => {
+                clearTimeout(timeout);
+                delete window[callbackId];
+                const numericCode = Number(code);
+                resolve({
+                    code: Number.isFinite(numericCode) ? numericCode : -1,
+                    stdout: stdout ? String(stdout).trim() : '',
+                    stderr: stderr ? String(stderr).trim() : ''
+                });
+            };
+            try {
+                ksu.exec(cmd, '{}', callbackId);
+            } catch (error) {
+                clearTimeout(timeout);
+                delete window[callbackId];
+                resolve({ code: -1, stdout: '', stderr: String(error?.message || error || '') });
+            }
         });
+    }
+    async exec(cmd) {
+        const result = await this.execResult(cmd);
+        return result.stdout;
     }
     shellQuote(value) {
         return `'${String(value).replace(/'/g, `'\\''`)}'`;
@@ -371,10 +393,10 @@ class CoronaAddon {
         return entries;
     }
     buildSimpleConfig(entries) {
-        return entries
+        const lines = entries
             .filter(item => Array.isArray(item) && item[0])
-            .map(([key, value]) => `${key}=${value}`)
-            .join('\n');
+            .map(([key, value]) => `${key}=${value}`);
+        return lines.length ? `${lines.join('\n')}\n` : '';
     }
     async buildMergedConfigContent(filename, updates, order = []) {
         const path = `${this.configDir}/${filename}`;

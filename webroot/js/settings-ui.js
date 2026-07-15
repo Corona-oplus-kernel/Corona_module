@@ -73,7 +73,7 @@
             item.classList.toggle('selected', item.dataset.language === normalized);
         });
         this.applyTranslations();
-        if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
+        if (typeof this.updateLoopControlState === 'function') this.updateLoopControlState();
     },
     initLanguageSelector() {
         const options = document.querySelectorAll('#language-options .language-option');

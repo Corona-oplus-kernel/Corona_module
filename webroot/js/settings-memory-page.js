@@ -47,7 +47,7 @@
         el.style.display = on ? '' : 'none';
         el.setAttribute('aria-hidden', on ? 'false' : 'true');
     },
-    updateZramWritebackVisibility() {
+    updateLoopControlState() {
         const toggle = document.getElementById('zram-writeback-switch');
         const container = document.getElementById('zram-writeback-switch-container');
         const settings = document.getElementById('zram-loop-settings');
@@ -55,7 +55,7 @@
         if (!toggle) return;
         const supported = !!this.zramFeatures?.writebackControl;
         toggle.disabled = !supported;
-        toggle.checked = supported && this.state.zramWriteback === 'true';
+        toggle.checked = this.state.loopEnabled;
         if (container) container.classList.toggle('feature-disabled', !supported);
         if (settings) settings.classList.toggle('enabled', supported && toggle.checked);
         if (action) action.disabled = !supported;
@@ -64,14 +64,13 @@
             hint.textContent = supported ? '' : this.t('writebackUnsupported');
             this.setFeatureVisible(hint, !supported);
         }
-        if (!supported && this.state.zramWriteback === 'true') this.state.zramWriteback = 'default';
         this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
         if (typeof this.refreshZramLoopDevice === 'function') this.refreshZramLoopDevice(false);
     },
     updateLoopParameterDisplay(loopDevice = '') {
         const values = {
-            'loop-param-config': this.t(this.state.zramWriteback === 'true' ? 'enabled' : 'disabled'),
-            'loop-param-size': `${Number(this.state.zramWritebackSize || 4).toFixed(1)} GB`,
+            'loop-param-config': this.t(this.state.loopEnabled ? 'enabled' : 'disabled'),
+            'loop-param-size': `${Number(this.state.loopSizeGb || 4).toFixed(1)} GB`,
             'loop-param-zram': this.state.zramPath || '/dev/block/zram0',
             'loop-param-file': '/data/nandswap/corona_swapfile',
             'loop-param-device': loopDevice || this.t('notAssigned')
@@ -81,19 +80,17 @@
             if (element) element.textContent = value;
         });
     },
-    async refreshZramLoopDevice(notify = false) {
-        const valueElement = document.getElementById('zram-loop-device-value');
-        if (!valueElement) return '';
+    getLoopZramBlock() {
         const candidate = String(this.state.zramPath || '/dev/block/zram0').split('/').pop();
-        const zramBlock = /^zram\d+$/.test(candidate) ? candidate : 'zram0';
-        const command = `if [ -f /sys/block/${zramBlock}/hybridswap_loop_device ]; then cat /sys/block/${zramBlock}/hybridswap_loop_device 2>/dev/null; elif [ -f /sys/block/${zramBlock}/backing_dev ]; then cat /sys/block/${zramBlock}/backing_dev 2>/dev/null; elif [ -f /data/nandswap/corona_loop_device ]; then cat /data/nandswap/corona_loop_device 2>/dev/null; fi`;
-        const raw = String(await this.exec(command) || '').trim();
-        const loopDevice = raw && raw !== 'none'
-            ? raw.replace(/^\/dev\/block\//, '').replace(/^\/dev\//, '')
-            : '';
+        return /^zram\d+$/.test(candidate) ? candidate : 'zram0';
+    },
+    renderLoopRuntimeState(loopDevice = '') {
+        const valueElement = document.getElementById('zram-loop-device-value');
         const display = loopDevice || this.t('notAssigned');
-        valueElement.textContent = display;
-        valueElement.classList.toggle('active', !!loopDevice);
+        if (valueElement) {
+            valueElement.textContent = display;
+            valueElement.classList.toggle('active', !!loopDevice);
+        }
         this._loopActive = !!loopDevice;
         this.updateLoopParameterDisplay(loopDevice);
         const status = document.getElementById('zram-loop-status');
@@ -106,8 +103,30 @@
             action.textContent = this.t(loopDevice ? 'stopLoop' : 'startLoop');
             action.classList.toggle('running', !!loopDevice);
         }
-        if (notify) this.showToast(`${this.t('loopDevice')}: ${display}`, 'info');
-        return loopDevice;
+        return display;
+    },
+    async refreshZramLoopDevice(notify = false, force = false) {
+        if (this._loopRefreshPromise && !force) {
+            const loopDevice = await this._loopRefreshPromise;
+            if (notify) this.showToast(`${this.t('loopDevice')}: ${loopDevice || this.t('notAssigned')}`, 'info');
+            return loopDevice;
+        }
+        const zramBlock = this.getLoopZramBlock();
+        const command = `hybrid=/sys/block/${zramBlock}/hybridswap_loop_device; backing=/sys/block/${zramBlock}/backing_dev; if [ -f "$hybrid" ]; then cat "$hybrid"; elif [ -f "$backing" ]; then cat "$backing"; else cat /data/nandswap/corona_loop_device 2>/dev/null; fi`;
+        const refresh = (async () => {
+            const raw = String(await this.exec(command) || '').trim();
+            const loopDevice = raw && raw !== 'none' ? raw : '';
+            this.renderLoopRuntimeState(loopDevice);
+            return loopDevice;
+        })();
+        this._loopRefreshPromise = refresh;
+        try {
+            const loopDevice = await refresh;
+            if (notify) this.showToast(`${this.t('loopDevice')}: ${loopDevice || this.t('notAssigned')}`, 'info');
+            return loopDevice;
+        } finally {
+            if (this._loopRefreshPromise === refresh) this._loopRefreshPromise = null;
+        }
     },
     initZramRecompFold() {
         if (typeof this.initAdvancedFold === 'function') {
