@@ -64,7 +64,7 @@
             void document.body.offsetWidth;
             document.body.classList.add('language-switching');
             if (this._languageSwitchTimer) clearTimeout(this._languageSwitchTimer);
-            this._languageSwitchTimer = setTimeout(() => document.body.classList.remove('language-switching'), 320);
+            this._languageSwitchTimer = setTimeout(() => document.body.classList.remove('language-switching'), 420);
         }
         this.state.language = normalized;
         document.documentElement.lang = normalized === 'en' ? 'en' : 'zh-CN';
@@ -379,7 +379,7 @@
             { hue: 48, name: '琥珀' },
             { hue: 126, name: '绿色' },
             { hue: 178, name: '青色' },
-            { hue: 214, name: 'Corona 蓝' },
+            { hue: 214, name: this.t('blueColor') },
             { hue: 252, name: '靛蓝' },
             { hue: 286, name: '紫色' },
             { hue: 330, name: '粉色' }

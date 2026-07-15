@@ -129,7 +129,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071519` : '';
+        return map[name] ? `${map[name]}?v=2026071520` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -279,7 +279,9 @@ class CoronaAddon {
             if (container && precise && !container.querySelector('.slider-precise-row')) {
                 const row = document.createElement('div');
                 row.className = 'slider-precise-row';
-                row.innerHTML = `<span class="slider-precise-label" data-i18n="preciseValue">精确值</span><label class="slider-precise-control"><input class="slider-number-input" type="number" inputmode="decimal"><span class="slider-number-unit"></span></label>`;
+                row.innerHTML = `<button type="button" class="slider-precise-toggle" aria-expanded="false"><span class="slider-precise-label" data-i18n="preciseValue">手动输入</span><span class="slider-precise-preview"></span><span class="slider-precise-arrow">›</span></button><label class="slider-precise-control"><input class="slider-number-input" type="number" inputmode="decimal"><span class="slider-number-unit"></span></label>`;
+                const toggle = row.querySelector('.slider-precise-toggle');
+                const preview = row.querySelector('.slider-precise-preview');
                 const input = row.querySelector('.slider-number-input');
                 const unit = row.querySelector('.slider-number-unit');
                 input.min = slider.min;
@@ -287,6 +289,14 @@ class CoronaAddon {
                 input.step = slider.step;
                 input.value = Number(slider.value).toFixed(precise.decimals);
                 unit.textContent = precise.unit;
+                const updatePrecisePreview = () => {
+                    preview.textContent = `${Number(slider.value).toFixed(precise.decimals)}${precise.unit ? ` ${precise.unit}` : ''}`;
+                };
+                toggle.addEventListener('click', () => {
+                    const editing = row.classList.toggle('editing');
+                    toggle.setAttribute('aria-expanded', editing ? 'true' : 'false');
+                    if (editing) requestAnimationFrame(() => input.focus());
+                });
                 input.addEventListener('input', () => {
                     if (input.value === '') return;
                     const value = Number(input.value);
@@ -300,10 +310,14 @@ class CoronaAddon {
                     input.value = Number(slider.value).toFixed(precise.decimals);
                     slider.dispatchEvent(new Event('input', { bubbles: true }));
                     slider.dispatchEvent(new Event('change', { bubbles: true }));
+                    row.classList.remove('editing');
+                    toggle.setAttribute('aria-expanded', 'false');
                 });
                 slider.addEventListener('input', () => {
                     input.value = Number(slider.value).toFixed(precise.decimals);
+                    updatePrecisePreview();
                 });
+                updatePrecisePreview();
                 container.appendChild(row);
             }
             const bubble = container?.querySelector('.slider-bubble');

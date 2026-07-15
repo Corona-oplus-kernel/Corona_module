@@ -1874,6 +1874,13 @@
             });
             sizeSlider.addEventListener('change', () => this.markZramDirty());
         }
+        const loopRefresh = document.getElementById('zram-loop-device-refresh');
+        if (loopRefresh && !loopRefresh.dataset.bound) {
+            loopRefresh.dataset.bound = '1';
+            loopRefresh.addEventListener('click', () => {
+                if (typeof this.refreshZramLoopDevice === 'function') this.refreshZramLoopDevice(true);
+            });
+        }
     },
     initZramPath() {
         const pathInput = document.getElementById('zram-path-input');

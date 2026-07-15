@@ -69,6 +69,25 @@
         const sizeSection = document.getElementById('zram-writeback-size-section');
         const showSize = supported && this.state.zramWriteback === 'true';
         this.setFeatureVisible(sizeSection, showSize);
+        const loopSection = document.getElementById('zram-loop-device-section');
+        this.setFeatureVisible(loopSection, showSize);
+        if (showSize && typeof this.refreshZramLoopDevice === 'function') this.refreshZramLoopDevice(false);
+    },
+    async refreshZramLoopDevice(notify = false) {
+        const valueElement = document.getElementById('zram-loop-device-value');
+        if (!valueElement) return '';
+        const candidate = String(this.state.zramPath || '/dev/block/zram0').split('/').pop();
+        const zramBlock = /^zram\d+$/.test(candidate) ? candidate : 'zram0';
+        const command = `if [ -f /sys/block/${zramBlock}/hybridswap_loop_device ]; then cat /sys/block/${zramBlock}/hybridswap_loop_device 2>/dev/null; elif [ -f /sys/block/${zramBlock}/backing_dev ]; then cat /sys/block/${zramBlock}/backing_dev 2>/dev/null; elif [ -f /data/nandswap/corona_loop_device ]; then cat /data/nandswap/corona_loop_device 2>/dev/null; fi`;
+        const raw = String(await this.exec(command) || '').trim();
+        const loopDevice = raw && raw !== 'none'
+            ? raw.replace(/^\/dev\/block\//, '').replace(/^\/dev\//, '')
+            : '';
+        const display = loopDevice || (this.state.zramWriteback === 'true' ? this.t('notAssigned') : this.t('automaticAssignment'));
+        valueElement.textContent = display;
+        valueElement.classList.toggle('active', !!loopDevice);
+        if (notify) this.showToast(`${this.t('loopDevice')}: ${display}`, 'info');
+        return loopDevice;
     },
     initZramRecompFold() {
         if (typeof this.initAdvancedFold === 'function') {

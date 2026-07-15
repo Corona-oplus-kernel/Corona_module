@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" id="theme-color-meta" content="#1783e8">
     <title>Corona 控制台</title>
-    <link rel="stylesheet" href="style.css?v=2026071519">
-    <link rel="stylesheet" href="css/components.css?v=2026071519">
-    <link rel="stylesheet" href="css/pages/settings.css?v=2026071519">
+    <link rel="stylesheet" href="style.css?v=2026071520">
+    <link rel="stylesheet" href="css/components.css?v=2026071520">
+    <link rel="stylesheet" href="css/pages/settings.css?v=2026071520">
     <link rel="stylesheet" href="css/animations.css?v=2026071464">
     <script>
     (function () {
@@ -432,6 +432,16 @@
                                             <span class="slider-value" id="zram-writeback-size-value">4.0 GB</span>
                                             <span>16GB</span>
                                         </div>
+                                    </div>
+                                </div>
+                                <div class="setting-section zram-loop-device-section" id="zram-loop-device-section" hidden style="display:none">
+                                    <span class="section-label" data-i18n="loopDevice">Loop 设备</span>
+                                    <div class="loop-device-card">
+                                        <div class="loop-device-copy">
+                                            <span class="loop-device-value" id="zram-loop-device-value" data-i18n="automaticAssignment">自动分配</span>
+                                            <span class="loop-device-desc" data-i18n="loopDeviceDesc">回写启用后自动分配，无需手动填写设备节点</span>
+                                        </div>
+                                        <button type="button" class="btn-small loop-device-refresh" id="zram-loop-device-refresh" data-i18n="refresh">刷新</button>
                                     </div>
                                 </div>
                                 <div class="setting-section">
@@ -1753,6 +1763,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071519" defer></script>
+    <script src="script.js?v=2026071520" defer></script>
 </body>
 </html>
