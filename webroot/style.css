@@ -3388,6 +3388,17 @@ body.theme-dark .section-marker::after {
     max-height: 78vh;
 }
 
+.app-policy-detail-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.app-policy-detail-card .detail-header,
+.app-policy-detail-card .priority-search-container {
+    flex: 0 0 auto;
+}
+
 .app-policy-loading-state {
     min-height: 240px;
     display: flex;
@@ -4383,8 +4394,14 @@ body.theme-dark #zram-settings .option-item {
     z-index: 12000 !important;
 }
 #app-policy-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
     contain: content;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
 }
 
 /* Color picker live preview */

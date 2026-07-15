@@ -147,15 +147,7 @@ output_app_meta() {
     [ -n "$payload" ] || return 0
     batch=$(run_launcher_meta label-batch "$payload")
     if [ -n "$batch" ]; then
-        printf '%s
-' "$payload" | while IFS='|' read -r pkg component; do
-            [ -n "$pkg" ] || continue
-            label=$(printf '%s
-' "$batch" | awk -F'|' -v key="$pkg" '$1 == key { print substr($0, index($0, "|") + 1); exit }')
-            [ -n "$label" ] || label=$(humanize_package_name "$pkg")
-            printf '%s|%s|%s
-' "$pkg" "$component" "$label"
-        done
+        printf '%s\n' "$batch"
     else
         printf '%s
 ' "$payload" | while IFS='|' read -r pkg component; do

@@ -502,6 +502,7 @@
                 this.initPerformanceMode();
                 this.initAppPolicy();
                 await Promise.all([this.loadPerformanceModeConfig(), this.loadAppRulesConfig()]);
+                this.prewarmAppPolicyData().catch(() => {});
                 return;
             }
             if (section === 'custom-scripts') {

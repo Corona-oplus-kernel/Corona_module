@@ -14,6 +14,9 @@ CoronaAddon.prototype.getAppPolicyScript = function(...args) {
     args.filter(Boolean).forEach(arg => parts.push(arg));
     return parts.join(' ');
 };
+CoronaAddon.prototype.getBackgroundAppPolicyScript = function(...args) {
+    return `nice -n 10 ionice -c 3 ${this.getAppPolicyScript(...args)}`;
+};
 CoronaAddon.prototype.parseAppRulesConfig = function(content) {
     this.ensureAppPolicyState();
     const next = { monitorEnabled: false, notifyEnabled: true, whitelist: [], protect: [], profiles: [] };
@@ -211,30 +214,81 @@ CoronaAddon.prototype.initAppPolicy = function() {
 CoronaAddon.prototype.loadInstalledApps = async function(force = false) {
     this.ensureAppPolicyState();
     if (!force && this.installedApps.length > 0) return this.installedApps;
-    const output = await this.exec(this.getAppPolicyScript('list-meta'));
-    const apps = [];
-    let cacheChanged = false;
-    String(output || '').split('\n').forEach(line => {
-        const trimmed = line.trim();
-        if (!trimmed) return;
-        const parts = trimmed.split('|');
-        const pkg = (parts[0] || '').trim();
-        const componentName = (parts[1] || '').trim();
-        const fetchedLabel = (parts[2] || '').trim();
-        if (!pkg) return;
-        const cached = (this.appMetaCache && this.appMetaCache[pkg]) || {};
-        const label = fetchedLabel && fetchedLabel !== pkg ? fetchedLabel : (cached.label && cached.label !== pkg ? cached.label : this.humanizePackageName(pkg));
-        apps.push({ packageName: pkg, componentName, label, labelLoaded: true });
-        const nextCache = { ...cached, label, componentName };
-        if (JSON.stringify(nextCache) !== JSON.stringify(cached)) {
-            this.appMetaCache[pkg] = nextCache;
-            cacheChanged = true;
-        }
-    });
-    apps.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN-u-co-pinyin') || a.packageName.localeCompare(b.packageName));
-    this.installedApps = apps;
-    if (cacheChanged) this.scheduleSaveAppMetaCache();
-    return apps;
+    if (this.installedAppsLoadPromise) return this.installedAppsLoadPromise;
+    this.installedAppsLoadPromise = (async () => {
+        const output = await this.exec(this.getAppPolicyScript('list'));
+        const apps = [];
+        String(output || '').split('\n').forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+            const parts = trimmed.split('|');
+            const packageName = (parts[0] || '').trim();
+            const componentName = (parts[1] || '').trim();
+            if (!packageName) return;
+            const cached = (this.appMetaCache && this.appMetaCache[packageName]) || {};
+            const cachedLabel = cached.label && cached.label !== packageName ? cached.label : '';
+            const label = cachedLabel || this.humanizePackageName(packageName);
+            apps.push({
+                packageName,
+                componentName: cached.componentName || componentName,
+                label,
+                labelLoaded: !!cachedLabel,
+                searchText: `${label}\n${packageName}`.toLowerCase()
+            });
+        });
+        this.installedApps = apps;
+        return apps;
+    })();
+    try {
+        return await this.installedAppsLoadPromise;
+    } finally {
+        this.installedAppsLoadPromise = null;
+    }
+};
+CoronaAddon.prototype.refreshInstalledAppLabels = async function(force = false) {
+    this.ensureAppPolicyState();
+    if (!force && this.installedApps.length > 0 && this.installedApps.every(app => app.labelLoaded)) return this.installedApps;
+    if (this.appLabelRefreshPromise) return this.appLabelRefreshPromise;
+    this.appLabelRefreshPromise = (async () => {
+        const output = await this.exec(this.getBackgroundAppPolicyScript('list-meta'));
+        const metadata = new Map();
+        let cacheChanged = false;
+        String(output || '').split('\n').forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+            const parts = trimmed.split('|');
+            const packageName = (parts[0] || '').trim();
+            const componentName = (parts[1] || '').trim();
+            const fetchedLabel = (parts.slice(2).join('|') || '').trim();
+            if (!packageName) return;
+            const label = fetchedLabel && fetchedLabel !== packageName ? fetchedLabel : this.humanizePackageName(packageName);
+            metadata.set(packageName, { componentName, label });
+            const cached = (this.appMetaCache && this.appMetaCache[packageName]) || {};
+            if (cached.label !== label || cached.componentName !== componentName) {
+                this.appMetaCache[packageName] = { ...cached, label, componentName };
+                cacheChanged = true;
+            }
+        });
+        this.installedApps.forEach(app => {
+            const meta = metadata.get(app.packageName);
+            if (!meta) return;
+            app.componentName = meta.componentName || app.componentName;
+            app.label = meta.label;
+            app.labelLoaded = true;
+            app.searchText = `${app.label}\n${app.packageName}`.toLowerCase();
+        });
+        if (cacheChanged) this.scheduleSaveAppMetaCache();
+        const search = document.getElementById('app-policy-search');
+        const overlayOpen = document.getElementById('app-policy-overlay')?.classList.contains('show');
+        if (overlayOpen && search?.value.trim()) this.renderAppPolicyList();
+        else if (overlayOpen) this.refreshRenderedAppPolicyLabels();
+        return this.installedApps;
+    })();
+    try {
+        return await this.appLabelRefreshPromise;
+    } finally {
+        this.appLabelRefreshPromise = null;
+    }
 };
 CoronaAddon.prototype.scheduleSaveAppMetaCache = function() {
     if (this._appMetaSaveTimer) clearTimeout(this._appMetaSaveTimer);
@@ -260,6 +314,7 @@ CoronaAddon.prototype.prewarmAppPolicyData = async function(force = false) {
         }
         if (lastError && apps.length === 0) throw lastError;
         this.appPolicyPrewarmDone = apps.length > 0;
+        this.refreshInstalledAppLabels(force).catch(() => {});
         return apps;
     })();
     try {
@@ -286,6 +341,17 @@ CoronaAddon.prototype.renderAppPolicyIcon = function(app) {
 };
 CoronaAddon.prototype.hydrateAppPolicyIcons = function(container) {
     if (!container) return;
+    const list = document.getElementById('app-policy-list');
+    if (!this.appPolicyIconObserver && 'IntersectionObserver' in window) {
+        this.appPolicyIconObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) return;
+                const img = entry.target;
+                this.appPolicyIconObserver.unobserve(img);
+                img.src = this.getAppPolicyIconSource(img.dataset.pkg || '');
+            });
+        }, { root: list, rootMargin: '240px 0px' });
+    }
     container.querySelectorAll('.app-policy-icon[data-pkg]').forEach(img => {
         if (img.dataset.bound === '1') return;
         img.dataset.bound = '1';
@@ -296,7 +362,8 @@ CoronaAddon.prototype.hydrateAppPolicyIcons = function(container) {
             img.classList.remove('loaded');
             img.closest('.app-policy-icon-wrap')?.classList.add('hidden');
         });
-        img.src = this.getAppPolicyIconSource(img.dataset.pkg || '');
+        if (this.appPolicyIconObserver) this.appPolicyIconObserver.observe(img);
+        else img.src = this.getAppPolicyIconSource(img.dataset.pkg || '');
     });
 };
 CoronaAddon.prototype.getAppPolicyMembership = function() {
@@ -384,21 +451,12 @@ CoronaAddon.prototype.openAppPolicyOverlay = async function(mode) {
         if (this.installedApps && this.installedApps.length > 0) {
             this.renderAppPolicyList();
             this.setAppPolicyManageLoading(false);
-            // background refresh
-            setTimeout(async () => {
-                try {
-                    await this.loadInstalledApps(true);
-                    if (document.getElementById('app-policy-overlay')?.classList.contains('show')) {
-                        this.renderAppPolicyList();
-                    }
-                } catch (error) {
-                    console.error('refresh installed apps failed', error);
-                }
-            }, 120);
+            setTimeout(() => this.refreshInstalledAppLabels().catch(() => {}), 120);
             return;
         }
         await this.loadInstalledApps();
         this.renderAppPolicyList();
+        this.refreshInstalledAppLabels().catch(() => {});
     } catch (error) {
         this.renderAppPolicyLoadingState('读取应用列表失败');
     } finally {
@@ -417,6 +475,18 @@ CoronaAddon.prototype.updateAppPolicyRow = function(pkg) {
     row.classList.toggle('active', this.isAppPolicyConfigured(pkg, membership));
     const tagsEl = row.querySelector('.app-policy-tags');
     if (tagsEl) tagsEl.innerHTML = this.renderAppPolicyTags(pkg, membership);
+};
+CoronaAddon.prototype.refreshRenderedAppPolicyLabels = function() {
+    const list = document.getElementById('app-policy-list');
+    if (!list) return;
+    const appMap = new Map((this.installedApps || []).map(app => [app.packageName, app]));
+    list.querySelectorAll('.app-policy-row[data-pkg]').forEach(row => {
+        const app = appMap.get(row.dataset.pkg || '');
+        if (!app) return;
+        row.dataset.label = app.label;
+        const name = row.querySelector('.app-policy-name');
+        if (name) name.textContent = app.label;
+    });
 };
 CoronaAddon.prototype.renderAppPolicyList = function() {
     this.ensureAppPolicyState();
@@ -448,7 +518,7 @@ CoronaAddon.prototype.renderAppPolicyList = function() {
     });
 
     const apps = (this.installedApps || [])
-        .filter(app => !keyword || app.label.toLowerCase().includes(keyword) || app.packageName.toLowerCase().includes(keyword))
+        .filter(app => !keyword || (app.searchText || `${app.label}\n${app.packageName}`.toLowerCase()).includes(keyword))
         .sort((a, b) => {
             const aActive = configured.has(a.packageName);
             const bActive = configured.has(b.packageName);
@@ -470,16 +540,21 @@ CoronaAddon.prototype.renderAppPolicyList = function() {
 
     // chunked paint so opening list never freezes UI (animation/main thread)
     list.innerHTML = '';
-    const chunk = 36;
+    const chunk = 16;
     let index = 0;
     const paint = () => {
         if (token.cancelled) return;
+        if (navigator.scheduling?.isInputPending?.()) {
+            requestAnimationFrame(paint);
+            return;
+        }
         const end = Math.min(index + chunk, apps.length);
+        const template = document.createElement('template');
         let html = '';
         for (let i = index; i < end; i++) html += rowHtml(apps[i]);
-        list.insertAdjacentHTML('beforeend', html);
-        // hydrate only the new batch
-        this.hydrateAppPolicyIcons(list);
+        template.innerHTML = html;
+        this.hydrateAppPolicyIcons(template.content);
+        list.appendChild(template.content);
         index = end;
         if (index < apps.length) {
             requestAnimationFrame(paint);

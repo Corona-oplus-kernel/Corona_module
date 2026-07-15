@@ -37,13 +37,24 @@ case "$1" in
     priority-set) set_priority_rule "$2" "$3" "$4" "$5" ;;
     priority-del) delete_priority_rule "$2" ;;
     label-batch)
-        printf '%s' "$2" | tr ',' '
-' | while IFS= read -r pkg; do
+        payload=$(printf '%s' "$2" | awk -v RS=',' 'NF { print }' | while IFS= read -r pkg; do
             [ -n "$pkg" ] || continue
-            label=$(output_label "$pkg")
-            printf '%s|%s
-' "$pkg" "$label"
-        done ;;
+            component=$(resolve_launcher_component "$pkg")
+            printf '%s|%s\n' "$pkg" "$component"
+        done)
+        batch=$(run_launcher_meta label-batch "$payload")
+        if [ -n "$batch" ]; then
+            printf '%s\n' "$batch" | while IFS='|' read -r pkg component label; do
+                [ -n "$pkg" ] || continue
+                printf '%s|%s\n' "$pkg" "$label"
+            done
+        else
+            printf '%s' "$2" | awk -v RS=',' 'NF { print }' | while IFS= read -r pkg; do
+                [ -n "$pkg" ] || continue
+                label=$(output_label "$pkg")
+                printf '%s|%s\n' "$pkg" "$label"
+            done
+        fi ;;
     label) output_label "$2" "$3" ;;
     icon) output_icon "$2" "$3" ;;
     icon-file) output_icon_file "$2" "$3" ;;
