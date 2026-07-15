@@ -59,6 +59,54 @@ get_active_zram_algorithm() {
   echo "$alg_raw" | awk '{print $1}'
 }
 
+select_supported_zram_algorithm() {
+  local zram_block="$1"
+  local requested="${2#kernel:}"
+  local available=$(/system/bin/cat "/sys/block/$zram_block/comp_algorithm" 2>/dev/null | tr -d '[]')
+  local algo
+  for algo in $available; do
+    [ "$algo" = "$requested" ] && { echo "$requested"; return 0; }
+  done
+  for requested in lz4 lzo-rle lzo zstd; do
+    for algo in $available; do
+      [ "$algo" = "$requested" ] && { echo "$requested"; return 0; }
+    done
+  done
+  echo "$available" | awk '{print $1}'
+}
+
+set_corona_config_value() {
+  local file="$CORONA_CONFIG/$1"
+  local key="$2"
+  local value="$3"
+  [ -f "$file" ] || return 0
+  if grep -q "^${key}=" "$file" 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "$file" 2>/dev/null
+  else
+    echo "${key}=${value}" >> "$file"
+  fi
+}
+
+apply_zram_primary_algorithm() {
+  local zram_block="$1"
+  local requested="${2#kernel:}"
+  local selected=$(select_supported_zram_algorithm "$zram_block" "$requested")
+  [ -n "$selected" ] || return 1
+  echo "$selected" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null || return 1
+  local active=$(get_active_zram_algorithm "$zram_block")
+  active=${active#kernel:}
+  if [ -z "$active" ] || [ "$active" != "$selected" ]; then
+    selected=$(select_supported_zram_algorithm "$zram_block" lz4)
+    [ -n "$selected" ] || return 1
+    echo "$selected" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null || return 1
+    active=$(get_active_zram_algorithm "$zram_block")
+    active=${active#kernel:}
+  fi
+  [ -n "$active" ] || return 1
+  [ "$active" = "$requested" ] || set_corona_config_value zram.conf algorithm "$active"
+  echo "$active"
+}
+
 run_default_nandswap_main() {
   local script=/product/bin/init.oplus.nandswap.sh
   [ -r "$script" ] || return 1
@@ -111,7 +159,9 @@ configure_zram_device() {
 
   /system/bin/swapoff "$zram_path" 2>/dev/null
   echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
-  [ -n "$comp_algorithm" ] && echo "$comp_algorithm" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null
+  if [ -n "$comp_algorithm" ]; then
+    comp_algorithm=$(apply_zram_primary_algorithm "$zram_block" "$comp_algorithm") || return 1
+  fi
   apply_zram_recomp_algorithms "$zram_block"
   apply_zstd_compression_level
   if [ "$zram_writeback" = "false" ]; then
@@ -229,7 +279,9 @@ init_zram() {
   if [ "$has_size" -eq 1 ] || [ "$has_algorithm" -eq 1 ] || [ "$has_writeback" -eq 1 ] || [ "$has_path" -eq 1 ]; then
     /system/bin/swapoff "$zram_path" 2>/dev/null
     echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
-    [ -n "$target_algorithm" ] && echo "$target_algorithm" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null
+    if [ -n "$target_algorithm" ]; then
+      target_algorithm=$(apply_zram_primary_algorithm "$zram_block" "$target_algorithm") || return
+    fi
     apply_zram_recomp_algorithms "$zram_block"
     apply_zstd_compression_level
     if [ "$has_writeback" -eq 1 ] && [ "$corona_writeback" = "false" ]; then

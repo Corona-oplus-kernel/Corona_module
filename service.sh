@@ -441,6 +441,61 @@ get_swap_priority() {
     awk -v dev="$1" 'NR > 1 && $1 == dev { print $5; exit }' /proc/swaps 2>/dev/null
 }
 
+get_active_zram_algorithm() {
+    zram_block="$1"
+    alg_raw=$(cat "/sys/block/$zram_block/comp_algorithm" 2>/dev/null)
+    active=$(echo "$alg_raw" | sed -n 's/.*\[\([^]]*\)\].*/\1/p')
+    [ -n "$active" ] && { echo "$active"; return; }
+    echo "$alg_raw" | awk '{print $1}'
+}
+
+select_supported_zram_algorithm() {
+    zram_block="$1"
+    requested=${2#kernel:}
+    available=$(cat "/sys/block/$zram_block/comp_algorithm" 2>/dev/null | tr -d '[]')
+    for algo in $available; do
+        [ "$algo" = "$requested" ] && { echo "$requested"; return 0; }
+    done
+    for requested in lz4 lzo-rle lzo zstd; do
+        for algo in $available; do
+            [ "$algo" = "$requested" ] && { echo "$requested"; return 0; }
+        done
+    done
+    echo "$available" | awk '{print $1}'
+}
+
+set_zram_config_value() {
+    key="$1"
+    value="$2"
+    conf="$CONFIG_DIR/zram.conf"
+    [ -f "$conf" ] || return 0
+    if grep -q "^${key}=" "$conf" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$conf" 2>/dev/null
+    else
+        echo "${key}=${value}" >> "$conf"
+    fi
+}
+
+apply_zram_primary_algorithm() {
+    zram_block="$1"
+    requested=${2#kernel:}
+    selected=$(select_supported_zram_algorithm "$zram_block" "$requested")
+    [ -n "$selected" ] || return 1
+    echo "$selected" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null || return 1
+    active=$(get_active_zram_algorithm "$zram_block")
+    active=${active#kernel:}
+    if [ -z "$active" ] || [ "$active" != "$selected" ]; then
+        selected=$(select_supported_zram_algorithm "$zram_block" lz4)
+        [ -n "$selected" ] || return 1
+        echo "$selected" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null || return 1
+        active=$(get_active_zram_algorithm "$zram_block")
+        active=${active#kernel:}
+    fi
+    [ -n "$active" ] || return 1
+    [ "$active" = "$requested" ] || set_zram_config_value algorithm "$active"
+    echo "$active"
+}
+
 
 
 apply_zstd_compression_level() {
@@ -481,7 +536,9 @@ apply_zram_config() {
     [ -z "$size" ] && return
     swapoff "$zram_path" 2>/dev/null
     echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
-    [ -n "$algorithm" ] && echo "$algorithm" > "/sys/block/$zram_block/comp_algorithm" 2>/dev/null
+    if [ -n "$algorithm" ]; then
+        algorithm=$(apply_zram_primary_algorithm "$zram_block" "$algorithm") || return
+    fi
     apply_zram_recomp_algorithms "$zram_block"
     apply_zstd_compression_level
     [ "$zram_writeback" = "false" ] && echo none > "/sys/block/$zram_block/backing_dev" 2>/dev/null

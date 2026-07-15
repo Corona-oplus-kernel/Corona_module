@@ -59,7 +59,7 @@ class CoronaAddon {
             compactionEnabled: false
         };
         this.kernelFeatures = { lruGen: false, thp: false, ksm: false, compaction: false };
-        this.zramFeatures = { multiComp: false, zstdLevel: false };
+        this.zramFeatures = { multiComp: false, zstdLevel: false, writebackControl: false };
         this.isCoronaKernel = false;
         this.localKernelWorkflowBuild = 0;
         this.kernelUpdateInfo = null;
@@ -124,7 +124,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071511` : '';
+        return map[name] ? `${map[name]}?v=2026071512` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -237,12 +237,51 @@ class CoronaAddon {
         const filledColor = 'var(--primary)';
         const emptyColor = 'color-mix(in srgb, var(--primary) 24%, transparent)';
         slider.style.background = `linear-gradient(to right, ${filledColor} 0%, ${filledColor} ${percent}%, ${emptyColor} ${percent}%, ${emptyColor} 100%)`;
+        const bubble = slider.parentElement?.querySelector('.slider-bubble');
+        if (bubble) {
+            const valueId = slider.id ? slider.id.replace(/-slider$/, '-value') : '';
+            const valueEl = valueId ? document.getElementById(valueId) : null;
+            bubble.textContent = valueEl?.textContent?.trim() || slider.value;
+            bubble.style.left = `${Math.max(4, Math.min(96, percent))}%`;
+        }
     }
     initSliderProgress() {
         const throttled = rafThrottle((slider) => this.updateSliderProgress(slider));
         document.querySelectorAll('.range-slider').forEach(slider => {
+            const container = slider.parentElement;
+            if (container && !container.querySelector('.slider-bubble')) {
+                container.classList.add('slider-bubble-host');
+                const bubble = document.createElement('output');
+                bubble.className = 'slider-bubble';
+                bubble.setAttribute('aria-hidden', 'true');
+                container.appendChild(bubble);
+            }
+            const bubble = container?.querySelector('.slider-bubble');
+            let hideTimer = null;
+            const showBubble = () => {
+                if (!bubble) return;
+                if (hideTimer) clearTimeout(hideTimer);
+                bubble.classList.add('visible');
+                bubble.setAttribute('aria-hidden', 'false');
+            };
+            const hideBubble = (delay = 120) => {
+                if (!bubble) return;
+                if (hideTimer) clearTimeout(hideTimer);
+                hideTimer = setTimeout(() => {
+                    bubble.classList.remove('visible');
+                    bubble.setAttribute('aria-hidden', 'true');
+                }, delay);
+            };
             this.updateSliderProgress(slider);
-            slider.addEventListener('input', () => throttled(slider));
+            slider.addEventListener('pointerdown', showBubble);
+            slider.addEventListener('input', () => {
+                showBubble();
+                throttled(slider);
+            });
+            slider.addEventListener('pointerup', () => hideBubble());
+            slider.addEventListener('pointercancel', () => hideBubble());
+            slider.addEventListener('change', () => hideBubble(180));
+            slider.addEventListener('blur', () => hideBubble(0));
         });
     }
     async exec(cmd) {

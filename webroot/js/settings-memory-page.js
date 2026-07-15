@@ -47,6 +47,17 @@
         el.style.display = on ? '' : 'none';
         el.setAttribute('aria-hidden', on ? 'false' : 'true');
     },
+    updateZramWritebackVisibility() {
+        const list = document.getElementById('zram-writeback-list');
+        if (!list) return;
+        const enableItem = list.querySelector('.option-item[data-value="true"]');
+        const supported = !!this.zramFeatures?.writebackControl;
+        this.setFeatureVisible(enableItem, supported);
+        if (!supported && this.state.zramWriteback === 'true') this.state.zramWriteback = 'default';
+        list.querySelectorAll('.option-item').forEach(item => {
+            item.classList.toggle('selected', item.dataset.value === this.state.zramWriteback);
+        });
+    },
     initZramRecompFold() {
         if (typeof this.initAdvancedFold === 'function') {
             this.initAdvancedFold('zram-recomp-toggle', 'zram-recomp-body', { defaultOpen: false });

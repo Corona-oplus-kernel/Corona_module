@@ -651,6 +651,7 @@
             if (enabledMatch) { this.state.zramEnabled = enabledMatch[1] === '1'; document.getElementById('zram-switch').checked = this.state.zramEnabled; this.toggleZramSettings(this.state.zramEnabled); }
             if (writebackMatch) {
                 this.state.zramWriteback = writebackMatch[1];
+                if (this.state.zramWriteback === 'true' && !this.zramFeatures?.writebackControl) this.state.zramWriteback = 'default';
                 const list = document.getElementById('zram-writeback-list');
                 if (list) list.querySelectorAll('.option-item').forEach(i => i.classList.toggle('selected', i.dataset.value === this.state.zramWriteback));
             }
@@ -956,16 +957,19 @@
         }
     },
     async detectZramFeatures() {
-        if (!this.zramFeatures) this.zramFeatures = { multiComp: false, zstdLevel: false };
+        if (!this.zramFeatures) this.zramFeatures = { multiComp: false, zstdLevel: false, writebackControl: false };
         const zramBlock = this.getZramBlockName(this.state.zramPath) || 'zram0';
-        const [recompNode, zstdNode] = await Promise.all([
+        const [recompNode, zstdNode, writebackNode] = await Promise.all([
             this.exec(`[ -f /sys/block/${zramBlock}/recomp_algorithm ] && echo 1 || echo 0`),
-            this.exec('[ -f /sys/module/zstd/parameters/compression_level ] && echo 1 || echo 0')
+            this.exec('[ -f /sys/module/zstd/parameters/compression_level ] && echo 1 || echo 0'),
+            this.exec(`[ -f /sys/block/${zramBlock}/backing_dev ] && [ -f /sys/block/${zramBlock}/writeback_limit_enable ] && echo 1 || echo 0`)
         ]);
         this.zramFeatures.multiComp = (recompNode || '').trim() === '1';
         this.zramFeatures.zstdLevel = (zstdNode || '').trim() === '1';
+        this.zramFeatures.writebackControl = (writebackNode || '').trim() === '1';
         if (typeof this.renderRecompAlgorithmOptions === 'function') this.renderRecompAlgorithmOptions();
         this.updateZstdLevelVisibility();
+        if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
         return this.zramFeatures;
     },
     usesZstdAlgorithm() {
@@ -1167,12 +1171,19 @@
     async applyZramImmediate(manageLoading = true) {
       return this.withLock('zram', async () => {
         const sizeBytes = Math.round(this.state.zramSize * 1024 * 1024 * 1024);
+        const requestedAlgorithm = this.state.algorithm;
         await this.persistZramConfig('zram');
         if (manageLoading) {
             this.showLoading(true);
             await this.sleep(0);
         }
         await this.exec(`/system/bin/sh ${this.modDir}/scripts/apply-zram.sh >/dev/null 2>&1`);
+        const savedAlgorithm = (await this.exec(`sed -n 's/^algorithm=//p' ${this.shellQuote(`${this.configDir}/zram.conf`)} 2>/dev/null | head -n1`)).trim();
+        const fallbackApplied = !!(savedAlgorithm && savedAlgorithm !== requestedAlgorithm);
+        if (fallbackApplied) {
+            this.state.algorithm = savedAlgorithm;
+            if (typeof this.renderAlgorithmOptions === 'function') this.renderAlgorithmOptions();
+        }
         if (typeof this.clearZramDirty === 'function') this.clearZramDirty();
         if (manageLoading) this.showLoading(false);
         if (!this.state.zramEnabled) {
@@ -1187,7 +1198,11 @@
             zstdLevel: this.state.zstdCompressionLevel,
             checkZstd: !!(this.usesZstdAlgorithm && this.usesZstdAlgorithm())
         });
-        if (ok) this.showToast('ZRAM 配置已应用并校验');
+        if (ok) {
+            this.showToast(fallbackApplied
+                ? `${requestedAlgorithm} 不受支持，已回退 ${savedAlgorithm}`
+                : 'ZRAM 配置已应用并校验');
+        }
         setTimeout(() => this.loadZramStatus(), 300);
         return ok;
       });
@@ -1781,6 +1796,7 @@
     initZramWriteback() {
         const list = document.getElementById('zram-writeback-list');
         if (!list) return;
+        if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
         list.querySelectorAll('.option-item').forEach(item => {
             item.addEventListener('click', async () => {
                 list.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
