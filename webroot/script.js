@@ -131,7 +131,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071535` : '';
+        return map[name] ? `${map[name]}?v=2026071536` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -392,13 +392,30 @@ class CoronaAddon {
     async readConfig(filename) {
         return this.exec(`cat ${this.shellQuote(this.getConfigPath(filename))} 2>/dev/null`);
     }
+    normalizeConfigContent(content) {
+        return String(content ?? '').replace(/\r/g, '').replace(/\n+$/, '');
+    }
+    async configFileMatches(filename, expectedContent) {
+        const path = this.shellQuote(this.getConfigPath(filename));
+        const marker = '__CORONA_CONFIG_EXISTS__';
+        const output = await this.exec(`if [ -f ${path} ]; then printf '${marker}\\n'; cat ${path}; fi`);
+        if (!String(output || '').startsWith(marker)) return false;
+        const actual = String(output).slice(marker.length).replace(/^\n/, '');
+        return this.normalizeConfigContent(actual) === this.normalizeConfigContent(expectedContent);
+    }
     async writeConfigUnlocked(filename, content) {
         const path = this.getConfigPath(filename);
         const parent = path.slice(0, path.lastIndexOf('/'));
         const b64 = btoa(unescape(encodeURIComponent(String(content))));
         const quotedPath = this.shellQuote(path);
         const result = await this.execResult(`mkdir -p ${this.shellQuote(parent)}; tmp=${quotedPath}.tmp.$$; echo '${b64}' | base64 -d > "$tmp" && mv -f "$tmp" ${quotedPath}; code=$?; [ "$code" -eq 0 ] || rm -f "$tmp"; exit "$code"`);
-        if (result.code !== 0) throw new Error(result.stderr || `Failed to write ${filename}`);
+        if (result.code !== 0) {
+            for (const delay of [0, 80, 220]) {
+                if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+                if (await this.configFileMatches(filename, content)) return String(content);
+            }
+            throw new Error(result.stderr || `Failed to write ${filename}`);
+        }
         return String(content);
     }
     writeConfig(filename, content) {

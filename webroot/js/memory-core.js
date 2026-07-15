@@ -1117,7 +1117,13 @@
             btn.dataset.dirtyHint = '1';
             btn.textContent = this.t('applyZramDirty');
         }
-        if (changedField) this.persistZramConfig(changedField).catch(() => this.showToast('ZRAM 配置保存失败'));
+        if (changedField) {
+            const revision = (this._zramConfigRevision || 0) + 1;
+            this._zramConfigRevision = revision;
+            this.persistZramConfig(changedField).catch(() => {
+                if (this._zramConfigRevision === revision) this.showToast('ZRAM 配置保存失败');
+            });
+        }
     },
     clearZramDirty() {
         this._zramDirty = false;
@@ -1131,7 +1137,13 @@
         this._swapDirty = true;
         const btn = document.getElementById('swap-apply-btn');
         if (btn) btn.textContent = '应用 Swap 配置 *';
-        if (changedField) this.persistSwapConfig(changedField).catch(() => this.showToast('Swap 配置保存失败'));
+        if (changedField) {
+            const revision = (this._swapConfigRevision || 0) + 1;
+            this._swapConfigRevision = revision;
+            this.persistSwapConfig(changedField).catch(() => {
+                if (this._swapConfigRevision === revision) this.showToast('Swap 配置保存失败');
+            });
+        }
     },
     clearSwapDirty() {
         this._swapDirty = false;
