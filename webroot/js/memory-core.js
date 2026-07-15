@@ -439,6 +439,7 @@
                 if (typeof this.initSettingDescriptionToggle === 'function') this.initSettingDescriptionToggle();
                 if (typeof this.initCategoryConfigVisibilityToggle === 'function') this.initCategoryConfigVisibilityToggle();
                 if (typeof this.initSnapshots === 'function') this.initSnapshots();
+                if (typeof this.initConfigValidation === 'function') this.initConfigValidation();
                 if (typeof this.initSliderProgress === 'function') this.initSliderProgress();
                 if (typeof this.initSwapSettings === 'function') this.initSwapSettings();
                 if (typeof this.initVmSettings === 'function') this.initVmSettings();
@@ -532,6 +533,87 @@
         ];
         this.allSettingsSectionsPromise = Promise.all(sections.map(section => this.ensureSettingsSectionReady(section)));
         return this.allSettingsSectionsPromise;
+    },
+    initConfigValidation() {
+        const button = document.getElementById('config-validation-btn');
+        if (!button || button.dataset.bound) return;
+        button.dataset.bound = '1';
+        button.addEventListener('click', () => this.validateConfiguration('all', { toast: true }));
+    },
+    async collectConfigurationIssues(scope = 'all') {
+        const issues = [];
+        const include = name => scope === 'all' || scope === name;
+        const memTotalKb = parseInt((await this.exec("awk '/^MemTotal:/ {print $2; exit}' /proc/meminfo 2>/dev/null")).trim(), 10) || 0;
+
+        if (include('zram') && this.state.zramEnabled) {
+            const fields = this.zramConfiguredFields || {};
+            if (fields.size && memTotalKb > 0) {
+                const sizeKb = Math.round(this.state.zramSize * 1024 * 1024);
+                if (sizeKb > memTotalKb * 2) issues.push({ type: 'error', message: this.t('validationZramTooLarge') });
+            }
+            if (fields.priority && (this.state.zramPriority < -32768 || this.state.zramPriority > 32767)) {
+                issues.push({ type: 'error', message: this.t('validationPriorityRange') });
+            }
+            const recompression = [this.state.recompAlgorithm1, this.state.recompAlgorithm2, this.state.recompAlgorithm3]
+                .filter(algorithm => algorithm && algorithm !== 'none');
+            if (new Set(recompression).size !== recompression.length) {
+                issues.push({ type: 'error', message: this.t('validationDuplicateRecomp') });
+            }
+        }
+
+        if ((include('zram') || include('swap')) && this.state.zramEnabled && this.state.swapEnabled) {
+            const zramPriorityConfigured = !!this.zramConfiguredFields?.priority;
+            const swapPriorityConfigured = !!this.swapConfiguredFields?.priority;
+            if (zramPriorityConfigured && swapPriorityConfigured && this.state.zramPriority <= this.state.swapPriority) {
+                issues.push({ type: 'error', message: this.t('validationSwapPriorityConflict') });
+            }
+        }
+
+        if (include('swap') && this.state.swapEnabled) {
+            const fields = this.swapConfiguredFields || {};
+            if (fields.priority && (this.state.swapPriority < -32768 || this.state.swapPriority > 32767)) {
+                issues.push({ type: 'error', message: this.t('validationPriorityRange') });
+            }
+            const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
+            const parent = swapPath.substring(0, swapPath.lastIndexOf('/')) || '/data';
+            const freeKb = parseInt((await this.exec(`df -k ${this.shellQuote(parent)} 2>/dev/null | awk 'END {print $4}'`)).trim(), 10) || 0;
+            if (fields.size && freeKb > 0 && this.state.swapSize * 1024 + 51200 > freeKb) {
+                issues.push({ type: 'error', message: this.t('validationSwapSpace') });
+            }
+        }
+
+        if (include('vm') && this.state.vmEnabled) {
+            if (this.state.dirtyBgRatio >= this.state.dirtyRatio) {
+                issues.push({ type: 'error', message: this.t('validationDirtyRatio') });
+            }
+            if (memTotalKb > 0 && this.state.extraFreeKbytes > memTotalKb / 2) {
+                issues.push({ type: 'warning', message: this.t('validationExtraFreeHigh') });
+            }
+        }
+        return issues;
+    },
+    renderConfigurationIssues(issues = []) {
+        const status = document.getElementById('config-validation-status');
+        if (!status) return;
+        if (!issues.length) {
+            status.className = 'config-validation-status valid';
+            status.textContent = this.t('validationPassed');
+            return;
+        }
+        status.className = 'config-validation-status invalid';
+        const escape = value => typeof this.escapeHtml === 'function'
+            ? this.escapeHtml(value)
+            : String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+        status.innerHTML = issues.map(issue => `<div class="config-validation-issue ${issue.type}">${escape(issue.message)}</div>`).join('');
+    },
+    async validateConfiguration(scope = 'all', options = {}) {
+        const issues = await this.collectConfigurationIssues(scope);
+        this.renderConfigurationIssues(issues);
+        const errors = issues.filter(issue => issue.type === 'error');
+        if (errors.length) this.showToast(`${this.t('validationFailed')}: ${errors[0].message}`);
+        else if (options.toast !== false && issues.length) this.showToast(`${this.t('validationWarning')}: ${issues[0].message}`);
+        else if (options.toast !== false) this.showToast(this.t('validationPassed'));
+        return errors.length === 0;
     },
     updateBatteryInfo(level, temp) {
         const levelElement = document.getElementById('battery-level');
@@ -1192,6 +1274,10 @@
     },
     markSwapDirty(changedField) {
         this._swapDirty = true;
+        if (['size', 'priority', 'path'].includes(changedField)) {
+            this.swapConfiguredFields = this.swapConfiguredFields || {};
+            this.swapConfiguredFields[changedField] = true;
+        }
         const btn = document.getElementById('swap-apply-btn');
         if (btn) btn.textContent = '应用 Swap 配置 *';
         if (changedField) {
@@ -1396,6 +1482,7 @@
     },
     async applyZramImmediate(manageLoading = true) {
       return this.withLock('zram', async () => {
+        if (!await this.validateConfiguration('zram', { toast: false })) return false;
         const requestedAlgorithm = this.state.algorithm;
         if (this._zramConfigSavePromise) await this._zramConfigSavePromise.catch(() => {});
         const configured = this.parseIoConfig(await this.readConfig('zram.conf'));
@@ -2229,6 +2316,11 @@
             const sizeMatch = config.match(/size=(\d+)/);
             const priorityMatch = config.match(/priority=([\-\d]+)/);
             const pathMatch = config.match(/^path=(.+)$/m);
+            this.swapConfiguredFields = {
+                size: !!sizeMatch,
+                priority: !!priorityMatch,
+                path: !!pathMatch
+            };
             if (enabledMatch) {
                 this.state.swapEnabled = enabledMatch[1] === '1';
                 const sw = document.getElementById('swap-switch');
@@ -2254,6 +2346,8 @@
                 }
             }
             if (pathMatch && pathMatch[1].trim()) this.state.swapPath = pathMatch[1].trim();
+        } else {
+            this.swapConfiguredFields = {};
         }
         await this.loadSwapStatus();
     },
@@ -2292,6 +2386,7 @@
     },
     async applySwapImmediate() {
       return this.withLock('swap', async () => {
+        if (!await this.validateConfiguration('swap', { toast: false })) return false;
         if (this._swapConfigSavePromise) await this._swapConfigSavePromise.catch(() => {});
         const configured = this.parseIoConfig(await this.readConfig('swap.conf'));
         const swapPath = configured.path || `${this.modDir}/swapfile.img`;
@@ -2510,6 +2605,7 @@
     },
     async applyVmConfig(changedKeys = null, skipPreview = false) {
       return this.withLock('vm', async () => {
+        if (!await this.validateConfiguration('vm', { toast: false })) return false;
         const keys = Array.isArray(changedKeys) ? changedKeys : (changedKeys ? [changedKeys] : ['enabled', 'watermark_scale_factor', 'extra_free_kbytes', 'dirty_ratio', 'dirty_background_ratio', 'vfs_cache_pressure']);
         const updates = {};
         if (keys.includes('enabled')) updates.enabled = this.state.vmEnabled ? '1' : '0';

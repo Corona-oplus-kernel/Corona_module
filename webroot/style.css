@@ -4287,6 +4287,39 @@ html[lang="en"] .language-segmented::before {
     transform: none;
 }
 
+.config-validation-section {
+    display: grid;
+    gap: 12px;
+}
+
+.config-validation-status {
+    display: grid;
+    gap: 7px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--text-main) 5%, transparent);
+    color: var(--text-sub);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.config-validation-status.valid {
+    background: color-mix(in srgb, #2e9d61 12%, transparent);
+    color: color-mix(in srgb, #176b42 86%, var(--text-main));
+}
+
+.config-validation-status.invalid {
+    background: color-mix(in srgb, #c45b4d 10%, transparent);
+}
+
+.config-validation-issue::before {
+    content: '•';
+    margin-right: 7px;
+}
+
+.config-validation-issue.error { color: color-mix(in srgb, #b33d32 88%, var(--text-main)); }
+.config-validation-issue.warning { color: color-mix(in srgb, #9a6800 88%, var(--text-main)); }
+
 @media (max-width: 420px) {
     .language-setting-section {
         align-items: stretch;
