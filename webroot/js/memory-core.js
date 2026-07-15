@@ -1718,21 +1718,14 @@
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     },
     sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); },
-    showToast(message, type = '') {
+    showToast(message) {
         const toast = document.getElementById('toast');
         if (!toast) return;
         const text = this.localizeMessage(String(message || ''));
-        let resolvedType = type;
-        if (!resolvedType) {
-            if (/失败|错误|无法|不足|未生效|failed|error|unable|insufficient/i.test(text)) resolvedType = 'error';
-            else if (/不支持|请先|警告|未检测|不存在|unsupported|warning|not found/i.test(text)) resolvedType = 'warning';
-            else if (/成功|已保存|已应用|已启用|已关闭|完成|success|saved|applied|enabled|disabled|complete/i.test(text)) resolvedType = 'success';
-            else resolvedType = 'info';
-        }
         if (this._toastTimer) clearTimeout(this._toastTimer);
-        toast.classList.remove('info', 'success', 'warning', 'error', 'language', 'show');
+        toast.classList.remove('info', 'success', 'warning', 'error', 'language');
         toast.textContent = text;
-        toast.classList.add(resolvedType, 'show');
+        toast.classList.add('show');
         this._toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
     },
     isRollbackAnimVisible(el) {
