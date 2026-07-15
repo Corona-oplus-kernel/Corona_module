@@ -37,7 +37,7 @@ class CoronaAddon {
             le9ecCleanLow: 0,
             le9ecCleanMin: 524288,
             dualCell: false,
-            theme: 'gold',
+            theme: 'light',
             accent: 'blue',
             hue: 214,
             changePreviewEnabled: true,
@@ -234,10 +234,8 @@ class CoronaAddon {
         const max = parseFloat(slider.max) || 100;
         const val = parseFloat(slider.value) || 0;
         const percent = Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
-        // fixed white translucent track — independent of theme primary color
-        const isDark = document.body.classList.contains('theme-dark');
-        const filledColor = isDark ? 'rgba(255, 255, 255, 0.55)' : 'rgba(255, 255, 255, 0.72)';
-        const emptyColor = isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(255, 255, 255, 0.28)';
+        const filledColor = 'var(--primary)';
+        const emptyColor = 'color-mix(in srgb, var(--primary) 24%, transparent)';
         slider.style.background = `linear-gradient(to right, ${filledColor} 0%, ${filledColor} ${percent}%, ${emptyColor} ${percent}%, ${emptyColor} 100%)`;
     }
     initSliderProgress() {

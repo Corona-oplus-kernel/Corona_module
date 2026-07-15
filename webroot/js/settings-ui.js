@@ -5,7 +5,7 @@
   Object.assign(CoronaAddon.prototype, {
     initTheme() {
         const savedTheme = localStorage.getItem('corona_theme') || 'light';
-        const normalizedTheme = savedTheme === 'auto' ? 'light' : savedTheme;
+        const normalizedTheme = savedTheme === 'dark' ? 'dark' : 'light';
         this.state.theme = normalizedTheme;
         this.state.hue = parseInt(localStorage.getItem('corona_color_hue') || '214', 10) || 214;
         if (normalizedTheme !== savedTheme) {
@@ -53,7 +53,6 @@
                 moduleSettings: '模块设置',
                 lightTheme: '浅色模式',
                 darkTheme: '深色模式',
-                goldTheme: '皇涩主题',
                 changePreview: '变更预览',
                 changePreviewDesc: '关闭后跳过变更预览，直接应用设置',
                 settingDescriptions: '设置说明',
@@ -97,7 +96,6 @@
         const themeLabels = document.querySelectorAll('#theme-options .theme-option span');
         if (themeLabels[0]) themeLabels[0].textContent = this.t('lightTheme');
         if (themeLabels[1]) themeLabels[1].textContent = this.t('darkTheme');
-        if (themeLabels[2]) themeLabels[2].textContent = this.t('goldTheme');
         const prefRows = document.querySelectorAll('#app-settings-content .ui-pref-switch-container .switch-info');
         if (prefRows[1]) {
             const labels = prefRows[1].querySelectorAll('span');
@@ -157,9 +155,8 @@
         document.body.style.setProperty('--hue', String(value));
         // explicit solid colors for WebView compatibility
         const isDark = document.body.classList.contains('theme-dark');
-        const isGold = document.body.classList.contains('theme-gold');
-        const sat = isGold ? 58 : (isDark ? 78 : 82);
-        const light = isGold ? 42 : (isDark ? 62 : 50);
+        const sat = isDark ? 78 : 82;
+        const light = isDark ? 62 : 50;
         const primary = `hsl(${value}, ${sat}%, ${light}%)`;
         const dim = `hsla(${value}, ${sat}%, ${light}%, ${isDark ? 0.22 : 0.18})`;
         const lite = `hsla(${value}, ${sat}%, ${light}%, ${isDark ? 0.14 : 0.12})`;
@@ -186,17 +183,13 @@
     },
     applyTheme(theme, animate = true) {
         const body = document.body;
-        const normalizedTheme = theme === 'auto' ? 'light' : theme;
+        const normalizedTheme = theme === 'dark' ? 'dark' : 'light';
         if (animate) this.applyThemeTransition();
-        body.classList.remove('theme-light', 'theme-dark', 'theme-gold');
+        body.classList.remove('theme-light', 'theme-dark');
         body.classList.add(`theme-${normalizedTheme}`);
-        // ensure hue still drives primary after theme class changes
         const hue = this.state.hue || this.normalizeHue(localStorage.getItem('corona_color_hue') || 214);
-        document.documentElement.style.setProperty('--hue', String(hue));
-        body.style.setProperty('--hue', String(hue));
-        document.querySelectorAll('.range-slider').forEach(slider => {
-            if (typeof this.updateSliderProgress === 'function') this.updateSliderProgress(slider);
-        });
+        this.state.theme = normalizedTheme;
+        this.applyHue(hue, false, { persist: false, updateState: false });
     },
     initAccentSelector() {
         const current = this.normalizeHue(this.state.hue || localStorage.getItem('corona_color_hue') || 214);

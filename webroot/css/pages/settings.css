@@ -478,41 +478,9 @@ body.theme-dark #page-settings .sub-card {
     background: var(--accent-light);
 }
 
-body.theme-gold .floating-header {
-    background: #F9F5EE;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border-bottom: 1px solid rgba(117, 93, 60, 0.10);
-    box-shadow: 0 10px 24px rgba(58, 44, 24, 0.05);
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-}
 
-body.theme-gold .card,
-body.theme-gold .module-card,
-body.theme-gold .banner-image {
-    background: #F8F3EA;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border: 1px solid rgba(117, 93, 60, 0.10);
-    box-shadow: 0 8px 24px rgba(58, 44, 24, 0.06);
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-}
 
-body.theme-gold .tab-bar-container {
-    background: #F8F3EA;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border: 1px solid rgba(117, 93, 60, 0.10);
-    box-shadow: 0 8px 24px rgba(58, 44, 24, 0.06);
-    transform: translateX(-50%) translateZ(0);
-    -webkit-transform: translateX(-50%) translateZ(0);
-}
 
-body.theme-gold .loading-overlay {
-    background: #F6F0E7;
-}
 
 .easter-egg-card {
     backdrop-filter: blur(10px);
@@ -617,32 +585,9 @@ body.theme-dark .easter-egg-card {
 }
 
 
-body.theme-gold #page-settings .sub-card {
-    background: #FAF6EF !important;
-    border: 1px solid rgba(117, 93, 60, 0.10) !important;
-    border-radius: 16px !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36) !important;
-    margin-bottom: 12px;
-}
 
-body.theme-gold #page-settings .sub-card-header,
-body.theme-gold #page-settings .setting-section,
-body.theme-gold #page-settings .info-row,
-body.theme-gold #page-settings .lru-switch,
-body.theme-gold #page-settings .lru-setting {
-    border: none !important;
-}
 
-body.theme-gold .option-item {
-    background: rgba(0, 0, 0, 0.04) !important;
-    border: 1.5px solid transparent !important;
-    box-shadow: none !important;
-}
 
-body.theme-gold .option-item.selected {
-    border-color: var(--primary) !important;
-    box-shadow: 0 2px 8px rgba(140, 103, 55, 0.14) !important;
-}
 
 body.theme-dark #page-settings .sub-card {
     background: rgba(255, 255, 255, 0.04) !important;
@@ -654,19 +599,7 @@ body.theme-dark #memory-compression-content .sub-card {
     border-color: transparent !important;
 }
 
-body.theme-gold #page-settings #memory-compression-content .sub-card,
-body.theme-gold #page-settings #memory-compression-content .sub-card:last-child {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
-    border-radius: 0 !important;
-    margin-bottom: 0 !important;
-}
 
-body.theme-gold #page-settings #memory-compression-content .sub-card:last-child {
-    border-bottom: none !important;
-}
 
 body.theme-dark #page-settings #memory-compression-content .sub-card,
 body.theme-dark #page-settings #memory-compression-content .sub-card:last-child {
@@ -677,13 +610,6 @@ body.theme-dark #page-settings #memory-compression-content .sub-card:last-child 
     border-bottom: none !important;
 }
 
-body.theme-gold #page-settings #memory-compression-content .sub-card-header,
-body.theme-gold #page-settings #memory-compression-content .setting-section,
-body.theme-gold #page-settings #memory-compression-content .info-row,
-body.theme-gold #page-settings #memory-compression-content .lru-switch,
-body.theme-gold #page-settings #memory-compression-content .lru-setting {
-    border: none !important;
-}
 
 
 
