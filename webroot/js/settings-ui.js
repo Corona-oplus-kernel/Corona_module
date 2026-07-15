@@ -7,7 +7,7 @@
         const savedTheme = localStorage.getItem('corona_theme') || 'light';
         const normalizedTheme = savedTheme === 'dark' ? 'dark' : 'light';
         this.state.theme = normalizedTheme;
-        this.state.hue = parseInt(localStorage.getItem('corona_color_hue') || '214', 10) || 214;
+        this.state.hue = this.normalizeHue(localStorage.getItem('corona_color_hue') || '214');
         if (normalizedTheme !== savedTheme) {
             localStorage.setItem('corona_theme', normalizedTheme);
         }
@@ -268,12 +268,25 @@
         const dim = `hsla(${value}, ${sat}%, ${light}%, ${isDark ? 0.22 : 0.18})`;
         const lite = `hsla(${value}, ${sat}%, ${light}%, ${isDark ? 0.14 : 0.12})`;
         const accent = `hsl(${value}, ${Math.max(sat - 10, 50)}%, ${Math.max(light - 8, 36)}%)`;
+        const strong = `hsl(${value}, ${sat}%, ${Math.max(light - 9, 34)}%)`;
+        const soft = `hsla(${value}, ${sat}%, ${light}%, ${isDark ? 0.12 : 0.08})`;
+        const border = `hsla(${value}, ${sat}%, ${light}%, ${isDark ? 0.34 : 0.26})`;
+        const shadow = `hsla(${value}, ${sat}%, ${light}%, ${isDark ? 0.3 : 0.22})`;
+        const gradientEnd = `hsl(${value}, ${Math.min(sat + 6, 96)}%, ${Math.min(light + 14, 76)}%)`;
         [document.documentElement, document.body].forEach(el => {
             el.style.setProperty('--primary', primary);
             el.style.setProperty('--primary-dim', dim);
             el.style.setProperty('--primary-light', lite);
             el.style.setProperty('--accent', accent);
+            el.style.setProperty('--primary-strong', strong);
+            el.style.setProperty('--primary-soft', soft);
+            el.style.setProperty('--primary-border', border);
+            el.style.setProperty('--primary-shadow', shadow);
+            el.style.setProperty('--primary-gradient-end', gradientEnd);
         });
+        document.documentElement.dataset.hue = String(value);
+        const themeMeta = document.getElementById('theme-color-meta');
+        if (themeMeta) themeMeta.setAttribute('content', primary);
         if (updateState) this.state.hue = value;
         if (persist) {
             localStorage.setItem('corona_color_hue', String(value));
@@ -286,7 +299,12 @@
         document.querySelectorAll('.range-slider').forEach(el => {
             if (typeof this.updateSliderProgress === 'function') this.updateSliderProgress(el);
         });
-        return { value, primary, dim, lite, accent };
+        try {
+            document.dispatchEvent(new CustomEvent('colorChanged', {
+                detail: { hue: value, primary, accent, source: 'corona' }
+            }));
+        } catch (e) {}
+        return { value, primary, dim, lite, accent, strong, soft, border, shadow, gradientEnd };
     },
     applyTheme(theme, animate = true) {
         const body = document.body;
@@ -294,12 +312,12 @@
         if (animate) this.applyThemeTransition();
         body.classList.remove('theme-light', 'theme-dark');
         body.classList.add(`theme-${normalizedTheme}`);
-        const hue = this.state.hue || this.normalizeHue(localStorage.getItem('corona_color_hue') || 214);
+        const hue = this.state.hue ?? this.normalizeHue(localStorage.getItem('corona_color_hue') || 214);
         this.state.theme = normalizedTheme;
         this.applyHue(hue, false, { persist: false, updateState: false });
     },
     initAccentSelector() {
-        const current = this.normalizeHue(this.state.hue || localStorage.getItem('corona_color_hue') || 214);
+        const current = this.normalizeHue(this.state.hue ?? localStorage.getItem('corona_color_hue') ?? 214);
         this.applyHue(current, false);
         this.updateColorPrefUI(current);
 
@@ -336,46 +354,67 @@
     },
     showColorPicker() {
         if (document.querySelector('.color-picker-overlay')) return;
-        const originalHue = this.normalizeHue(this.state.hue || localStorage.getItem('corona_color_hue') || 214);
+        const originalHue = this.normalizeHue(this.state.hue ?? localStorage.getItem('corona_color_hue') ?? 214);
         let draftHue = originalHue;
+        const colorPresets = [
+            { hue: 0, name: '红色' },
+            { hue: 28, name: '橙色' },
+            { hue: 48, name: '琥珀' },
+            { hue: 126, name: '绿色' },
+            { hue: 178, name: '青色' },
+            { hue: 214, name: 'Corona 蓝' },
+            { hue: 252, name: '靛蓝' },
+            { hue: 286, name: '紫色' },
+            { hue: 330, name: '粉色' }
+        ];
 
         const overlay = document.createElement('div');
         overlay.className = 'color-picker-overlay';
         const dialog = document.createElement('div');
         dialog.className = 'color-picker-dialog';
         dialog.innerHTML = `
-            <h2>颜色选择器</h2>
+            <div class="color-picker-header">
+                <div class="color-picker-header-swatch" id="picker-header-swatch"></div>
+                <div class="color-picker-header-copy">
+                    <h2>全局主题颜色</h2>
+                    <p>调整后立即同步到整个 WebUI</p>
+                </div>
+                <span class="color-global-badge">全局生效</span>
+            </div>
             <div class="color-picker-content">
-                <div class="color-live-preview" id="color-live-preview">
-                    <div class="color-live-swatch" id="picker-live-swatch"></div>
-                    <div class="color-live-meta">
-                        <div class="color-live-title">实时预览</div>
-                        <div class="color-live-desc" id="picker-live-desc">色调 ${originalHue}°</div>
-                        <div class="color-live-samples">
+                <div class="color-global-preview">
+                    <div class="color-preview-topbar">
+                        <strong>Corona</strong>
+                        <span id="picker-live-desc">色调 ${originalHue}°</span>
+                    </div>
+                    <div class="color-preview-tabs">
+                        <span class="active">主页</span>
+                        <span>配置</span>
+                        <i id="picker-live-dot"></i>
+                    </div>
+                    <div class="color-preview-grid">
+                        <div class="color-preview-card">
+                            <small>运行内存</small>
+                            <strong id="picker-live-value">68%</strong>
+                            <span class="color-live-bar"><i id="picker-live-bar"></i></span>
+                        </div>
+                        <div class="color-preview-card color-preview-actions">
                             <span class="color-live-chip" id="picker-live-chip">选中项</span>
                             <span class="color-live-btn" id="picker-live-btn">主按钮</span>
-                            <span class="color-live-dot" id="picker-live-dot"></span>
-                        </div>
-                        <div class="color-live-home">
-                            <div class="color-live-home-title">主页效果</div>
-                            <div class="color-live-home-row">
-                                <span class="color-live-kicker" id="picker-live-kicker">设备状态</span>
-                                <span class="color-live-badge" id="picker-live-badge">ZRAM</span>
-                            </div>
-                            <div class="color-live-home-row">
-                                <span class="color-live-home-label">运行内存</span>
-                                <span class="color-live-bar"><i id="picker-live-bar"></i></span>
-                            </div>
                         </div>
                     </div>
                 </div>
+                <div class="color-picker-section-title">预设颜色</div>
                 <div class="preset-colors">
-                    ${[0, 30, 60, 120, 180, 214, 260, 300, 330].map(h => `
-                        <button type="button" class="preset-color${Math.abs(h - originalHue) <= 2 ? ' active' : ''}" data-hue="${h}" aria-label="色调 ${h}" style="--preview-hue:${h};background:hsl(${h}, 82%, 50%)"></button>
+                    ${colorPresets.map(preset => `
+                        <button type="button" class="preset-color${Math.abs(preset.hue - originalHue) <= 2 ? ' active' : ''}" data-hue="${preset.hue}" aria-label="${preset.name}">
+                            <span class="preset-color-dot" style="--preview-hue:${preset.hue}"></span>
+                            <span class="preset-color-name">${preset.name}</span>
+                        </button>
                     `).join('')}
                 </div>
-                <label>
-                    <span>色调值</span>
+                <label class="hue-setting-label">
+                    <span>自定义色调</span>
                     <div class="hue-control">
                         <input type="range" id="picker-hue-slider" min="0" max="360" value="${originalHue}">
                         <output id="picker-hue-value">${originalHue}°</output>
@@ -392,19 +431,17 @@
         const slider = dialog.querySelector('#picker-hue-slider');
         const output = dialog.querySelector('#picker-hue-value');
         const presets = dialog.querySelectorAll('.preset-color');
-        const liveSwatch = dialog.querySelector('#picker-live-swatch');
+        const headerSwatch = dialog.querySelector('#picker-header-swatch');
         const liveDesc = dialog.querySelector('#picker-live-desc');
         const liveChip = dialog.querySelector('#picker-live-chip');
         const liveBtn = dialog.querySelector('#picker-live-btn');
         const liveDot = dialog.querySelector('#picker-live-dot');
-
-        const liveKicker = dialog.querySelector('#picker-live-kicker');
-        const liveBadge = dialog.querySelector('#picker-live-badge');
         const liveBar = dialog.querySelector('#picker-live-bar');
+        const liveValue = dialog.querySelector('#picker-live-value');
 
         const paintLocalPreview = (value, primary, dim) => {
-            if (liveSwatch) liveSwatch.style.background = primary;
-            if (liveDesc) liveDesc.textContent = `色调 ${value}° · 主页与配置同步`;
+            if (headerSwatch) headerSwatch.style.background = primary;
+            if (liveDesc) liveDesc.textContent = `色调 ${value}° · 全局同步`;
             if (liveChip) {
                 liveChip.style.background = dim;
                 liveChip.style.color = primary;
@@ -412,18 +449,11 @@
             }
             if (liveBtn) liveBtn.style.background = primary;
             if (liveDot) liveDot.style.background = primary;
-            if (liveKicker) liveKicker.style.color = primary;
-            if (liveBadge) {
-                liveBadge.style.background = dim;
-                liveBadge.style.color = primary;
-            }
+            if (liveValue) liveValue.style.color = primary;
             if (liveBar) liveBar.style.background = primary;
-            // refresh home progress bars live while dragging
-            document.querySelectorAll('.progress-fill, .progress-bar-mini .progress-fill').forEach(() => {});
             if (typeof this.updateSliderProgress === 'function') {
                 document.querySelectorAll('.range-slider').forEach(el => this.updateSliderProgress(el));
             }
-            // redraw chart with new primary if on home
             if (typeof this.drawChart === 'function') {
                 try { this.drawChart(); } catch (e) {}
             }
@@ -431,7 +461,6 @@
 
         const previewHue = (hue, { toast = false } = {}) => {
             draftHue = this.normalizeHue(hue);
-            // 默认即时应用并保存，无需点「应用」
             const painted = this.applyHue(draftHue, false, { persist: true, updateState: true });
             if (output) output.textContent = `${draftHue}°`;
             if (slider && String(slider.value) !== String(draftHue)) slider.value = String(draftHue);
@@ -446,18 +475,15 @@
             }
         };
 
-        // initial paint (already current color, no toast)
         previewHue(originalHue);
 
         presets.forEach(p => {
             p.addEventListener('click', () => previewHue(p.dataset.hue, { toast: true }));
         });
-        // drag applies live; release toast once
         slider.addEventListener('input', () => previewHue(slider.value));
         slider.addEventListener('change', () => previewHue(slider.value, { toast: true }));
 
         const closeDialog = () => {
-            // already persisted on each change
             this.applyHue(draftHue, false, { persist: true, updateState: true });
             overlay.classList.add('closing');
             dialog.classList.add('closing');

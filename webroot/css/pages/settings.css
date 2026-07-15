@@ -418,7 +418,7 @@ body.theme-dark #page-settings .sub-card {
 .text-input:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(52, 130, 255, 0.15);
+    box-shadow: 0 0 0 3px hsla(var(--hue), 82%, 50%, 0.15);
 }
 
 .text-input::placeholder {
@@ -454,7 +454,7 @@ body.theme-dark #page-settings .sub-card {
 }
 
 .btn-small.btn-primary:active {
-    background: #2a6fd6;
+    background: var(--primary-strong);
 }
 
 .setting-hint {

@@ -3,23 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" id="theme-color-meta" content="#1783e8">
     <title>Corona 控制台</title>
-    <link rel="stylesheet" href="style.css?v=2026071516">
-    <link rel="stylesheet" href="css/components.css?v=2026071514">
-    <link rel="stylesheet" href="css/pages/settings.css?v=2026071510">
+    <link rel="stylesheet" href="style.css?v=2026071517">
+    <link rel="stylesheet" href="css/components.css?v=2026071517">
+    <link rel="stylesheet" href="css/pages/settings.css?v=2026071517">
     <link rel="stylesheet" href="css/animations.css?v=2026071464">
     <script>
     (function () {
         try {
             var hue = localStorage.getItem('corona_color_hue') || '214';
-            var h = parseInt(hue, 10) || 214;
+            var parsedHue = parseInt(hue, 10);
+            var h = Number.isFinite(parsedHue) ? Math.max(0, Math.min(360, parsedHue)) : 214;
             var root = document.documentElement;
             root.style.setProperty('--hue', String(h));
             root.style.setProperty('--primary', 'hsl(' + h + ', 82%, 50%)');
             root.style.setProperty('--primary-dim', 'hsla(' + h + ', 82%, 50%, 0.18)');
             root.style.setProperty('--primary-light', 'hsla(' + h + ', 82%, 50%, 0.12)');
             root.style.setProperty('--accent', 'hsl(' + h + ', 70%, 42%)');
+            root.style.setProperty('--primary-strong', 'hsl(' + h + ', 82%, 41%)');
+            root.style.setProperty('--primary-soft', 'hsla(' + h + ', 82%, 50%, 0.08)');
+            root.style.setProperty('--primary-border', 'hsla(' + h + ', 82%, 50%, 0.26)');
+            root.style.setProperty('--primary-shadow', 'hsla(' + h + ', 82%, 50%, 0.22)');
+            root.style.setProperty('--primary-gradient-end', 'hsl(' + h + ', 88%, 64%)');
             root.dataset.hue = String(h);
+            var themeMeta = document.getElementById('theme-color-meta');
+            if (themeMeta) themeMeta.setAttribute('content', 'hsl(' + h + ', 82%, 50%)');
         } catch (e) {}
     })();
     </script>
@@ -1727,6 +1736,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071516" defer></script>
+    <script src="script.js?v=2026071517" defer></script>
 </body>
 </html>

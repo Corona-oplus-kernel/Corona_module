@@ -328,7 +328,7 @@
         const primaryDim = styles.getPropertyValue('--primary-dim').trim() || 'rgba(52, 130, 255, 0.2)';
         let data = [], maxVal = 100, unit = '%', color1 = primaryColor, color2 = primaryDim, label = 'CPU 使用率';
         if (this.chartType === 'cpu') { data = this.historyData.cpu.map(d => d.value); label = 'CPU 使用率'; }
-        else if (this.chartType === 'mem') { data = this.historyData.mem.map(d => d.value); label = '内存使用率'; color1 = '#00C853'; color2 = 'rgba(0, 200, 83, 0.2)'; }
+        else if (this.chartType === 'mem') { data = this.historyData.mem.map(d => d.value); label = '内存使用率'; color1 = primaryColor; color2 = primaryDim; }
         else if (this.chartType === 'temp') {
             const cpuData = this.historyData.cpuTemp.map(d => d.value);
             const battData = this.historyData.batteryTemp.map(d => d.value);

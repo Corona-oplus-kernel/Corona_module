@@ -33,8 +33,9 @@
                  processing: 'Processing...',
                  language: 'Language',
                  languageDesc: 'Updates the main interface immediately',
-                 languageChanged: 'Interface language changed',
-                 zramManagement: 'ZRAM Management',
+                languageChanged: 'Interface language changed',
+                colorChanged: 'Theme color updated',
+                zramManagement: 'ZRAM Management',
                  zramOverview: 'ZRAM Overview',
                  runtimeStatus: 'Runtime Status',
                  usedSpace: 'Used Space',
@@ -273,6 +274,26 @@
     '浅色模式': 'Light Mode',
     '深色模式': 'Dark Mode',
     '颜色选择器': 'Color Picker',
+    '运行内存': 'Memory',
+    '选中项': 'Selected',
+    '主按钮': 'Primary Button',
+    '完成': 'Done',
+    '全局主题颜色': 'Global Theme Color',
+    '调整后立即同步到整个 WebUI': 'Changes are applied across the entire WebUI immediately',
+    '全局生效': 'Global',
+    '预设颜色': 'Preset Colors',
+    '自定义色调': 'Custom Hue',
+    '红色': 'Red',
+    '橙色': 'Orange',
+    '琥珀': 'Amber',
+    '绿色': 'Green',
+    '青色': 'Cyan',
+    'Corona 蓝': 'Corona Blue',
+    '靛蓝': 'Indigo',
+    '紫色': 'Purple',
+    '粉色': 'Pink',
+    '弹窗': 'Dialogs',
+    '图表': 'Charts',
     '调整界面主色': 'Adjust the interface accent color',
     '恢复默认界面': 'Restore Default Interface',
     '变更预览': 'Change Preview',
@@ -702,7 +723,9 @@
       ,[/^即将删除线程规则 (.+)。$/, 'Delete thread rule $1.']
       ,[/^请先设置重压缩 (\d+)$/, 'Configure recompression $1 first']
       ,[/^当前色调 (\d+)°$/, 'Current Hue $1°']
+      ,[/^色调 (\d+)°$/, 'Hue $1°']
       ,[/^色调 (\d+)° · 主页与配置同步$/, 'Hue $1° · Synced across Home and Settings']
+      ,[/^色调 (\d+)° · 全局同步$/, 'Hue $1° · Synced Globally']
       ,[/^共 (\d+) 个快照；当前仅恢复配置状态，不会自动全量立即应用。$/, '$1 snapshots; restoration changes configuration state only and does not immediately apply everything.']
       ,[/^快照 (\d+)$/, 'Snapshot $1']
       ,[/^即将保存参数快照 (.+)。$/, 'Save parameter snapshot $1.']
