@@ -9,6 +9,8 @@ for base in /data/adb/modules /data/adb/ksu/modules /data/adb/ap/modules; do
   CORONA_CONFIG="$base/Corona/config"
   break
 done
+CORONA_MODDIR=${CORONA_CONFIG%/config}
+WRITEBACK_HELPER="$CORONA_MODDIR/scripts/zram-writeback.sh"
 
 logi() {
   /system/bin/log -p i -t ${LOG_TAG} "$1"
@@ -261,6 +263,7 @@ init_zram() {
   local corona_size=$(corona_get zram.conf size)
   local corona_algorithm=$(corona_get zram.conf algorithm)
   local corona_writeback=$(corona_get zram.conf zram_writeback)
+  local corona_writeback_size=$(corona_get zram.conf writeback_size_mb)
   local corona_swappiness=$(corona_get zram.conf swappiness)
 
   local target_size="$current_size"
@@ -284,13 +287,10 @@ init_zram() {
     fi
     apply_zram_recomp_algorithms "$zram_block"
     apply_zstd_compression_level
-    if [ "$has_writeback" -eq 1 ] && [ "$corona_writeback" = "false" ]; then
-      echo none > "/sys/block/$zram_block/backing_dev" 2>/dev/null
-      [ -f "/sys/block/$zram_block/hybridswap_loop_device" ] && echo none > "/sys/block/$zram_block/hybridswap_loop_device" 2>/dev/null
-      echo 1 > "/sys/block/$zram_block/writeback_limit_enable" 2>/dev/null
-      echo 0 > "/sys/block/$zram_block/writeback_limit" 2>/dev/null
-    fi
     [ -n "$target_size" ] && echo "$target_size" > "/sys/block/$zram_block/disksize" 2>/dev/null
+    if [ "$has_writeback" -eq 1 ] && [ -x "$WRITEBACK_HELPER" ]; then
+      /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" "$corona_writeback" "$corona_writeback_size" 2>/dev/null
+    fi
     /system/bin/mkswap "$zram_path" 2>/dev/null || return
     /system/bin/swapon "$zram_path" -p "$current_priority" 2>/dev/null || return
   fi

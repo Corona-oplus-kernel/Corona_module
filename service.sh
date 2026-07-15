@@ -5,6 +5,7 @@ RUNTIME_CONF="$CONFIG_DIR/runtime.conf"
 SCRIPTS_DIR="$MODDIR/scripts.d"
 APP_POLICY_SH="$MODDIR/app_policy.sh"
 THREAD_PRIORITY_FILE="$CONFIG_DIR/thread_priority.conf"
+WRITEBACK_HELPER="$MODDIR/scripts/zram-writeback.sh"
 
 BRAND=$(getprop ro.product.brand | tr '[:upper:]' '[:lower:]')
 MANUFACTURER=$(getprop ro.product.manufacturer | tr '[:upper:]' '[:lower:]')
@@ -72,10 +73,18 @@ zram_config_needs_overlay() {
 
     if grep -q '^zram_writeback=' "$conf"; then
         want=$(get_conf_value "$conf" zram_writeback)
-        if [ "$want" = "false" ] && [ -f "/sys/block/$block/backing_dev" ]; then
-            now=$(cat "/sys/block/$block/backing_dev" 2>/dev/null | tr -d ' \n')
-            [ "$now" != "none" ] && return 0
+        node="/sys/block/$block/backing_dev"
+        [ -f "/sys/block/$block/hybridswap_loop_device" ] && node="/sys/block/$block/hybridswap_loop_device"
+        now=$(cat "$node" 2>/dev/null | tr -d ' \n')
+        [ "$now" = "none" ] && now=""
+        [ "$want" = "true" ] && [ -z "$now" ] && return 0
+        if [ "$want" = "true" ] && grep -q '^writeback_size_mb=' "$conf"; then
+            want_size=$(get_conf_value "$conf" writeback_size_mb)
+            file_size=$(stat -c %s /data/nandswap/corona_swapfile 2>/dev/null)
+            [ -n "$want_size" ] && [ "$file_size" != "$((want_size * 1024 * 1024))" ] && return 0
         fi
+        [ "$want" = "false" ] && [ -n "$now" ] && return 0
+        [ "$want" = "default" ] && [ -f /data/nandswap/corona_swapfile ] && return 0
     fi
 
     return 1
@@ -530,6 +539,7 @@ apply_zram_config() {
     size=$(get_conf_value "$CONFIG_DIR/zram.conf" size)
     swappiness=$(get_conf_value "$CONFIG_DIR/zram.conf" swappiness)
     zram_writeback=$(get_conf_value "$CONFIG_DIR/zram.conf" zram_writeback)
+    writeback_size_mb=$(get_conf_value "$CONFIG_DIR/zram.conf" writeback_size_mb)
     zram_path=$(get_conf_value "$CONFIG_DIR/zram.conf" zram_path)
     zram_path=$(normalize_zram_path "$zram_path") || return
     zram_block=$(get_zram_block "$zram_path") || return
@@ -541,8 +551,8 @@ apply_zram_config() {
     fi
     apply_zram_recomp_algorithms "$zram_block"
     apply_zstd_compression_level
-    [ "$zram_writeback" = "false" ] && echo none > "/sys/block/$zram_block/backing_dev" 2>/dev/null
     echo "$size" > "/sys/block/$zram_block/disksize" 2>/dev/null
+    [ -x "$WRITEBACK_HELPER" ] && /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" "$zram_writeback" "$writeback_size_mb" 2>/dev/null
     mkswap "$zram_path" 2>/dev/null || return
     swapon "$zram_path" -p 32758 2>/dev/null || return
     [ "$(get_swap_priority "$zram_path")" = "32758" ] || return

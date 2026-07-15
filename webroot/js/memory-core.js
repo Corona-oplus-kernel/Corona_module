@@ -644,6 +644,7 @@
             const swapMatch = config.match(/swappiness=(\d+)/);
             const enabledMatch = config.match(/enabled=(\d)/);
             const writebackMatch = config.match(/zram_writeback=(\S+)/);
+            const writebackSizeMatch = config.match(/writeback_size_mb=(\d+)/);
             const pathMatch = config.match(/zram_path=(\S+)/);
             if (algMatch) { this.state.algorithm = algMatch[1]; this.renderAlgorithmOptions(); }
             if (sizeMatch) { this.state.zramSize = parseInt(sizeMatch[1]) / 1024 / 1024 / 1024; document.getElementById('zram-size-slider').value = this.state.zramSize; document.getElementById('zram-size-value').textContent = `${this.state.zramSize.toFixed(2)} GB`; }
@@ -654,6 +655,13 @@
                 if (this.state.zramWriteback === 'true' && !this.zramFeatures?.writebackControl) this.state.zramWriteback = 'default';
                 const list = document.getElementById('zram-writeback-list');
                 if (list) list.querySelectorAll('.option-item').forEach(i => i.classList.toggle('selected', i.dataset.value === this.state.zramWriteback));
+            }
+            if (writebackSizeMatch) {
+                this.state.zramWritebackSize = Math.max(0.5, parseInt(writebackSizeMatch[1], 10) / 1024);
+                const slider = document.getElementById('zram-writeback-size-slider');
+                const value = document.getElementById('zram-writeback-size-value');
+                if (slider) { slider.value = this.state.zramWritebackSize; this.updateSliderProgress(slider); }
+                if (value) value.textContent = `${this.state.zramWritebackSize.toFixed(1)} GB`;
             }
             if (pathMatch) {
                 this.state.zramPath = pathMatch[1];
@@ -957,16 +965,17 @@
         }
     },
     async detectZramFeatures() {
-        if (!this.zramFeatures) this.zramFeatures = { multiComp: false, zstdLevel: false, writebackControl: false };
+        if (!this.zramFeatures) this.zramFeatures = { multiComp: false, zstdLevel: false, writebackControl: false, writebackMode: 'none' };
         const zramBlock = this.getZramBlockName(this.state.zramPath) || 'zram0';
         const [recompNode, zstdNode, writebackNode] = await Promise.all([
             this.exec(`[ -f /sys/block/${zramBlock}/recomp_algorithm ] && echo 1 || echo 0`),
             this.exec('[ -f /sys/module/zstd/parameters/compression_level ] && echo 1 || echo 0'),
-            this.exec(`[ -f /sys/block/${zramBlock}/backing_dev ] && [ -f /sys/block/${zramBlock}/writeback_limit_enable ] && echo 1 || echo 0`)
+            this.exec(`if [ ! -x /product/bin/nandswap_tool ]; then echo none; elif [ -f /sys/block/${zramBlock}/hybridswap_loop_device ]; then echo hybrid; elif [ -f /sys/block/${zramBlock}/backing_dev ] && [ -f /sys/block/${zramBlock}/writeback_limit_enable ]; then echo standard; else echo none; fi`)
         ]);
         this.zramFeatures.multiComp = (recompNode || '').trim() === '1';
         this.zramFeatures.zstdLevel = (zstdNode || '').trim() === '1';
-        this.zramFeatures.writebackControl = (writebackNode || '').trim() === '1';
+        this.zramFeatures.writebackMode = (writebackNode || '').trim() || 'none';
+        this.zramFeatures.writebackControl = this.zramFeatures.writebackMode !== 'none';
         if (typeof this.renderRecompAlgorithmOptions === 'function') this.renderRecompAlgorithmOptions();
         this.updateZstdLevelVisibility();
         if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
@@ -1054,12 +1063,13 @@
         if (field === 'zram' || field === 'size') updates.size = String(sizeBytes);
         if (field === 'zram' || field === 'swappiness') updates.swappiness = String(this.state.swappiness);
         if (field === 'zram' || field === 'zram_writeback') updates.zram_writeback = this.state.zramWriteback;
+        if (field === 'zram' || field === 'writeback_size_mb') updates.writeback_size_mb = String(Math.round(this.state.zramWritebackSize * 1024));
         if (field === 'zram' || field === 'zram_path') updates.zram_path = this.state.zramPath;
         return updates;
     },
     persistZramConfig(changedField = 'zram') {
         const save = this.withLock('zram-config', async () => {
-            await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
+            await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'writeback_size_mb', 'zram_path']);
             await this.updateModuleDescription();
             return true;
         });
@@ -1067,7 +1077,7 @@
         return save;
     },
     async saveZramConfig(changedField = 'zram', skipPreview = false) {
-        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
+        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates(changedField), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'writeback_size_mb', 'zram_path']);
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将保存 ZRAM 配置。',
@@ -1103,13 +1113,16 @@
         }
 
         const mismatches = [];
-        const [algRaw, disksizeRaw, swapRaw, zstdRaw, recompRaw] = await Promise.all([
+        const [algRaw, disksizeRaw, swapRaw, zstdRaw, recompRaw, backingRaw] = await Promise.all([
             this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`),
             this.exec(`cat /sys/block/${zramBlock}/disksize 2>/dev/null`),
             this.exec('cat /proc/sys/vm/swappiness 2>/dev/null'),
             checkZstd ? this.exec('cat /sys/module/zstd/parameters/compression_level 2>/dev/null') : Promise.resolve(''),
             this.zramFeatures && this.zramFeatures.multiComp
                 ? this.exec(`cat /sys/block/${zramBlock}/recomp_algorithm 2>/dev/null`)
+                : Promise.resolve(''),
+            this.state.zramWriteback !== 'default'
+                ? this.exec(`if [ -f /sys/block/${zramBlock}/hybridswap_loop_device ]; then cat /sys/block/${zramBlock}/hybridswap_loop_device 2>/dev/null; else cat /sys/block/${zramBlock}/backing_dev 2>/dev/null; fi`)
                 : Promise.resolve('')
         ]);
 
@@ -1145,6 +1158,12 @@
             if (Number.isFinite(now) && Number.isFinite(want) && now !== want) {
                 mismatches.push(`zstd ${now}≠${want}`);
             }
+        }
+
+        if (this.state.zramWriteback !== 'default') {
+            const backing = this.normalizeBackingDev(backingRaw);
+            if (this.state.zramWriteback === 'true' && !backing) mismatches.push('回写后端未绑定');
+            if (this.state.zramWriteback === 'false' && backing) mismatches.push(`回写后端仍为 ${this.formatBackingDevName(backing)}`);
         }
 
         // soft check recomp: if configured non-none, recomp node should mention algo (best-effort)
@@ -1209,7 +1228,7 @@
     },
     async applySwappinessImmediate(skipPreview = false) {
       return this.withLock('zram', async () => {
-        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates('swappiness'), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
+        const config = await this.buildMergedConfigContent('zram.conf', this.getZramFieldUpdates('swappiness'), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'writeback_size_mb', 'zram_path']);
         if (!skipPreview) {
             const confirmed = await this.confirmChangePreview('变更预览', {
                 summary: '即将通过官方初始化链更新 ZRAM Swappiness。',
@@ -1223,7 +1242,7 @@
         }
         this.showLoading(true);
         await this.sleep(0);
-        await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates('swappiness'), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'zram_path']);
+        await this.mergeConfigFile('zram.conf', this.getZramFieldUpdates('swappiness'), ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'zram_writeback', 'writeback_size_mb', 'zram_path']);
         await this.exec(`/system/bin/sh ${this.modDir}/scripts/apply-zram.sh >/dev/null 2>&1`);
         await this.updateModuleDescription();
         this.showLoading(false);
@@ -1802,9 +1821,21 @@
                 list.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                 item.classList.add('selected');
                 this.state.zramWriteback = item.dataset.value;
+                if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
                 this.markZramDirty();
             });
         });
+        const sizeSlider = document.getElementById('zram-writeback-size-slider');
+        const sizeValue = document.getElementById('zram-writeback-size-value');
+        if (sizeSlider && !sizeSlider.dataset.bound) {
+            sizeSlider.dataset.bound = '1';
+            sizeSlider.addEventListener('input', (event) => {
+                this.state.zramWritebackSize = parseFloat(event.target.value) || 4;
+                if (sizeValue) sizeValue.textContent = `${this.state.zramWritebackSize.toFixed(1)} GB`;
+                this.updateSliderProgress(sizeSlider);
+            });
+            sizeSlider.addEventListener('change', () => this.markZramDirty());
+        }
     },
     initZramPath() {
         const pathInput = document.getElementById('zram-path-input');

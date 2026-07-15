@@ -19,6 +19,7 @@ class CoronaAddon {
             zramSize: 8,
             swappiness: 100,
             zramWriteback: 'default',
+            zramWritebackSize: 4,
             zramPath: '/dev/block/zram0',
             ioEnabled: false,
             ioScheduler: null,
@@ -59,7 +60,7 @@ class CoronaAddon {
             compactionEnabled: false
         };
         this.kernelFeatures = { lruGen: false, thp: false, ksm: false, compaction: false };
-        this.zramFeatures = { multiComp: false, zstdLevel: false, writebackControl: false };
+        this.zramFeatures = { multiComp: false, zstdLevel: false, writebackControl: false, writebackMode: 'none' };
         this.isCoronaKernel = false;
         this.localKernelWorkflowBuild = 0;
         this.kernelUpdateInfo = null;
@@ -124,7 +125,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071512` : '';
+        return map[name] ? `${map[name]}?v=2026071513` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};

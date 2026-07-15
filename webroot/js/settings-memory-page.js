@@ -57,6 +57,9 @@
         list.querySelectorAll('.option-item').forEach(item => {
             item.classList.toggle('selected', item.dataset.value === this.state.zramWriteback);
         });
+        const sizeSection = document.getElementById('zram-writeback-size-section');
+        const showSize = supported && this.state.zramWriteback === 'true';
+        this.setFeatureVisible(sizeSection, showSize);
     },
     initZramRecompFold() {
         if (typeof this.initAdvancedFold === 'function') {

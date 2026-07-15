@@ -383,6 +383,17 @@
                                         <div class="option-item" data-value="false">禁用</div>
                                     </div>
                                 </div>
+                                <div class="setting-section" id="zram-writeback-size-section" hidden style="display:none">
+                                    <span class="section-label">回写空间</span>
+                                    <div class="slider-container">
+                                        <input type="range" class="range-slider" id="zram-writeback-size-slider" min="0.5" max="16" step="0.5" value="4">
+                                        <div class="slider-labels">
+                                            <span>0.5GB</span>
+                                            <span class="slider-value" id="zram-writeback-size-value">4.0 GB</span>
+                                            <span>16GB</span>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div class="setting-section">
                                     <span class="section-label">设备路径</span>
                                     <div class="zram-path-container">
@@ -1692,6 +1703,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071512" defer></script>
+    <script src="script.js?v=2026071513" defer></script>
 </body>
 </html>

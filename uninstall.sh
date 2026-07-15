@@ -11,3 +11,4 @@ rm -rf "$MODPATH/scripts.d/.logs"
 rm -f /data/adb/post-fs-data.d/Corona.sh
 swapoff "$swapfile" 2>/dev/null
 rm -f "$swapfile"
+rm -f /data/nandswap/corona_swapfile /data/nandswap/corona_loop_device

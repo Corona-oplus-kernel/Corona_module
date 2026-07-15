@@ -23,6 +23,7 @@ chmod 755 "$MODPATH/customize.sh" 2>/dev/null
 chmod 755 "$MODPATH/service.sh" 2>/dev/null
 chmod 755 "$MODPATH/uninstall.sh" 2>/dev/null
 chmod 755 "$MODPATH/app_policy.sh" 2>/dev/null
+chmod 755 "$MODPATH/scripts/zram-writeback.sh" 2>/dev/null
 chmod 755 "$MODPATH/odm/etc/init.oplus.mm-sys.sh" 2>/dev/null
 chmod 755 "$MODPATH"/app_policy/*.sh 2>/dev/null
 mem_total_str=$(cat /proc/meminfo | grep MemTotal)
