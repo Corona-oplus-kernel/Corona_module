@@ -31,21 +31,12 @@
     --motion-fast: 0.22s;
     --motion-base: 0.36s;
     --motion-slow: 0.5s;
-    --module-font: "OPPOSans", "OnePlus Sans", "MiSans", "HarmonyOS Sans SC", "Noto Sans SC", "PingFang SC", "Source Han Sans SC", sans-serif;
+    --module-font: sans-serif;
 }
 
 body, button, input, select, textarea {
     font-family: var(--module-font);
 }
-
-@font-face {
-    font-family: "OPPOSans";
-    src: url("fonts/OPPOSans-Regular.ttc") format("truetype-collection");
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-}
-
 
 /* Hue-driven primary (AMMF/Zram style) */
 html {
