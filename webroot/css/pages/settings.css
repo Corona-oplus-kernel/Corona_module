@@ -518,35 +518,23 @@ body.theme-dark #page-settings .sub-card {
 }
 
 body.theme-dark .floating-header {
-    background: rgba(20, 24, 32, 0.72);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-bottom-color: rgba(255, 255, 255, 0.08);
+    background: var(--glass-floating-bg);
+    backdrop-filter: blur(var(--glass-blur-floating));
+    -webkit-backdrop-filter: blur(var(--glass-blur-floating));
+    border-bottom-color: var(--glass-floating-border);
 }
 
-body.theme-dark .card,
-body.theme-dark .module-card,
-body.theme-dark .banner-image {
+body.theme-dark .module-card {
     background: var(--glass-card-bg);
     backdrop-filter: blur(var(--glass-blur-card));
     -webkit-backdrop-filter: blur(var(--glass-blur-card));
     border-color: var(--glass-border);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
-}
-
-body.theme-dark .tab-bar-container {
-    background: rgba(12, 15, 22, 0.88);
-    backdrop-filter: blur(var(--glass-blur-floating));
-    -webkit-backdrop-filter: blur(var(--glass-blur-floating));
-    border-color: rgba(255, 255, 255, 0.10);
-    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    transform: translateX(-50%) translateZ(0);
-    -webkit-transform: translateX(-50%) translateZ(0);
+    box-shadow: var(--glass-shadow);
 }
 
 body.theme-dark .sub-card {
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(var(--glass-blur-card));
+    -webkit-backdrop-filter: blur(var(--glass-blur-card));
 }
 
 body.theme-dark .detail-card {
@@ -554,18 +542,13 @@ body.theme-dark .detail-card {
     backdrop-filter: blur(var(--glass-blur-dialog));
     -webkit-backdrop-filter: blur(var(--glass-blur-dialog));
     border-color: var(--glass-border);
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--glass-shadow-lg);
 }
 
 body.theme-dark .theme-option,
 body.theme-dark .option-item {
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
-}
-
-body.theme-dark .toast {
-    backdrop-filter: blur(var(--glass-blur-floating));
-    -webkit-backdrop-filter: blur(var(--glass-blur-floating));
 }
 
 body.theme-dark .loading-overlay {

@@ -5,10 +5,16 @@
     --glass-border: rgba(255, 255, 255, 0.28);
     --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.06);
     --glass-shadow-lg: 0 18px 40px rgba(0, 0, 0, 0.10);
-    --floating-bar-bg: rgba(255, 255, 255, 0.35);
+    --glass-bg: var(--glass-surface);
     --glass-card-bg: var(--glass-surface);
     --glass-dialog-bg: var(--glass-surface-strong);
-    --glass-floating-bg: var(--floating-bar-bg);
+    --glass-floating-bg: rgba(255, 255, 255, 0.35);
+    --glass-floating-border: rgba(255, 255, 255, 0.24);
+    --glass-floating-shadow: 0 12px 34px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.48);
+    --glass-selection-bg: rgba(255, 255, 255, 0.55);
+    --glass-selection-border: rgba(255, 255, 255, 0.35);
+    --glass-selection-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    --glass-control-bg: rgba(0, 0, 0, 0.05);
     --glass-blur-floating: 10px;
     --glass-blur-card: 14px;
     --glass-blur-dialog: 16px;
@@ -64,9 +70,16 @@ body.theme-dark {
     --glass-border: rgba(255, 255, 255, 0.10);
     --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
     --glass-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.36);
-    --floating-bar-bg: rgba(24, 29, 40, 0.55);
+    --glass-bg: var(--glass-surface);
     --glass-card-bg: rgba(24, 29, 40, 0.55);
     --glass-dialog-bg: rgba(24, 29, 40, 0.65);
+    --glass-floating-bg: rgba(24, 29, 40, 0.55);
+    --glass-floating-border: rgba(255, 255, 255, 0.12);
+    --glass-floating-shadow: 0 14px 38px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --glass-selection-bg: rgba(255, 255, 255, 0.16);
+    --glass-selection-border: rgba(255, 255, 255, 0.14);
+    --glass-selection-shadow: 0 2px 10px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    --glass-control-bg: rgba(255, 255, 255, 0.07);
     --primary: hsl(var(--hue), 78%, 62%);
     --primary-dim: hsla(var(--hue), 78%, 62%, 0.18);
     --primary-light: hsla(var(--hue), 78%, 62%, 0.12);
@@ -419,10 +432,11 @@ body.theme-dark .corona-title {
     right: 0;
     height: 70px;
     padding-top: 30px;
-    background: var(--floating-bar-bg);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    background: var(--glass-floating-bg);
+    backdrop-filter: blur(var(--glass-blur-floating));
+    -webkit-backdrop-filter: blur(var(--glass-blur-floating));
+    border-bottom: 1px solid var(--glass-floating-border);
+    box-shadow: var(--glass-shadow);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -508,11 +522,6 @@ body.theme-dark .corona-title {
     font-size: 32px;
     font-weight: 600;
     color: var(--text-main);
-}
-
-body.theme-dark .floating-header {
-    background: rgba(30, 30, 35, 0.45);
-    border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
 body.theme-dark .floating-header-title {
@@ -1283,8 +1292,8 @@ body.theme-dark .cpu-core .cpu-core-load.has-usage {
     -webkit-backdrop-filter: blur(var(--glass-blur-floating));
     border-radius: 24px;
     padding: 8px;
-    box-shadow: var(--glass-shadow);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: var(--glass-floating-shadow);
+    border: 1px solid var(--glass-floating-border);
     transition: var(--glass-motion);
 }
 
@@ -1335,10 +1344,10 @@ body.theme-dark .cpu-core .cpu-core-load.has-usage {
     left: 0;
     width: calc(50% - 4px);
     height: 100%;
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: var(--glass-selection-bg);
+    border: 1px solid var(--glass-selection-border);
     border-radius: 16px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    box-shadow: var(--glass-selection-shadow);
     transition: transform var(--motion-slow) var(--motion-ease), box-shadow var(--motion-fast) ease;
     z-index: 1;
 }
@@ -1354,7 +1363,7 @@ body.theme-dark .cpu-core .cpu-core-load.has-usage {
     bottom: 100px;
     left: 50%;
     transform: translateX(-50%) translateY(20px);
-    border: 1px solid var(--primary-border);
+    border: 1px solid var(--glass-floating-border);
     background: var(--glass-floating-bg);
     backdrop-filter: blur(var(--glass-blur-floating)) saturate(1.18);
     -webkit-backdrop-filter: blur(var(--glass-blur-floating)) saturate(1.18);
@@ -1366,7 +1375,7 @@ body.theme-dark .cpu-core .cpu-core-load.has-usage {
     opacity: 0;
     pointer-events: none;
     z-index: 20100;
-    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.16), 0 0 0 1px var(--primary-soft), inset 0 1px 0 rgba(255, 255, 255, 0.58);
+    box-shadow: var(--glass-floating-shadow);
     display: flex;
     align-items: center;
     gap: 9px;
@@ -1386,13 +1395,6 @@ body.theme-dark .cpu-core .cpu-core-load.has-usage {
     color: var(--primary);
     font-size: 12px;
     font-weight: 800;
-}
-
-body.theme-dark .toast {
-    border-color: rgba(255, 255, 255, 0.14);
-    background: var(--glass-floating-bg);
-    color: var(--text-main);
-    box-shadow: 0 14px 38px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .toast.show {
@@ -2476,17 +2478,6 @@ body.theme-dark .detail-overlay.no-close-btn.show {
     text-align: center;
 }
 
-body.theme-dark {
-    --bg-color: #0D0D0D;
-    --glass-surface: rgba(30, 30, 30, 0.6);
-    --glass-surface-strong: rgba(40, 40, 40, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    --text-main: #FFFFFF;
-    --text-sub: #A0A0A0;
-    --text-dim: #666666;
-}
-
 body.theme-dark .bg-decoration {
     background: linear-gradient(-45deg, #0D1117, #161B22, #0D1117, #1C1C1C);
 }
@@ -2497,43 +2488,23 @@ body.theme-dark .bg-decoration::before {
                 radial-gradient(circle at 40% 80%, rgba(0, 200, 83, 0.05) 0%, transparent 50%);
 }
 
-body.theme-dark .card {
-    background: rgba(30, 30, 35, 0.45);
-    border-color: rgba(255, 255, 255, 0.08);
-}
-
-body.theme-dark .banner-image {
-    background: rgba(30, 30, 35, 0.45);
-    border-color: rgba(255, 255, 255, 0.08);
-}
-
-body.theme-dark .action-section {
-    background: rgba(30, 30, 35, 0.45);
-    border-color: rgba(255, 255, 255, 0.08);
-}
-
-body.theme-dark .easter-egg-card {
-    background: rgba(30, 30, 35, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: none;
-}
-
-body.theme-dark .priority-rule-item {
-    background: rgba(30, 30, 35, 0.45);
-    border-color: rgba(255, 255, 255, 0.08);
-}
-
+body.theme-dark .card,
+body.theme-dark .banner-image,
+body.theme-dark .action-section,
+body.theme-dark .easter-egg-card,
+body.theme-dark .priority-rule-item,
 body.theme-dark .priority-process-item {
-    background: rgba(30, 30, 35, 0.45);
-    border-color: rgba(255, 255, 255, 0.08);
+    background: var(--glass-card-bg);
+    border-color: var(--glass-border);
+    box-shadow: var(--glass-shadow);
 }
 
 body.theme-dark .switch-container {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--glass-control-bg);
 }
 
 body.theme-dark .option-item {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--glass-control-bg);
 }
 
 body.theme-dark .option-item:hover {
@@ -2596,18 +2567,6 @@ body.init-lock .floating-header {
 
 body.theme-dark .tab-bar {
     background: transparent;
-}
-
-body.theme-dark .tab-bar-container {
-    background: rgba(12, 15, 22, 0.88);
-    border-color: rgba(255, 255, 255, 0.10);
-    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-body.theme-dark .tab-slider {
-    background: rgba(255, 255, 255, 0.16);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 body.theme-dark .range-slider {
@@ -2717,9 +2676,9 @@ body.theme-dark .range-slider::-webkit-slider-thumb {
     text-align: left;
 }
 body.theme-dark .confirm-dialog {
-    background: rgba(30, 30, 35, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    background: var(--glass-dialog-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow-lg);
 }
 .confirm-dialog-body {
     padding: 20px 16px;
@@ -3273,20 +3232,20 @@ body.theme-dark #io-scheduler-content .setting-section {
 }
 
 body.theme-dark .script-item {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: var(--glass-control-bg);
+    border-color: var(--glass-border);
 }
 body.theme-dark .script-item:hover {
     background: hsla(var(--hue), 82%, 50%, 0.1);
 }
 body.theme-dark .script-name-input,
 body.theme-dark .script-code-input {
-    background: rgba(0, 0, 0, 0.3);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: var(--glass-control-bg);
+    border-color: var(--glass-border);
 }
 body.theme-dark .script-tag {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: var(--glass-control-bg);
+    border-color: var(--glass-border);
 }
 
 .update-section .section-header-row {
@@ -4256,9 +4215,9 @@ body.theme-dark .mini-switch-row input:checked {
     justify-content: space-between;
     gap: 16px;
     padding: 14px;
-    border: 1px solid rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--glass-border);
     border-radius: 14px;
-    background: rgba(0, 0, 0, 0.025);
+    background: var(--glass-control-bg);
 }
 
 .language-setting-copy {
@@ -4283,7 +4242,7 @@ body.theme-dark .mini-switch-row input:checked {
     gap: 3px;
     padding: 3px;
     border-radius: 11px;
-    background: rgba(0, 0, 0, 0.06);
+    background: var(--glass-control-bg);
 }
 
 .language-segmented::before {
@@ -4293,9 +4252,9 @@ body.theme-dark .mini-switch-row input:checked {
     width: calc((100% - 9px) / 2);
     box-sizing: border-box;
     border-radius: 8px;
-    background: var(--card-bg);
-    border: 1px solid var(--glass-border);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+    background: var(--glass-selection-bg);
+    border: 1px solid var(--glass-selection-border);
+    box-shadow: var(--glass-selection-shadow);
     transition: transform 340ms var(--motion-ease), background-color 280ms ease, border-color 280ms ease, box-shadow 280ms ease;
 }
 
