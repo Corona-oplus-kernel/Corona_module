@@ -535,11 +535,11 @@ body.theme-dark .banner-image {
 }
 
 body.theme-dark .tab-bar-container {
-    background: var(--glass-floating-bg);
+    background: rgba(12, 15, 22, 0.88);
     backdrop-filter: blur(var(--glass-blur-floating));
     -webkit-backdrop-filter: blur(var(--glass-blur-floating));
-    border-color: var(--glass-border);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+    border-color: rgba(255, 255, 255, 0.10);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
     transform: translateX(-50%) translateZ(0);
     -webkit-transform: translateX(-50%) translateZ(0);
 }

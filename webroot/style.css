@@ -117,14 +117,14 @@ body.theme-animate .current-badge {
 
 body.theme-switch-out .page.active,
 body.theme-switch-out .floating-header,
-body.theme-switch-out .tab-bar-container,
+body.theme-switch-out .tab-bar-container .tab-bar,
 body.theme-switch-out .detail-overlay.show .detail-card {
     animation: coronaThemeOut 100ms ease-out both;
 }
 
 body.theme-switch-in .page.active,
 body.theme-switch-in .floating-header,
-body.theme-switch-in .tab-bar-container,
+body.theme-switch-in .tab-bar-container .tab-bar,
 body.theme-switch-in .detail-overlay.show .detail-card {
     animation: coronaThemeIn 380ms var(--motion-ease) both;
 }
@@ -1286,13 +1286,14 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
 
 .tab-bar {
     position: relative;
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
     height: 44px;
 }
 
 .tab-item {
-    flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1315,8 +1316,13 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
 }
 
 .tab-label {
+    display: block;
+    max-width: 100%;
     font-size: 15px;
     font-weight: inherit;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .tab-slider {
@@ -2585,6 +2591,12 @@ body.init-lock .floating-header {
 
 body.theme-dark .tab-bar {
     background: transparent;
+}
+
+body.theme-dark .tab-bar-container {
+    background: rgba(12, 15, 22, 0.88);
+    border-color: rgba(255, 255, 255, 0.10);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 body.theme-dark .tab-slider {
@@ -4991,14 +5003,14 @@ body.theme-dark .color-live-bar { background: rgba(255,255,255,0.08); }
 /* Language refresh and external navigation */
 body.language-switch-out .page.active,
 body.language-switch-out .floating-header,
-body.language-switch-out .tab-bar-container,
+body.language-switch-out .tab-bar-container .tab-bar,
 body.language-switch-out .detail-overlay.show .detail-card {
     animation: coronaLanguageOut 110ms ease-out both !important;
 }
 
 body.language-switch-in .page.active,
 body.language-switch-in .floating-header,
-body.language-switch-in .tab-bar-container,
+body.language-switch-in .tab-bar-container .tab-bar,
 body.language-switch-in .detail-overlay.show .detail-card {
     animation: coronaLanguageIn 320ms var(--motion-ease) both !important;
 }
