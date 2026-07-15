@@ -1242,6 +1242,10 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
     color: #000000 !important;
 }
 
+body.theme-dark .cpu-core .cpu-core-load.has-usage {
+    color: #ffffff !important;
+}
+
 
 
 .cpu-core.offline {
