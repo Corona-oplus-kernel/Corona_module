@@ -190,6 +190,59 @@
     font-weight: 600;
 }
 
+.slider-precise-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.slider-precise-label {
+    color: var(--text-sub);
+    font-size: 12px;
+}
+
+.slider-precise-control {
+    display: flex;
+    align-items: center;
+    min-width: 112px;
+    padding: 6px 10px;
+    border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--card-bg) 90%, transparent);
+}
+
+.slider-number-input {
+    width: 72px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text-main);
+    font: 600 13px 'SF Mono', monospace;
+    text-align: right;
+}
+
+.slider-number-unit {
+    min-width: 24px;
+    color: var(--text-sub);
+    font-size: 12px;
+    text-align: right;
+}
+
+.option-item.feature-disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+    filter: saturate(0.35);
+}
+
+.feature-disabled-hint {
+    margin-top: 8px;
+    color: var(--warning, #b26a00);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 .option-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Corona 控制台</title>
-    <link rel="stylesheet" href="style.css?v=2026071510">
-    <link rel="stylesheet" href="css/components.css?v=2026071512">
+    <link rel="stylesheet" href="style.css?v=2026071516">
+    <link rel="stylesheet" href="css/components.css?v=2026071514">
     <link rel="stylesheet" href="css/pages/settings.css?v=2026071510">
     <link rel="stylesheet" href="css/animations.css?v=2026071464">
     <script>
@@ -197,20 +197,33 @@
                 <div id="memory-compression-content" class="module-card-content hidden">
                     <div class="sub-card" id="zram-sub">
                         <div class="sub-card-header" id="zram-toggle">
-                            <span class="sub-card-title">ZRAM 管理</span>
+                            <span class="sub-card-title" data-i18n="zramManagement">ZRAM 管理</span>
                             <span class="current-badge" id="zram-status">--</span>
                             <span class="expand-icon">❯</span>
                         </div>
                         <div id="zram-content" class="sub-expandable-content">
+                            <div class="zram-overview-card" id="zram-overview-card">
+                                <div class="zram-overview-header">
+                                    <span data-i18n="zramOverview">ZRAM 总览</span>
+                                    <span class="zram-overview-state" id="zram-overview-state">--</span>
+                                </div>
+                                <div class="zram-overview-grid">
+                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="usedSpace">已用空间</span><strong id="zram-overview-used">--</strong></div>
+                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="physicalUsage">物理占用</span><strong id="zram-overview-memory">--</strong></div>
+                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="compressionRatio">压缩比</span><strong id="zram-overview-ratio">--</strong></div>
+                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="writebackDevice">回写设备</span><strong id="zram-overview-backing">--</strong></div>
+                                </div>
+                                <div class="zram-overview-progress"><span id="zram-overview-progress"></span></div>
+                            </div>
 <div class="zram-status-card" id="zram-status-card">
-                                <div class="zram-status-title">运行状态</div>
+                                <div class="zram-status-title" data-i18n="runtimeStatus">运行状态</div>
                                 <div class="info-list" id="zram-status-list">
                                     <div class="info-item" data-metric="alg">
-                                        <span class="info-label">算法</span>
+                                        <span class="info-label" data-i18n="algorithm">算法</span>
                                         <span class="info-value" id="zram-current-alg">--</span>
                                     </div>
                                     <div class="info-item" data-metric="size">
-                                        <span class="info-label">大小</span>
+                                        <span class="info-label" data-i18n="size">大小</span>
                                         <span class="info-value" id="zram-current-size">--</span>
                                     </div>
                                     <div class="info-item" data-metric="swappiness">
@@ -218,35 +231,35 @@
                                         <span class="info-value" id="zram-current-swappiness">--</span>
                                     </div>
                                     <div class="info-item" data-metric="path">
-                                        <span class="info-label">设备路径</span>
+                                        <span class="info-label" data-i18n="devicePath">设备路径</span>
                                         <span class="info-value" id="zram-current-path">--</span>
                                     </div>
                                     <div class="info-item" data-metric="raw" hidden>
-                                        <span class="info-label">原始数据</span>
+                                        <span class="info-label" data-i18n="rawData">原始数据</span>
                                         <span class="info-value" id="zram-raw-size">--</span>
                                     </div>
                                     <div class="info-item" data-metric="compr" hidden>
-                                        <span class="info-label">压缩后</span>
+                                        <span class="info-label" data-i18n="compressedData">压缩后</span>
                                         <span class="info-value" id="zram-compr-size">--</span>
                                     </div>
                                     <div class="info-item" data-metric="mem" hidden>
-                                        <span class="info-label">物理占用</span>
+                                        <span class="info-label" data-i18n="physicalUsage">物理占用</span>
                                         <span class="info-value" id="zram-mem-used">--</span>
                                     </div>
                                     <div class="info-item" data-metric="ratio" hidden>
-                                        <span class="info-label">压缩比</span>
+                                        <span class="info-label" data-i18n="compressionRatio">压缩比</span>
                                         <span class="info-value" id="zram-compr-ratio">--</span>
                                     </div>
                                     <div class="info-item" data-metric="reads" hidden>
-                                        <span class="info-label">总读取</span>
+                                        <span class="info-label" data-i18n="totalReads">总读取</span>
                                         <span class="info-value" id="zram-total-reads">--</span>
                                     </div>
                                     <div class="info-item" data-metric="writes" hidden>
-                                        <span class="info-label">总写入</span>
+                                        <span class="info-label" data-i18n="totalWrites">总写入</span>
                                         <span class="info-value" id="zram-total-writes">--</span>
                                     </div>
                                     <div class="info-item" data-metric="backing" hidden>
-                                        <span class="info-label">回写设备</span>
+                                        <span class="info-label" data-i18n="writebackDevice">回写设备</span>
                                         <span class="info-value" id="zram-backing-dev">--</span>
                                     </div>
                                     <div class="info-item" data-metric="bdcount" hidden>
@@ -305,8 +318,8 @@
                             
                             <div class="switch-container">
                                 <div class="switch-info">
-                                    <span class="switch-label">启用 ZRAM</span>
-                                    <span class="switch-desc" id="zram-switch-desc">压缩内存块，扩展可用RAM</span>
+                                    <span class="switch-label" data-i18n="enableZram">启用 ZRAM</span>
+                                    <span class="switch-desc" id="zram-switch-desc" data-i18n="enableZramDesc">压缩内存块，扩展可用RAM</span>
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" id="zram-switch">
@@ -354,7 +367,7 @@
                                     </div>
                                 </div>
                                 <div class="setting-section">
-                                    <span class="section-label">ZRAM 大小</span>
+                                    <span class="section-label" data-i18n="zramSize">ZRAM 大小</span>
                                     <div class="slider-container">
                                         <input type="range" class="range-slider" id="zram-size-slider" min="0" max="24" step="0.25" value="8">
                                         <div class="slider-labels">
@@ -376,15 +389,16 @@
                                     </div>
                                 </div>
                                 <div class="setting-section">
-                                    <span class="section-label">ZRAM 回写</span>
+                                    <span class="section-label" data-i18n="zramWriteback">ZRAM 回写</span>
                                     <div class="option-grid" id="zram-writeback-list">
-                                        <div class="option-item selected" data-value="default">系统管理</div>
-                                        <div class="option-item" data-value="true">启用</div>
-                                        <div class="option-item" data-value="false">禁用</div>
+                                        <div class="option-item selected" data-value="default" data-i18n="systemManaged">系统管理</div>
+                                        <div class="option-item" data-value="true" data-i18n="enabled">启用</div>
+                                        <div class="option-item" data-value="false" data-i18n="disabled">禁用</div>
                                     </div>
+                                    <div class="feature-disabled-hint" id="zram-writeback-hint" hidden></div>
                                 </div>
                                 <div class="setting-section" id="zram-writeback-size-section" hidden style="display:none">
-                                    <span class="section-label">回写空间</span>
+                                    <span class="section-label" data-i18n="writebackSpace">回写空间</span>
                                     <div class="slider-container">
                                         <input type="range" class="range-slider" id="zram-writeback-size-slider" min="0.5" max="16" step="0.5" value="4">
                                         <div class="slider-labels">
@@ -406,7 +420,7 @@
                                 </div>
                             </div>
                             <div class="zram-actions-sep"></div>
-                            <button class="action-btn" id="zram-apply-btn" style="width:100%">应用 ZRAM 配置</button>
+                            <button class="action-btn" id="zram-apply-btn" style="width:100%" data-i18n="applyZram">应用 ZRAM 配置</button>
                         </div>
                     </div>
                     <div class="sub-card" id="swap-sub">
@@ -1188,6 +1202,16 @@
                         </button>
                         <button type="button" class="action-btn" id="theme-reset-btn" style="margin-top:12px;width:100%">恢复默认界面</button>
                     </div>
+                    <div class="setting-section language-setting-section">
+                        <div class="language-setting-copy">
+                            <span class="section-label" data-i18n="language">界面语言</span>
+                            <span class="section-desc" data-i18n="languageDesc">切换后立即更新主要界面文字</span>
+                        </div>
+                        <div class="language-segmented" id="language-options" role="group" aria-label="界面语言">
+                            <button type="button" class="language-option selected" data-language="zh">中文</button>
+                            <button type="button" class="language-option" data-language="en">English</button>
+                        </div>
+                    </div>
                     <div class="switch-container ui-pref-switch-container">
                         <div class="switch-info">
                             <span class="switch-label">变更预览</span>
@@ -1364,10 +1388,10 @@
             <nav class="tab-bar">
                 <div class="tab-slider" id="tab-slider"></div>
                 <div class="tab-item active" data-page="home">
-                    <span class="tab-label">主页</span>
+                    <span class="tab-label" data-i18n="tabHome">主页</span>
                 </div>
                 <div class="tab-item" data-page="settings">
-                    <span class="tab-label">配置</span>
+                    <span class="tab-label" data-i18n="tabSettings">配置</span>
                 </div>
             </nav>
         </div>
@@ -1703,6 +1727,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071513" defer></script>
+    <script src="script.js?v=2026071516" defer></script>
 </body>
 </html>

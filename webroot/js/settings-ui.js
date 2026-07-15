@@ -46,50 +46,154 @@
         this.setCategoryConfigVisibility(saved === null ? true : saved === '1');
     },
     getTranslations() {
-        return {
-            zh: {
-                tabHome: '主页',
-                tabSettings: '配置',
-                moduleSettings: '模块设置',
-                lightTheme: '浅色模式',
-                darkTheme: '深色模式',
-                changePreview: '变更预览',
-                changePreviewDesc: '关闭后跳过变更预览，直接应用设置',
-                settingDescriptions: '设置说明',
-                settingDescriptionsDesc: '显示各项功能的用途说明，关闭后仅保留标题与操作控件',
-                categoryConfig: '显示分类配置',
-                categoryConfigDesc: '关闭后隐藏各分类配置的启用开关，不影响模块功能和已保存参数',
-                cardVisibility: '模块卡片显示',
-                cardVisibilityDesc: '关闭后仅隐藏配置页卡片，不影响模块功能和已保存参数',
-                themeSwitched: '主题已切换',
-                previewEnabled: '变更预览已开启',
-                previewDisabled: '变更预览已关闭',
-                descriptionsShown: '设置说明已显示',
-                descriptionsHidden: '设置说明已隐藏',
-                categoryShown: '分类配置已显示',
-                categoryHidden: '分类配置已隐藏',
-                initDefault: '正在初始化，请稍候...',
-                initResolve: '正在解析模块环境...',
-                initPrepare: '正在准备配置...',
-                initDevice: '正在加载设备信息...',
-                initSettings: '正在预加载配置页面...',
-                initRealtime: '正在获取实时状态...',
-                initApps: '正在预加载应用列表...',
-                unsupportedTitle: '设备不支持',
-                unsupportedBody: '此模块仅支持 OnePlus / OPPO / realme / OPlus 设备',
-                processing: '处理中...'
-            }
-        };
+        return window.CoronaTranslations || { zh: {}, en: {} };
+    },
+    initLanguage() {
+        const saved = localStorage.getItem('corona_language');
+        this.state.language = saved === 'en' || saved === 'zh' ? saved : 'zh';
+        document.documentElement.lang = this.state.language === 'en' ? 'en' : 'zh-CN';
+    },
+    setLanguage(language, persist = true) {
+        const normalized = language === 'en' ? 'en' : 'zh';
+        this.state.language = normalized;
+        document.documentElement.lang = normalized === 'en' ? 'en' : 'zh-CN';
+        if (persist) localStorage.setItem('corona_language', normalized);
+        document.querySelectorAll('#language-options .language-option').forEach(item => {
+            item.classList.toggle('selected', item.dataset.language === normalized);
+        });
+        this.applyTranslations();
+        if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
+    },
+    initLanguageSelector() {
+        const options = document.querySelectorAll('#language-options .language-option');
+        options.forEach(item => {
+            item.classList.toggle('selected', item.dataset.language === this.state.language);
+            if (item.dataset.bound) return;
+            item.dataset.bound = '1';
+            item.addEventListener('click', () => {
+                this.setLanguage(item.dataset.language, true);
+                if (typeof this.loadZramStatus === 'function') this.loadZramStatus();
+                this.showToast(this.t('languageChanged'), 'success');
+            });
+        });
     },
     t(key) {
-        const fallback = this.getTranslations().zh || {};
-        return fallback[key] || key;
+        const translations = this.getTranslations();
+        const current = translations[this.state.language] || translations.zh || {};
+        const fallback = translations.zh || {};
+        return current[key] || fallback[key] || key;
+    },
+    localizeMessage(message) {
+        const text = String(message || '');
+        if (this.state.language !== 'en') return text;
+        const translateLine = line => {
+            const match = line.match(/^(\s*(?:[-•*]\s*)?)(.*?)(\s*)$/);
+            const prefix = match?.[1] || '';
+            const core = match?.[2] || line;
+            const suffix = match?.[3] || '';
+            const translated = typeof window.CoronaI18nDynamicEn === 'function'
+                ? window.CoronaI18nDynamicEn(core)
+                : (window.CoronaI18nEn?.[core] || core);
+            return `${prefix}${translated}${suffix}`;
+        };
+        return text.split('\n').map(translateLine).join('\n');
+    },
+    translateDomNode(node) {
+        if (!node) return;
+        if (!this._translationTextOriginals) this._translationTextOriginals = new WeakMap();
+        if (!this._translationTextTranslated) this._translationTextTranslated = new WeakMap();
+        const parentTag = node.parentElement?.tagName?.toLowerCase();
+        if (parentTag === 'script' || parentTag === 'style' || parentTag === 'textarea') return;
+        const current = node.nodeValue;
+        let original = this._translationTextOriginals.get(node);
+        if (original === undefined) {
+            original = current;
+            if (!/[\u3400-\u9fff]/.test(original)) return;
+            this._translationTextOriginals.set(node, original);
+        } else {
+            const previousTranslation = this._translationTextTranslated.get(node);
+            if (current !== original && current !== previousTranslation && /[\u3400-\u9fff]/.test(current)) {
+                original = current;
+                this._translationTextOriginals.set(node, original);
+            }
+        }
+        if (this.state.language !== 'en') {
+            if (node.nodeValue !== original) node.nodeValue = original;
+            this._translationTextTranslated.delete(node);
+            return;
+        }
+        const leading = original.match(/^\s*/)?.[0] || '';
+        const trailing = original.match(/\s*$/)?.[0] || '';
+        const core = original.trim();
+        const translated = this.localizeMessage(core);
+        const next = translated === core ? original : `${leading}${translated}${trailing}`;
+        this._translationTextTranslated.set(node, next);
+        if (node.nodeValue !== next) node.nodeValue = next;
+    },
+    translateDomElement(element) {
+        if (!element || element.nodeType !== 1) return;
+        if (!this._translationAttributeOriginals) this._translationAttributeOriginals = new WeakMap();
+        if (!this._translationAttributeTranslated) this._translationAttributeTranslated = new WeakMap();
+        let originals = this._translationAttributeOriginals.get(element);
+        let translations = this._translationAttributeTranslated.get(element);
+        if (!originals) {
+            originals = {};
+            this._translationAttributeOriginals.set(element, originals);
+        }
+        if (!translations) {
+            translations = {};
+            this._translationAttributeTranslated.set(element, translations);
+        }
+        ['placeholder', 'title', 'aria-label'].forEach(attribute => {
+            if (!element.hasAttribute(attribute)) return;
+            const current = element.getAttribute(attribute);
+            if (!(attribute in originals)) originals[attribute] = current;
+            else if (current !== originals[attribute] && current !== translations[attribute] && /[\u3400-\u9fff]/.test(current)) originals[attribute] = current;
+            const original = originals[attribute];
+            const next = this.state.language === 'en' ? this.localizeMessage(original) : original;
+            translations[attribute] = next;
+            if (element.getAttribute(attribute) !== next) element.setAttribute(attribute, next);
+        });
+    },
+    translateDom(root = document.body) {
+        if (!root) return;
+        this._translationBusy = true;
+        try {
+            if (root.nodeType === 1) this.translateDomElement(root);
+            if (root.nodeType === 3) this.translateDomNode(root);
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+            let node;
+            while ((node = walker.nextNode())) {
+                if (node.nodeType === 1) this.translateDomElement(node);
+                else if (node.nodeType === 3) this.translateDomNode(node);
+            }
+            if (!this._translationTitleOriginal) this._translationTitleOriginal = document.title;
+            document.title = this.state.language === 'en'
+                ? this.localizeMessage(this._translationTitleOriginal)
+                : this._translationTitleOriginal;
+        } finally {
+            this._translationBusy = false;
+        }
+    },
+    startTranslationObserver() {
+        if (this._translationObserver || !document.body) return;
+        this._translationObserver = new MutationObserver(mutations => {
+            if (this._translationBusy || this.state.language !== 'en') return;
+            mutations.forEach(mutation => {
+                if (mutation.type === 'characterData') this.translateDomNode(mutation.target);
+                mutation.addedNodes?.forEach(node => this.translateDom(node));
+            });
+        });
+        this._translationObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
     },
     applyTranslations() {
         const setText = (selector, value) => {
             const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
             if (el) el.textContent = value;
         };
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            el.textContent = this.t(el.dataset.i18n);
+        });
         setText('.tab-item[data-page="home"] .tab-label', this.t('tabHome'));
         setText('.tab-item[data-page="settings"] .tab-label', this.t('tabSettings'));
         setText('#app-settings-card .module-card-title', this.t('moduleSettings'));
@@ -122,6 +226,9 @@
         if (loadingText && !document.getElementById('loading')?.classList.contains('show')) {
             loadingText.textContent = this.t('processing');
         }
+        const zramApply = document.getElementById('zram-apply-btn');
+        if (zramApply) zramApply.textContent = this.t(this._zramDirty ? 'applyZramDirty' : 'applyZram');
+        this.translateDom(document.body);
     },
     setCategoryConfigVisibility(enabled, persist = false) {
         const normalized = !!enabled;

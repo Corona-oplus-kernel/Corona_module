@@ -891,6 +891,21 @@
         const bdCount = Number(bdStat[0] || 0);
 
         const runtime = !!(disksize && parseInt(disksize, 10) > 0);
+        const swapSizeBytes = Number(swapInfo?.size || 0) * 1024;
+        const swapUsedBytes = Number(swapInfo?.used || 0) * 1024;
+        const swapUsedPercent = swapSizeBytes > 0 ? Math.min(100, (swapUsedBytes / swapSizeBytes) * 100) : 0;
+        const overviewState = document.getElementById('zram-overview-state');
+        const overviewUsed = document.getElementById('zram-overview-used');
+        const overviewMemory = document.getElementById('zram-overview-memory');
+        const overviewRatio = document.getElementById('zram-overview-ratio');
+        const overviewBacking = document.getElementById('zram-overview-backing');
+        const overviewProgress = document.getElementById('zram-overview-progress');
+        if (overviewState) overviewState.textContent = swapInfo ? this.t('active') : this.t('inactive');
+        if (overviewUsed) overviewUsed.textContent = swapSizeBytes > 0 ? `${this.formatBytes(swapUsedBytes)} / ${this.formatBytes(swapSizeBytes)}` : '--';
+        if (overviewMemory) overviewMemory.textContent = physicalMemoryUsed > 0 ? this.formatBytes(physicalMemoryUsed) : '--';
+        if (overviewRatio) overviewRatio.textContent = compressionRatio !== '--' ? compressionRatio : '--';
+        if (overviewBacking) overviewBacking.textContent = backingDevice ? this.formatBackingDevName(backingDevice) : this.t('none');
+        if (overviewProgress) overviewProgress.style.width = `${swapUsedPercent.toFixed(1)}%`;
         const opt = { always: runtime };
         this.setMetricValue('zram-raw-size', this.formatBytes(rawDataSize), opt);
         this.setMetricValue('zram-compr-size', this.formatBytes(compressedSize), opt);
@@ -920,13 +935,13 @@
 
         const statusEl = document.getElementById('zram-status');
         if (statusEl) {
-            if (!isActive) statusEl.textContent = '未启用';
+            if (!isActive) statusEl.textContent = this.t('inactive');
             else statusEl.textContent = (currentAlg && currentAlg !== '--') ? currentAlg : '--';
         }
         const memBadge = document.getElementById('memory-compression-badge');
         if (memBadge) {
-            if (!isActive) memBadge.textContent = '未配置';
-            else memBadge.textContent = this.state.zramEnabled ? 'ZRAM: 模块接管' : 'ZRAM: 系统接管';
+            if (!isActive) memBadge.textContent = this.t('unconfigured');
+            else memBadge.textContent = this.t(this.state.zramEnabled ? 'moduleManagedZram' : 'systemManagedZram');
         }
 
         await this.loadHybridSwapMetrics(zramBlock);
@@ -1023,9 +1038,7 @@
         const btn = document.getElementById('zram-apply-btn');
         if (btn && !btn.dataset.dirtyHint) {
             btn.dataset.dirtyHint = '1';
-            const base = btn.textContent.replace(/\s*\*$/, '');
-            btn.textContent = base.includes('应用') ? `${base.replace('应用 ZRAM 配置', '应用 ZRAM 配置')} *` : `${base} *`;
-            if (!btn.textContent.includes('*')) btn.textContent = '应用 ZRAM 配置 *';
+            btn.textContent = this.t('applyZramDirty');
         }
         this.persistZramConfig().catch(() => this.showToast('ZRAM 配置保存失败'));
     },
@@ -1034,7 +1047,7 @@
         const btn = document.getElementById('zram-apply-btn');
         if (btn) {
             btn.dataset.dirtyHint = '';
-            btn.textContent = '应用 ZRAM 配置';
+            btn.textContent = this.t('applyZram');
         }
     },
     markSwapDirty() {
@@ -1583,7 +1596,23 @@
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     },
     sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); },
-    showToast(message) { const toast = document.getElementById('toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500); },
+    showToast(message, type = '') {
+        const toast = document.getElementById('toast');
+        if (!toast) return;
+        const text = this.localizeMessage(String(message || ''));
+        let resolvedType = type;
+        if (!resolvedType) {
+            if (/失败|错误|无法|不足|未生效|failed|error|unable|insufficient/i.test(text)) resolvedType = 'error';
+            else if (/不支持|请先|警告|未检测|不存在|unsupported|warning|not found/i.test(text)) resolvedType = 'warning';
+            else if (/成功|已保存|已应用|已启用|已关闭|完成|success|saved|applied|enabled|disabled|complete/i.test(text)) resolvedType = 'success';
+            else resolvedType = 'info';
+        }
+        if (this._toastTimer) clearTimeout(this._toastTimer);
+        toast.classList.remove('info', 'success', 'warning', 'error', 'show');
+        toast.textContent = text;
+        toast.classList.add(resolvedType, 'show');
+        this._toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
+    },
     isRollbackAnimVisible(el) {
         if (!el) return false;
         return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
@@ -1818,6 +1847,10 @@
         if (typeof this.updateZramWritebackVisibility === 'function') this.updateZramWritebackVisibility();
         list.querySelectorAll('.option-item').forEach(item => {
             item.addEventListener('click', async () => {
+                if (item.classList.contains('feature-disabled')) {
+                    this.showToast(item.dataset.disabledReason || this.t('writebackUnsupported'), 'warning');
+                    return;
+                }
                 list.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                 item.classList.add('selected');
                 this.state.zramWriteback = item.dataset.value;

@@ -39,6 +39,7 @@ class CoronaAddon {
             le9ecCleanMin: 524288,
             dualCell: false,
             theme: 'light',
+            language: 'zh',
             accent: 'blue',
             hue: 214,
             changePreviewEnabled: true,
@@ -114,6 +115,8 @@ class CoronaAddon {
     $(id) { return this.dom[id] || (this.dom[id] = document.getElementById(id)); }
     getFeatureScriptPath(name) {
         const map = {
+            'i18n-zh': 'translations/zh.js',
+            'i18n-en': 'translations/en.js',
             'app-policy': 'js/app-policy.js',
             'priority-thread': 'js/priority-thread.js',
             'memory-opt': 'js/memory-opt.js',
@@ -125,7 +128,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071513` : '';
+        return map[name] ? `${map[name]}?v=2026071516` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -177,10 +180,13 @@ class CoronaAddon {
     }
     async init() {
         await this.resolvePaths();
+        await this.ensureFeatureScript('i18n-zh');
+        await this.ensureFeatureScript('i18n-en');
         await this.ensureFeatureScript('settings-ui');
         await this.ensureFeatureScript('home-ui');
         await this.ensureFeatureScript('memory-core');
         await this.ensureFeatureScript('settings-memory-page');
+        this.initLanguage();
         this.showInitOverlay(true, this.t('initDefault'));
         try {
             this.updateInitOverlayMessage(this.t('initResolve'));
@@ -202,6 +208,9 @@ class CoronaAddon {
             this.initSettingDescriptionPreference();
             this.initCategoryConfigVisibilityPreference();
             this.bindAllEvents();
+            this.initLanguageSelector();
+            this.applyTranslations();
+            this.startTranslationObserver();
             this.updateInitOverlayMessage(this.t('initDevice'));
             await this.loadDeviceInfo();
             await this.loadModuleVersion();
@@ -248,6 +257,13 @@ class CoronaAddon {
     }
     initSliderProgress() {
         const throttled = rafThrottle((slider) => this.updateSliderProgress(slider));
+        const preciseInputs = {
+            'zstd-level-slider': { unit: '', decimals: 0 },
+            'zram-size-slider': { unit: 'GB', decimals: 2 },
+            'swappiness-slider': { unit: '', decimals: 0 },
+            'zram-writeback-size-slider': { unit: 'GB', decimals: 1 },
+            'swap-size-slider': { unit: 'MB', decimals: 0 }
+        };
         document.querySelectorAll('.range-slider').forEach(slider => {
             const container = slider.parentElement;
             if (container && !container.querySelector('.slider-bubble')) {
@@ -256,6 +272,37 @@ class CoronaAddon {
                 bubble.className = 'slider-bubble';
                 bubble.setAttribute('aria-hidden', 'true');
                 container.appendChild(bubble);
+            }
+            const precise = preciseInputs[slider.id];
+            if (container && precise && !container.querySelector('.slider-precise-row')) {
+                const row = document.createElement('div');
+                row.className = 'slider-precise-row';
+                row.innerHTML = `<span class="slider-precise-label" data-i18n="preciseValue">精确值</span><label class="slider-precise-control"><input class="slider-number-input" type="number" inputmode="decimal"><span class="slider-number-unit"></span></label>`;
+                const input = row.querySelector('.slider-number-input');
+                const unit = row.querySelector('.slider-number-unit');
+                input.min = slider.min;
+                input.max = slider.max;
+                input.step = slider.step;
+                input.value = Number(slider.value).toFixed(precise.decimals);
+                unit.textContent = precise.unit;
+                input.addEventListener('input', () => {
+                    if (input.value === '') return;
+                    const value = Number(input.value);
+                    if (!Number.isFinite(value)) return;
+                    slider.value = String(Math.max(Number(slider.min), Math.min(Number(slider.max), value)));
+                    slider.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+                input.addEventListener('change', () => {
+                    const value = Math.max(Number(slider.min), Math.min(Number(slider.max), Number(input.value)));
+                    slider.value = String(Number.isFinite(value) ? value : Number(slider.value));
+                    input.value = Number(slider.value).toFixed(precise.decimals);
+                    slider.dispatchEvent(new Event('input', { bubbles: true }));
+                    slider.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                slider.addEventListener('input', () => {
+                    input.value = Number(slider.value).toFixed(precise.decimals);
+                });
+                container.appendChild(row);
             }
             const bubble = container?.querySelector('.slider-bubble');
             let hideTimer = null;
@@ -284,6 +331,7 @@ class CoronaAddon {
             slider.addEventListener('change', () => hideBubble(180));
             slider.addEventListener('blur', () => hideBubble(0));
         });
+        if (typeof this.applyTranslations === 'function') this.applyTranslations();
     }
     async exec(cmd) {
         return new Promise((resolve) => {

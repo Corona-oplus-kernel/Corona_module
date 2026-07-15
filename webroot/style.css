@@ -1270,6 +1270,33 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
     pointer-events: none;
     z-index: 20100;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    max-width: min(86vw, 520px);
+    transition: opacity 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.toast::before {
+    content: 'ℹ';
+    display: grid;
+    place-items: center;
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.18);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.toast.success { background: linear-gradient(135deg, #176b42, #0f5132); }
+.toast.success::before { content: '✓'; }
+.toast.warning { background: linear-gradient(135deg, #8a5700, #684100); }
+.toast.warning::before { content: '!'; }
+.toast.error { background: linear-gradient(135deg, #9b2c2c, #6f1d1d); }
+.toast.error::before { content: '×'; }
+.toast.info::before { content: 'i'; }
 }
 
 .toast.show {
@@ -3926,6 +3953,140 @@ body.theme-dark .mini-switch-row input:checked {
     box-shadow: none;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+}
+
+.zram-overview-card {
+    margin: 0 0 14px;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+    border-radius: 18px;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 10%, var(--card-bg)), var(--card-bg));
+}
+
+.zram-overview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    color: var(--text-main);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.zram-overview-state {
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    color: var(--primary);
+    font-size: 11px;
+}
+
+.zram-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.zram-overview-item {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 4px;
+}
+
+.zram-overview-label {
+    color: var(--text-sub);
+    font-size: 11px;
+}
+
+.zram-overview-item strong {
+    overflow: hidden;
+    color: var(--text-main);
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.zram-overview-progress {
+    height: 5px;
+    margin-top: 13px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.zram-overview-progress span {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--primary);
+    transition: width 260ms ease;
+}
+
+.language-setting-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.025);
+}
+
+.language-setting-copy {
+    min-width: 0;
+}
+
+.language-setting-section .section-label {
+    margin: 0 0 4px;
+}
+
+.language-setting-section .section-desc {
+    margin: 0;
+}
+
+.language-segmented {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(72px, 1fr));
+    flex: 0 0 auto;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 11px;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.language-option {
+    min-height: 34px;
+    padding: 0 13px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-sub);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.language-option.selected {
+    background: var(--card-bg);
+    color: var(--primary);
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 420px) {
+    .language-setting-section {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .language-segmented {
+        width: 100%;
+    }
 }
 .zram-status-title {
     font-size: 12px;

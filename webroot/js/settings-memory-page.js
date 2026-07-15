@@ -52,7 +52,16 @@
         if (!list) return;
         const enableItem = list.querySelector('.option-item[data-value="true"]');
         const supported = !!this.zramFeatures?.writebackControl;
-        this.setFeatureVisible(enableItem, supported);
+        if (enableItem) {
+            enableItem.classList.toggle('feature-disabled', !supported);
+            enableItem.setAttribute('aria-disabled', supported ? 'false' : 'true');
+            enableItem.dataset.disabledReason = supported ? '' : this.t('writebackUnsupported');
+        }
+        const hint = document.getElementById('zram-writeback-hint');
+        if (hint) {
+            hint.textContent = supported ? '' : this.t('writebackUnsupported');
+            this.setFeatureVisible(hint, !supported);
+        }
         if (!supported && this.state.zramWriteback === 'true') this.state.zramWriteback = 'default';
         list.querySelectorAll('.option-item').forEach(item => {
             item.classList.toggle('selected', item.dataset.value === this.state.zramWriteback);
