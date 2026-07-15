@@ -816,7 +816,41 @@
         card.hidden = !visible;
         card.style.display = visible ? '' : 'none';
     },
-    async loadHybridSwapMetrics(zramBlock) {
+    decodeSnapshotValue(value) {
+        if (!value) return '';
+        try { return atob(value); } catch (error) { return ''; }
+    },
+    async readZramStatusSnapshot(configuredPath) {
+        const path = this.shellQuote(configuredPath || '/dev/block/zram0');
+        const command = `emit_value() { tag="$1"; value="$2"; printf '%s ' "$tag"; printf '%s' "$value" | base64 2>/dev/null | tr -d '\\r\\n'; printf '\\n'; }; configured=${path}; active=$(awk 'NR > 1 && ($1 ~ /^\\/dev\\/block\\/zram/ || $1 ~ /^\\/dev\\/zram/) { print $1; exit }' /proc/swaps 2>/dev/null); zram_path=\${active:-$configured}; block=\${zram_path##*/}; case "$block" in zram[0-9]*) ;; *) block= ;; esac; emit_value PATH "$zram_path"; if [ -n "$block" ]; then base=/sys/block/$block; emit_value ALG "$(cat "$base/comp_algorithm" 2>/dev/null)"; emit_value SIZE "$(cat "$base/disksize" 2>/dev/null)"; emit_value MM "$(cat "$base/mm_stat" 2>/dev/null)"; emit_value BD "$(cat "$base/bd_stat" 2>/dev/null)"; emit_value BACKING "$(cat "$base/backing_dev" 2>/dev/null)"; emit_value BLOCK "$(cat "$base/stat" 2>/dev/null)"; emit_value HYB_MEM "$(cat "$base/hybridswap_meminfo" 2>/dev/null)"; emit_value HYB_SNAP "$(cat "$base/hybridswap_stat_snap" 2>/dev/null)"; emit_value HYB_VM "$(cat "$base/hybridswap_vmstat" 2>/dev/null)"; emit_value HYB_LOOP "$(cat "$base/hybridswap_loop_device" 2>/dev/null)"; emit_value HYB_ENABLE "$(cat "$base/hybridswap_enable" 2>/dev/null)"; fi; emit_value SWAPPINESS "$(cat /proc/sys/vm/swappiness 2>/dev/null)"; emit_value SWAP "$(awk -v path="$zram_path" 'NR > 1 && $1 == path { print $1, $2, $3, $4, $5; exit }' /proc/swaps 2>/dev/null)"`;
+        const output = await this.exec(command);
+        const values = {};
+        String(output || '').split('\n').forEach(line => {
+            const separator = line.indexOf(' ');
+            if (separator <= 0) return;
+            values[line.slice(0, separator)] = this.decodeSnapshotValue(line.slice(separator + 1).trim());
+        });
+        const swapParts = String(values.SWAP || '').trim().split(/\s+/);
+        return {
+            path: values.PATH || configuredPath || '/dev/block/zram0',
+            algorithm: values.ALG || '',
+            disksize: values.SIZE || '',
+            swappiness: values.SWAPPINESS || '',
+            mmStat: values.MM || '',
+            bdStat: values.BD || '',
+            backingDevice: values.BACKING || '',
+            blockStat: values.BLOCK || '',
+            swapInfo: swapParts.length >= 5 ? { device: swapParts[0], type: swapParts[1], size: swapParts[2], used: swapParts[3], priority: swapParts[4] } : null,
+            hybrid: {
+                meminfo: values.HYB_MEM || '',
+                stat: values.HYB_SNAP || '',
+                vmstat: values.HYB_VM || '',
+                loop: values.HYB_LOOP || '',
+                enabled: values.HYB_ENABLE || ''
+            }
+        };
+    },
+    async loadHybridSwapMetrics(zramBlock, metrics = {}) {
         const section = document.getElementById('hybridswap-metrics');
         if (!section) return;
         if (!zramBlock) {
@@ -824,14 +858,11 @@
             section.style.display = 'none';
             return;
         }
-        const basePath = `/sys/block/${zramBlock}`;
-        const [meminfoRaw, snapRaw, vmstatRaw, loopRaw, enableRaw] = await Promise.all([
-            this.exec(`cat ${basePath}/hybridswap_meminfo 2>/dev/null`),
-            this.exec(`cat ${basePath}/hybridswap_stat_snap 2>/dev/null`),
-            this.exec(`cat ${basePath}/hybridswap_vmstat 2>/dev/null`),
-            this.exec(`cat ${basePath}/hybridswap_loop_device 2>/dev/null`),
-            this.exec(`cat ${basePath}/hybridswap_enable 2>/dev/null`)
-        ]);
+        const meminfoRaw = metrics.meminfo || '';
+        const snapRaw = metrics.stat || '';
+        const vmstatRaw = metrics.vmstat || '';
+        const loopRaw = metrics.loop || '';
+        const enableRaw = metrics.enabled || '';
         const hasNode = !!(meminfoRaw || snapRaw || enableRaw || loopRaw);
         if (!hasNode) {
             section.hidden = true;
@@ -877,20 +908,23 @@
         }
     },
     async loadZramStatusSnapshot() {
-        const detectedPath = await this.detectActiveZramPath();
-        const zramPath = detectedPath || this.state.zramPath;
+        const snapshot = await this.readZramStatusSnapshot(this.state.zramPath);
+        const zramPath = snapshot.path || this.state.zramPath;
+        if (zramPath && zramPath !== this.state.zramPath) {
+            this.state.zramPath = zramPath;
+            const pathInput = document.getElementById('zram-path-input');
+            if (pathInput) pathInput.value = zramPath;
+        }
         const zramBlock = this.getZramBlockName(zramPath);
         const pageSize = 4096;
-        const [algRaw, disksize, swappiness, swapInfo, mmStatRaw, bdStatRaw, backingDevRaw, blockStatRaw] = await Promise.all([
-            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`) : '',
-            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/disksize 2>/dev/null`) : '',
-            this.exec('cat /proc/sys/vm/swappiness 2>/dev/null'),
-            this.getActiveSwapInfo(zramPath),
-            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/mm_stat 2>/dev/null`) : '',
-            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/bd_stat 2>/dev/null`) : '',
-            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/backing_dev 2>/dev/null`) : '',
-            zramBlock ? this.exec(`cat /sys/block/${zramBlock}/stat 2>/dev/null`) : ''
-        ]);
+        const algRaw = snapshot.algorithm;
+        const disksize = snapshot.disksize;
+        const swappiness = snapshot.swappiness;
+        const swapInfo = snapshot.swapInfo;
+        const mmStatRaw = snapshot.mmStat;
+        const bdStatRaw = snapshot.bdStat;
+        const backingDevRaw = snapshot.backingDevice;
+        const blockStatRaw = snapshot.blockStat;
         const currentAlg = algRaw.match(/\[([^\]]+)\]/)?.[1] || algRaw.split(' ')[0] || '--';
         const sizeGB = disksize ? (parseInt(disksize) / 1024 / 1024 / 1024).toFixed(1) : '0';
         const swappinessValue = parseInt((swappiness || '').trim(), 10);
@@ -970,7 +1004,7 @@
             else memBadge.textContent = this.t(this.state.zramEnabled ? 'moduleManagedZram' : 'systemManagedZram');
         }
 
-        await this.loadHybridSwapMetrics(zramBlock);
+        await this.loadHybridSwapMetrics(zramBlock, snapshot.hybrid);
         this.updateZramModeHint(this.state.zramEnabled ? 'module' : (isActive ? 'system' : 'off'), runtimeInfo);
     },
     startZramMetricsRefresh(intervalMs = 8000) {
