@@ -433,10 +433,10 @@
             setTimeout(run, 600);
         }
     },
-    async ensureSettingsPageReady(silent = false) {
-        if (this.settingsUiInitialized && this.settingsDataLoaded) return;
+    async ensureSettingsPageReady() {
+        if (this.settingsReadyState === 'ready') return this.settingsInitPromise;
         if (this.settingsInitPromise) return this.settingsInitPromise;
-        if (!silent) this.showLoading(true);
+        this.settingsReadyState = 'loading';
         this.settingsInitPromise = (async () => {
             if (!this.settingsUiInitialized) {
                 if (typeof this.loadMemoryPageTextResources === 'function') await this.loadMemoryPageTextResources();
@@ -473,15 +473,12 @@
         })();
         try {
             await this.settingsInitPromise;
-        } finally {
+            this.settingsReadyState = 'ready';
+            return this.settingsInitPromise;
+        } catch (error) {
+            this.settingsReadyState = 'idle';
             this.settingsInitPromise = null;
-            if (document.getElementById('page-settings')?.classList.contains('active')) {
-                requestAnimationFrame(() => {
-                    const scroller = document.querySelector('.container');
-                    if (scroller) scroller.scrollTo({ top: 0, behavior: 'auto' });
-                });
-            }
-            if (!silent) this.showLoading(false);
+            throw error;
         }
     },
     ensureSettingsSectionReady(section) {

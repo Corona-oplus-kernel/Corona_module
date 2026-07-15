@@ -89,6 +89,7 @@ class CoronaAddon {
         this.deferredHomeReady = false;
         this.settingsUiInitialized = false;
         this.settingsDataLoaded = false;
+        this.settingsReadyState = 'idle';
         this.settingsInitPromise = null;
         this.featureScriptPromises = {};
         this.parameterSnapshots = [];
@@ -245,6 +246,15 @@ class CoronaAddon {
             this.scheduleDeferredInit();
         } else if (typeof this.initEasterEgg === 'function') {
             try { this.initEasterEgg(); } catch (e) {}
+        }
+        const warmSettings = () => {
+            if (typeof this.ensureSettingsPageReady !== 'function') return;
+            this.ensureSettingsPageReady().catch(e => console.error('settings warmup failed', e));
+        };
+        if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(warmSettings, { timeout: 1200 });
+        } else {
+            setTimeout(warmSettings, 320);
         }
     }
     updateSliderProgress(slider) {
@@ -764,7 +774,7 @@ class CoronaAddon {
             const floatingHeader = document.getElementById('floating-header');
             if (floatingHeader) floatingHeader.classList.remove('visible', 'overlay-hidden');
         });
-        if (pageName === 'settings' && (!this.settingsUiInitialized || !this.settingsDataLoaded)) {
+        if (pageName === 'settings' && this.settingsReadyState !== 'ready') {
             this.ensureSettingsPageReady().catch(e => console.error('ensureSettingsPageReady failed', e));
         }
         if (pageName === 'home' && this.pendingChartDraw) {
