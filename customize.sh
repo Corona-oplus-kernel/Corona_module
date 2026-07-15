@@ -35,6 +35,12 @@ ui_print "- RAM: ${mem_total_gb}GB"
 OLD_MODDIR="/data/adb/modules/Corona"
 mkdir -p "$MODPATH/config"
 mkdir -p "$MODPATH/scripts.d"
+if [ -x "$OLD_MODDIR/app_policy.sh" ]; then
+    /system/bin/sh "$OLD_MODDIR/app_policy.sh" daemon-stop >/dev/null 2>&1
+elif [ -f "$OLD_MODDIR/.app_policy_daemon.pid" ]; then
+    old_daemon_pid=$(cat "$OLD_MODDIR/.app_policy_daemon.pid" 2>/dev/null)
+    [ -n "$old_daemon_pid" ] && kill -TERM "$old_daemon_pid" 2>/dev/null
+fi
 if [ -d "$OLD_MODDIR/config" ]; then
     ui_print "- 迁移已有配置"
     cp -af "$OLD_MODDIR/config/." "$MODPATH/config/"
@@ -42,6 +48,33 @@ fi
 if [ -d "$OLD_MODDIR/scripts.d" ]; then
     cp -af "$OLD_MODDIR/scripts.d/." "$MODPATH/scripts.d/"
 fi
+
+rm -rf "$MODPATH/.app_policy_effective" "$MODPATH"/.app_policy_effective.next.*
+rm -f "$MODPATH/.app_policy_daemon.pid" "$MODPATH/.app_policy_state"
+rm -rf "$MODPATH/scripts.d/.logs"
+find "$MODPATH/config" -type f \( -name '*.tmp.*' -o -name '*.bak' \) -delete 2>/dev/null
+
+get_config_value() {
+    [ -f "$1" ] && grep -m1 "^$2=" "$1" 2>/dev/null | cut -d'=' -f2-
+}
+
+zram_conf="$MODPATH/config/zram.conf"
+loop_conf="$MODPATH/config/loop.conf"
+if [ ! -f "$loop_conf" ] && [ -f "$zram_conf" ]; then
+    legacy_loop=$(get_config_value "$zram_conf" zram_writeback)
+    legacy_size=$(get_config_value "$zram_conf" writeback_size_mb)
+    case "$legacy_loop" in true|1) loop_enabled=1 ;; *) loop_enabled=0 ;; esac
+    case "$legacy_size" in ''|*[!0-9]*) legacy_size=4096 ;; esac
+    printf 'enabled=%s\nsize_mb=%s\n' "$loop_enabled" "$legacy_size" > "$loop_conf"
+fi
+if [ -f "$loop_conf" ]; then
+    loop_enabled=$(get_config_value "$loop_conf" enabled)
+    loop_size=$(get_config_value "$loop_conf" size_mb)
+    [ "$loop_enabled" = "1" ] || loop_enabled=0
+    case "$loop_size" in ''|*[!0-9]*) loop_size=4096 ;; esac
+    printf 'enabled=%s\nsize_mb=%s\n' "$loop_enabled" "$loop_size" > "$loop_conf"
+fi
+[ -f "$zram_conf" ] && sed -i '/^zram_writeback=/d;/^writeback_size_mb=/d' "$zram_conf"
 
 ui_print "- Done"
 
