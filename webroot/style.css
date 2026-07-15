@@ -738,26 +738,45 @@ body.monet-decoration .bg-decoration::before {
 }
 
 .card-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
     gap: 12px;
     margin-bottom: 12px;
 }
 
 .card-row .card {
+    min-width: 0;
     margin-bottom: 0;
 }
 
 .card-col-left {
-    flex: 1;
     display: flex;
+    min-width: 0;
     flex-direction: column;
 }
 
 .card-col-right {
-    flex: 1;
     display: flex;
+    min-width: 0;
     flex-direction: column;
     gap: 12px;
+}
+
+.card-row .card-title {
+    position: relative;
+    width: 100%;
+    min-height: 30px;
+    justify-content: center;
+    margin-bottom: 8px;
+    text-align: center;
+    line-height: 1.2;
+    white-space: normal;
+}
+
+.card-row .cpu-brand-badge {
+    position: absolute;
+    right: 0;
 }
 
 .card-col-right .card {
@@ -797,6 +816,8 @@ body.monet-decoration .bg-decoration::before {
 }
 
 .device-brand {
+    max-width: calc(100% - 62px);
+    overflow-wrap: anywhere;
     font-size: 20px;
     font-weight: 600;
     color: var(--text-main);
@@ -804,6 +825,8 @@ body.monet-decoration .bg-decoration::before {
 }
 
 .device-model {
+    max-width: calc(100% - 62px);
+    overflow-wrap: anywhere;
     font-size: 15px;
     color: var(--text-sub);
 }
@@ -1299,6 +1322,19 @@ body.setting-descriptions-hidden .io-scheduler-options-section {
 .toast.error { background: linear-gradient(135deg, #9b2c2c, #6f1d1d); }
 .toast.error::before { content: '×'; }
 .toast.info::before { content: 'i'; }
+.toast.language {
+    border: 1px solid var(--primary-border);
+    background: color-mix(in srgb, var(--glass-surface-strong) 86%, transparent);
+    color: var(--text-main);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14), 0 0 0 1px var(--primary-soft);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+}
+.toast.language::before {
+    content: 'A';
+    background: var(--primary-dim);
+    color: var(--primary);
+}
 
 .toast.show {
     opacity: 1;
@@ -4665,6 +4701,11 @@ html[lang="en"] .section-label {
 html[lang="en"] .module-card-title,
 html[lang="en"] .card-title {
     line-height: 1.25;
+}
+
+html[lang="en"] .card-row .card-title {
+    font-size: 11px;
+    letter-spacing: 0.04em;
 }
 
 html[lang="en"] .action-btn,

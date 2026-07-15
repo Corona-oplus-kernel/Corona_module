@@ -743,8 +743,8 @@ body.theme-dark #xinran-overlay .detail-card {
 
 #cpu-card .card-title {
     margin-bottom: 6px;
-    white-space: nowrap;
-    overflow: hidden;
+    white-space: normal;
+    overflow: visible;
 }
 
 #cpu-card .info-primary {

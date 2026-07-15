@@ -1608,7 +1608,7 @@
             else resolvedType = 'info';
         }
         if (this._toastTimer) clearTimeout(this._toastTimer);
-        toast.classList.remove('info', 'success', 'warning', 'error', 'show');
+        toast.classList.remove('info', 'success', 'warning', 'error', 'language', 'show');
         toast.textContent = text;
         toast.classList.add(resolvedType, 'show');
         this._toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);

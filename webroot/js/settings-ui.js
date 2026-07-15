@@ -46,7 +46,10 @@
         this.setCategoryConfigVisibility(saved === null ? true : saved === '1');
     },
     getTranslations() {
-        return window.CoronaTranslations || { zh: {}, en: {} };
+        return {
+            zh: window.CoronaLocales?.zh?.messages || {},
+            en: window.CoronaLocales?.en?.messages || {}
+        };
     },
     initLanguage() {
         const saved = localStorage.getItem('corona_language');
@@ -81,7 +84,7 @@
             item.addEventListener('click', () => {
                 this.setLanguage(item.dataset.language, true);
                 if (typeof this.loadZramStatus === 'function') this.loadZramStatus();
-                this.showToast(this.t('languageChanged'), 'success');
+                this.showToast(this.t('languageChanged'), 'language');
             });
         });
     },
@@ -94,20 +97,15 @@
     localizeMessage(message) {
         const text = String(message || '');
         const language = this.state.language === 'en' ? 'en' : 'zh';
-        const catalog = window.CoronaI18n?.[language] || {};
-        const dynamicTranslator = window.CoronaI18nDynamic?.[language];
-        const fullTranslation = typeof dynamicTranslator === 'function'
-            ? dynamicTranslator(text)
-            : (catalog[text] || text);
+        const translator = window.CoronaI18n?.translate;
+        const fullTranslation = typeof translator === 'function' ? translator(text, language) : text;
         if (fullTranslation !== text) return fullTranslation;
         const translateLine = line => {
             const match = line.match(/^(\s*(?:[-•*]\s*)?)(.*?)(\s*)$/);
             const prefix = match?.[1] || '';
             const core = match?.[2] || line;
             const suffix = match?.[3] || '';
-            const translated = typeof dynamicTranslator === 'function'
-                ? dynamicTranslator(core)
-                : (catalog[core] || core);
+            const translated = typeof translator === 'function' ? translator(core, language) : core;
             return `${prefix}${translated}${suffix}`;
         };
         return text.split('\n').map(translateLine).join('\n');

@@ -117,6 +117,7 @@ class CoronaAddon {
         const map = {
             'i18n-zh': 'translations/zh.js',
             'i18n-en': 'translations/en.js',
+            'i18n-runtime': 'js/i18n-runtime.js',
             'app-policy': 'js/app-policy.js',
             'priority-thread': 'js/priority-thread.js',
             'memory-opt': 'js/memory-opt.js',
@@ -128,7 +129,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071518` : '';
+        return map[name] ? `${map[name]}?v=2026071519` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -182,6 +183,7 @@ class CoronaAddon {
         await this.resolvePaths();
         await this.ensureFeatureScript('i18n-zh');
         await this.ensureFeatureScript('i18n-en');
+        await this.ensureFeatureScript('i18n-runtime');
         await this.ensureFeatureScript('settings-ui');
         await this.ensureFeatureScript('home-ui');
         await this.ensureFeatureScript('memory-core');
