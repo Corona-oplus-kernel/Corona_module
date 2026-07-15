@@ -9,6 +9,7 @@
     --glass-card-bg: var(--glass-surface);
     --glass-dialog-bg: var(--glass-surface-strong);
     --glass-floating-bg: rgba(255, 255, 255, 0.35);
+    --glass-toast-bg: rgba(255, 255, 255, 0.175);
     --glass-floating-border: rgba(255, 255, 255, 0.24);
     --glass-floating-shadow: 0 12px 34px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.48);
     --glass-selection-bg: rgba(255, 255, 255, 0.55);
@@ -74,6 +75,7 @@ body.theme-dark {
     --glass-card-bg: rgba(24, 29, 40, 0.55);
     --glass-dialog-bg: rgba(24, 29, 40, 0.65);
     --glass-floating-bg: rgba(24, 29, 40, 0.55);
+    --glass-toast-bg: rgba(24, 29, 40, 0.275);
     --glass-floating-border: rgba(255, 255, 255, 0.12);
     --glass-floating-shadow: 0 14px 38px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     --glass-selection-bg: rgba(255, 255, 255, 0.16);
@@ -1364,7 +1366,7 @@ body.theme-dark .cpu-core .cpu-core-load.has-usage {
     left: 50%;
     transform: translateX(-50%) translateY(20px);
     border: 1px solid var(--glass-floating-border);
-    background: var(--glass-floating-bg);
+    background: var(--glass-toast-bg);
     backdrop-filter: blur(var(--glass-blur-floating)) saturate(1.18);
     -webkit-backdrop-filter: blur(var(--glass-blur-floating)) saturate(1.18);
     color: var(--text-main);
