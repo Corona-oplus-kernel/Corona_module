@@ -389,11 +389,12 @@ monitor_daemon() {
         profile_changed=0
         foreground_changed=0
         if [ "$target_profile" != "$last_profile" ]; then
+            target_config_dir="$MODDIR/config"
+            [ "$target_profile" != "base" ] && target_config_dir="$profile_dir"
+            "$MODDIR/service.sh" --apply-runtime-delta "$target_config_dir" >/dev/null 2>&1
             if [ "$target_profile" = "base" ]; then
-                "$MODDIR/service.sh" --apply-runtime-config >/dev/null 2>&1
                 [ "$notify_enabled" = "1" ] && send_notification "Corona 应用预设" "已恢复默认配置"
             else
-                CORONA_CONFIG_DIR="$profile_dir" CORONA_SKIP_DESCRIPTION=1 "$MODDIR/service.sh" --apply-runtime-config >/dev/null 2>&1
                 [ "$notify_enabled" = "1" ] && send_notification "Corona 应用预设" "已切换到 $(get_package_label "$current_pkg")"
             fi
             last_profile="$target_profile"

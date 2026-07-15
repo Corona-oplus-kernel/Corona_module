@@ -833,9 +833,75 @@ apply_runtime_configs() {
     apply_protect_config
 }
 
+runtime_config_files='swap.conf vm.conf kernel.conf lmk.conf reclaim.conf kswapd.conf le9ec.conf corona_kernel.conf io_scheduler.conf cpu_governor.conf cpu_hotplug.conf tcp.conf process_priority.conf thread_priority.conf device.conf protect.conf'
+
+build_effective_runtime_config() {
+    target_dir="$1"
+    output_dir="$2"
+    rm -rf "$output_dir"
+    mkdir -p "$output_dir"
+    for config_name in $runtime_config_files; do
+        [ -f "$MODDIR/config/$config_name" ] && cp -f "$MODDIR/config/$config_name" "$output_dir/$config_name"
+    done
+    if [ -n "$target_dir" ] && [ "$target_dir" != "$MODDIR/config" ] && [ -d "$target_dir" ]; then
+        for config_name in $runtime_config_files; do
+            [ -f "$target_dir/$config_name" ] && cp -f "$target_dir/$config_name" "$output_dir/$config_name"
+        done
+    fi
+}
+
+apply_runtime_config_name() {
+    case "$1" in
+        swap.conf) apply_swap_config ;;
+        vm.conf) has_mm_sys_entry || apply_vm_config ;;
+        kernel.conf) has_mm_sys_entry || apply_kernel_features_config ;;
+        lmk.conf) has_mm_sys_entry || apply_lmk_config ;;
+        reclaim.conf) has_mm_sys_entry || apply_reclaim_config ;;
+        kswapd.conf) has_mm_sys_entry || apply_kswapd_config ;;
+        le9ec.conf) apply_le9ec_config ;;
+        corona_kernel.conf) apply_corona_kernel_config ;;
+        io_scheduler.conf) apply_io_config ;;
+        cpu_governor.conf) apply_cpu_governor_config ;;
+        cpu_hotplug.conf) apply_cpu_hotplug_config ;;
+        tcp.conf) apply_tcp_config ;;
+        process_priority.conf) apply_process_priority_config ;;
+        thread_priority.conf) apply_thread_priority_config ;;
+        device.conf) apply_device_config ;;
+        protect.conf) apply_protect_config ;;
+    esac
+}
+
+apply_runtime_config_delta() {
+    target_dir="$1"
+    current_dir="$MODDIR/.app_policy_effective"
+    next_dir="$MODDIR/.app_policy_effective.next.$$"
+    [ -d "$current_dir" ] || build_effective_runtime_config "$MODDIR/config" "$current_dir"
+    build_effective_runtime_config "$target_dir" "$next_dir"
+    original_config_dir="$CONFIG_DIR"
+    CONFIG_DIR="$next_dir"
+    get_system_info
+    for config_name in $runtime_config_files; do
+        current_file="$current_dir/$config_name"
+        next_file="$next_dir/$config_name"
+        if [ -f "$current_file" ] && [ -f "$next_file" ] && cmp -s "$current_file" "$next_file"; then
+            continue
+        fi
+        [ ! -f "$current_file" ] && [ ! -f "$next_file" ] && continue
+        apply_runtime_config_name "$config_name"
+    done
+    CONFIG_DIR="$original_config_dir"
+    rm -rf "$current_dir"
+    mv "$next_dir" "$current_dir"
+}
+
 if [ "$1" = "--apply-runtime-config" ]; then
     apply_runtime_configs
     [ "$CORONA_SKIP_DESCRIPTION" = "1" ] || update_module_description
+    exit 0
+fi
+
+if [ "$1" = "--apply-runtime-delta" ]; then
+    apply_runtime_config_delta "$2"
     exit 0
 fi
 
@@ -848,6 +914,7 @@ wait_until_boot_complete
 wait_until_login
 trigger_official_nandswap_once
 apply_runtime_configs
+rm -rf "$MODDIR/.app_policy_effective" "$MODDIR"/.app_policy_effective.next.*
 apply_fstrim_config
 run_user_scripts
 start_app_policy_daemon
