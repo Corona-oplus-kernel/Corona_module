@@ -3,7 +3,12 @@
   window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
   if (window.CoronaFeatureScripts["le9ec"]) return;
   Object.assign(CoronaAddon.prototype, {
-    toggleLe9ecSettings(show) { const settings = document.getElementById('le9ec-settings'); if (show) { settings.classList.remove('hidden'); this.loadLe9ecStatus(); } else { settings.classList.add('hidden'); } },
+    toggleLe9ecSettings(show) {
+        const settings = document.getElementById('le9ec-settings');
+        if (typeof this.setSubSettingsExpanded === 'function') this.setSubSettingsExpanded(settings, show);
+        else if (settings) settings.classList.toggle('hidden', !show);
+        if (show) this.loadLe9ecStatus();
+    },
     bindSettingsOverscrollGuard() {},
     async loadLe9ecConfig() {
         const exists = await this.exec('cat /proc/sys/vm/anon_min_kbytes 2>/dev/null');

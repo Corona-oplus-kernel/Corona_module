@@ -126,6 +126,71 @@
     initZramAdvancedFold() {
         this.initAdvancedFold('zram-advanced-toggle', 'zram-advanced-body', { defaultOpen: false });
     },
+    setSubSettingsExpanded(settings, show, options = {}) {
+        if (!settings) return;
+        const instant = options.instant === true || this.isInitializing;
+        const revision = (settings._expandRevision || 0) + 1;
+        settings._expandRevision = revision;
+        if (settings._expandTimer) {
+            clearTimeout(settings._expandTimer);
+            settings._expandTimer = null;
+        }
+        if (instant) {
+            settings.classList.toggle('hidden', !show);
+            settings.classList.toggle('sub-settings-expanded', show);
+            settings.style.maxHeight = show ? 'none' : '0px';
+            settings.style.opacity = show ? '1' : '0';
+            settings.style.transform = show ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(0.985)';
+            settings.style.overflow = show ? 'visible' : 'hidden';
+            return;
+        }
+        settings.style.overflow = 'hidden';
+        settings.style.willChange = 'max-height, opacity, transform';
+        if (show) {
+            settings.classList.remove('hidden');
+            settings.classList.remove('sub-settings-expanded');
+            settings.style.transition = 'none';
+            settings.style.maxHeight = '0px';
+            settings.style.opacity = '0';
+            settings.style.transform = 'translateY(-8px) scale(0.985)';
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                if (settings._expandRevision !== revision) return;
+                settings.style.transition = 'max-height 440ms var(--motion-ease), opacity 260ms ease, transform 440ms var(--motion-spring)';
+                settings.style.maxHeight = `${settings.scrollHeight}px`;
+                settings.style.opacity = '1';
+                settings.style.transform = 'translateY(0) scale(1)';
+                settings.classList.add('sub-settings-expanded');
+            }));
+            settings._expandTimer = setTimeout(() => {
+                if (settings._expandRevision !== revision) return;
+                settings.style.maxHeight = 'none';
+                settings.style.overflow = 'visible';
+                settings.style.willChange = 'auto';
+                settings._expandTimer = null;
+            }, 480);
+            return;
+        }
+        if (settings.classList.contains('hidden')) return;
+        settings.style.transition = 'none';
+        settings.style.maxHeight = `${settings.scrollHeight}px`;
+        settings.style.opacity = '1';
+        settings.style.transform = 'translateY(0) scale(1)';
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (settings._expandRevision !== revision) return;
+            settings.style.transition = 'max-height 340ms var(--motion-ease), opacity 210ms ease, transform 340ms var(--motion-ease)';
+            settings.style.maxHeight = '0px';
+            settings.style.opacity = '0';
+            settings.style.transform = 'translateY(-8px) scale(0.985)';
+            settings.classList.remove('sub-settings-expanded');
+        }));
+        settings._expandTimer = setTimeout(() => {
+            if (settings._expandRevision !== revision) return;
+            settings.classList.add('hidden');
+            settings.style.overflow = 'hidden';
+            settings.style.willChange = 'auto';
+            settings._expandTimer = null;
+        }, 370);
+    },
     async getPreferredBlockDevice() {
         const device = (await this.exec("for d in /sys/block/*; do b=$(basename \"$d\"); case \"$b\" in loop*|ram*|zram*|dm-*) continue ;; esac; [ -d \"$d/queue\" ] || continue; echo \"$b\"; break; done")).trim();
         return device || '';
@@ -738,6 +803,7 @@
         const settings = document.getElementById('zram-settings');
         if (!settings) return;
         this.setSubSettingsExpanded(settings, show);
+        if (show && refreshStatus && typeof this.loadZramStatus === 'function') this.loadZramStatus();
     },
     syncZramControlsFromRuntime(runtimeInfo, fields = {}) {
         if (!runtimeInfo) return;
