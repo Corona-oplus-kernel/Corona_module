@@ -261,6 +261,9 @@
         }
         const zramApply = document.getElementById('zram-apply-btn');
         if (zramApply) zramApply.textContent = this.t(this._zramDirty ? 'applyZramDirty' : 'applyZram');
+        if (typeof this.renderModuleVersion === 'function') this.renderModuleVersion();
+        if (typeof this.renderKernelWorkflowBuild === 'function') this.renderKernelWorkflowBuild();
+        if (typeof this.renderKernelReleaseUpdate === 'function') this.renderKernelReleaseUpdate();
         this.translateDom(document.body);
     },
     setCategoryConfigVisibility(enabled, persist = false) {

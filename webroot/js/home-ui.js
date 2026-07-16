@@ -1081,14 +1081,16 @@
         const text = document.getElementById('kernel-build-text');
         const show = !!(this.isCoronaKernel && this.localKernelWorkflowBuild);
         if (section) section.classList.toggle('hidden', !show);
-        if (text && show) text.textContent = `当前迭代：#${this.localKernelWorkflowBuild}`;
+        if (text) text.textContent = `${this.t('currentKernelIterationPrefix')}${show ? `#${this.localKernelWorkflowBuild}` : '--'}`;
+    },
+    renderModuleVersion() {
+        const text = document.getElementById('current-version-text');
+        if (text) text.textContent = `${this.t('currentModuleVersionPrefix')}${this.moduleVersion || '--'}`;
     },
     async loadModuleVersion() {
-        const prop = await this.exec(`cat ${this.modDir}/module.prop`);
-        const match = prop.match(/version=(\S+)/);
-        const ver = match ? match[1] : '--';
-        const el = document.getElementById('current-version-text');
-        if (el) el.textContent = `当前版本：${ver}`;
+        const version = await this.exec(`grep -m1 '^version=' ${this.shellQuote(`${this.modDir}/module.prop`)} 2>/dev/null | cut -d= -f2-`);
+        this.moduleVersion = String(version || '').trim() || '--';
+        this.renderModuleVersion();
         this.renderKernelWorkflowBuild();
         await this.checkKernelReleaseUpdate();
     },
@@ -1147,7 +1149,8 @@
         }
     },
     renderKernelReleaseUpdate() {
-        const hasUpdate = !!(this.kernelUpdateInfo && this.kernelUpdateInfo.build > this.localKernelWorkflowBuild);
+        const hasLocalBuild = Number.isFinite(this.localKernelWorkflowBuild) && this.localKernelWorkflowBuild > 0;
+        const hasUpdate = !!(hasLocalBuild && this.kernelUpdateInfo && this.kernelUpdateInfo.build > this.localKernelWorkflowBuild);
         const floatingBadge = document.getElementById('floating-header-new');
         const floatingBlock = document.getElementById('floating-update-block');
         const floatingLink = document.getElementById('floating-header-link');

@@ -71,6 +71,7 @@ class CoronaAddon {
         this.zramFeatures = { multiComp: false, zstdLevel: false, writebackControl: false, writebackMode: 'none' };
         this.isCoronaKernel = false;
         this.localKernelWorkflowBuild = 0;
+        this.moduleVersion = '--';
         this.kernelUpdateInfo = null;
         this.cpuCores = [];
         this.cpuClusterInfo = { little: 0, mid: 0, big: 0, prime: 0 };
@@ -137,7 +138,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071563` : '';
+        return map[name] ? `${map[name]}?v=2026071564` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
