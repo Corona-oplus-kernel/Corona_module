@@ -123,6 +123,74 @@
     initZramRecompFold() {
         this.initAdvancedFold('zram-recomp-toggle', 'zram-recomp-body', { defaultOpen: false });
     },
+    initZramAdvancedFold() {
+        this.initAdvancedFold('zram-advanced-toggle', 'zram-advanced-body', { defaultOpen: false });
+    },
+    setSubSettingsExpanded(settings, show, options = {}) {
+        if (!settings) return;
+        const instant = options.instant === true || this.isInitializing;
+        const revision = (settings._expandRevision || 0) + 1;
+        settings._expandRevision = revision;
+        if (settings._expandTimer) {
+            clearTimeout(settings._expandTimer);
+            settings._expandTimer = null;
+        }
+        if (instant) {
+            settings.classList.toggle('hidden', !show);
+            settings.classList.toggle('sub-settings-expanded', show);
+            settings.style.maxHeight = show ? 'none' : '0px';
+            settings.style.opacity = show ? '1' : '0';
+            settings.style.transform = show ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(0.985)';
+            settings.style.overflow = show ? 'visible' : 'hidden';
+            return;
+        }
+        settings.style.overflow = 'hidden';
+        settings.style.willChange = 'max-height, opacity, transform';
+        if (show) {
+            settings.classList.remove('hidden');
+            settings.classList.remove('sub-settings-expanded');
+            settings.style.transition = 'none';
+            settings.style.maxHeight = '0px';
+            settings.style.opacity = '0';
+            settings.style.transform = 'translateY(-8px) scale(0.985)';
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                if (settings._expandRevision !== revision) return;
+                settings.style.transition = 'max-height 440ms var(--motion-ease), opacity 260ms ease, transform 440ms var(--motion-spring)';
+                settings.style.maxHeight = `${settings.scrollHeight}px`;
+                settings.style.opacity = '1';
+                settings.style.transform = 'translateY(0) scale(1)';
+                settings.classList.add('sub-settings-expanded');
+            }));
+            settings._expandTimer = setTimeout(() => {
+                if (settings._expandRevision !== revision) return;
+                settings.style.maxHeight = 'none';
+                settings.style.overflow = 'visible';
+                settings.style.willChange = 'auto';
+                settings._expandTimer = null;
+            }, 480);
+            return;
+        }
+        if (settings.classList.contains('hidden')) return;
+        settings.style.transition = 'none';
+        settings.style.maxHeight = `${settings.scrollHeight}px`;
+        settings.style.opacity = '1';
+        settings.style.transform = 'translateY(0) scale(1)';
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (settings._expandRevision !== revision) return;
+            settings.style.transition = 'max-height 340ms var(--motion-ease), opacity 210ms ease, transform 340ms var(--motion-ease)';
+            settings.style.maxHeight = '0px';
+            settings.style.opacity = '0';
+            settings.style.transform = 'translateY(-8px) scale(0.985)';
+            settings.classList.remove('sub-settings-expanded');
+        }));
+        settings._expandTimer = setTimeout(() => {
+            if (settings._expandRevision !== revision) return;
+            settings.classList.add('hidden');
+            settings.style.overflow = 'hidden';
+            settings.style.willChange = 'auto';
+            settings._expandTimer = null;
+        }, 370);
+    },
     async getPreferredBlockDevice() {
         const device = (await this.exec("for d in /sys/block/*; do b=$(basename \"$d\"); case \"$b\" in loop*|ram*|zram*|dm-*) continue ;; esac; [ -d \"$d/queue\" ] || continue; echo \"$b\"; break; done")).trim();
         return device || '';
@@ -563,7 +631,7 @@
                 const sizeKb = Math.round(this.state.zramSize * 1024 * 1024);
                 if (sizeKb > memTotalKb * 2) issues.push({ type: 'error', message: this.t('validationZramTooLarge') });
             }
-            if (fields.priority && (this.state.zramPriority < -32768 || this.state.zramPriority > 32767)) {
+            if (fields.priority && (this.state.zramPriority < -1 || this.state.zramPriority > 32767)) {
                 issues.push({ type: 'error', message: this.t('validationPriorityRange') });
             }
             const recompression = [this.state.recompAlgorithm1, this.state.recompAlgorithm2, this.state.recompAlgorithm3]
@@ -583,7 +651,7 @@
 
         if (include('swap') && this.state.swapEnabled) {
             const fields = this.swapConfiguredFields || {};
-            if (fields.priority && (this.state.swapPriority < -32768 || this.state.swapPriority > 32767)) {
+            if (fields.priority && (this.state.swapPriority < -1 || this.state.swapPriority > 32767)) {
                 issues.push({ type: 'error', message: this.t('validationPriorityRange') });
             }
             const swapPath = this.state.swapPath || this.runtimeConfig.swapPath || `${this.modDir}/swapfile.img`;
@@ -734,7 +802,7 @@
     toggleZramSettings(show, refreshStatus = true) {
         const settings = document.getElementById('zram-settings');
         if (!settings) return;
-        settings.classList.toggle('hidden', !show);
+        this.setSubSettingsExpanded(settings, show);
         if (show && refreshStatus && typeof this.loadZramStatus === 'function') this.loadZramStatus();
     },
     syncZramControlsFromRuntime(runtimeInfo, fields = {}) {
@@ -767,9 +835,18 @@
     renderZramPriorityOptions() {
         const list = document.getElementById('zram-priority-list');
         if (!list) return;
+        const presetPriorities = [100, 1000, 32758];
+        const custom = !presetPriorities.includes(this.state.zramPriority);
         list.querySelectorAll('.option-item').forEach(item => {
-            item.classList.toggle('selected', parseInt(item.dataset.value, 10) === this.state.zramPriority);
+            const selected = item.dataset.custom === '1'
+                ? custom
+                : parseInt(item.dataset.value, 10) === this.state.zramPriority;
+            item.classList.toggle('selected', selected);
         });
+        const editor = document.getElementById('zram-priority-custom-editor');
+        const input = document.getElementById('zram-priority-custom-input');
+        if (editor) editor.classList.toggle('visible', custom);
+        if (input) input.value = String(this.state.zramPriority);
     },
     async loadZramConfig() {
         const config = await this.readConfig('zram.conf');
@@ -780,12 +857,20 @@
             const enabledMatch = config.match(/enabled=(\d)/);
             const pathMatch = config.match(/zram_path=(\S+)/);
             const priorityMatch = config.match(/priority=(-?\d+)/);
+            const directSwapMatch = config.match(/direct_swappiness=(\d+)/);
+            const usedLimitMatch = config.match(/zram_used_limit_mb=(\d+)/);
+            const increaseMatch = config.match(/hybridswap_zram_increase=(\d+)/);
+            const quotaMatch = config.match(/hybridswap_quota_day=(\d+)/);
             this.zramConfiguredFields = {
                 algorithm: !!algMatch,
                 size: !!sizeMatch,
                 swappiness: !!swapMatch,
                 priority: !!priorityMatch
             };
+            if (directSwapMatch) this.state.directSwappiness = parseInt(directSwapMatch[1], 10);
+            if (usedLimitMatch) this.state.zramUsedLimitMb = parseInt(usedLimitMatch[1], 10);
+            if (increaseMatch) this.state.hybridswapIncreaseMb = parseInt(increaseMatch[1], 10);
+            if (quotaMatch) this.state.hybridswapQuotaGb = parseInt(quotaMatch[1], 10) / 1024 / 1024 / 1024;
             if (algMatch) { this.state.algorithm = algMatch[1]; this.renderAlgorithmOptions(); }
             if (sizeMatch) { this.state.zramSize = parseInt(sizeMatch[1]) / 1024 / 1024 / 1024; }
             if (swapMatch) { this.state.swappiness = parseInt(swapMatch[1]); }
@@ -829,12 +914,20 @@
             this.toggleZramSettings(false);
         }
         await this.loadLoopConfig(config);
+        await this.loadZramOfficialExtensions();
         if (typeof this.updateLoopControlState === 'function') this.updateLoopControlState();
         await this.loadZramStatus();
     },
     async loadLoopConfig(legacyZramConfig = '') {
         const loopConfig = await this.readConfig('loop.conf');
         const source = loopConfig || legacyZramConfig;
+        const officialSizesRaw = await this.exec('getprop persist.sys.oplus.nandswap.cfg 2>/dev/null');
+        const officialSizes = String(officialSizesRaw || '')
+            .split(/[\s,]+/)
+            .map(value => parseInt(value, 10))
+            .filter(value => Number.isFinite(value) && value > 0);
+        this.loopSizeOptions = [...new Set(officialSizes)].sort((left, right) => left - right);
+        if (!this.loopSizeOptions.length) this.loopSizeOptions = [4, 8, 12];
         const enabledMatch = loopConfig
             ? loopConfig.match(/enabled=(\d)/)
             : source.match(/zram_writeback=(\S+)/);
@@ -844,16 +937,33 @@
         this.state.loopEnabled = loopConfig
             ? enabledMatch?.[1] === '1'
             : enabledMatch?.[1] === 'true';
-        if (sizeMatch) this.state.loopSizeGb = Math.max(0.5, parseInt(sizeMatch[1], 10) / 1024);
+        let requestedSize = 0;
+        if (sizeMatch) {
+            requestedSize = Math.max(1, Math.round(parseInt(sizeMatch[1], 10) / 1024));
+        } else {
+            const officialSize = parseInt((await this.exec('getprop persist.sys.oplus.nandswap.swapsize.curr 2>/dev/null || getprop persist.sys.oplus.nandswap.swapsize 2>/dev/null')).trim(), 10);
+            if (Number.isFinite(officialSize) && officialSize > 0) requestedSize = officialSize;
+        }
+        if (!requestedSize) requestedSize = this.loopSizeOptions[this.loopSizeOptions.length - 1];
+        this.state.loopSizeGb = this.loopSizeOptions.reduce((nearest, candidate) => (
+            Math.abs(candidate - requestedSize) < Math.abs(nearest - requestedSize) ? candidate : nearest
+        ), this.loopSizeOptions[0]);
         const toggle = document.getElementById('zram-writeback-switch');
         const slider = document.getElementById('zram-writeback-size-slider');
         const value = document.getElementById('zram-writeback-size-value');
+        const minLabel = document.getElementById('zram-writeback-size-min');
+        const maxLabel = document.getElementById('zram-writeback-size-max');
         if (toggle) toggle.checked = this.state.loopEnabled;
         if (slider) {
-            slider.value = this.state.loopSizeGb;
+            slider.min = '0';
+            slider.max = String(this.loopSizeOptions.length - 1);
+            slider.step = '1';
+            slider.value = String(Math.max(0, this.loopSizeOptions.indexOf(this.state.loopSizeGb)));
             this.updateSliderProgress(slider);
         }
-        if (value) value.textContent = `${this.state.loopSizeGb.toFixed(1)} GB`;
+        if (minLabel) minLabel.textContent = `${this.loopSizeOptions[0]}GB`;
+        if (maxLabel) maxLabel.textContent = `${this.loopSizeOptions[this.loopSizeOptions.length - 1]}GB`;
+        if (value) value.textContent = `${Math.round(this.state.loopSizeGb)} GB`;
         if (!loopConfig && (enabledMatch || sizeMatch)) await this.persistLoopConfig('loop');
     },
     parseNumericList(text) {
@@ -971,7 +1081,7 @@
     },
     async readZramStatusSnapshot(configuredPath) {
         const path = this.shellQuote(configuredPath || '/dev/block/zram0');
-        const command = `emit_value() { tag="$1"; value="$2"; printf '%s ' "$tag"; printf '%s' "$value" | base64 2>/dev/null | tr -d '\\r\\n'; printf '\\n'; }; configured=${path}; active=$(awk 'NR > 1 && ($1 ~ /^\\/dev\\/block\\/zram/ || $1 ~ /^\\/dev\\/zram/) { print $1; exit }' /proc/swaps 2>/dev/null); zram_path=\${active:-$configured}; block=\${zram_path##*/}; case "$block" in zram[0-9]*) ;; *) block= ;; esac; emit_value PATH "$zram_path"; if [ -n "$block" ]; then base=/sys/block/$block; emit_value ALG "$(cat "$base/comp_algorithm" 2>/dev/null)"; emit_value SIZE "$(cat "$base/disksize" 2>/dev/null)"; emit_value MM "$(cat "$base/mm_stat" 2>/dev/null)"; emit_value BD "$(cat "$base/bd_stat" 2>/dev/null)"; emit_value BACKING "$(cat "$base/backing_dev" 2>/dev/null)"; emit_value BLOCK "$(cat "$base/stat" 2>/dev/null)"; emit_value HYB_MEM "$(cat "$base/hybridswap_meminfo" 2>/dev/null)"; emit_value HYB_SNAP "$(cat "$base/hybridswap_stat_snap" 2>/dev/null)"; emit_value HYB_VM "$(cat "$base/hybridswap_vmstat" 2>/dev/null)"; emit_value HYB_LOOP "$(cat "$base/hybridswap_loop_device" 2>/dev/null)"; emit_value HYB_ENABLE "$(cat "$base/hybridswap_enable" 2>/dev/null)"; fi; emit_value SWAPPINESS "$(cat /proc/sys/vm/swappiness 2>/dev/null)"; emit_value SWAP "$(awk -v path="$zram_path" 'NR > 1 && $1 == path { print $1, $2, $3, $4, $5; exit }' /proc/swaps 2>/dev/null)"`;
+        const command = `emit_value() { tag="$1"; value="$2"; printf '%s ' "$tag"; printf '%s' "$value" | base64 2>/dev/null | tr -d '\\r\\n'; printf '\\n'; }; configured=${path}; active=$(awk 'NR > 1 && ($1 ~ /^\\/dev\\/block\\/zram/ || $1 ~ /^\\/dev\\/zram/) { print $1; exit }' /proc/swaps 2>/dev/null); zram_path=\${active:-$configured}; block=\${zram_path##*/}; case "$block" in zram[0-9]*) ;; *) block= ;; esac; emit_value PATH "$zram_path"; if [ -n "$block" ]; then base=/sys/block/$block; emit_value ALG "$(cat "$base/comp_algorithm" 2>/dev/null)"; emit_value SIZE "$(cat "$base/disksize" 2>/dev/null)"; emit_value MM "$(cat "$base/mm_stat" 2>/dev/null)"; emit_value BLOCK "$(cat "$base/stat" 2>/dev/null)"; fi; emit_value SWAPPINESS "$(cat /proc/sys/vm/swappiness 2>/dev/null)"; emit_value SWAP "$(awk -v path="$zram_path" 'NR > 1 && $1 == path { print $1, $2, $3, $4, $5; exit }' /proc/swaps 2>/dev/null)"`;
         const output = await this.exec(command);
         const values = {};
         String(output || '').split('\n').forEach(line => {
@@ -986,66 +1096,9 @@
             disksize: values.SIZE || '',
             swappiness: values.SWAPPINESS || '',
             mmStat: values.MM || '',
-            bdStat: values.BD || '',
-            backingDevice: values.BACKING || '',
             blockStat: values.BLOCK || '',
-            swapInfo: swapParts.length >= 5 ? { device: swapParts[0], type: swapParts[1], size: swapParts[2], used: swapParts[3], priority: swapParts[4] } : null,
-            hybrid: {
-                meminfo: values.HYB_MEM || '',
-                stat: values.HYB_SNAP || '',
-                vmstat: values.HYB_VM || '',
-                loop: values.HYB_LOOP || '',
-                enabled: values.HYB_ENABLE || ''
-            }
+            swapInfo: swapParts.length >= 5 ? { device: swapParts[0], type: swapParts[1], size: swapParts[2], used: swapParts[3], priority: swapParts[4] } : null
         };
-    },
-    async loadHybridSwapMetrics(zramBlock, metrics = {}) {
-        const section = document.getElementById('hybridswap-metrics');
-        if (!section) return;
-        if (!zramBlock) {
-            section.hidden = true;
-            section.style.display = 'none';
-            return;
-        }
-        const meminfoRaw = metrics.meminfo || '';
-        const snapRaw = metrics.stat || '';
-        const vmstatRaw = metrics.vmstat || '';
-        const loopRaw = metrics.loop || '';
-        const enableRaw = metrics.enabled || '';
-        const hasNode = !!(meminfoRaw || snapRaw || enableRaw || loopRaw);
-        if (!hasNode) {
-            section.hidden = true;
-            section.style.display = 'none';
-            return;
-        }
-        section.hidden = false;
-        section.style.display = '';
-
-        const mem = this.parseHybridMap(meminfoRaw);
-        const snap = this.parseHybridMap(snapRaw);
-        const vm = this.parseHybridMap(vmstatRaw);
-        const loop = String(loopRaw || '').trim();
-
-        this.setMetricValue('hyb-loop', (loop && loop !== 'none') ? loop.replace(/^\/dev\/block\//, '').replace(/^\/dev\//, '') : '');
-
-        const zst = this.parseHybridSizeToBytes(mem.ZST);
-        const est = this.parseHybridSizeToBytes(mem.EST);
-        this.setMetricValue('hyb-zst', zst > 0 ? this.formatBytes(zst) : '');
-        this.setMetricValue('hyb-zsu', this.formatHybridPair(mem.ZSU_C, mem.ZSU_O));
-        this.setMetricValue('hyb-est', est > 0 ? this.formatBytes(est) : '');
-        this.setMetricValue('hyb-esu', this.formatHybridPair(mem.ESU_C, mem.ESU_O));
-
-        const reclaim = this.parseHybridSizeToBytes(snap.reclaimin_bytes || snap.reclaimin_real_load);
-        const batch = this.parseHybridSizeToBytes(snap.batchout_bytes || snap.batchout_real_load);
-        const reclaimCnt = parseInt(snap.reclaimin_cnt || '0', 10) || 0;
-        const batchCnt = parseInt(snap.batchout_cnt || '0', 10) || 0;
-        this.setMetricValue('hyb-reclaimin', reclaim > 0 ? this.formatBytes(reclaim) : (reclaimCnt > 0 ? String(reclaimCnt) : ''));
-        this.setMetricValue('hyb-batchout', batch > 0 ? this.formatBytes(batch) : (batchCnt > 0 ? String(batchCnt) : ''));
-
-        const wakeup = parseInt(vm.swapd_wakeup || '0', 10) || 0;
-        this.setMetricValue('hyb-swapd-wakeup', wakeup > 0 ? String(wakeup) : '');
-
-        this.refreshMetricCard('hybridswap-metrics');
     },
     async loadZramStatus() {
         if (this.zramStatusBusy) return;
@@ -1064,15 +1117,11 @@
             const pathInput = document.getElementById('zram-path-input');
             if (pathInput) pathInput.value = zramPath;
         }
-        const zramBlock = this.getZramBlockName(zramPath);
-        const pageSize = 4096;
         const algRaw = snapshot.algorithm;
         const disksize = snapshot.disksize;
         const swappiness = snapshot.swappiness;
         const swapInfo = snapshot.swapInfo;
         const mmStatRaw = snapshot.mmStat;
-        const bdStatRaw = snapshot.bdStat;
-        const backingDevRaw = snapshot.backingDevice;
         const blockStatRaw = snapshot.blockStat;
         const currentAlg = algRaw.match(/\[([^\]]+)\]/)?.[1] || algRaw.split(' ')[0] || '--';
         const sizeGB = disksize ? (parseInt(disksize) / 1024 / 1024 / 1024).toFixed(1) : '0';
@@ -1083,22 +1132,17 @@
         this.setMetricValue('zram-current-priority', swapInfo?.priority || '', { always: true });
         this.setMetricValue('zram-current-path', zramPath || '', { always: true });
 
-        // mm_stat / bd_stat — hide empties
+        // mm_stat and block layer statistics
         const mmStat = this.parseNumericList(mmStatRaw);
-        const bdStat = this.parseNumericList(bdStatRaw);
         const rawDataSize = Number(mmStat[0] || 0);
         const compressedSize = Number(mmStat[1] || 0);
         const physicalMemoryUsed = Number(mmStat[2] || 0);
         const compressionRatio = this.formatZramRatio(rawDataSize, compressedSize);
-        const backingDevice = this.normalizeBackingDev(backingDevRaw);
-        const bdRead = Number(bdStat[1] || 0) * pageSize;
-        const bdWrite = Number(bdStat[2] || 0) * pageSize;
 
         // block layer stat: read_sectors / write_sectors (512-byte units)
         const blockStat = this.parseNumericList(blockStatRaw);
         const totalReadBytes = Number(blockStat[2] || 0) * 512;
         const totalWriteBytes = Number(blockStat[6] || 0) * 512;
-        const bdCount = Number(bdStat[0] || 0);
 
         const runtime = !!(disksize && parseInt(disksize, 10) > 0);
         const swapSizeBytes = Number(swapInfo?.size || 0) * 1024;
@@ -1108,13 +1152,11 @@
         const overviewUsed = document.getElementById('zram-overview-used');
         const overviewMemory = document.getElementById('zram-overview-memory');
         const overviewRatio = document.getElementById('zram-overview-ratio');
-        const overviewBacking = document.getElementById('zram-overview-backing');
         const overviewProgress = document.getElementById('zram-overview-progress');
         if (overviewState) overviewState.textContent = swapInfo ? this.t('active') : this.t('inactive');
         if (overviewUsed) overviewUsed.textContent = swapSizeBytes > 0 ? `${this.formatBytes(swapUsedBytes)} / ${this.formatBytes(swapSizeBytes)}` : '--';
         if (overviewMemory) overviewMemory.textContent = physicalMemoryUsed > 0 ? this.formatBytes(physicalMemoryUsed) : '--';
         if (overviewRatio) overviewRatio.textContent = compressionRatio !== '--' ? compressionRatio : '--';
-        if (overviewBacking) overviewBacking.textContent = backingDevice ? this.formatBackingDevName(backingDevice) : this.t('none');
         if (overviewProgress) overviewProgress.style.width = `${swapUsedPercent.toFixed(1)}%`;
         const opt = { always: runtime };
         this.setMetricValue('zram-raw-size', this.formatBytes(rawDataSize), opt);
@@ -1123,12 +1165,6 @@
         this.setMetricValue('zram-compr-ratio', compressionRatio !== '--' ? compressionRatio : '0:1', opt);
         this.setMetricValue('zram-total-reads', this.formatBytes(totalReadBytes), opt);
         this.setMetricValue('zram-total-writes', this.formatBytes(totalWriteBytes), opt);
-        this.setMetricValue('zram-backing-dev', (backingDevice && backingDevice !== '--') ? this.formatBackingDevName(backingDevice) : '');
-        const hasWb = !!(backingDevice || (bdStatRaw && String(bdStatRaw).trim()));
-        const wbOpt = { always: hasWb };
-        this.setMetricValue('zram-bd-count', hasWb ? `${bdCount} 页` : '', wbOpt);
-        this.setMetricValue('zram-bd-read', hasWb ? this.formatBytes(bdRead) : '', wbOpt);
-        this.setMetricValue('zram-bd-write', hasWb ? this.formatBytes(bdWrite) : '', wbOpt);
         this.refreshMetricCard('zram-status-card');
 
         const isActive = !!swapInfo;
@@ -1161,7 +1197,6 @@
             else memBadge.textContent = this.t(this.state.zramEnabled ? 'moduleManagedZram' : 'systemManagedZram');
         }
 
-        await this.loadHybridSwapMetrics(zramBlock, snapshot.hybrid);
         this.updateZramModeHint(this.state.zramEnabled ? 'module' : (isActive ? 'system' : 'off'), runtimeInfo);
     },
     startZramMetricsRefresh(intervalMs = 8000) {
@@ -1217,6 +1252,31 @@
         if (typeof this.updateLoopControlState === 'function') this.updateLoopControlState();
         return this.zramFeatures;
     },
+    async loadZramOfficialExtensions() {
+        const zramBlock = this.getZramBlockName(this.state.zramPath) || 'zram0';
+        const raw = await this.exec(`for node in /proc/oplus_mem/swappiness_para /proc/oplus_healthinfo/swappiness_para; do [ -r "$node" ] || continue; awk -F': *' '/^direct_swappiness:/ { print "DIRECT=" $2; exit }' "$node"; break; done; [ -r /dev/memcg/memory.zram_used_limit_mb ] && echo LIMIT=$(cat /dev/memcg/memory.zram_used_limit_mb); [ -r /sys/block/${zramBlock}/hybridswap_zram_increase ] && echo INCREASE=$(cat /sys/block/${zramBlock}/hybridswap_zram_increase); [ -r /sys/block/${zramBlock}/hybridswap_quota_day ] && echo QUOTA=$(cat /sys/block/${zramBlock}/hybridswap_quota_day)`);
+        const values = Object.fromEntries(String(raw || '').split(/\n/).map(line => line.split('=')).filter(parts => parts.length === 2));
+        const configured = this.parseIoConfig(await this.readConfig('zram.conf'));
+        const controls = [
+            ['DIRECT', 'direct_swappiness', 'directSwappiness', 'direct-swappiness', value => parseInt(value, 10), value => String(value)],
+            ['LIMIT', 'zram_used_limit_mb', 'zramUsedLimitMb', 'zram-used-limit', value => parseInt(value, 10), value => `${value} MB`],
+            ['INCREASE', 'hybridswap_zram_increase', 'hybridswapIncreaseMb', 'hybridswap-increase', value => parseInt(value, 10), value => `${value} MB`],
+            ['QUOTA', 'hybridswap_quota_day', 'hybridswapQuotaGb', 'hybridswap-quota', value => parseInt(value, 10) / 1024 / 1024 / 1024, value => `${Math.round(value)} GB`]
+        ];
+        controls.forEach(([runtimeKey, configKey, stateKey, id, parser, formatter]) => {
+            const section = document.getElementById(`${id}-section`);
+            const supported = values[runtimeKey] !== undefined && values[runtimeKey] !== '';
+            if (section) { section.hidden = !supported; section.style.display = supported ? '' : 'none'; }
+            if (!supported) return;
+            const source = configured[configKey] !== undefined ? configured[configKey] : values[runtimeKey];
+            const parsed = parser(source);
+            if (Number.isFinite(parsed)) this.state[stateKey] = parsed;
+            const slider = document.getElementById(`${id}-slider`);
+            const value = document.getElementById(`${id}-value`);
+            if (slider) { slider.value = this.state[stateKey]; this.updateSliderProgress(slider); }
+            if (value) value.textContent = formatter(this.state[stateKey]);
+        });
+    },
     usesZstdAlgorithm() {
         const algs = [
             this.state.algorithm,
@@ -1256,7 +1316,7 @@
     },
     markZramDirty(changedField) {
         this._zramDirty = true;
-        if (['algorithm', 'size', 'swappiness', 'priority'].includes(changedField)) {
+        if (['algorithm', 'size', 'swappiness', 'priority', 'direct_swappiness', 'zram_used_limit_mb', 'hybridswap_zram_increase', 'hybridswap_quota_day'].includes(changedField)) {
             this.zramConfiguredFields = this.zramConfiguredFields || {};
             this.zramConfiguredFields[changedField] = true;
         }
@@ -1322,12 +1382,16 @@
         if (field === 'zram' || field === 'recomp_algorithm3') updates.recomp_algorithm3 = this.state.recompAlgorithm3 || 'none';
         if (field === 'zram' || field === 'size') updates.size = String(sizeBytes);
         if (field === 'zram' || field === 'swappiness') updates.swappiness = String(this.state.swappiness);
+        if (field === 'zram' || field === 'direct_swappiness') updates.direct_swappiness = String(this.state.directSwappiness);
+        if (field === 'zram' || field === 'zram_used_limit_mb') updates.zram_used_limit_mb = String(this.state.zramUsedLimitMb);
+        if (field === 'zram' || field === 'hybridswap_zram_increase') updates.hybridswap_zram_increase = String(this.state.hybridswapIncreaseMb);
+        if (field === 'zram' || field === 'hybridswap_quota_day') updates.hybridswap_quota_day = String(Math.round(this.state.hybridswapQuotaGb * 1024 * 1024 * 1024));
         if (field === 'zram' || field === 'priority') updates.priority = String(this.state.zramPriority);
         if (field === 'zram' || field === 'zram_path') updates.zram_path = this.state.zramPath;
         return updates;
     },
     getZramConfigKeys() {
-        return ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'priority', 'zram_path'];
+        return ['enabled', 'algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'direct_swappiness', 'zram_used_limit_mb', 'hybridswap_zram_increase', 'hybridswap_quota_day', 'priority', 'zram_path'];
     },
     persistLoopConfig(changedField = 'enabled') {
         const save = this.withLock('loop-config', async () => {
@@ -1341,25 +1405,37 @@
         this._loopConfigSavePromise = save;
         return save;
     },
-    async applyLoopImmediate(action) {
+    markWritebackBlockDirty() {
+        const button = document.getElementById('zram-loop-action');
+        if (!button) return;
+        button.dataset.dirtyHint = '1';
+        button.textContent = this.t('applyWritebackBlockDirty');
+    },
+    clearWritebackBlockDirty() {
+        const button = document.getElementById('zram-loop-action');
+        if (!button) return;
+        button.dataset.dirtyHint = '';
+        button.textContent = this.t('applyWritebackBlock');
+    },
+    async applyLoopImmediate() {
         return this.withLock('loop-apply', async () => {
-            const command = action === 'stop' ? 'stop' : 'start';
+            const command = this.state.loopEnabled ? 'start' : 'stop';
             const button = document.getElementById('zram-loop-action');
             let succeeded = false;
             try {
-                if (command === 'start') this.state.loopEnabled = true;
-                await this.persistLoopConfig('enabled');
+                if (this._loopConfigSavePromise) await this._loopConfigSavePromise.catch(() => {});
                 const configured = this.parseIoConfig(await this.readConfig('loop.conf'));
                 if (command === 'start' && !configured.size_mb) {
-                    this.showToast('Loop 已启用，但未设置大小，未修改当前系统');
+                    this.showToast(this.t('writebackBlockSizeRequired'), 'warning');
                     return false;
                 }
                 if (button) button.disabled = true;
                 this.showLoading(true);
-                const script = this.shellQuote(`${this.modDir}/scripts/apply-loop.sh`);
-                const result = await this.execResult(`/system/bin/sh ${script} ${command}`);
+                const service = this.shellQuote(`${this.modDir}/service.sh`);
+                const result = await this.execResult(`/system/bin/sh ${service} --apply-writeback-block`);
                 await this.refreshZramLoopDevice(false, true);
                 succeeded = result.code === 0 && (command === 'stop' ? !this._loopActive : this._loopActive);
+                if (succeeded) this.clearWritebackBlockDirty();
             } catch (error) {
                 try { await this.refreshZramLoopDevice(false, true); } catch (refreshError) {}
             } finally {
@@ -1367,8 +1443,8 @@
                 if (button) button.disabled = !this.zramFeatures?.writebackControl;
             }
             this.showToast(this.t(succeeded
-                ? (command === 'stop' ? 'loopStopped' : 'loopStarted')
-                : (command === 'stop' ? 'loopStopFailed' : 'loopStartFailed')), succeeded ? 'success' : 'error');
+                ? (command === 'stop' ? 'writebackBlockDisabled' : 'writebackBlockApplied')
+                : 'writebackBlockApplyFailed'), succeeded ? 'success' : 'error');
             return succeeded;
         });
     },
@@ -1403,6 +1479,7 @@
         const expectSwap = options.swappiness !== undefined ? options.swappiness : this.state.swappiness;
         const expectZstd = options.zstdLevel !== undefined ? options.zstdLevel : this.state.zstdCompressionLevel;
         const expectPriority = options.priority !== undefined ? options.priority : this.state.zramPriority;
+        const extensionExpected = options.extensions || {};
         const checkAlg = options.checkAlgorithm !== false;
         const checkSize = options.checkSize !== false;
         const checkSwap = options.checkSwappiness !== false;
@@ -1421,15 +1498,20 @@
         }
 
         const mismatches = [];
-        const [algRaw, disksizeRaw, swapRaw, zstdRaw, recompRaw, priorityRaw] = await Promise.all([
+        const [algRaw, disksizeRaw, swapRaw, oplusSwapRaw, zstdRaw, recompRaw, priorityRaw, directRaw, usedLimitRaw, increaseRaw, quotaRaw] = await Promise.all([
             this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`),
             this.exec(`cat /sys/block/${zramBlock}/disksize 2>/dev/null`),
             this.exec('cat /proc/sys/vm/swappiness 2>/dev/null'),
+            checkSwap ? this.exec(`for node in /proc/oplus_mem/swappiness_para /proc/oplus_healthinfo/swappiness_para; do [ -r "$node" ] || continue; awk -F': *' '/^vm_swappiness:/ { print $2; exit }' "$node"; break; done`) : Promise.resolve(''),
             checkZstd ? this.exec('cat /sys/module/zstd/parameters/compression_level 2>/dev/null') : Promise.resolve(''),
             this.zramFeatures && this.zramFeatures.multiComp
                 ? this.exec(`cat /sys/block/${zramBlock}/recomp_algorithm 2>/dev/null`)
                 : Promise.resolve(''),
-            checkPriority ? this.exec(`awk -v path=${this.shellQuote(zramPath)} 'NR > 1 && $1 == path { print $5; exit }' /proc/swaps 2>/dev/null`) : Promise.resolve('')
+            checkPriority ? this.exec(`awk -v path=${this.shellQuote(zramPath)} 'NR > 1 && $1 == path { print $5; exit }' /proc/swaps 2>/dev/null`) : Promise.resolve(''),
+            extensionExpected.direct_swappiness !== undefined ? this.exec(`for node in /proc/oplus_mem/swappiness_para /proc/oplus_healthinfo/swappiness_para; do [ -r "$node" ] || continue; awk -F': *' '/^direct_swappiness:/ { print $2; exit }' "$node"; break; done`) : Promise.resolve(''),
+            extensionExpected.zram_used_limit_mb !== undefined ? this.exec('cat /dev/memcg/memory.zram_used_limit_mb 2>/dev/null') : Promise.resolve(''),
+            extensionExpected.hybridswap_zram_increase !== undefined ? this.exec(`cat /sys/block/${zramBlock}/hybridswap_zram_increase 2>/dev/null`) : Promise.resolve(''),
+            extensionExpected.hybridswap_quota_day !== undefined ? this.exec(`cat /sys/block/${zramBlock}/hybridswap_quota_day 2>/dev/null`) : Promise.resolve('')
         ]);
 
         if (checkAlg && expectAlg) {
@@ -1456,6 +1538,10 @@
             if (Number.isFinite(now) && Number.isFinite(want) && now !== want) {
                 mismatches.push(`swappiness ${now}≠${want}`);
             }
+            const oplusNow = parseInt(String(oplusSwapRaw || '').trim(), 10);
+            if (Number.isFinite(oplusNow) && Number.isFinite(want) && oplusNow !== want) {
+                mismatches.push(`Oplus swappiness ${oplusNow}≠${want}`);
+            }
         }
 
         if (checkZstd && expectZstd !== undefined && expectZstd !== null && expectZstd !== '') {
@@ -1471,6 +1557,18 @@
             const want = parseInt(expectPriority, 10);
             if (Number.isFinite(now) && Number.isFinite(want) && now !== want) mismatches.push(`优先级 ${now}≠${want}`);
         }
+
+        [
+            ['direct_swappiness', directRaw],
+            ['zram_used_limit_mb', usedLimitRaw],
+            ['hybridswap_zram_increase', increaseRaw],
+            ['hybridswap_quota_day', quotaRaw]
+        ].forEach(([key, raw]) => {
+            if (extensionExpected[key] === undefined) return;
+            const now = parseInt(String(raw || '').trim(), 10);
+            const want = parseInt(extensionExpected[key], 10);
+            if (Number.isFinite(now) && Number.isFinite(want) && now !== want) mismatches.push(`${key} ${now}≠${want}`);
+        });
 
         // soft check recomp: if configured non-none, recomp node should mention algo (best-effort)
         if (checkRecomp && this.zramFeatures && this.zramFeatures.multiComp) {
@@ -1518,7 +1616,7 @@
             setTimeout(() => this.loadZramStatus(), 200);
             return true;
         }
-        const actionableKeys = ['algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'priority', 'zram_path'];
+        const actionableKeys = ['algorithm', 'recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3', 'zstd_compression_level', 'size', 'swappiness', 'direct_swappiness', 'zram_used_limit_mb', 'hybridswap_zram_increase', 'hybridswap_quota_day', 'priority', 'zram_path'];
         if (!actionableKeys.some(key => configured[key] !== undefined)) {
             this.showToast('ZRAM 已启用，但未配置参数，未修改当前系统');
             return true;
@@ -1534,7 +1632,10 @@
             priority: configured.priority,
             checkPriority: configured.priority !== undefined,
             checkZstd: configured.zstd_compression_level !== undefined,
-            checkRecomp: ['recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3'].some(key => configured[key] !== undefined)
+            checkRecomp: ['recomp_algorithm1', 'recomp_algorithm2', 'recomp_algorithm3'].some(key => configured[key] !== undefined),
+            extensions: Object.fromEntries(['direct_swappiness', 'zram_used_limit_mb', 'hybridswap_zram_increase', 'hybridswap_quota_day']
+                .filter(key => configured[key] !== undefined)
+                .map(key => [key, configured[key]]))
         });
         if (ok) {
             this.showToast(fallbackApplied
@@ -2181,7 +2282,8 @@
                 if (typeof this.updateLoopControlState === 'function') this.updateLoopControlState();
                 try {
                     await this.persistLoopConfig('enabled');
-                    if (!toggle.checked && this._loopActive) await this.applyLoopImmediate('stop');
+                    this.markWritebackBlockDirty();
+                    this.showToast(this.t('writebackBlockConfigSaved'));
                 } catch (error) {
                     this.state.loopEnabled = previous;
                     toggle.checked = previous;
@@ -2195,12 +2297,24 @@
         if (sizeSlider && !sizeSlider.dataset.bound) {
             sizeSlider.dataset.bound = '1';
             sizeSlider.addEventListener('input', (event) => {
-                this.state.loopSizeGb = parseFloat(event.target.value) || 4;
-                if (sizeValue) sizeValue.textContent = `${this.state.loopSizeGb.toFixed(1)} GB`;
+                const options = Array.isArray(this.loopSizeOptions) && this.loopSizeOptions.length
+                    ? this.loopSizeOptions
+                    : [4, 8, 12];
+                const index = Math.max(0, Math.min(options.length - 1, parseInt(event.target.value, 10) || 0));
+                this.state.loopSizeGb = options[index];
+                if (sizeValue) sizeValue.textContent = `${this.state.loopSizeGb} GB`;
                 this.updateSliderProgress(sizeSlider);
                 if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
             });
-            sizeSlider.addEventListener('change', () => this.persistLoopConfig('size_mb').catch(() => this.showToast(this.t('loopConfigSaveFailed'), 'error')));
+            sizeSlider.addEventListener('change', async () => {
+                try {
+                    await this.persistLoopConfig('size_mb');
+                    this.markWritebackBlockDirty();
+                    this.showToast(this.t('writebackBlockConfigSaved'));
+                } catch (error) {
+                    this.showToast(this.t('loopConfigSaveFailed'), 'error');
+                }
+            });
         }
         const loopRefresh = document.getElementById('zram-loop-device-refresh');
         if (loopRefresh && !loopRefresh.dataset.bound) {
@@ -2212,7 +2326,7 @@
         const loopAction = document.getElementById('zram-loop-action');
         if (loopAction && !loopAction.dataset.bound) {
             loopAction.dataset.bound = '1';
-            loopAction.addEventListener('click', () => this.applyLoopImmediate(this._loopActive ? 'stop' : 'start'));
+            loopAction.addEventListener('click', () => this.applyLoopImmediate());
         }
     },
     initZramPath() {
@@ -2333,7 +2447,7 @@
     },
     toggleMemoryPressureSettings(show) {
         const settings = document.getElementById('memory-pressure-settings');
-        if (settings) settings.classList.toggle('hidden', !show);
+        this.setSubSettingsExpanded(settings, show);
     },
     renderMemoryPressureProfile() {
         document.querySelectorAll('#memory-pressure-profile-list .option-item').forEach(item => {
@@ -2426,11 +2540,7 @@
     },
     toggleSwapSettings(show) {
         const settings = document.getElementById('swap-settings');
-        if (show) {
-            settings.classList.remove('hidden');
-        } else {
-            settings.classList.add('hidden');
-        }
+        this.setSubSettingsExpanded(settings, show);
     },
     async loadSwapConfig() {
         const config = await this.exec(`cat ${this.shellQuote(`${this.configDir}/swap.conf`)} 2>/dev/null`);

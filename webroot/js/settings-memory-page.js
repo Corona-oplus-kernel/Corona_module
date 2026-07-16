@@ -29,7 +29,7 @@
         }
         return this.memoryPageConfig;
     },
-    renderStaticOptions() { this.renderAlgorithmOptions(); this.renderReadaheadOptions(); this.renderIOAdvancedOptions(); if (typeof this.initIoAdvancedFold === 'function') this.initIoAdvancedFold(); },
+    renderStaticOptions() { this.renderAlgorithmOptions(); this.renderReadaheadOptions(); this.renderIOAdvancedOptions(); if (typeof this.initIoAdvancedFold === 'function') this.initIoAdvancedFold(); if (typeof this.initZramAdvancedFold === 'function') this.initZramAdvancedFold(); },
     renderAlgorithmOptions() {
         const container = document.getElementById('algorithm-list');
         if (!container) return;
@@ -70,9 +70,8 @@
     updateLoopParameterDisplay(loopDevice = '') {
         const values = {
             'loop-param-config': this.t(this.state.loopEnabled ? 'enabled' : 'disabled'),
-            'loop-param-size': `${Number(this.state.loopSizeGb || 4).toFixed(1)} GB`,
+            'loop-param-size': `${Math.round(Number(this.state.loopSizeGb || 1))} GB`,
             'loop-param-zram': this.state.zramPath || '/dev/block/zram0',
-            'loop-param-file': '/data/nandswap/corona_swapfile',
             'loop-param-device': loopDevice || this.t('notAssigned')
         };
         Object.entries(values).forEach(([id, value]) => {
@@ -91,17 +90,19 @@
             valueElement.textContent = display;
             valueElement.classList.toggle('active', !!loopDevice);
         }
-        this._loopActive = !!loopDevice;
+        this._writebackDevice = loopDevice;
+        this._loopActive = !!loopDevice && this.state.loopEnabled;
+        this._systemWritebackActive = !!loopDevice && !this.state.loopEnabled;
         this.updateLoopParameterDisplay(loopDevice);
         const status = document.getElementById('zram-loop-status');
         if (status) {
-            status.textContent = this.t(loopDevice ? 'active' : 'inactive');
+            status.textContent = this.t(this._loopActive ? 'active' : (this._systemWritebackActive ? 'systemManaged' : 'inactive'));
             status.classList.toggle('active', !!loopDevice);
         }
         const action = document.getElementById('zram-loop-action');
         if (action) {
-            action.textContent = this.t(loopDevice ? 'stopLoop' : 'startLoop');
-            action.classList.toggle('running', !!loopDevice);
+            if (!action.dataset.dirtyHint) action.textContent = this.t('applyWritebackBlock');
+            action.classList.remove('running');
         }
         return display;
     },
@@ -112,7 +113,7 @@
             return loopDevice;
         }
         const zramBlock = this.getLoopZramBlock();
-        const command = `hybrid=/sys/block/${zramBlock}/hybridswap_loop_device; backing=/sys/block/${zramBlock}/backing_dev; if [ -f "$hybrid" ]; then cat "$hybrid"; elif [ -f "$backing" ]; then cat "$backing"; else cat /data/nandswap/corona_loop_device 2>/dev/null; fi`;
+        const command = `hybrid=/sys/block/${zramBlock}/hybridswap_loop_device; backing=/sys/block/${zramBlock}/backing_dev; if [ -f "$hybrid" ]; then current=$(cat "$hybrid" 2>/dev/null); elif [ -f "$backing" ]; then current=$(cat "$backing" 2>/dev/null); fi; printf '%s\\n' "$current" | tr -d ' \\r'`;
         const refresh = (async () => {
             const raw = String(await this.exec(command) || '').trim();
             const loopDevice = raw && raw !== 'none' ? raw : '';
@@ -144,6 +145,11 @@
             body.style.display = open ? 'none' : 'block';
             header.classList.toggle('expanded', !open);
         });
+    },
+    initZramAdvancedFold() {
+        if (typeof this.initAdvancedFold === 'function') {
+            this.initAdvancedFold('zram-advanced-toggle', 'zram-advanced-body', { defaultOpen: false });
+        }
     },
     renderRecompAlgorithmOptions() {
         const section = document.getElementById('zram-recomp-section');

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" id="theme-color-meta" content="#1783e8">
     <title data-i18n="text_3f923c3a"></title>
-    <link rel="stylesheet" href="style.css?v=2026071552">
+    <link rel="stylesheet" href="style.css?v=2026071562">
     <link rel="stylesheet" href="css/components.css?v=2026071552">
     <link rel="stylesheet" href="css/pages/settings.css?v=2026071552">
     <link rel="stylesheet" href="css/animations.css?v=2026071552">
@@ -237,7 +237,6 @@
                                     <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="usedSpace"></span><strong id="zram-overview-used">--</strong></div>
                                     <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="physicalUsage"></span><strong id="zram-overview-memory">--</strong></div>
                                     <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="compressionRatio"></span><strong id="zram-overview-ratio">--</strong></div>
-                                    <div class="zram-overview-item"><span class="zram-overview-label" data-i18n="writebackDevice"></span><strong id="zram-overview-backing">--</strong></div>
                                 </div>
                                 <div class="zram-overview-progress"><span id="zram-overview-progress"></span></div>
                             </div>
@@ -287,60 +286,6 @@
                                     <div class="info-item" data-metric="writes" hidden>
                                         <span class="info-label" data-i18n="totalWrites"></span>
                                         <span class="info-value" id="zram-total-writes">--</span>
-                                    </div>
-                                    <div class="info-item" data-metric="backing" hidden>
-                                        <span class="info-label" data-i18n="writebackDevice"></span>
-                                        <span class="info-value" id="zram-backing-dev">--</span>
-                                    </div>
-                                    <div class="info-item" data-metric="bdcount" hidden>
-                                        <span class="info-label" data-i18n="text_5c3961d5"></span>
-                                        <span class="info-value" id="zram-bd-count">--</span>
-                                    </div>
-                                    <div class="info-item" data-metric="bdread" hidden>
-                                        <span class="info-label" data-i18n="text_954c5b4d"></span>
-                                        <span class="info-value" id="zram-bd-read">--</span>
-                                    </div>
-                                    <div class="info-item" data-metric="bdwrite" hidden>
-                                        <span class="info-label" data-i18n="text_0bbe7612"></span>
-                                        <span class="info-value" id="zram-bd-write">--</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="zram-status-card" id="hybridswap-metrics" hidden>
-                                <div class="zram-status-title">HybridSwap</div>
-                                <div class="info-list" id="hybridswap-list">
-                                    <div class="info-item" data-metric="hyb-loop" hidden>
-                                        <span class="info-label" data-i18n="text_76d57225"></span>
-                                        <span class="info-value" id="hyb-loop">--</span>
-                                    </div>
-                                    <div class="info-item" data-metric="hyb-zst" hidden>
-                                        <span class="info-label" data-i18n="text_5e555183"></span>
-                                        <span class="info-value" id="hyb-zst">--</span>
-                                    </div>
-                                    <div class="info-item" data-metric="hyb-zsu" hidden>
-                                        <span class="info-label" data-i18n="text_0ad48a31"></span>
-                                        <span class="info-value" id="hyb-zsu">--</span>
-                                    </div>
-                                    <div class="info-item" data-metric="hyb-est" hidden>
-                                        <span class="info-label" data-i18n="text_3fb0bedb"></span>
-                                        <span class="info-value" id="hyb-est">--</span>
-                                    </div>
-                                    <div class="info-item" data-metric="hyb-esu" hidden>
-                                        <span class="info-label" data-i18n="text_b2c3cc89"></span>
-                                        <span class="info-value" id="hyb-esu">--</span>
-                                    </div>
-                                    <div class="info-item" data-metric="hyb-reclaimin" hidden>
-                                        <span class="info-label" data-i18n="text_bca6a657"></span>
-                                        <span class="info-value" id="hyb-reclaimin">--</span>
-                                    </div>
-                                    <div class="info-item" data-metric="hyb-batchout" hidden>
-                                        <span class="info-label" data-i18n="text_672af442"></span>
-                                        <span class="info-value" id="hyb-batchout">--</span>
-                                    </div>
-                                    <div class="info-item" data-metric="hyb-swapd" hidden>
-                                        <span class="info-label" data-i18n="text_e4621518"></span>
-                                        <span class="info-value" id="hyb-swapd-wakeup">--</span>
                                     </div>
                                 </div>
                             </div>
@@ -418,12 +363,59 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="setting-section advanced-fold" id="zram-advanced-section">
+                                    <div class="advanced-fold-header" id="zram-advanced-toggle" role="button" tabindex="0">
+                                        <div class="advanced-fold-titles">
+                                            <span class="section-label" data-i18n="zramAdvancedSettings"></span>
+                                            <span class="setting-hint" data-i18n="zramAdvancedSettingsDesc"></span>
+                                        </div>
+                                        <span class="expand-icon">❯</span>
+                                    </div>
+                                    <div class="advanced-fold-body" id="zram-advanced-body">
+                                <div class="setting-section" id="direct-swappiness-section" hidden style="display:none">
+                                    <span class="section-label" data-i18n="directSwappiness"></span>
+                                    <div class="setting-hint" data-i18n="directSwappinessDesc"></div>
+                                    <div class="slider-container">
+                                        <input type="range" class="range-slider" id="direct-swappiness-slider" min="0" max="200" step="1" value="60">
+                                        <div class="slider-labels"><span>0</span><span class="slider-value" id="direct-swappiness-value">60</span><span>200</span></div>
+                                    </div>
+                                </div>
+                                <div class="setting-section" id="zram-used-limit-section" hidden style="display:none">
+                                    <span class="section-label" data-i18n="zramUsedLimit"></span>
+                                    <div class="setting-hint" data-i18n="zramUsedLimitDesc"></div>
+                                    <div class="slider-container">
+                                        <input type="range" class="range-slider" id="zram-used-limit-slider" min="0" max="32768" step="256" value="0">
+                                        <div class="slider-labels"><span>0</span><span class="slider-value" id="zram-used-limit-value">0 MB</span><span>32 GB</span></div>
+                                    </div>
+                                </div>
+                                <div class="setting-section" id="hybridswap-increase-section" hidden style="display:none">
+                                    <span class="section-label" data-i18n="hybridswapIncrease"></span>
+                                    <div class="setting-hint" data-i18n="hybridswapIncreaseDesc"></div>
+                                    <div class="slider-container">
+                                        <input type="range" class="range-slider" id="hybridswap-increase-slider" min="0" max="8192" step="256" value="2048">
+                                        <div class="slider-labels"><span>0</span><span class="slider-value" id="hybridswap-increase-value">2048 MB</span><span>8 GB</span></div>
+                                    </div>
+                                </div>
+                                <div class="setting-section" id="hybridswap-quota-section" hidden style="display:none">
+                                    <span class="section-label" data-i18n="hybridswapDailyQuota"></span>
+                                    <div class="setting-hint" data-i18n="hybridswapDailyQuotaDesc"></div>
+                                    <div class="slider-container">
+                                        <input type="range" class="range-slider" id="hybridswap-quota-slider" min="0" max="50" step="1" value="10">
+                                        <div class="slider-labels"><span>0</span><span class="slider-value" id="hybridswap-quota-value">10 GB</span><span>50 GB</span></div>
+                                    </div>
+                                </div>
                                 <div class="setting-section">
                                     <span class="section-label" data-i18n="zramPriority"></span>
                                     <div class="option-grid" id="zram-priority-list">
                                         <div class="option-item" data-value="100" data-i18n="priorityBalanced"></div>
                                         <div class="option-item" data-value="1000" data-i18n="priorityHigh"></div>
                                         <div class="option-item selected" data-value="32758" data-i18n="prioritySystemHigh"></div>
+                                        <div class="option-item" data-custom="1" data-i18n="priorityCustom"></div>
+                                    </div>
+                                    <div class="priority-custom-editor" id="zram-priority-custom-editor">
+                                        <span class="priority-custom-label" data-i18n="customPriorityValue"></span>
+                                        <input type="number" class="text-input" id="zram-priority-custom-input" min="-1" max="32767" step="1" inputmode="numeric" value="32758">
+                                        <span class="priority-custom-range">-1 ~ 32767</span>
                                     </div>
                                     <div class="setting-hint" data-i18n="zramPriorityDesc"></div>
                                 </div>
@@ -435,6 +427,8 @@
                                             <button class="btn-small" id="zram-path-detect" data-i18n="text_1ee8a9fc"></button>
                                             <button class="btn-small btn-primary" id="zram-path-save" data-i18n="text_ad5b82b0"></button>
                                         </div>
+                                    </div>
+                                </div>
                                     </div>
                                 </div>
                             </div>
@@ -467,10 +461,6 @@
                                             <span data-i18n="targetZram"></span>
                                             <strong id="loop-param-zram">--</strong>
                                         </div>
-                                        <div class="loop-parameter-item">
-                                            <span data-i18n="backingFile"></span>
-                                            <strong id="loop-param-file">--</strong>
-                                        </div>
                                         <div class="loop-parameter-item loop-parameter-wide">
                                             <span data-i18n="runtimeDevice"></span>
                                             <strong id="loop-param-device">--</strong>
@@ -493,11 +483,11 @@
                                         <div class="setting-section" id="zram-writeback-size-section">
                                             <span class="section-label" data-i18n="writebackSpace"></span>
                                             <div class="slider-container">
-                                                <input type="range" class="range-slider" id="zram-writeback-size-slider" min="0.5" max="16" step="0.5" value="4">
+                                                <input type="range" class="range-slider" id="zram-writeback-size-slider" min="0" max="2" step="1" value="2">
                                                 <div class="slider-labels">
-                                                    <span>0.5GB</span>
-                                                    <span class="slider-value" id="zram-writeback-size-value">4.0 GB</span>
-                                                    <span>16GB</span>
+                                                    <span id="zram-writeback-size-min">4GB</span>
+                                                    <span class="slider-value" id="zram-writeback-size-value">12 GB</span>
+                                                    <span id="zram-writeback-size-max">12GB</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -511,9 +501,10 @@
                                                 <button type="button" class="btn-small loop-device-refresh" id="zram-loop-device-refresh" data-i18n="refresh"></button>
                                             </div>
                                         </div>
-                                        <button type="button" class="action-btn loop-action-btn" id="zram-loop-action" data-i18n="startLoop"></button>
                                     </div>
                                 </div>
+                                <div class="zram-actions-sep"></div>
+                                <button type="button" class="action-btn loop-action-btn" id="zram-loop-action" data-i18n="applyWritebackBlock"></button>
                             </div>
                         </div>
                     </div>
@@ -1918,6 +1909,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071552" defer></script>
+    <script src="script.js?v=2026071562" defer></script>
 </body>
 </html>

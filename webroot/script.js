@@ -18,9 +18,13 @@ class CoronaAddon {
             zstdCompressionLevel: 1,
             zramSize: 8,
             swappiness: 100,
+            directSwappiness: 60,
+            zramUsedLimitMb: 0,
+            hybridswapIncreaseMb: 2048,
+            hybridswapQuotaGb: 10,
             zramPriority: 32758,
             loopEnabled: false,
-            loopSizeGb: 4,
+            loopSizeGb: 12,
             pressureEnabled: false,
             pressureProfile: 'balanced',
             zramPath: '/dev/block/zram0',
@@ -109,8 +113,7 @@ class CoronaAddon {
             'battery-level', 'battery-capacity', 'battery-temp', 'cpu-temp',
             'system-version', 'kernel-version', 'history-chart',
             'zram-current-alg', 'zram-current-size', 'zram-current-swappiness', 'zram-status',
-            'zram-raw-size', 'zram-bd-write', 'zram-bd-read', 'zram-bd-count', 'zram-total-writes', 'zram-total-reads', 'zram-compr-size', 'zram-mem-used', 'zram-compr-ratio', 'zram-backing-dev', 'zram-bd-io',
-            'hyb-enable', 'hyb-loop', 'hyb-zst', 'hyb-zsu', 'hyb-est', 'hyb-esu', 'hyb-reclaimin', 'hyb-batchout', 'hyb-swapd-wakeup',
+            'zram-raw-size', 'zram-total-writes', 'zram-total-reads', 'zram-compr-size', 'zram-mem-used', 'zram-compr-ratio',
             'zstd-level-slider', 'zstd-level-value',
             'swap-status', 'swap-current-status', 'swap-current-size', 'swap-size-value', 'swap-io-in', 'swap-io-out',
             'vm-status', 'lru-status'
@@ -134,7 +137,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071552` : '';
+        return map[name] ? `${map[name]}?v=2026071562` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -270,7 +273,11 @@ class CoronaAddon {
             'zstd-level-slider': { unit: '', decimals: 0 },
             'zram-size-slider': { unit: 'GB', decimals: 2 },
             'swappiness-slider': { unit: '', decimals: 0 },
-            'zram-writeback-size-slider': { unit: 'GB', decimals: 1 },
+            'direct-swappiness-slider': { unit: '', decimals: 0 },
+            'zram-used-limit-slider': { unit: 'MB', decimals: 0 },
+            'hybridswap-increase-slider': { unit: 'MB', decimals: 0 },
+            'hybridswap-quota-slider': { unit: 'GB', decimals: 0 },
+            'zram-writeback-size-slider': { unit: 'GB', decimals: 0 },
             'swap-size-slider': { unit: 'MB', decimals: 0 }
         };
         document.querySelectorAll('.range-slider').forEach(slider => {
@@ -691,14 +698,60 @@ class CoronaAddon {
             this.state.swappiness = parseInt(e.target.value);
             this.markZramDirty('swappiness');
         });
+        const bindZramRange = (id, valueId, stateKey, field, formatter, parser = Number) => {
+            const slider = document.getElementById(id);
+            const value = document.getElementById(valueId);
+            if (!slider) return;
+            slider.addEventListener('input', (event) => {
+                this.state[stateKey] = parser(event.target.value);
+                if (value) value.textContent = formatter(this.state[stateKey]);
+            });
+            slider.addEventListener('change', (event) => {
+                this.state[stateKey] = parser(event.target.value);
+                this.markZramDirty(field);
+            });
+        };
+        bindZramRange('direct-swappiness-slider', 'direct-swappiness-value', 'directSwappiness', 'direct_swappiness', value => String(value), value => parseInt(value, 10));
+        bindZramRange('zram-used-limit-slider', 'zram-used-limit-value', 'zramUsedLimitMb', 'zram_used_limit_mb', value => `${value} MB`, value => parseInt(value, 10));
+        bindZramRange('hybridswap-increase-slider', 'hybridswap-increase-value', 'hybridswapIncreaseMb', 'hybridswap_zram_increase', value => `${value} MB`, value => parseInt(value, 10));
+        bindZramRange('hybridswap-quota-slider', 'hybridswap-quota-value', 'hybridswapQuotaGb', 'hybridswap_quota_day', value => `${value} GB`, value => parseInt(value, 10));
         document.getElementById('zram-priority-list')?.querySelectorAll('.option-item').forEach(item => {
             item.addEventListener('click', () => {
                 document.getElementById('zram-priority-list').querySelectorAll('.option-item').forEach(option => option.classList.remove('selected'));
                 item.classList.add('selected');
+                const editor = document.getElementById('zram-priority-custom-editor');
+                const input = document.getElementById('zram-priority-custom-input');
+                if (item.dataset.custom === '1') {
+                    if (editor) editor.classList.add('visible');
+                    if (input) {
+                        input.value = String(this.state.zramPriority);
+                        requestAnimationFrame(() => input.focus());
+                    }
+                    return;
+                }
+                if (editor) editor.classList.remove('visible');
                 this.state.zramPriority = parseInt(item.dataset.value, 10) || 32758;
                 this.markZramDirty('priority');
             });
         });
+        const customPriorityInput = document.getElementById('zram-priority-custom-input');
+        if (customPriorityInput) {
+            customPriorityInput.addEventListener('input', (event) => {
+                const value = parseInt(event.target.value, 10);
+                if (Number.isFinite(value) && value >= -1 && value <= 32767) this.state.zramPriority = value;
+            });
+            customPriorityInput.addEventListener('change', (event) => {
+                const value = parseInt(event.target.value, 10);
+                if (!Number.isFinite(value) || value < -1 || value > 32767) {
+                    event.target.value = String(this.state.zramPriority);
+                    this.showToast(this.t('validationPriorityRange'), 'error');
+                    return;
+                }
+                this.state.zramPriority = value;
+                this.renderZramPriorityOptions();
+                this.markZramDirty('priority');
+            });
+        }
         document.getElementById('zram-apply-btn').addEventListener('click', async (e) => {
             e.stopPropagation();
             await this.applyZramImmediate();

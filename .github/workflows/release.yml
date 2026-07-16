@@ -41,6 +41,7 @@ jobs:
         run: |
           zip -r "Corona-${{ steps.version.outputs.version }}.zip" . \
             -x ".git/*" -x ".github/*" \
+            -x "docs/*" \
             -x "LICENSE" -x "README.md" -x "changelog.md" -x "update.json"
 
       - name: Update update.json and changelog
