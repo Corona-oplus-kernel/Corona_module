@@ -134,7 +134,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071543` : '';
+        return map[name] ? `${map[name]}?v=2026071551` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -222,6 +222,7 @@ class CoronaAddon {
                 this.setCategoryConfigVisibility(this.state.showCategoryConfigToggles);
             }
             this.bindAllEvents();
+            this.initNavigationHistory();
             this.initLanguageSelector();
             this.applyTranslations();
             this.startTranslationObserver();
@@ -750,13 +751,33 @@ class CoronaAddon {
         const floatingHeader = document.getElementById('floating-header');
         if (floatingHeader) floatingHeader.classList.remove('visible', 'overlay-hidden');
     }
-    async switchPage(pageName) {
+    initNavigationHistory() {
+        if (this._navigationHistoryInitialized) return;
+        this._navigationHistoryInitialized = true;
+        const activePage = document.querySelector('.page.active')?.id === 'page-settings' ? 'settings' : 'home';
+        window.history.replaceState({ coronaPage: activePage }, '', `#${activePage}`);
+        window.addEventListener('popstate', event => {
+            const targetPage = event.state?.coronaPage === 'settings' ? 'settings' : 'home';
+            document.querySelectorAll('.detail-overlay.show').forEach(overlay => {
+                if (overlay.id && typeof this.hideOverlay === 'function') this.hideOverlay(overlay.id);
+            });
+            this.switchPage(targetPage, { updateHistory: false }).catch(error => {
+                console.error('system back navigation failed', error);
+            });
+        });
+    }
+    async switchPage(pageName, options = {}) {
+        const updateHistory = options.updateHistory !== false;
         const pages = document.querySelectorAll('.page');
         const tabs = document.querySelectorAll('.tab-item');
         const slider = document.getElementById('tab-slider');
         const currentActive = document.querySelector('.page.active');
         const targetPage = document.getElementById(`page-${pageName}`);
         if (!targetPage || currentActive === targetPage) return;
+        if (updateHistory && pageName === 'home' && window.history.state?.coronaPage === 'settings') {
+            window.history.back();
+            return;
+        }
         // fully close half-open panels when going home / leaving settings
         if (pageName === 'home' || (currentActive && currentActive.id === 'page-settings')) {
             if (typeof this.forceCloseAllPanels === 'function') this.forceCloseAllPanels();
@@ -795,6 +816,13 @@ class CoronaAddon {
         if (pageName === 'home' && this.pendingChartDraw) {
             requestAnimationFrame(() => this.drawChart());
             this.pendingChartDraw = false;
+        }
+        if (updateHistory) {
+            if (pageName === 'settings') {
+                window.history.pushState({ coronaPage: 'settings' }, '', '#settings');
+            } else {
+                window.history.replaceState({ coronaPage: 'home' }, '', '#home');
+            }
         }
     }
 }
