@@ -10,6 +10,7 @@ BACKING_FILE="$BACKING_DIR/corona_swapfile"
 LOOP_STATE="$BACKING_DIR/corona_loop_device"
 SYSTEM_BACKING_STATE="$BACKING_DIR/corona_system_backing"
 HYBRID_STATE="$BACKING_DIR/corona_hybridswap_state"
+NANDSWAP_TOOL=/product/bin/nandswap_tool
 
 get_current_backing() {
     [ -n "$ZRAM_BLOCK" ] || return 1
@@ -165,75 +166,6 @@ restore_system_backing() {
     bind_backing_device "$system_backing"
 }
 
-get_current_backing() {
-    [ -n "$ZRAM_BLOCK" ] || return 1
-    if [ -f "/sys/block/$ZRAM_BLOCK/hybridswap_loop_device" ]; then
-        cat "/sys/block/$ZRAM_BLOCK/hybridswap_loop_device" 2>/dev/null | tr -d ' \r\n'
-    elif [ -f "/sys/block/$ZRAM_BLOCK/backing_dev" ]; then
-        cat "/sys/block/$ZRAM_BLOCK/backing_dev" 2>/dev/null | tr -d ' \r\n'
-    fi
-}
-
-get_managed_loop() {
-    loop_device=$(cat "$LOOP_STATE" 2>/dev/null | tr -d ' \r\n')
-    if [ -n "$loop_device" ]; then
-        /system/bin/losetup "$loop_device" 2>/dev/null | grep -Fq "$BACKING_FILE" || loop_device=
-    fi
-    [ -n "$loop_device" ] || loop_device=$(find_backing_loop)
-    [ -n "$loop_device" ] && printf '%s\n' "$loop_device"
-}
-
-is_managed_backing() {
-    device="$1"
-    [ -n "$device" ] || return 1
-    managed=$(get_managed_loop)
-    [ -n "$managed" ] && [ "$device" = "$managed" ] && return 0
-    case "$device" in
-        /dev/block/loop*|/dev/loop*)
-            /system/bin/losetup "$device" 2>/dev/null | grep -Fq "$BACKING_FILE"
-            return $?
-            ;;
-    esac
-    return 1
-}
-
-find_system_backing() {
-    for device in /dev/block/mapper/hybridswap_crypto /dev/mapper/hybridswap_crypto; do
-        [ -b "$device" ] && {
-            printf '%s\n' "$device"
-            return 0
-        }
-    done
-    return 1
-}
-
-bind_backing_device() {
-    device="$1"
-    [ -n "$device" ] || return 1
-    if [ -f "/sys/block/$ZRAM_BLOCK/hybridswap_loop_device" ]; then
-        printf '%s' "$device" > "/sys/block/$ZRAM_BLOCK/hybridswap_loop_device" 2>/dev/null || return 1
-        readback=$(get_current_backing)
-        [ "$readback" = "$device" ] || return 1
-        [ -f "/sys/block/$ZRAM_BLOCK/hybridswap_enable" ] && echo 1 > "/sys/block/$ZRAM_BLOCK/hybridswap_enable" 2>/dev/null
-        return 0
-    fi
-    if [ -f "/sys/block/$ZRAM_BLOCK/backing_dev" ] && [ -f "/sys/block/$ZRAM_BLOCK/writeback_limit_enable" ]; then
-        printf '%s' "$device" > "/sys/block/$ZRAM_BLOCK/backing_dev" 2>/dev/null || return 1
-        readback=$(get_current_backing)
-        [ "$readback" = "$device" ] || return 1
-        echo 0 > "/sys/block/$ZRAM_BLOCK/writeback_limit_enable" 2>/dev/null
-        return 0
-    fi
-    return 1
-}
-
-restore_system_backing() {
-    system_backing=$(find_system_backing) || return 0
-    current=$(get_current_backing)
-    [ "$current" = "$system_backing" ] && return 0
-    bind_backing_device "$system_backing"
-}
-
 find_backing_loop() {
     /system/bin/losetup -a 2>/dev/null | awk -v file="($BACKING_FILE)" '$0 ~ file { sub(/:.*/, "", $1); print $1; exit }'
 }
@@ -280,6 +212,7 @@ create_backing() {
     required_kb=$((SIZE_MB * 1024 + 524288))
     [ -n "$available_kb" ] && [ "$available_kb" -lt "$required_kb" ] && return 1
     mkdir -p "$BACKING_DIR" || return 1
+    remember_system_backing
     clear_managed_binding
     detach_backing_loop || return 1
 

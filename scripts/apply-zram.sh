@@ -5,13 +5,21 @@ MM_SYS_SCRIPT="$MODDIR/scripts/init.oplus.mm-sys.sh"
 ZRAM_CONF="$MODDIR/config/zram.conf"
 LOOP_CONF="$MODDIR/config/loop.conf"
 
-zram_enabled=$(grep -m1 '^enabled=' "$ZRAM_CONF" 2>/dev/null | cut -d'=' -f2-)
-if [ "$zram_enabled" = "1" ] && ! grep -Eq '^(algorithm|recomp_algorithm[123]|zstd_compression_level|size|swappiness|priority|zram_path)=' "$ZRAM_CONF" 2>/dev/null; then
-  exit 0
-fi
+official_zram_ready() {
+  awk 'NR > 1 && ($1 ~ /^\/dev\/block\/zram/ || $1 ~ /^\/dev\/zram/) { found=1; exit } END { exit found ? 0 : 1 }' /proc/swaps 2>/dev/null
+}
 
-[ -f "$MM_SYS_SCRIPT" ] && /system/bin/sh "$MM_SYS_SCRIPT" >/dev/null 2>&1
-writeback_mode=$(grep -m1 '^zram_writeback=' "$ZRAM_CONF" 2>/dev/null | cut -d'=' -f2-)
-if [ ! -f "$LOOP_CONF" ] && { [ -z "$writeback_mode" ] || [ "$writeback_mode" = "default" ]; }; then
-  [ -f /product/bin/init.oplus.nandswap.sh ] && /system/bin/sh /product/bin/init.oplus.nandswap.sh boot_completed >/dev/null 2>&1
-fi
+wait_for_official_zram() {
+  official_zram_ready && return 0
+  setprop ctl.start init.oplus.nandswap.sh 2>/dev/null
+  local attempt=0
+  while [ "$attempt" -lt 20 ]; do
+    sleep 1
+    official_zram_ready && return 0
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+wait_for_official_zram || exit 1
+[ -f "$MM_SYS_SCRIPT" ] && /system/bin/sh "$MM_SYS_SCRIPT" --zram-only >/dev/null 2>&1

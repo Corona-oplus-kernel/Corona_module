@@ -1534,7 +1534,7 @@
         }
 
         const mismatches = [];
-        const [algRaw, disksizeRaw, swapRaw, oplusSwapRaw, zstdRaw, recompRaw, priorityRaw, directRaw, usedLimitRaw, increaseRaw, quotaRaw] = await Promise.all([
+        const [algRaw, disksizeRaw, swapRaw, oplusSwapRaw, zstdRaw, recompRaw, priorityRaw] = await Promise.all([
             this.exec(`cat /sys/block/${zramBlock}/comp_algorithm 2>/dev/null`),
             this.exec(`cat /sys/block/${zramBlock}/disksize 2>/dev/null`),
             this.exec('cat /proc/sys/vm/swappiness 2>/dev/null'),

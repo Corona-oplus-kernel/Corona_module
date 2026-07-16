@@ -1,4 +1,4 @@
-#!system/bin/sh
+#!/system/bin/sh
 
 readonly HYB_ERR_UNSUPPORTED=1004
 readonly HYB_ERR_UNSET=1009
@@ -109,12 +109,6 @@ apply_zram_primary_algorithm() {
   echo "$active"
 }
 
-run_default_nandswap_main() {
-  local script=/product/bin/init.oplus.nandswap.sh
-  [ -r "$script" ] || return 1
-  /system/bin/sh -c '. "$1"; main' sh "$script"
-}
-
 write_zram_swappiness() {
   local corona_swappiness="$1"
   [ -n "$corona_swappiness" ] || return
@@ -122,10 +116,16 @@ write_zram_swappiness() {
   if [ -d "$spt_dir" ] && [ -f "$spt_dir/swappiness_idle" ]; then
     echo "$corona_swappiness" > "$spt_dir/swappiness_idle" 2>/dev/null
   fi
-  echo "$corona_swappiness" > /proc/sys/vm/swappiness 2>/dev/null
-  echo "$corona_swappiness" > /dev/memcg/memory.swappiness 2>/dev/null
-  echo "$corona_swappiness" > /dev/memcg/apps/memory.swappiness 2>/dev/null
-  echo "$corona_swappiness" > /sys/module/zram_opt/parameters/vm_swappiness 2>/dev/null
+  local oplus_swappiness
+  for oplus_swappiness in /proc/oplus_mem/swappiness_para /proc/oplus_healthinfo/swappiness_para; do
+    [ -w "$oplus_swappiness" ] || continue
+    echo "vm_swappiness=${corona_swappiness}" > "$oplus_swappiness" 2>/dev/null
+    break
+  done
+  [ -f /proc/sys/vm/swappiness ] && echo "$corona_swappiness" > /proc/sys/vm/swappiness 2>/dev/null
+  [ -f /dev/memcg/memory.swappiness ] && echo "$corona_swappiness" > /dev/memcg/memory.swappiness 2>/dev/null
+  [ -f /dev/memcg/apps/memory.swappiness ] && echo "$corona_swappiness" > /dev/memcg/apps/memory.swappiness 2>/dev/null
+  [ -f /sys/module/zram_opt/parameters/vm_swappiness ] && echo "$corona_swappiness" > /sys/module/zram_opt/parameters/vm_swappiness 2>/dev/null
 }
 
 
@@ -233,7 +233,7 @@ init_zram() {
   local zram_conf="$CORONA_CONFIG/zram.conf"
   local loop_conf="$CORONA_CONFIG/loop.conf"
   local corona_zram_enabled=$(corona_get zram.conf enabled)
-  [ "$corona_zram_enabled" = "1" ] || return
+  [ "$corona_zram_enabled" = "1" ] || return 0
 
   local has_size=0
   local has_algorithm=0
@@ -301,7 +301,13 @@ init_zram() {
     setprop persist.sys.oplus.hybridswap_app_uid_memcg true
   fi
 
-  if [ "$has_size" -eq 1 ] || [ "$has_algorithm" -eq 1 ] || [ "$has_writeback" -eq 1 ] || [ "$has_path" -eq 1 ] || [ "$has_recomp" -eq 1 ]; then
+  local rebuild=0
+  [ "$has_size" -eq 1 ] && rebuild=1
+  [ "$has_algorithm" -eq 1 ] && rebuild=1
+  [ "$has_recomp" -eq 1 ] && rebuild=1
+
+  if [ "$rebuild" -eq 1 ]; then
+    [ -x "$WRITEBACK_HELPER" ] && /system/bin/sh "$WRITEBACK_HELPER" remember "$zram_block" 2>/dev/null
     /system/bin/swapoff "$zram_path" 2>/dev/null
     echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
     if [ -n "$target_algorithm" ]; then
@@ -310,19 +316,27 @@ init_zram() {
     apply_zram_recomp_algorithms "$zram_block"
     apply_zstd_compression_level
     [ -n "$target_size" ] && echo "$target_size" > "/sys/block/$zram_block/disksize" 2>/dev/null
-    if [ "$has_writeback" -eq 1 ] && [ -x "$WRITEBACK_HELPER" ]; then
+    if [ ! -f "/sys/block/$zram_block/hybridswap_loop_device" ] && [ -x "$WRITEBACK_HELPER" ]; then
       /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" "$corona_writeback" "$corona_writeback_size" 2>/dev/null
     fi
     /system/bin/mkswap "$zram_path" 2>/dev/null || return
     /system/bin/swapon "$zram_path" -p "$target_priority" 2>/dev/null || return
-  elif [ "$has_priority" -eq 1 ]; then
-    /system/bin/swapoff "$zram_path" 2>/dev/null
-    /system/bin/swapon "$zram_path" -p "$target_priority" 2>/dev/null || return
-  elif [ "$has_zstd" -eq 1 ]; then
-    apply_zstd_compression_level
+    if [ -f "/sys/block/$zram_block/hybridswap_loop_device" ] && [ -x "$WRITEBACK_HELPER" ]; then
+      /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" "$corona_writeback" "$corona_writeback_size" 2>/dev/null
+    fi
+  else
+    if [ "$has_writeback" -eq 1 ] && [ -x "$WRITEBACK_HELPER" ]; then
+      /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" "$corona_writeback" "$corona_writeback_size" 2>/dev/null
+    fi
+    if [ "$has_priority" -eq 1 ]; then
+      /system/bin/swapoff "$zram_path" 2>/dev/null
+      /system/bin/swapon "$zram_path" -p "$target_priority" 2>/dev/null || return
+    fi
+    [ "$has_zstd" -eq 1 ] && apply_zstd_compression_level
   fi
 
   [ "$has_swappiness" -eq 1 ] && write_zram_swappiness "$corona_swappiness"
+  return 0
 }
 apply_corona_vm_config() {
   [ ! -f "$CORONA_CONFIG/vm.conf" ] && return
@@ -503,7 +517,10 @@ configure_aizerofs_parameters() {
 }
 
 main() {
-  configure_sys_params
+  if [ "$1" = "--zram-only" ]; then
+    init_zram
+    return
+  fi
   init_zram
   apply_corona_vm_config
   apply_corona_kernel_features
