@@ -969,6 +969,9 @@
         if (container) {
             container.hidden = !this.loopSizeFixed;
             if (this.loopSizeFixed) {
+                const selectedIndex = Math.max(0, this.loopSizeOptions.indexOf(this.state.loopSizeGb));
+                container.style.setProperty('--writeback-size-count', String(this.loopSizeOptions.length));
+                container.style.setProperty('--writeback-size-index', String(selectedIndex));
                 container.style.gridTemplateColumns = `repeat(${this.loopSizeOptions.length}, minmax(0, 1fr))`;
                 container.innerHTML = this.loopSizeOptions.map(size => {
                     const selected = size === this.state.loopSizeGb;
