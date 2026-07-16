@@ -4562,7 +4562,46 @@ body.theme-dark #zram-settings .option-item {
     box-shadow: none;
 }
 
+.priority-custom-editor {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(110px, 0.7fr) auto;
+    align-items: center;
+    gap: 10px;
+    max-height: 0;
+    margin-top: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+    transition: max-height 360ms var(--motion-ease), margin-top 300ms var(--motion-ease), opacity 220ms ease, transform 360ms var(--motion-spring);
+}
+
+.priority-custom-editor.visible {
+    max-height: 72px;
+    margin-top: 10px;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.priority-custom-label,
+.priority-custom-range {
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+.priority-custom-editor .text-input {
+    min-width: 0;
+    text-align: center;
+}
+
 @media (max-width: 380px) {
+    .priority-custom-editor {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .priority-custom-range {
+        text-align: right;
+    }
+
     .loop-action-row {
         grid-template-columns: minmax(0, 1fr);
     }

@@ -138,7 +138,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071556` : '';
+        return map[name] ? `${map[name]}?v=2026071557` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -722,7 +722,6 @@ class CoronaAddon {
                 const priorityList = document.getElementById('zram-priority-list');
                 priorityList.querySelectorAll('.option-item').forEach(option => option.classList.remove('selected'));
                 item.classList.add('selected');
-                this.syncAnimatedOptionIndicator(priorityList);
                 const editor = document.getElementById('zram-priority-custom-editor');
                 const input = document.getElementById('zram-priority-custom-input');
                 if (item.dataset.custom === '1') {

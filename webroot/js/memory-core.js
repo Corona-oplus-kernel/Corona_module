@@ -777,20 +777,10 @@
                 : parseInt(item.dataset.value, 10) === this.state.zramPriority;
             item.classList.toggle('selected', selected);
         });
-        this.syncAnimatedOptionIndicator(list);
         const editor = document.getElementById('zram-priority-custom-editor');
         const input = document.getElementById('zram-priority-custom-input');
         if (editor) editor.classList.toggle('visible', custom);
         if (input) input.value = String(this.state.zramPriority);
-    },
-    syncAnimatedOptionIndicator(target) {
-        const list = typeof target === 'string' ? document.getElementById(target) : target;
-        if (!list) return;
-        const items = [...list.querySelectorAll('.option-item')];
-        const selectedIndex = items.findIndex(item => item.classList.contains('selected'));
-        list.style.setProperty('--animated-option-count', String(Math.max(1, items.length)));
-        list.style.setProperty('--animated-option-index', String(Math.max(0, selectedIndex)));
-        list.classList.toggle('indicator-ready', selectedIndex >= 0);
     },
     async loadZramConfig() {
         const config = await this.readConfig('zram.conf');
