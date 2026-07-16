@@ -213,7 +213,16 @@
     },
     renderIOAdvancedOptions() {
         const ensureValues = (values, fallback) => Array.isArray(values) && values.length > 0 ? values : fallback;
-        this.ioNrRequestsOptions = ensureValues(this.ioNrRequestsOptions, [64, 128, 256, 512, 1024, 2048]);
+        const includeCurrentValue = (values, currentValue) => {
+            const normalized = values.map(Number).filter(value => Number.isFinite(value) && value > 0);
+            const current = Number(currentValue);
+            if (Number.isFinite(current) && current > 0) normalized.push(current);
+            return [...new Set(normalized)].sort((left, right) => left - right);
+        };
+        this.ioNrRequestsOptions = includeCurrentValue(
+            ensureValues(this.ioNrRequestsOptions, [64, 128, 256, 512, 1024, 2048]),
+            this.state.ioNrRequests
+        );
         this.ioRqAffinityOptions = ensureValues(this.ioRqAffinityOptions, [0, 1, 2]);
         this.ioNomergesOptions = ensureValues(this.ioNomergesOptions, [0, 1, 2]);
         this.renderDiscreteOptions('io-nr-requests-list', this.ioNrRequestsOptions, this.state.ioNrRequests, null, async (value) => {
