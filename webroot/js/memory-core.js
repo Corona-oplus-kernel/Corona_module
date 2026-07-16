@@ -126,78 +126,6 @@
     initZramAdvancedFold() {
         this.initAdvancedFold('zram-advanced-toggle', 'zram-advanced-body', { defaultOpen: false });
     },
-    setSubSettingsExpanded(settings, show, options = {}) {
-        if (!settings) return;
-        const instant = options.instant === true || this.isInitializing;
-        const expandDuration = 320;
-        const collapseDuration = 260;
-        const hidden = settings.classList.contains('hidden');
-        const expanded = settings.classList.contains('sub-settings-expanded');
-        if (!instant && ((show && expanded && !hidden) || (!show && hidden))) return;
-        const revision = (settings._expandRevision || 0) + 1;
-        settings._expandRevision = revision;
-        if (settings._expandTimer) {
-            clearTimeout(settings._expandTimer);
-            settings._expandTimer = null;
-        }
-        if (instant) {
-            settings.classList.toggle('hidden', !show);
-            settings.classList.toggle('sub-settings-expanded', show);
-            settings.style.maxHeight = show ? 'none' : '0px';
-            settings.style.opacity = show ? '1' : '0';
-            settings.style.transform = show ? 'translateY(0)' : 'translateY(-6px)';
-            settings.style.overflow = show ? 'visible' : 'hidden';
-            return;
-        }
-        settings.style.overflow = 'hidden';
-        settings.style.willChange = 'max-height, opacity, transform';
-        if (show) {
-            settings.classList.remove('hidden');
-            settings.classList.remove('sub-settings-expanded');
-            settings.style.transition = 'none';
-            settings.style.maxHeight = '0px';
-            settings.style.opacity = '0';
-            settings.style.transform = 'translateY(-6px)';
-            const targetHeight = settings.scrollHeight;
-            requestAnimationFrame(() => {
-                if (settings._expandRevision !== revision) return;
-                settings.style.transition = `max-height ${expandDuration}ms var(--motion-ease), opacity 180ms ease, transform ${expandDuration}ms var(--motion-spring)`;
-                settings.style.maxHeight = `${targetHeight}px`;
-                settings.style.opacity = '1';
-                settings.style.transform = 'translateY(0)';
-                settings.classList.add('sub-settings-expanded');
-            });
-            settings._expandTimer = setTimeout(() => {
-                if (settings._expandRevision !== revision) return;
-                settings.style.maxHeight = 'none';
-                settings.style.overflow = 'visible';
-                settings.style.willChange = 'auto';
-                settings._expandTimer = null;
-            }, expandDuration + 40);
-            return;
-        }
-        if (settings.classList.contains('hidden')) return;
-        settings.style.transition = 'none';
-        settings.style.maxHeight = `${settings.scrollHeight}px`;
-        settings.style.opacity = '1';
-        settings.style.transform = 'translateY(0)';
-        void settings.offsetHeight;
-        requestAnimationFrame(() => {
-            if (settings._expandRevision !== revision) return;
-            settings.style.transition = `max-height ${collapseDuration}ms var(--motion-ease), opacity 160ms ease, transform ${collapseDuration}ms var(--motion-ease)`;
-            settings.style.maxHeight = '0px';
-            settings.style.opacity = '0';
-            settings.style.transform = 'translateY(-6px)';
-            settings.classList.remove('sub-settings-expanded');
-        });
-        settings._expandTimer = setTimeout(() => {
-            if (settings._expandRevision !== revision) return;
-            settings.classList.add('hidden');
-            settings.style.overflow = 'hidden';
-            settings.style.willChange = 'auto';
-            settings._expandTimer = null;
-        }, collapseDuration + 40);
-    },
     async getPreferredBlockDevice() {
         const device = (await this.exec("for d in /sys/block/*; do b=$(basename \"$d\"); case \"$b\" in loop*|ram*|zram*|dm-*) continue ;; esac; [ -d \"$d/queue\" ] || continue; echo \"$b\"; break; done")).trim();
         return device || '';
@@ -1457,15 +1385,21 @@
         return this.withLock('loop-apply', async () => {
             const command = this.state.loopEnabled ? 'start' : 'stop';
             const button = document.getElementById('zram-loop-action');
+            const stopButton = document.getElementById('zram-loop-stop');
             let succeeded = false;
             try {
-                if (this._loopConfigSavePromise) await this._loopConfigSavePromise.catch(() => {});
+                this.state.loopEnabled = command === 'start';
+                const toggle = document.getElementById('zram-writeback-switch');
+                if (toggle) toggle.checked = this.state.loopEnabled;
+                if (typeof this.updateLoopControlState === 'function') this.updateLoopControlState();
+                await this.persistLoopConfig('enabled');
                 const configured = this.parseIoConfig(await this.readConfig('loop.conf'));
                 if (command === 'start' && !configured.size_mb) {
                     this.showToast(this.t('writebackBlockSizeRequired'), 'warning');
                     return false;
                 }
                 if (button) button.disabled = true;
+                if (stopButton) stopButton.disabled = true;
                 this.showLoading(true);
                 const service = this.shellQuote(`${this.modDir}/service.sh`);
                 const result = await this.execResult(`/system/bin/sh ${service} --apply-writeback-block`);
@@ -1477,6 +1411,7 @@
             } finally {
                 this.showLoading(false);
                 if (button) button.disabled = !this.zramFeatures?.writebackControl;
+                if (stopButton) stopButton.disabled = !this.zramFeatures?.writebackControl || !this._loopActive;
             }
             this.showToast(this.t(succeeded
                 ? (command === 'stop' ? 'writebackBlockDisabled' : 'writebackBlockApplied')
@@ -2381,7 +2316,12 @@
         const loopAction = document.getElementById('zram-loop-action');
         if (loopAction && !loopAction.dataset.bound) {
             loopAction.dataset.bound = '1';
-            loopAction.addEventListener('click', () => this.applyLoopImmediate());
+            loopAction.addEventListener('click', () => this.applyLoopImmediate('start'));
+        }
+        const loopStop = document.getElementById('zram-loop-stop');
+        if (loopStop && !loopStop.dataset.bound) {
+            loopStop.dataset.bound = '1';
+            loopStop.addEventListener('click', () => this.applyLoopImmediate('stop'));
         }
     },
     initZramPath() {

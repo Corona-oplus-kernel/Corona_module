@@ -75,7 +75,7 @@ case "$ACTION" in
         apply_official_backing
         ;;
     stop|disable|delete)
-        restore_official_backing
+        /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" false "$size_mb"
         ;;
     apply)
         if [ "$enabled" = "1" ]; then

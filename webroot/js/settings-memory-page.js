@@ -52,6 +52,7 @@
         const container = document.getElementById('zram-writeback-switch-container');
         const settings = document.getElementById('zram-loop-settings');
         const action = document.getElementById('zram-loop-action');
+        const stop = document.getElementById('zram-loop-stop');
         if (!toggle) return;
         const supported = !!this.zramFeatures?.writebackControl;
         toggle.disabled = !supported;
@@ -59,6 +60,7 @@
         if (container) container.classList.toggle('feature-disabled', !supported);
         if (settings) settings.classList.toggle('enabled', supported && toggle.checked);
         if (action) action.disabled = !supported;
+        if (stop) stop.disabled = !supported || !this._loopActive;
         const hint = document.getElementById('zram-writeback-hint');
         if (hint) {
             hint.textContent = supported ? '' : this.t('writebackUnsupported');
@@ -101,9 +103,11 @@
         }
         const action = document.getElementById('zram-loop-action');
         if (action) {
-            action.textContent = this.t(this._loopActive ? 'stopLoop' : 'startLoop');
-            action.classList.toggle('running', this._loopActive);
+            action.textContent = this.t(this._loopActive ? 'recreateLoop' : 'createLoop');
+            action.classList.remove('running');
         }
+        const stop = document.getElementById('zram-loop-stop');
+        if (stop) stop.disabled = !this.zramFeatures?.writebackControl || !this._loopActive;
         return display;
     },
     async refreshZramLoopDevice(notify = false, force = false) {

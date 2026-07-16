@@ -4546,12 +4546,27 @@ body.theme-dark #zram-settings .option-item {
     margin-top: 2px;
 }
 
-.loop-action-btn.running {
+.loop-action-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 2px;
+}
+
+.loop-stop-btn {
     background: color-mix(in srgb, var(--danger) 88%, black);
     box-shadow: 0 6px 18px color-mix(in srgb, var(--danger) 28%, transparent);
 }
 
+.loop-stop-btn:disabled {
+    box-shadow: none;
+}
+
 @media (max-width: 380px) {
+    .loop-action-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
     .loop-parameter-grid {
         grid-template-columns: minmax(0, 1fr);
     }
