@@ -927,7 +927,7 @@
             .map(value => parseInt(value, 10))
             .filter(value => Number.isFinite(value) && value > 0);
         this.loopSizeOptions = [...new Set(officialSizes)].sort((left, right) => left - right);
-        if (!this.loopSizeOptions.length) this.loopSizeOptions = [4, 8, 12];
+        this.loopSizeFixed = this.loopSizeOptions.length > 0;
         const enabledMatch = loopConfig
             ? loopConfig.match(/enabled=(\d)/)
             : source.match(/zram_writeback=(\S+)/);
@@ -944,27 +944,44 @@
             const officialSize = parseInt((await this.exec('getprop persist.sys.oplus.nandswap.swapsize.curr 2>/dev/null || getprop persist.sys.oplus.nandswap.swapsize 2>/dev/null')).trim(), 10);
             if (Number.isFinite(officialSize) && officialSize > 0) requestedSize = officialSize;
         }
-        if (!requestedSize) requestedSize = this.loopSizeOptions[this.loopSizeOptions.length - 1];
-        this.state.loopSizeGb = this.loopSizeOptions.reduce((nearest, candidate) => (
-            Math.abs(candidate - requestedSize) < Math.abs(nearest - requestedSize) ? candidate : nearest
-        ), this.loopSizeOptions[0]);
+        if (this.loopSizeFixed) {
+            if (!requestedSize) requestedSize = this.loopSizeOptions[this.loopSizeOptions.length - 1];
+            this.state.loopSizeGb = this.loopSizeOptions.reduce((nearest, candidate) => (
+                Math.abs(candidate - requestedSize) < Math.abs(nearest - requestedSize) ? candidate : nearest
+            ), this.loopSizeOptions[0]);
+        } else {
+            this.state.loopSizeGb = Math.max(1, Math.min(16, requestedSize || 4));
+        }
         const toggle = document.getElementById('zram-writeback-switch');
+        if (toggle) toggle.checked = this.state.loopEnabled;
+        this.renderLoopSizeOptions();
+        const configuredSizeMb = sizeMatch ? parseInt(sizeMatch[1], 10) : 0;
+        if (loopConfig && configuredSizeMb > 0 && configuredSizeMb !== this.state.loopSizeGb * 1024) {
+            await this.persistLoopConfig('size_mb');
+        }
+        if (!loopConfig && (enabledMatch || sizeMatch)) await this.persistLoopConfig('loop');
+    },
+    renderLoopSizeOptions() {
+        const container = document.getElementById('zram-writeback-size-options');
+        const sliderContainer = document.getElementById('zram-writeback-size-slider-container');
         const slider = document.getElementById('zram-writeback-size-slider');
         const value = document.getElementById('zram-writeback-size-value');
-        const minLabel = document.getElementById('zram-writeback-size-min');
-        const maxLabel = document.getElementById('zram-writeback-size-max');
-        if (toggle) toggle.checked = this.state.loopEnabled;
-        if (slider) {
-            slider.min = '0';
-            slider.max = String(this.loopSizeOptions.length - 1);
-            slider.step = '1';
-            slider.value = String(Math.max(0, this.loopSizeOptions.indexOf(this.state.loopSizeGb)));
+        if (container) {
+            container.hidden = !this.loopSizeFixed;
+            if (this.loopSizeFixed) {
+                container.style.gridTemplateColumns = `repeat(${this.loopSizeOptions.length}, minmax(0, 1fr))`;
+                container.innerHTML = this.loopSizeOptions.map(size => {
+                    const selected = size === this.state.loopSizeGb;
+                    return `<button type="button" class="writeback-size-option${selected ? ' selected' : ''}" data-size-gb="${size}" role="radio" aria-checked="${selected}">${size} GB</button>`;
+                }).join('');
+            }
+        }
+        if (sliderContainer) sliderContainer.hidden = this.loopSizeFixed;
+        if (!this.loopSizeFixed && slider) {
+            slider.value = String(this.state.loopSizeGb);
             this.updateSliderProgress(slider);
         }
-        if (minLabel) minLabel.textContent = `${this.loopSizeOptions[0]}GB`;
-        if (maxLabel) maxLabel.textContent = `${this.loopSizeOptions[this.loopSizeOptions.length - 1]}GB`;
-        if (value) value.textContent = `${Math.round(this.state.loopSizeGb)} GB`;
-        if (!loopConfig && (enabledMatch || sizeMatch)) await this.persistLoopConfig('loop');
+        if (!this.loopSizeFixed && value) value.textContent = `${this.state.loopSizeGb} GB`;
     },
     parseNumericList(text) {
         return String(text || '')
@@ -2292,21 +2309,40 @@
                 }
             });
         }
+        const sizeOptions = document.getElementById('zram-writeback-size-options');
+        if (sizeOptions && !sizeOptions.dataset.bound) {
+            sizeOptions.dataset.bound = '1';
+            sizeOptions.addEventListener('click', async (event) => {
+                const button = event.target.closest('.writeback-size-option');
+                if (!button || !sizeOptions.contains(button)) return;
+                const sizeGb = parseInt(button.dataset.sizeGb, 10);
+                if (!this.loopSizeFixed || !Number.isFinite(sizeGb) || !this.loopSizeOptions.includes(sizeGb)) return;
+                if (this.state.loopSizeGb === sizeGb) return;
+                this.state.loopSizeGb = sizeGb;
+                this.renderLoopSizeOptions();
+                if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
+                try {
+                    await this.persistLoopConfig('size_mb');
+                    this.markWritebackBlockDirty();
+                    this.showToast(this.t('writebackBlockConfigSaved'));
+                } catch (error) {
+                    this.showToast(this.t('loopConfigSaveFailed'), 'error');
+                }
+            });
+        }
         const sizeSlider = document.getElementById('zram-writeback-size-slider');
         const sizeValue = document.getElementById('zram-writeback-size-value');
         if (sizeSlider && !sizeSlider.dataset.bound) {
             sizeSlider.dataset.bound = '1';
             sizeSlider.addEventListener('input', (event) => {
-                const options = Array.isArray(this.loopSizeOptions) && this.loopSizeOptions.length
-                    ? this.loopSizeOptions
-                    : [4, 8, 12];
-                const index = Math.max(0, Math.min(options.length - 1, parseInt(event.target.value, 10) || 0));
-                this.state.loopSizeGb = options[index];
+                if (this.loopSizeFixed) return;
+                this.state.loopSizeGb = Math.max(1, Math.min(16, parseInt(event.target.value, 10) || 1));
                 if (sizeValue) sizeValue.textContent = `${this.state.loopSizeGb} GB`;
                 this.updateSliderProgress(sizeSlider);
                 if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
             });
             sizeSlider.addEventListener('change', async () => {
+                if (this.loopSizeFixed) return;
                 try {
                     await this.persistLoopConfig('size_mb');
                     this.markWritebackBlockDirty();

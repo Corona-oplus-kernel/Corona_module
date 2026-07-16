@@ -7,7 +7,7 @@
     <title data-i18n="text_3f923c3a"></title>
     <link rel="stylesheet" href="style.css?v=2026071562">
     <link rel="stylesheet" href="css/components.css?v=2026071552">
-    <link rel="stylesheet" href="css/pages/settings.css?v=2026071552">
+    <link rel="stylesheet" href="css/pages/settings.css?v=2026071553">
     <link rel="stylesheet" href="css/animations.css?v=2026071552">
     <script>
     (function () {
@@ -482,12 +482,17 @@
                                     <div class="loop-dependent-inner">
                                         <div class="setting-section" id="zram-writeback-size-section">
                                             <span class="section-label" data-i18n="writebackSpace"></span>
-                                            <div class="slider-container">
-                                                <input type="range" class="range-slider" id="zram-writeback-size-slider" min="0" max="2" step="1" value="2">
+                                            <div class="writeback-size-options" id="zram-writeback-size-options" role="radiogroup" aria-label="HybridSwap size">
+                                                <button type="button" class="writeback-size-option" data-size-gb="4" role="radio" aria-checked="false">4 GB</button>
+                                                <button type="button" class="writeback-size-option" data-size-gb="8" role="radio" aria-checked="false">8 GB</button>
+                                                <button type="button" class="writeback-size-option selected" data-size-gb="12" role="radio" aria-checked="true">12 GB</button>
+                                            </div>
+                                            <div class="slider-container" id="zram-writeback-size-slider-container" hidden>
+                                                <input type="range" class="range-slider" id="zram-writeback-size-slider" min="1" max="16" step="1" value="4">
                                                 <div class="slider-labels">
-                                                    <span id="zram-writeback-size-min">4GB</span>
-                                                    <span class="slider-value" id="zram-writeback-size-value">12 GB</span>
-                                                    <span id="zram-writeback-size-max">12GB</span>
+                                                    <span>1GB</span>
+                                                    <span class="slider-value" id="zram-writeback-size-value">4 GB</span>
+                                                    <span>16GB</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1909,6 +1914,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071562" defer></script>
+    <script src="script.js?v=2026071563" defer></script>
 </body>
 </html>

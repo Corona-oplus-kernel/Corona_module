@@ -137,7 +137,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071562` : '';
+        return map[name] ? `${map[name]}?v=2026071563` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -272,12 +272,12 @@ class CoronaAddon {
         const preciseInputs = {
             'zstd-level-slider': { unit: '', decimals: 0 },
             'zram-size-slider': { unit: 'GB', decimals: 2 },
+            'zram-writeback-size-slider': { unit: 'GB', decimals: 0 },
             'swappiness-slider': { unit: '', decimals: 0 },
             'direct-swappiness-slider': { unit: '', decimals: 0 },
             'zram-used-limit-slider': { unit: 'MB', decimals: 0 },
             'hybridswap-increase-slider': { unit: 'MB', decimals: 0 },
             'hybridswap-quota-slider': { unit: 'GB', decimals: 0 },
-            'zram-writeback-size-slider': { unit: 'GB', decimals: 0 },
             'swap-size-slider': { unit: 'MB', decimals: 0 }
         };
         document.querySelectorAll('.range-slider').forEach(slider => {
