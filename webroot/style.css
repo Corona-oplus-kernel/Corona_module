@@ -42,6 +42,9 @@
     --radius-pill: 999px;
     --nav-height: 56px;
     --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --motion-expand: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-spring: cubic-bezier(0.22, 1.32, 0.36, 1);
+    --motion-collapse: cubic-bezier(0.4, 0, 0.2, 1);
     --motion-fast: 0.22s;
     --motion-base: 0.36s;
     --motion-slow: 0.5s;

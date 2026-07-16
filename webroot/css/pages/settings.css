@@ -130,34 +130,18 @@ body.theme-dark .sub-card-header.expanded {
 /* chevron more obvious */
 .sub-card-header .expand-icon,
 .module-card-expand {
-    transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+    transition: transform 0.4s var(--motion-spring);
 }
 .sub-card-header.expanded .expand-icon {
     transform: rotate(270deg);
     opacity: 1;
 }
 .module-card-header .module-card-expand {
-    transition: transform 0.42s cubic-bezier(0.22, 0.61, 0.36, 1);
+    transition: transform 0.42s var(--motion-spring);
 }
 .module-card-header.expanded .module-card-expand,
 .module-card-expand.expanded {
     transform: rotate(180deg);
-}
-
-.sub-expandable-content > .collapsible-inner {
-    padding: 0;
-}
-
-.sub-expandable-content.expanded > .collapsible-inner {
-    padding: 4px 0 16px;
-}
-
-.module-card-content > .collapsible-inner {
-    padding: 0 18px;
-}
-
-.module-card-content.expanded > .collapsible-inner {
-    padding: 16px 18px 18px;
 }
 
 .info-row {
@@ -280,7 +264,7 @@ body.setting-descriptions-hidden .section-header-row > div {
     background: transparent;
     cursor: pointer;
     color: var(--text-sub);
-    transition: transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1), color 0.15s ease;
+    transition: transform 0.4s var(--motion-spring), color 0.15s ease;
 }
 .module-card-expand.expanded {
     transform: rotate(180deg);
@@ -337,7 +321,7 @@ body.theme-dark .module-card {
 .card-visibility-header .expand-icon {
     font-size: 12px;
     color: var(--text-sub);
-    transition: transform var(--motion-base) var(--motion-ease);
+    transition: transform 0.4s var(--motion-spring);
     display: inline-block;
     transform: rotate(90deg);
     flex-shrink: 0;
@@ -355,10 +339,10 @@ body.theme-dark .module-card {
     margin-top: 0;
     transform: translateY(-6px);
     transform-origin: top center;
-    transition: max-height 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    transition: max-height 360ms var(--motion-expand),
                 opacity 240ms ease,
-                transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
-                margin-top 360ms cubic-bezier(0.22, 1, 0.36, 1);
+                transform 380ms var(--motion-spring),
+                margin-top 360ms var(--motion-expand);
 }
 .card-visibility-switches.expanded {
     opacity: 1;
@@ -797,7 +781,7 @@ body.theme-dark #swap-content .zram-actions-sep {
 .advanced-fold-header .expand-icon {
     font-size: 12px;
     color: var(--text-dim);
-    transition: transform 0.2s ease;
+    transition: transform 0.4s var(--motion-spring);
     transform: rotate(90deg);
     flex-shrink: 0;
 }
@@ -810,9 +794,6 @@ body.theme-dark #swap-content .zram-actions-sep {
     max-height: 0;
     opacity: 0;
     padding-bottom: 0;
-}
-.advanced-fold-header .expand-icon {
-    transition: transform 0.22s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 #zram-recomp-section[hidden],
 #zstd-level-section[hidden] {

@@ -74,18 +74,18 @@
 
 .sub-expandable-content {
     will-change: max-height, opacity, transform, padding;
-    transition: max-height 0.38s cubic-bezier(0.25, 0.78, 0.18, 1),
-                padding 0.38s cubic-bezier(0.25, 0.78, 0.18, 1),
+    transition: max-height 0.38s var(--motion-expand),
+                padding 0.38s var(--motion-expand),
                 opacity 0.24s ease,
-                transform 0.30s cubic-bezier(0.22, 0.76, 0.24, 1);
+                transform 0.36s var(--motion-spring);
 }
 
 .module-card-content {
     will-change: max-height, opacity, transform, padding;
-    transition: max-height var(--motion-base) var(--motion-ease),
-                padding var(--motion-base) var(--motion-ease),
+    transition: max-height var(--motion-base) var(--motion-expand),
+                padding var(--motion-base) var(--motion-expand),
                 opacity var(--motion-fast) ease,
-                transform 0.34s var(--motion-ease);
+                transform 0.4s var(--motion-spring);
 }
 
 .module-card-content.animating,

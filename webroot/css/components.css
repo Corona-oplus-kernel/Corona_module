@@ -252,7 +252,7 @@
     opacity: 0;
     transform: translateY(-4px) scale(0.98);
     pointer-events: none;
-    transition: max-height 280ms cubic-bezier(0.22, 1, 0.36, 1), padding 240ms cubic-bezier(0.22, 1, 0.36, 1), border-color 180ms ease, opacity 210ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition: max-height 280ms var(--motion-expand), padding 240ms var(--motion-expand), border-color 180ms ease, opacity 210ms ease, transform 320ms var(--motion-spring);
 }
 
 .slider-precise-row.editing .slider-precise-toggle {

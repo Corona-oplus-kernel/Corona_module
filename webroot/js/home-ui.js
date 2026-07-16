@@ -30,16 +30,20 @@
         const maximum = largePanel ? 560 : 480;
         return Math.round(Math.min(maximum, Math.max(280, visual * 0.2 + 240)));
     },
-    setPanelTransition(content, durationMs, mode = 'both') {
+    getPanelMotion(direction = 'expand') {
+        return direction === 'collapse'
+            ? { height: 'cubic-bezier(0.4, 0, 0.2, 1)', content: 'cubic-bezier(0.32, 0, 0.2, 1)' }
+            : { height: 'cubic-bezier(0.16, 1, 0.3, 1)', content: 'cubic-bezier(0.22, 1.32, 0.36, 1)' };
+    },
+    setPanelTransition(content, durationMs, mode = 'both', direction = 'expand') {
         if (!content) return;
         const d = Math.max(180, Number(durationMs) || 320);
-        const ease = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
+        const motion = this.getPanelMotion(direction);
         if (mode === 'height') {
-            // collapse: only fold height so inner content stays visible while closing
-            content.style.transition = `max-height ${d}ms ${ease}`;
+            content.style.transition = `max-height ${d}ms ${motion.height}`;
             return;
         }
-        content.style.transition = `max-height ${d}ms ${ease}, opacity ${Math.round(d * 0.7)}ms ease, transform ${Math.round(d * 0.8)}ms ${ease}`;
+        content.style.transition = `max-height ${d}ms ${motion.height}, opacity ${Math.round(d * 0.7)}ms ease, transform ${Math.round(d * 0.88)}ms ${motion.content}`;
     },
     clearPanelTransition(content) {
         if (!content) return;
@@ -137,17 +141,17 @@
         // duration: use capped visual height so huge panels (模块设置) don't feel broken
         const visual = Math.min(Math.max(target - from, from === 0 ? target : 1), 720);
         const duration = this.getPanelAnimMs(visual, content);
-        const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
+        const motion = this.getPanelMotion('expand');
 
         if (toggle) {
-            toggle.style.transition = `transform ${duration}ms ${ease}`;
+            toggle.style.transition = `transform ${Math.round(duration * 0.92)}ms ${motion.content}`;
             toggle.classList.add('expanded');
             toggle.setAttribute('aria-expanded', 'true');
             const svg = toggle.querySelector && toggle.querySelector('svg');
             if (svg) { svg.style.transition = 'none'; svg.style.transform = 'none'; }
         }
         if (icon) {
-            icon.style.transition = `transform ${duration}ms ${ease}`;
+            icon.style.transition = `transform ${Math.round(duration * 0.92)}ms ${motion.content}`;
             icon.classList.add('expanded');
         }
         const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
@@ -189,7 +193,7 @@
         content.addEventListener('transitionend', onEnd);
 
         // CSS transition only (more stable than WAAPI max-height on huge panels)
-        content.style.transition = `max-height ${duration}ms ${ease}, opacity ${Math.round(duration * 0.72)}ms ease, transform ${duration}ms ${ease}`;
+        content.style.transition = `max-height ${duration}ms ${motion.height}, opacity ${Math.round(duration * 0.72)}ms ease, transform ${Math.round(duration * 0.92)}ms ${motion.content}`;
         void content.offsetHeight;
         content.style.maxHeight = target + 'px';
         content.style.opacity = '1';
@@ -238,17 +242,17 @@
 
         const visual = Math.min(from, 720);
         const duration = this.getPanelAnimMs(visual, content);
-        const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
+        const motion = this.getPanelMotion('collapse');
 
         if (toggle) {
-            toggle.style.transition = `transform ${duration}ms ${ease}`;
+            toggle.style.transition = `transform ${Math.round(duration * 0.82)}ms ${motion.content}`;
             toggle.classList.remove('expanded');
             toggle.setAttribute('aria-expanded', 'false');
             const svg = toggle.querySelector && toggle.querySelector('svg');
             if (svg) { svg.style.transition = 'none'; svg.style.transform = 'none'; }
         }
         if (icon) {
-            icon.style.transition = `transform ${duration}ms ${ease}`;
+            icon.style.transition = `transform ${Math.round(duration * 0.82)}ms ${motion.content}`;
             icon.classList.remove('expanded');
         }
         const header = toggle && (toggle.closest('.module-card-header') || toggle.closest('.sub-card-header'));
@@ -310,7 +314,7 @@
         content._anim = onEnd;
         content.addEventListener('transitionend', onEnd);
 
-        content.style.transition = `max-height ${duration}ms ${ease}, opacity ${Math.round(duration * 0.68)}ms ease, transform ${duration}ms ${ease}`;
+        content.style.transition = `max-height ${duration}ms ${motion.height}, opacity ${Math.round(duration * 0.62)}ms ease, transform ${Math.round(duration * 0.82)}ms ${motion.content}`;
         void content.offsetHeight;
         content.style.maxHeight = '0px';
         content.style.opacity = '0';
@@ -520,7 +524,8 @@
                     list.style.transform = currentHeight > 1 ? 'translateY(0)' : 'translateY(-6px)';
                     void list.offsetHeight;
                     const duration = this.getPanelAnimMs(targetHeight, list);
-                    list.style.transition = `max-height ${duration}ms cubic-bezier(0.22, 1, 0.36, 1), opacity ${Math.round(duration * 0.72)}ms ease, transform ${duration}ms cubic-bezier(0.22, 1, 0.36, 1), margin-top ${duration}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+                    const motion = this.getPanelMotion('expand');
+                    list.style.transition = `max-height ${duration}ms ${motion.height}, opacity ${Math.round(duration * 0.72)}ms ease, transform ${Math.round(duration * 0.92)}ms ${motion.content}, margin-top ${duration}ms ${motion.height}`;
                     list.style.maxHeight = `${targetHeight}px`;
                     list.style.opacity = '1';
                     list.style.transform = 'translateY(0)';
@@ -539,7 +544,8 @@
                     list.style.transform = 'translateY(0)';
                     void list.offsetHeight;
                     const duration = this.getPanelAnimMs(fromHeight, list);
-                    list.style.transition = `max-height ${duration}ms cubic-bezier(0.22, 1, 0.36, 1), opacity ${Math.round(duration * 0.68)}ms ease, transform ${duration}ms cubic-bezier(0.22, 1, 0.36, 1), margin-top ${duration}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+                    const motion = this.getPanelMotion('collapse');
+                    list.style.transition = `max-height ${duration}ms ${motion.height}, opacity ${Math.round(duration * 0.62)}ms ease, transform ${Math.round(duration * 0.82)}ms ${motion.content}, margin-top ${duration}ms ${motion.height}`;
                     list.style.maxHeight = '0px';
                     list.style.opacity = '0';
                     list.style.transform = 'translateY(-6px)';

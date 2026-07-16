@@ -10,7 +10,8 @@
         if (!header || !body || header.dataset.bound) return;
         header.dataset.bound = '1';
 
-        const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
+        const expandMotion = { height: 'cubic-bezier(0.16, 1, 0.3, 1)', content: 'cubic-bezier(0.22, 1.32, 0.36, 1)' };
+        const collapseMotion = { height: 'cubic-bezier(0.4, 0, 0.2, 1)', content: 'cubic-bezier(0.32, 0, 0.2, 1)' };
         const durationFor = (height) => Math.round(Math.min(440, Math.max(240, (Number(height) || 0) * 0.28 + 190)));
 
         const setClosedInstant = () => {
@@ -26,22 +27,32 @@
         };
 
         const openAnim = () => {
-            if (body.dataset.open === '1' || body._foldAnim) return;
+            if (body.dataset.open === '1' && !body._foldAnim) return;
+            if (body._foldAnim) {
+                clearTimeout(body._foldAnim);
+                body._foldAnim = null;
+            }
             body.hidden = false;
             body.style.display = 'block';
             body.style.overflow = 'hidden';
             body.style.transition = 'none';
+            const currentHeight = Math.max(body.getBoundingClientRect().height || 0, 0);
+            const currentStyle = currentHeight > 1 ? getComputedStyle(body) : null;
+            const currentOpacity = currentStyle ? Math.max(0, Math.min(1, parseFloat(currentStyle.opacity) || 0)) : 0;
+            const currentTransform = currentStyle?.transform && currentStyle.transform !== 'none'
+                ? currentStyle.transform
+                : 'translateY(-8px) scale(0.985)';
             body.style.maxHeight = 'none';
             body.style.opacity = '1';
             body.style.transform = 'none';
             const target = Math.max(body.scrollHeight, 1);
-            body.style.maxHeight = '0px';
-            body.style.opacity = '0';
-            body.style.transform = 'translateY(-8px) scale(0.985)';
+            body.style.maxHeight = `${Math.min(currentHeight, target)}px`;
+            body.style.opacity = String(currentOpacity);
+            body.style.transform = currentTransform;
             void body.offsetHeight;
             const d = durationFor(target);
             body.style.willChange = 'max-height, opacity, transform';
-            body.style.transition = `max-height ${d}ms ${ease}, opacity ${Math.round(d * 0.72)}ms ease, transform ${d}ms ${ease}`;
+            body.style.transition = `max-height ${d}ms ${expandMotion.height}, opacity ${Math.round(d * 0.72)}ms ease, transform ${Math.round(d * 0.92)}ms ${expandMotion.content}`;
             void body.offsetHeight;
             body.style.maxHeight = target + 'px';
             body.style.opacity = '1';
@@ -77,7 +88,7 @@
             void body.offsetHeight;
             const d = durationFor(from);
             body.style.willChange = 'max-height, opacity, transform';
-            body.style.transition = `max-height ${d}ms ${ease}, opacity ${Math.round(d * 0.68)}ms ease, transform ${d}ms ${ease}`;
+            body.style.transition = `max-height ${d}ms ${collapseMotion.height}, opacity ${Math.round(d * 0.62)}ms ease, transform ${Math.round(d * 0.82)}ms ${collapseMotion.content}`;
             void body.offsetHeight;
             body.style.maxHeight = '0px';
             body.style.opacity = '0';
