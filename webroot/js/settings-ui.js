@@ -233,22 +233,6 @@
         const themeLabels = document.querySelectorAll('#theme-options .theme-option span');
         if (themeLabels[0]) themeLabels[0].textContent = this.t('lightTheme');
         if (themeLabels[1]) themeLabels[1].textContent = this.t('darkTheme');
-        const prefRows = document.querySelectorAll('#app-settings-content .ui-pref-switch-container .switch-info');
-        if (prefRows[1]) {
-            const labels = prefRows[1].querySelectorAll('span');
-            if (labels[0]) labels[0].textContent = this.t('changePreview');
-            if (labels[1]) labels[1].textContent = this.t('changePreviewDesc');
-        }
-        if (prefRows[2]) {
-            const labels = prefRows[2].querySelectorAll('span');
-            if (labels[0]) labels[0].textContent = this.t('settingDescriptions');
-            if (labels[1]) labels[1].textContent = this.t('settingDescriptionsDesc');
-        }
-        if (prefRows[3]) {
-            const labels = prefRows[3].querySelectorAll('span');
-            if (labels[0]) labels[0].textContent = this.t('categoryConfig');
-            if (labels[1]) labels[1].textContent = this.t('categoryConfigDesc');
-        }
         const cardHeader = document.getElementById('card-visibility-toggle');
         if (cardHeader) {
             const labels = cardHeader.querySelectorAll('span');
