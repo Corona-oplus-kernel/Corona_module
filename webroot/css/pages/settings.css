@@ -914,3 +914,76 @@ body.theme-dark #swap-content .zram-actions-sep {
         animation-duration: 0.01ms;
     }
 }
+
+.animated-option-grid {
+    --animated-option-count: 3;
+    --animated-option-index: 0;
+    position: relative;
+    grid-template-columns: repeat(var(--animated-option-count), minmax(0, 1fr));
+    gap: 0;
+    padding: 4px;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-ctl);
+    background: var(--glass-control-bg);
+}
+
+.animated-option-grid::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    width: calc((100% - 8px) / var(--animated-option-count));
+    border: 1px solid var(--primary-border);
+    border-radius: calc(var(--radius-ctl) - 4px);
+    background: var(--primary-dim);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 4px 12px var(--primary-shadow);
+    opacity: 0;
+    transform: translateX(calc(var(--animated-option-index) * 100%));
+    transition: transform 420ms var(--motion-spring), opacity 180ms ease, background-color 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
+    pointer-events: none;
+}
+
+.animated-option-grid.indicator-ready::before {
+    opacity: 1;
+}
+
+.animated-option-grid > .option-item,
+body.theme-dark .animated-option-grid > .option-item,
+#zram-content .animated-option-grid > .option-item,
+#memory-compression-content .animated-option-grid > .option-item {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    border: 1px solid transparent !important;
+    border-radius: calc(var(--radius-ctl) - 4px);
+    background: transparent !important;
+    box-shadow: none !important;
+    transition: transform 220ms var(--motion-spring), color 220ms ease;
+}
+
+.animated-option-grid > .option-item.selected,
+#zram-content .animated-option-grid > .option-item.selected,
+#memory-compression-content .animated-option-grid > .option-item.selected {
+    border-color: transparent !important;
+    background: transparent !important;
+    color: var(--primary) !important;
+    box-shadow: none !important;
+    animation: writeback-size-pop 360ms var(--motion-spring);
+}
+
+#zram-priority-list.animated-option-grid > .option-item {
+    padding-inline: 5px;
+    font-size: 12px;
+    line-height: 1.25;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animated-option-grid::before,
+    .animated-option-grid > .option-item {
+        transition-duration: 0.01ms;
+        animation-duration: 0.01ms;
+    }
+}

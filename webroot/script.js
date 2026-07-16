@@ -138,7 +138,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071565` : '';
+        return map[name] ? `${map[name]}?v=2026071566` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -718,8 +718,10 @@ class CoronaAddon {
         bindZramRange('hybridswap-quota-slider', 'hybridswap-quota-value', 'hybridswapQuotaGb', 'hybridswap_quota_day', value => `${value} GB`, value => parseInt(value, 10));
         document.getElementById('zram-priority-list')?.querySelectorAll('.option-item').forEach(item => {
             item.addEventListener('click', () => {
-                document.getElementById('zram-priority-list').querySelectorAll('.option-item').forEach(option => option.classList.remove('selected'));
+                const priorityList = document.getElementById('zram-priority-list');
+                priorityList.querySelectorAll('.option-item').forEach(option => option.classList.remove('selected'));
                 item.classList.add('selected');
+                this.syncAnimatedOptionIndicator(priorityList);
                 const editor = document.getElementById('zram-priority-custom-editor');
                 const input = document.getElementById('zram-priority-custom-input');
                 if (item.dataset.custom === '1') {

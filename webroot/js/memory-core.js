@@ -843,10 +843,20 @@
                 : parseInt(item.dataset.value, 10) === this.state.zramPriority;
             item.classList.toggle('selected', selected);
         });
+        this.syncAnimatedOptionIndicator(list);
         const editor = document.getElementById('zram-priority-custom-editor');
         const input = document.getElementById('zram-priority-custom-input');
         if (editor) editor.classList.toggle('visible', custom);
         if (input) input.value = String(this.state.zramPriority);
+    },
+    syncAnimatedOptionIndicator(target) {
+        const list = typeof target === 'string' ? document.getElementById(target) : target;
+        if (!list) return;
+        const items = [...list.querySelectorAll('.option-item')];
+        const selectedIndex = items.findIndex(item => item.classList.contains('selected'));
+        list.style.setProperty('--animated-option-count', String(Math.max(1, items.length)));
+        list.style.setProperty('--animated-option-index', String(Math.max(0, selectedIndex)));
+        list.classList.toggle('indicator-ready', selectedIndex >= 0);
     },
     async loadZramConfig() {
         const config = await this.readConfig('zram.conf');
@@ -2489,9 +2499,11 @@
         this.setSubSettingsExpanded(settings, show);
     },
     renderMemoryPressureProfile() {
-        document.querySelectorAll('#memory-pressure-profile-list .option-item').forEach(item => {
+        const list = document.getElementById('memory-pressure-profile-list');
+        list?.querySelectorAll('.option-item').forEach(item => {
             item.classList.toggle('selected', item.dataset.value === this.state.pressureProfile);
         });
+        this.syncAnimatedOptionIndicator(list);
     },
     async loadMemoryPressureConfig() {
         const config = await this.readConfig('memory_pressure.conf');
@@ -2568,10 +2580,12 @@
                 item.addEventListener('click', () => {
                     priorityList.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                     item.classList.add('selected');
+                    this.syncAnimatedOptionIndicator(priorityList);
                     this.state.swapPriority = parseInt(item.dataset.value);
                     this.markSwapDirty('priority');
                 });
             });
+            this.syncAnimatedOptionIndicator(priorityList);
         }
         this.loadSwapConfig();
         const swapApplyBtn = document.getElementById('swap-apply-btn');
@@ -2615,6 +2629,7 @@
                     list.querySelectorAll('.option-item').forEach(i => {
                         i.classList.toggle('selected', parseInt(i.dataset.value) === this.state.swapPriority);
                     });
+                    this.syncAnimatedOptionIndicator(list);
                 }
             }
             if (pathMatch && pathMatch[1].trim()) this.state.swapPath = pathMatch[1].trim();
