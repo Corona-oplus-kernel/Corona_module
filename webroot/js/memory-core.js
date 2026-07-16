@@ -1441,7 +1441,6 @@
         return this.withLock('loop-apply', async () => {
             const command = this.state.loopEnabled ? 'start' : 'stop';
             const button = document.getElementById('zram-loop-action');
-            const stopButton = document.getElementById('zram-loop-stop');
             let succeeded = false;
             try {
                 this.state.loopEnabled = command === 'start';
@@ -1455,7 +1454,6 @@
                     return false;
                 }
                 if (button) button.disabled = true;
-                if (stopButton) stopButton.disabled = true;
                 this.showLoading(true);
                 const service = this.shellQuote(`${this.modDir}/service.sh`);
                 const result = await this.execResult(`/system/bin/sh ${service} --apply-writeback-block`);
@@ -1467,7 +1465,6 @@
             } finally {
                 this.showLoading(false);
                 if (button) button.disabled = !this.zramFeatures?.writebackControl;
-                if (stopButton) stopButton.disabled = !this.zramFeatures?.writebackControl || !this._loopActive;
             }
             this.showToast(this.t(succeeded
                 ? (command === 'stop' ? 'writebackBlockDisabled' : 'writebackBlockApplied')
@@ -2372,12 +2369,7 @@
         const loopAction = document.getElementById('zram-loop-action');
         if (loopAction && !loopAction.dataset.bound) {
             loopAction.dataset.bound = '1';
-            loopAction.addEventListener('click', () => this.applyLoopImmediate('start'));
-        }
-        const loopStop = document.getElementById('zram-loop-stop');
-        if (loopStop && !loopStop.dataset.bound) {
-            loopStop.dataset.bound = '1';
-            loopStop.addEventListener('click', () => this.applyLoopImmediate('stop'));
+            loopAction.addEventListener('click', () => this.applyLoopImmediate(this._loopActive ? 'stop' : 'start'));
         }
     },
     initZramPath() {
