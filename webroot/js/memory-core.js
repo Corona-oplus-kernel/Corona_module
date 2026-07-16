@@ -1443,11 +1443,7 @@
             const button = document.getElementById('zram-loop-action');
             let succeeded = false;
             try {
-                this.state.loopEnabled = command === 'start';
-                const toggle = document.getElementById('zram-writeback-switch');
-                if (toggle) toggle.checked = this.state.loopEnabled;
-                if (typeof this.updateLoopControlState === 'function') this.updateLoopControlState();
-                await this.persistLoopConfig('enabled');
+                if (this._loopConfigSavePromise) await this._loopConfigSavePromise.catch(() => {});
                 const configured = this.parseIoConfig(await this.readConfig('loop.conf'));
                 if (command === 'start' && !configured.size_mb) {
                     this.showToast(this.t('writebackBlockSizeRequired'), 'warning');
@@ -2349,7 +2345,6 @@
                 if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
             });
             sizeSlider.addEventListener('change', async () => {
-                if (this.loopSizeFixed) return;
                 try {
                     await this.persistLoopConfig('size_mb');
                     this.markWritebackBlockDirty();
@@ -2369,7 +2364,7 @@
         const loopAction = document.getElementById('zram-loop-action');
         if (loopAction && !loopAction.dataset.bound) {
             loopAction.dataset.bound = '1';
-            loopAction.addEventListener('click', () => this.applyLoopImmediate(this._loopActive ? 'stop' : 'start'));
+            loopAction.addEventListener('click', () => this.applyLoopImmediate());
         }
     },
     initZramPath() {

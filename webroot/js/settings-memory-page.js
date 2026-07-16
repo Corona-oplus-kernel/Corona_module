@@ -101,8 +101,8 @@
         }
         const action = document.getElementById('zram-loop-action');
         if (action) {
-            action.textContent = this.t(this._loopActive ? 'closeLoop' : 'createLoop');
-            action.classList.toggle('running', this._loopActive);
+            if (!action.dataset.dirtyHint) action.textContent = this.t('applyWritebackBlock');
+            action.classList.remove('running');
         }
         return display;
     },

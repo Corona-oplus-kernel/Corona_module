@@ -4542,11 +4542,6 @@ body.theme-dark #zram-settings .option-item {
     margin-top: 2px;
 }
 
-.loop-action-btn.running {
-    background: color-mix(in srgb, var(--danger) 88%, black);
-    box-shadow: 0 6px 18px color-mix(in srgb, var(--danger) 28%, transparent);
-}
-
 .priority-custom-editor {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(110px, 0.7fr) auto;
