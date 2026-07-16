@@ -127,6 +127,7 @@
     },
     translateDomNode(node) {
         if (!node) return;
+        if (node.parentElement?.hasAttribute('data-i18n')) return;
         if (!this._translationTextOriginals) this._translationTextOriginals = new WeakMap();
         if (!this._translationTextTranslated) this._translationTextTranslated = new WeakMap();
         const parentTag = node.parentElement?.tagName?.toLowerCase();
@@ -159,6 +160,22 @@
     },
     translateDomElement(element) {
         if (!element || element.nodeType !== 1) return;
+        const textKey = element.getAttribute('data-i18n');
+        if (textKey) {
+            const text = this.t(textKey);
+            if (element.textContent !== text) element.textContent = text;
+        }
+        const fallbackAttributes = [];
+        ['placeholder', 'title', 'aria-label', 'alt'].forEach(attribute => {
+            const translationKey = element.getAttribute(`data-i18n-${attribute}`);
+            if (translationKey) {
+                const translated = this.t(translationKey);
+                if (element.getAttribute(attribute) !== translated) element.setAttribute(attribute, translated);
+            } else if (element.hasAttribute(attribute)) {
+                fallbackAttributes.push(attribute);
+            }
+        });
+        if (!fallbackAttributes.length) return;
         if (!this._translationAttributeOriginals) this._translationAttributeOriginals = new WeakMap();
         if (!this._translationAttributeTranslated) this._translationAttributeTranslated = new WeakMap();
         let originals = this._translationAttributeOriginals.get(element);
@@ -171,8 +188,7 @@
             translations = {};
             this._translationAttributeTranslated.set(element, translations);
         }
-        ['placeholder', 'title', 'aria-label', 'alt'].forEach(attribute => {
-            if (!element.hasAttribute(attribute)) return;
+        fallbackAttributes.forEach(attribute => {
             const current = element.getAttribute(attribute);
             if (!(attribute in originals)) originals[attribute] = current;
             else if (current !== originals[attribute] && current !== translations[attribute] && /[\u3400-\u9fff]/.test(current)) originals[attribute] = current;
@@ -214,41 +230,12 @@
         this._translationObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
     },
     applyTranslations() {
-        const setText = (selector, value) => {
-            const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
-            if (el) el.textContent = value;
-        };
-        document.querySelectorAll('[data-i18n]').forEach(el => {
-            el.textContent = this.t(el.dataset.i18n);
-        });
-        ['placeholder', 'title', 'aria-label', 'alt'].forEach(attribute => {
-            const dataAttribute = `data-i18n-${attribute}`;
-            document.querySelectorAll(`[${dataAttribute}]`).forEach(element => {
-                element.setAttribute(attribute, this.t(element.getAttribute(dataAttribute)));
-            });
-        });
-        setText('.tab-item[data-page="home"] .tab-label', this.t('tabHome'));
-        setText('.tab-item[data-page="settings"] .tab-label', this.t('tabSettings'));
-        setText('#app-settings-card .module-card-title', this.t('moduleSettings'));
-        const themeLabels = document.querySelectorAll('#theme-options .theme-option span');
-        if (themeLabels[0]) themeLabels[0].textContent = this.t('lightTheme');
-        if (themeLabels[1]) themeLabels[1].textContent = this.t('darkTheme');
-        const cardHeader = document.getElementById('card-visibility-toggle');
-        if (cardHeader) {
-            const labels = cardHeader.querySelectorAll('span');
-            if (labels[0]) labels[0].textContent = this.t('cardVisibility');
-            if (labels[1]) labels[1].textContent = this.t('cardVisibilityDesc');
-        }
-        const loadingText = document.querySelector('#loading .loading-text');
-        if (loadingText && !document.getElementById('loading')?.classList.contains('show')) {
-            loadingText.textContent = this.t('processing');
-        }
+        this.translateDom(document.body);
         const zramApply = document.getElementById('zram-apply-btn');
         if (zramApply) zramApply.textContent = this.t(this._zramDirty ? 'applyZramDirty' : 'applyZram');
         if (typeof this.renderModuleVersion === 'function') this.renderModuleVersion();
         if (typeof this.renderKernelWorkflowBuild === 'function') this.renderKernelWorkflowBuild();
         if (typeof this.renderKernelReleaseUpdate === 'function') this.renderKernelReleaseUpdate();
-        this.translateDom(document.body);
     },
     setCategoryConfigVisibility(enabled, persist = false) {
         const normalized = !!enabled;
