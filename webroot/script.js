@@ -49,9 +49,9 @@ class CoronaAddon {
             language: 'zh',
             accent: 'blue',
             hue: 214,
-            changePreviewEnabled: true,
-            showSettingDescriptions: true,
-            showCategoryConfigToggles: true,
+            changePreviewEnabled: false,
+            showSettingDescriptions: false,
+            showCategoryConfigToggles: false,
             swapEnabled: false,
             swapSize: 2048,
             swapPriority: 0,
@@ -138,7 +138,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071603` : '';
+        return map[name] ? `${map[name]}?v=2026071604` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};

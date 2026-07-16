@@ -16,7 +16,7 @@
     },
     initChangePreviewPreference() {
         const saved = localStorage.getItem('corona_change_preview');
-        this.setChangePreviewEnabled(saved === null ? true : saved === '1');
+        this.setChangePreviewEnabled(saved === '1');
     },
     setChangePreviewEnabled(enabled, persist = false) {
         const normalized = !!enabled;
@@ -29,7 +29,7 @@
     },
     initSettingDescriptionPreference() {
         const saved = localStorage.getItem('corona_setting_descriptions');
-        this.setSettingDescriptionsEnabled(saved === null ? true : saved === '1');
+        this.setSettingDescriptionsEnabled(saved === '1');
     },
     setSettingDescriptionsEnabled(enabled, persist = false) {
         const normalized = !!enabled;
@@ -43,7 +43,7 @@
     },
     initCategoryConfigVisibilityPreference() {
         const saved = localStorage.getItem('corona_category_config_toggles');
-        this.setCategoryConfigVisibility(saved === null ? true : saved === '1');
+        this.setCategoryConfigVisibility(saved === '1');
     },
     getTranslations() {
         return {
