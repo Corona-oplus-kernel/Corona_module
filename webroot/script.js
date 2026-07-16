@@ -138,7 +138,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071554` : '';
+        return map[name] ? `${map[name]}?v=2026071555` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -279,6 +279,7 @@ class CoronaAddon {
             'zram-used-limit-slider': { unit: 'MB', decimals: 0 },
             'hybridswap-increase-slider': { unit: 'MB', decimals: 0 },
             'hybridswap-quota-slider': { unit: 'GB', decimals: 0 },
+            'zram-writeback-size-slider': { unit: 'GB', decimals: 1 },
             'swap-size-slider': { unit: 'MB', decimals: 0 }
         };
         document.querySelectorAll('.range-slider').forEach(slider => {

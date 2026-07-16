@@ -85,14 +85,17 @@ get_oplus_vm_swappiness() {
 
 write_zram_swappiness() {
     value="$1"
+    direct_value="$2"
     [ -n "$value" ] || return 0
     spt_dir=/sys/module/swappiness_pressure_throttle/parameters
-    [ -f "$spt_dir/swappiness_idle" ] && echo "$value" > "$spt_dir/swappiness_idle" 2>/dev/null
+    [ -n "$value" ] && [ -f "$spt_dir/swappiness_idle" ] && echo "$value" > "$spt_dir/swappiness_idle" 2>/dev/null
     for node in /proc/oplus_mem/swappiness_para /proc/oplus_healthinfo/swappiness_para; do
         [ -w "$node" ] || continue
-        echo "vm_swappiness=${value}" > "$node" 2>/dev/null
+        [ -n "$direct_value" ] && echo "direct_swappiness=${direct_value}" > "$node" 2>/dev/null
+        [ -n "$value" ] && echo "vm_swappiness=${value}" > "$node" 2>/dev/null
         break
     done
+    [ -n "$value" ] || return
     [ -f /proc/sys/vm/swappiness ] && echo "$value" > /proc/sys/vm/swappiness 2>/dev/null
     [ -f /dev/memcg/memory.swappiness ] && echo "$value" > /dev/memcg/memory.swappiness 2>/dev/null
     [ -f /dev/memcg/apps/memory.swappiness ] && echo "$value" > /dev/memcg/apps/memory.swappiness 2>/dev/null
@@ -127,6 +130,26 @@ zram_config_needs_overlay() {
         now_oplus=$(get_oplus_vm_swappiness 2>/dev/null)
         [ -n "$want" ] && { [ "$want" != "$now_vm" ] || [ "$want" != "$now_apps" ] || { [ -n "$now_oplus" ] && [ "$want" != "$now_oplus" ]; }; } && return 0
     fi
+
+    if grep -q '^direct_swappiness=' "$conf"; then
+        want=$(get_conf_value "$conf" direct_swappiness)
+        now=$(for node in /proc/oplus_mem/swappiness_para /proc/oplus_healthinfo/swappiness_para; do [ -r "$node" ] || continue; awk -F': *' '/^direct_swappiness:/ { print $2; exit }' "$node"; break; done)
+        [ -n "$want" ] && [ -n "$now" ] && [ "$want" != "$now" ] && return 0
+    fi
+
+    if grep -q '^zram_used_limit_mb=' "$conf" && [ -r /dev/memcg/memory.zram_used_limit_mb ]; then
+        want=$(get_conf_value "$conf" zram_used_limit_mb)
+        now=$(cat /dev/memcg/memory.zram_used_limit_mb 2>/dev/null | tr -d ' \n')
+        [ -n "$want" ] && [ "$want" != "$now" ] && return 0
+    fi
+
+    for key in hybridswap_zram_increase hybridswap_quota_day; do
+        grep -q "^${key}=" "$conf" || continue
+        [ -r "/sys/block/$block/$key" ] || continue
+        want=$(get_conf_value "$conf" "$key")
+        now=$(cat "/sys/block/$block/$key" 2>/dev/null | tr -d ' \n')
+        [ -n "$want" ] && [ "$want" != "$now" ] && return 0
+    done
 
     want=$(get_loop_mode)
     if [ -n "$want" ]; then
@@ -641,25 +664,30 @@ apply_zram_config() {
         [ -n "$hybridswap_quota_day" ] && [ -w "/sys/block/$zram_block/hybridswap_quota_day" ] && echo "$hybridswap_quota_day" > "/sys/block/$zram_block/hybridswap_quota_day" 2>/dev/null
         return
     fi
-    swapoff "$zram_path" 2>/dev/null
+    swapoff "$zram_path" 2>/dev/null || return
     [ -x "$WRITEBACK_HELPER" ] && /system/bin/sh "$WRITEBACK_HELPER" remember "$zram_block" 2>/dev/null
-    echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null
+    echo 1 > "/sys/block/$zram_block/reset" 2>/dev/null || return
     if [ -n "$algorithm" ]; then
         algorithm=$(apply_zram_primary_algorithm "$zram_block" "$algorithm") || return
     fi
-    apply_zram_recomp_algorithms "$zram_block"
-    apply_zstd_compression_level
+    apply_zram_recomp_algorithms "$zram_block" || return
+    apply_zstd_compression_level || return
     if [ ! -f "/sys/block/$zram_block/hybridswap_loop_device" ] && [ -x "$WRITEBACK_HELPER" ]; then
-        /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" "$zram_writeback" "$writeback_size_mb" 2>/dev/null
+        /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" "$zram_writeback" "$writeback_size_mb" 2>/dev/null || return
     fi
-    echo "$size" > "/sys/block/$zram_block/disksize" 2>/dev/null
+    echo "$size" > "/sys/block/$zram_block/disksize" 2>/dev/null || return
     mkswap "$zram_path" 2>/dev/null || return
     swapon "$zram_path" -p "$zram_priority" 2>/dev/null || return
     if [ -f "/sys/block/$zram_block/hybridswap_loop_device" ] && [ -x "$WRITEBACK_HELPER" ]; then
-        /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" "$zram_writeback" "$writeback_size_mb" 2>/dev/null
+        /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" "$zram_writeback" "$writeback_size_mb" 2>/dev/null || return
     fi
     [ "$(get_swap_priority "$zram_path")" = "$zram_priority" ] || return
-    [ -n "$swappiness" ] && write_zram_swappiness "$swappiness"
+    if [ -n "$swappiness" ] || [ -n "$direct_swappiness" ]; then
+        write_zram_swappiness "$swappiness" "$direct_swappiness"
+    fi
+    [ -n "$zram_used_limit_mb" ] && [ -w /dev/memcg/memory.zram_used_limit_mb ] && echo "$zram_used_limit_mb" > /dev/memcg/memory.zram_used_limit_mb 2>/dev/null
+    [ -n "$hybridswap_zram_increase" ] && [ -w "/sys/block/$zram_block/hybridswap_zram_increase" ] && echo "$hybridswap_zram_increase" > "/sys/block/$zram_block/hybridswap_zram_increase" 2>/dev/null
+    [ -n "$hybridswap_quota_day" ] && [ -w "/sys/block/$zram_block/hybridswap_quota_day" ] && echo "$hybridswap_quota_day" > "/sys/block/$zram_block/hybridswap_quota_day" 2>/dev/null
 }
 
 apply_swap_config() {
