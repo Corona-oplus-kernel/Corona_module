@@ -83,7 +83,7 @@
         const candidate = String(this.state.zramPath || '/dev/block/zram0').split('/').pop();
         return /^zram\d+$/.test(candidate) ? candidate : 'zram0';
     },
-    renderLoopRuntimeState(loopDevice = '') {
+    renderLoopRuntimeState(loopDevice = '', managed = false) {
         const valueElement = document.getElementById('zram-loop-device-value');
         const display = loopDevice || this.t('notAssigned');
         if (valueElement) {
@@ -91,8 +91,8 @@
             valueElement.classList.toggle('active', !!loopDevice);
         }
         this._writebackDevice = loopDevice;
-        this._loopActive = !!loopDevice && this.state.loopEnabled;
-        this._systemWritebackActive = !!loopDevice && !this.state.loopEnabled;
+        this._loopActive = !!loopDevice && managed;
+        this._systemWritebackActive = !!loopDevice && !managed;
         this.updateLoopParameterDisplay(loopDevice);
         const status = document.getElementById('zram-loop-status');
         if (status) {
@@ -101,8 +101,8 @@
         }
         const action = document.getElementById('zram-loop-action');
         if (action) {
-            if (!action.dataset.dirtyHint) action.textContent = this.t('applyWritebackBlock');
-            action.classList.remove('running');
+            action.textContent = this.t(this._loopActive ? 'stopLoop' : 'startLoop');
+            action.classList.toggle('running', this._loopActive);
         }
         return display;
     },
@@ -113,11 +113,13 @@
             return loopDevice;
         }
         const zramBlock = this.getLoopZramBlock();
-        const command = `hybrid=/sys/block/${zramBlock}/hybridswap_loop_device; backing=/sys/block/${zramBlock}/backing_dev; if [ -f "$hybrid" ]; then current=$(cat "$hybrid" 2>/dev/null); elif [ -f "$backing" ]; then current=$(cat "$backing" 2>/dev/null); fi; printf '%s\\n' "$current" | tr -d ' \\r'`;
+        const command = `hybrid=/sys/block/${zramBlock}/hybridswap_loop_device; backing=/sys/block/${zramBlock}/backing_dev; state=/data/nandswap/corona_loop_device; if [ -f "$hybrid" ]; then current=$(cat "$hybrid" 2>/dev/null); elif [ -f "$backing" ]; then current=$(cat "$backing" 2>/dev/null); else current=$(cat "$state" 2>/dev/null); fi; current=$(printf '%s' "$current" | tr -d ' \\r\\n'); owned=0; case "$current" in /dev/block/loop*|/dev/loop*) /system/bin/losetup "$current" 2>/dev/null | grep -Fq /data/nandswap/corona_swapfile && owned=1 ;; esac; printf '%s\\n%s\\n' "$current" "$owned"`;
         const refresh = (async () => {
-            const raw = String(await this.exec(command) || '').trim();
+            const lines = String(await this.exec(command) || '').split(/\r?\n/);
+            const raw = String(lines[0] || '').trim();
             const loopDevice = raw && raw !== 'none' ? raw : '';
-            this.renderLoopRuntimeState(loopDevice);
+            const managed = String(lines[1] || '').trim() === '1';
+            this.renderLoopRuntimeState(loopDevice, managed);
             return loopDevice;
         })();
         this._loopRefreshPromise = refresh;

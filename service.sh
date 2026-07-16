@@ -131,10 +131,21 @@ zram_config_needs_overlay() {
         [ -n "$want" ] && { [ "$want" != "$now_vm" ] || [ "$want" != "$now_apps" ] || { [ -n "$now_oplus" ] && [ "$want" != "$now_oplus" ]; }; } && return 0
     fi
 
-    if grep -q '^direct_swappiness=' "$conf"; then
-        want=$(get_conf_value "$conf" direct_swappiness)
-        now=$(for node in /proc/oplus_mem/swappiness_para /proc/oplus_healthinfo/swappiness_para; do [ -r "$node" ] || continue; awk -F': *' '/^direct_swappiness:/ { print $2; exit }' "$node"; break; done)
-        [ -n "$want" ] && [ -n "$now" ] && [ "$want" != "$now" ] && return 0
+    want=$(get_loop_mode)
+    if [ -n "$want" ]; then
+        node="/sys/block/$block/backing_dev"
+        [ -f "/sys/block/$block/hybridswap_loop_device" ] && node="/sys/block/$block/hybridswap_loop_device"
+        now=$(cat "$node" 2>/dev/null | tr -d ' \n')
+        [ "$now" = "none" ] && now=""
+        managed=$(get_managed_loop_device)
+        [ "$want" = "true" ] && { [ -z "$managed" ] || [ "$now" != "$managed" ]; } && return 0
+        if [ "$want" = "true" ]; then
+            want_size=$(get_loop_size_mb)
+            file_size_mb=$(stat -c %s /data/nandswap/corona_swapfile 2>/dev/null | awk '{ printf "%.0f", $1 / 1048576 }')
+            [ -n "$want_size" ] && [ "$file_size_mb" != "$want_size" ] && return 0
+        fi
+        [ "$want" = "false" ] && { [ -n "$managed" ] || [ -f /data/nandswap/corona_swapfile ]; } && return 0
+        [ "$want" = "default" ] && [ -f /data/nandswap/corona_swapfile ] && return 0
     fi
 
     if grep -q '^zram_used_limit_mb=' "$conf" && [ -r /dev/memcg/memory.zram_used_limit_mb ]; then
