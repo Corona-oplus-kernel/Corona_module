@@ -654,6 +654,29 @@ body.theme-dark .option-item {
     margin-top: 4px;
 }
 
+.runtime-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.runtime-refresh-icon {
+    display: inline-flex;
+    width: 30px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    background: var(--glass-control-bg);
+    color: var(--text-sub);
+}
+
+.runtime-refresh-icon:active {
+    transform: rotate(45deg) scale(0.94);
+}
+
 .runtime-status-badge[data-state="running"] {
     background: color-mix(in srgb, #25a76f 16%, transparent);
     color: #198858;
@@ -664,37 +687,119 @@ body.theme-dark .option-item {
     color: #c63c47;
 }
 
-.runtime-status-grid {
+.runtime-dashboard {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 9px;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 10px;
     margin-bottom: 12px;
 }
 
-.runtime-status-item {
-    min-width: 0;
-    padding: 11px 12px;
+.runtime-foreground-card,
+.runtime-quick-grid,
+.runtime-metrics-strip {
     border: 1px solid var(--glass-border);
-    border-radius: var(--radius-ctl);
+    border-radius: calc(var(--radius-ctl) + 2px);
     background: var(--glass-surface);
 }
 
-.runtime-status-item span,
+.runtime-foreground-card {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    padding: 16px;
+}
+
+.runtime-dashboard-label,
+.runtime-quick-item span,
+.runtime-metrics-strip > span > span,
 .runtime-field-grid label > span,
 .runtime-number-grid label > span {
-    display: block;
-    margin-bottom: 6px;
     color: var(--text-sub);
     font-size: 11px;
 }
 
-.runtime-status-item strong {
-    display: block;
+.runtime-foreground-card > strong {
     overflow: hidden;
+    margin: 6px 0 8px;
     color: var(--text-main);
-    font-size: 13px;
+    font-size: 16px;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.runtime-dashboard-meta {
+    overflow: hidden;
+    color: var(--text-dim);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.runtime-dashboard-meta b {
+    color: var(--text-sub);
+    font-weight: 600;
+}
+
+.runtime-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: hidden;
+}
+
+.runtime-quick-item {
+    min-width: 0;
+    padding: 11px 12px;
+    border-right: 1px solid var(--glass-border);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.runtime-quick-item:nth-child(2n) {
+    border-right: none;
+}
+
+.runtime-quick-item:nth-last-child(-n + 2) {
+    border-bottom: none;
+}
+
+.runtime-quick-item span,
+.runtime-quick-item strong {
+    display: block;
+}
+
+.runtime-quick-item strong {
+    overflow: hidden;
+    margin-top: 5px;
+    color: var(--text-main);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.runtime-metrics-strip {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 10px 12px;
+}
+
+.runtime-metrics-strip > span {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+}
+
+.runtime-metrics-strip > span + span {
+    margin-left: 12px;
+    padding-left: 12px;
+    border-left: 1px solid var(--glass-border);
+}
+
+.runtime-metrics-strip strong {
+    color: var(--text-main);
+    font-size: 12px;
 }
 
 .runtime-status-note {
@@ -708,6 +813,7 @@ body.theme-dark .option-item {
 }
 
 .runtime-action-row,
+.runtime-switch-grid,
 .runtime-class-options,
 .runtime-field-grid,
 .runtime-number-grid {
@@ -717,7 +823,81 @@ body.theme-dark .option-item {
 
 .runtime-action-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 18px;
+}
+
+.runtime-control-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.runtime-control-heading .section-desc {
+    display: block;
+    margin-top: 4px;
+}
+
+.runtime-save-state {
+    flex: 0 0 auto;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--glass-control-bg);
+    color: var(--text-sub);
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.runtime-save-state[data-state="saving"] {
+    color: var(--primary);
+}
+
+.runtime-save-state[data-state="error"] {
+    background: color-mix(in srgb, #d94b55 14%, transparent);
+    color: #c63c47;
+}
+
+.runtime-switch-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-bottom: 16px;
+}
+
+#runtime-optimizer-panel .runtime-switch-card {
+    align-items: center;
+    min-width: 0;
+    min-height: 76px;
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-ctl);
+    background: var(--glass-surface);
+}
+
+.runtime-switch-card .switch-info {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.runtime-switch-card .switch-desc {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-height: 1.35;
+}
+
+.runtime-switch-card .switch {
+    flex: 0 0 auto;
+    margin-left: 8px;
+    align-self: center;
+}
+
+.runtime-class-section {
+    margin: 0 0 12px;
 }
 
 .runtime-class-options {
@@ -751,6 +931,106 @@ body.theme-dark .option-item {
     min-width: 0;
 }
 
+.runtime-advanced {
+    margin-bottom: 12px;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-ctl);
+    background: var(--glass-surface);
+}
+
+.runtime-advanced-toggle {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px 14px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    user-select: none;
+}
+
+.runtime-advanced-toggle > span:first-child {
+    min-width: 0;
+}
+
+.runtime-advanced-toggle strong,
+.runtime-advanced-toggle small {
+    display: block;
+}
+
+.runtime-advanced-toggle strong {
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+.runtime-advanced-toggle small {
+    margin-top: 3px;
+    color: var(--text-sub);
+    font-size: 11px;
+}
+
+.runtime-advanced-arrow {
+    color: var(--text-sub);
+    font-size: 22px;
+    transform: rotate(90deg);
+    transition: transform 260ms var(--motion-spring);
+}
+
+.runtime-advanced-toggle[aria-expanded="true"] .runtime-advanced-arrow {
+    transform: rotate(270deg);
+}
+
+.runtime-advanced-content {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: max-height 360ms var(--motion-spring), opacity 220ms ease, transform 320ms var(--motion-spring);
+}
+
+.runtime-advanced-content.expanded {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.runtime-advanced-inner {
+    padding: 0 14px 14px;
+    border-top: 1px solid var(--glass-border);
+}
+
+.runtime-advanced-content .setting-section {
+    margin-top: 14px;
+    margin-bottom: 0;
+}
+
+body.theme-dark .runtime-foreground-card,
+body.theme-dark .runtime-quick-grid,
+body.theme-dark .runtime-metrics-strip,
+body.theme-dark #runtime-optimizer-panel .runtime-switch-card,
+body.theme-dark .runtime-advanced {
+    background: color-mix(in srgb, var(--glass-surface) 88%, transparent);
+}
+
+@media (hover: hover) {
+    .runtime-class-options button:hover,
+    .runtime-advanced-toggle:hover {
+        background: color-mix(in srgb, var(--primary) 8%, var(--glass-control-bg));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .runtime-advanced-content,
+    .runtime-advanced-arrow {
+        transition-duration: 0.01ms;
+    }
+}
+
 #runtime-optimizer-panel .text-input {
     width: 100%;
     box-sizing: border-box;
@@ -762,10 +1042,23 @@ body.theme-dark .option-item {
 }
 
 @media (max-width: 420px) {
-    .runtime-status-grid,
+    .runtime-dashboard,
+    .runtime-switch-grid,
     .runtime-field-grid,
     .runtime-number-grid {
         grid-template-columns: 1fr;
+    }
+
+    .runtime-metrics-strip {
+        grid-column: auto;
+    }
+
+    .runtime-section-header {
+        align-items: center;
+    }
+
+    #runtime-optimizer-panel .runtime-switch-card {
+        min-height: 0;
     }
 }
 

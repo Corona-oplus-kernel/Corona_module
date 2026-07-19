@@ -15,7 +15,7 @@ default_class=balanced
 efficiency_cpus=
 balanced_cpus=
 performance_cpus=
-exclude_packages=com.android.systemui,com.android.launcher,com.google.android.apps.nexuslauncher
+exclude_packages=
 
 trim_value() {
     printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
@@ -51,7 +51,7 @@ default_class=balanced
 efficiency_cpus=
 balanced_cpus=
 performance_cpus=
-exclude_packages=com.android.systemui,com.android.launcher,com.google.android.apps.nexuslauncher
+exclude_packages=
 scan_interval_ms=1000
 load_learning=1
 thermal_control=1

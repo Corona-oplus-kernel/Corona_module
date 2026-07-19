@@ -15,13 +15,45 @@
             if (this.runtimeOptimizerInitialized) return;
             this.runtimeOptimizerInitialized = true;
             document.getElementById('runtime-refresh-btn')?.addEventListener('click', () => this.refreshRuntimeOptimizer(true));
-            document.getElementById('runtime-restart-btn')?.addEventListener('click', () => this.restartRuntimeOptimizer());
-            document.getElementById('runtime-apply-btn')?.addEventListener('click', () => this.applyRuntimeOptimizerConfig());
+            document.getElementById('runtime-advanced-toggle')?.addEventListener('click', () => this.toggleRuntimeAdvanced());
             document.querySelectorAll('#runtime-class-options button').forEach(button => {
-                button.addEventListener('click', () => this.selectRuntimeClass(button.dataset.value));
+                button.addEventListener('click', () => {
+                    this.selectRuntimeClass(button.dataset.value);
+                    this.scheduleRuntimeOptimizerApply();
+                });
+            });
+            ['runtime-enabled-switch', 'runtime-ebpf-switch', 'runtime-load-learning-switch', 'runtime-thermal-control-switch'].forEach(id => {
+                document.getElementById(id)?.addEventListener('change', () => this.scheduleRuntimeOptimizerApply());
+            });
+            ['runtime-efficiency-cpus', 'runtime-balanced-cpus', 'runtime-performance-cpus', 'runtime-scan-interval', 'runtime-warm-threshold', 'runtime-severe-threshold'].forEach(id => {
+                document.getElementById(id)?.addEventListener('change', () => this.scheduleRuntimeOptimizerApply());
             });
             this.loadRuntimeOptimizerConfig();
             this.refreshRuntimeOptimizer();
+        },
+        toggleRuntimeAdvanced() {
+            const toggle = document.getElementById('runtime-advanced-toggle');
+            const content = document.getElementById('runtime-advanced-content');
+            if (!toggle || !content) return;
+            const opening = toggle.getAttribute('aria-expanded') !== 'true';
+            toggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
+            content.setAttribute('aria-hidden', opening ? 'false' : 'true');
+            if (opening) {
+                content.style.maxHeight = '0px';
+                content.classList.add('expanded');
+                requestAnimationFrame(() => {
+                    content.style.maxHeight = `${content.scrollHeight}px`;
+                });
+            } else {
+                content.style.maxHeight = `${content.scrollHeight}px`;
+                requestAnimationFrame(() => {
+                    content.classList.remove('expanded');
+                    content.style.maxHeight = '0px';
+                });
+            }
+            if (typeof this.refreshExpandedContentHeight === 'function') {
+                setTimeout(() => this.refreshExpandedContentHeight('app-policy-content'), 360);
+            }
         },
         parseRuntimeKeyValues(content) {
             return Object.fromEntries(this.parseSimpleConfig(content));
@@ -29,6 +61,21 @@
         setRuntimeText(id, value) {
             const element = document.getElementById(id);
             if (element) element.textContent = value || '--';
+        },
+        setRuntimeSaveState(state) {
+            const element = document.getElementById('runtime-save-state');
+            if (!element) return;
+            element.dataset.state = state;
+            const key = state === 'saving' ? 'runtimeAutoSaving' : state === 'error' ? 'runtimeAutoSaveFailed' : 'runtimeAutoSaved';
+            element.textContent = this.t(key);
+        },
+        scheduleRuntimeOptimizerApply() {
+            this.setRuntimeSaveState('saving');
+            if (this.runtimeOptimizerApplyTimer) clearTimeout(this.runtimeOptimizerApplyTimer);
+            this.runtimeOptimizerApplyTimer = setTimeout(() => {
+                this.runtimeOptimizerApplyTimer = null;
+                this.applyRuntimeOptimizerConfig({ silent: true });
+            }, 350);
         },
         selectRuntimeClass(value) {
             const normalized = ['efficiency', 'balanced', 'performance'].includes(value) ? value : 'balanced';
@@ -63,7 +110,7 @@
             if (!Number.isFinite(value)) return fallback;
             return Math.max(minimum, Math.min(maximum, value));
         },
-        async applyRuntimeOptimizerConfig() {
+        async applyRuntimeOptimizerConfig(options = {}) {
             const selectedClass = document.querySelector('#runtime-class-options button.selected')?.dataset.value || 'balanced';
             const warm = this.runtimeNumberValue('runtime-warm-threshold', 65, 35, 100);
             const severe = this.runtimeNumberValue('runtime-severe-threshold', 75, warm + 1, 110);
@@ -80,18 +127,20 @@
                 thermal_warm_c: String(warm),
                 thermal_severe_c: String(severe)
             };
-            this.showLoading(true);
+            if (!options.silent) this.showLoading(true);
             try {
                 await this.mergeConfigFile(CONFIG_FILE, updates, CONFIG_ORDER);
                 await this.exec(`${this.shellQuote(`${this.modDir}/bin/coronad`)} reload >/dev/null 2>&1`);
                 await this.sleep(350);
                 await this.loadRuntimeOptimizerConfig();
                 await this.refreshRuntimeOptimizer();
-                this.showToast(this.t('runtimeApplied'));
+                this.setRuntimeSaveState('saved');
+                if (!options.silent) this.showToast(this.t('runtimeApplied'));
             } catch (error) {
-                this.showToast(this.t('runtimeApplyFailed'), 'error');
+                this.setRuntimeSaveState('error');
+                if (!options.silent) this.showToast(this.t('runtimeApplyFailed'), 'error');
             } finally {
-                this.showLoading(false);
+                if (!options.silent) this.showLoading(false);
             }
         },
         async restartRuntimeOptimizer() {

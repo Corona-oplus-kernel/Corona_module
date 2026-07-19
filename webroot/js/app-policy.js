@@ -99,18 +99,9 @@ CoronaAddon.prototype.renderAppPolicySummary = function() {
         } else {
             manageBtn.classList.remove('is-loading');
             manageBtn.disabled = false;
-            manageBtn.innerHTML = configuredCount > 0
-                ? `应用列表 <span id="app-policy-manage-count">${configuredCount}</span>`
-                : '应用列表';
+            manageBtn.textContent = this.t('text_01d8b3ce');
         }
     }
-    const pairs = [
-        ['app-policy-manage-count', configuredCount]
-    ];
-    pairs.forEach(([id, count]) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = String(count);
-    });
 };
 CoronaAddon.prototype.loadAppRulesConfig = async function() {
     this.ensureAppPolicyState();
@@ -676,19 +667,29 @@ CoronaAddon.prototype.renderAppProfileChoices = function() {
     const hasProfile = this.appPolicy.profiles.includes(pkg);
     const priorityRule = this.priorityRules?.[pkg] || null;
     const currentConfigCount = Number(this.currentProfileConfigCount || 0);
-    const actionOptions = [
+    const basicOptions = [
         `<div class="doze-preset" data-mode="toggle-whitelist"><div class="doze-preset-name">${inWhitelist ? '移出白名单' : '加入白名单'}</div><div class="doze-preset-desc">紧急回收时跳过这个应用</div></div>`,
         `<div class="doze-preset" data-mode="toggle-protect"><div class="doze-preset-name">${inProtect ? '取消保护进程' : '加入保护进程'}</div><div class="doze-preset-desc">尝试持续保活并迁入受保护内存组</div></div>`,
-        `<div class="doze-preset" data-mode="toggle-affinity-exclude"><div class="doze-preset-name">${inAffinityExclude ? '取消自动绑核排除' : '排除自动绑核'}</div><div class="doze-preset-desc">运行优化器不会调整这个应用的线程 CPU 亲和性</div></div>`,
+        `<div class="doze-preset" data-mode="toggle-affinity-exclude"><div class="doze-preset-name">${inAffinityExclude ? '取消自动绑核排除' : '排除自动绑核'}</div><div class="doze-preset-desc">运行优化器不会调整这个应用的线程 CPU 亲和性</div></div>`
+    ];
+    const tuningOptions = [
         `<div class="doze-preset" data-mode="threads"><div class="doze-preset-name">管理线程规则</div><div class="doze-preset-desc">自定义线程亲和性、调度策略与优先级</div></div>`,
         `<div class="doze-preset" data-mode="priority"><div class="doze-preset-name">${priorityRule ? '调整优先级策略' : '设置优先级策略'}</div><div class="doze-preset-desc">nice ${priorityRule?.nice ?? 0} · I/O ${priorityRule ? `${priorityRule.ioClass}/${priorityRule.ioLevel}` : '2/4'}</div></div>`
     ];
+    const profileOptions = [];
     if (currentConfigCount > 0) {
-        actionOptions.push(`<div class="doze-preset" data-mode="current"><div class="doze-preset-name">${hasProfile ? '覆盖应用预设' : '使用当前配置创建预设'}</div><div class="doze-preset-desc">将当前 config 下的已保存参数写入该应用独立预设目录</div></div>`);
+        profileOptions.push(`<div class="doze-preset" data-mode="current"><div class="doze-preset-name">${hasProfile ? '覆盖应用预设' : '使用当前配置创建预设'}</div><div class="doze-preset-desc">将当前 config 下的已保存参数写入该应用独立预设目录</div></div>`);
     }
     const clearOption = hasProfile ? `<div class="doze-preset" data-mode="clear"><div class="doze-preset-name">清除应用预设</div><div class="doze-preset-desc">删除该应用的独立预设，下次切回默认配置</div></div>` : '';
     const snapshotOptions = snapshots.map(snapshot => `<div class="doze-preset" data-mode="snapshot" data-snapshot-id="${this.escapeHtml(snapshot.id || '')}"><div class="doze-preset-name">套用快照：${this.escapeHtml(snapshot.name || '未命名快照')}</div><div class="doze-preset-desc">${this.escapeHtml(this.formatSnapshotTime(snapshot.createdAt))} · ${Object.keys(snapshot.files || {}).length} 个配置</div></div>`).join('');
-    container.innerHTML = actionOptions.join('') + snapshotOptions + clearOption;
+    if (snapshotOptions) profileOptions.push(snapshotOptions);
+    if (clearOption) profileOptions.push(clearOption);
+    const renderGroup = (title, items) => items.length
+        ? `<div class="app-config-action-group"><div class="app-config-action-title">${title}</div>${items.join('')}</div>`
+        : '';
+    container.innerHTML = renderGroup('基础策略', basicOptions)
+        + renderGroup('调度设置', tuningOptions)
+        + renderGroup('应用预设', profileOptions);
     container.querySelectorAll('.doze-preset').forEach(item => {
         item.addEventListener('click', async (event) => {
             event.preventDefault();
@@ -698,9 +699,22 @@ CoronaAddon.prototype.renderAppProfileChoices = function() {
             const label = this.selectedAppProfileLabel || pkg;
             const snapshotId = item.dataset.snapshotId;
             if (!pkg) return;
-            if (mode === 'toggle-whitelist') await this.toggleAppPolicyPackage('whitelist', pkg);
-            if (mode === 'toggle-protect') await this.toggleAppPolicyPackage('protect', pkg);
-            if (mode === 'toggle-affinity-exclude') await this.toggleAppPolicyPackage('affinityExclude', pkg);
+            if (mode === 'toggle-whitelist' || mode === 'toggle-protect' || mode === 'toggle-affinity-exclude') {
+                if (mode === 'toggle-whitelist') await this.toggleAppPolicyPackage('whitelist', pkg);
+                if (mode === 'toggle-protect') await this.toggleAppPolicyPackage('protect', pkg);
+                if (mode === 'toggle-affinity-exclude') await this.toggleAppPolicyPackage('affinityExclude', pkg);
+                this.appProfileStateSnapshot = {
+                    monitorEnabled: !!this.appPolicy.monitorEnabled,
+                    notifyEnabled: !!this.appPolicy.notifyEnabled,
+                    whitelist: [...(this.appPolicy.whitelist || [])],
+                    protect: [...(this.appPolicy.protect || [])],
+                    profiles: [...(this.appPolicy.profiles || [])],
+                    affinityExclude: [...(this.appPolicy.affinityExclude || [])]
+                };
+                this.refreshAppPolicyPackage(pkg, { reorder: true });
+                this.renderAppProfileChoices();
+                return;
+            }
             if (mode === 'threads') {
                 this.closeAppProfilePicker(false);
                 this.hideOverlay('app-policy-overlay');
