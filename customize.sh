@@ -26,8 +26,12 @@ chmod 755 "$MODPATH/app_policy.sh" 2>/dev/null
 chmod 755 "$MODPATH/scripts/zram-writeback.sh" 2>/dev/null
 chmod 755 "$MODPATH/scripts/apply-loop.sh" 2>/dev/null
 chmod 755 "$MODPATH/scripts/memory-pressure.sh" 2>/dev/null
+chmod 755 "$MODPATH/scripts/auto-affinity.sh" 2>/dev/null
+chmod 755 "$MODPATH/bin/coronad" 2>/dev/null
 chmod 755 "$MODPATH/odm/etc/init.oplus.mm-sys.sh" 2>/dev/null
 chmod 755 "$MODPATH"/app_policy/*.sh 2>/dev/null
+find "$MODPATH" -type f -name '*.log' -delete 2>/dev/null
+rm -rf "$MODPATH/scripts.d/.logs"
 mem_total_str=$(cat /proc/meminfo | grep MemTotal)
 mem_total_kb=${mem_total_str:16:8}
 mem_total_gb=$(((mem_total_kb/1024+2047)/2048*2))
@@ -52,7 +56,6 @@ fi
 
 rm -rf "$MODPATH/.app_policy_effective" "$MODPATH"/.app_policy_effective.next.*
 rm -f "$MODPATH/.app_policy_daemon.pid" "$MODPATH/.app_policy_state"
-rm -rf "$MODPATH/scripts.d/.logs"
 find "$MODPATH/config" -type f \( -name '*.tmp.*' -o -name '*.bak' \) -delete 2>/dev/null
 
 get_config_value() {

@@ -2,7 +2,6 @@
 
 readonly HYB_ERR_UNSUPPORTED=1004
 readonly HYB_ERR_UNSET=1009
-readonly LOG_TAG="init_oplus_mm-sys"
 CORONA_CONFIG="/data/adb/modules/Corona/config"
 for base in /data/adb/modules /data/adb/ksu/modules /data/adb/ap/modules; do
   [ -d "$base/Corona/config" ] || continue
@@ -11,11 +10,6 @@ for base in /data/adb/modules /data/adb/ksu/modules /data/adb/ap/modules; do
 done
 CORONA_MODDIR=${CORONA_CONFIG%/config}
 WRITEBACK_HELPER="$CORONA_MODDIR/scripts/zram-writeback.sh"
-
-logi() {
-  /system/bin/log -p i -t ${LOG_TAG} "$1"
-  echo "${LOG_TAG}: $1"
-}
 
 corona_get() {
   local file="$CORONA_CONFIG/$1"
@@ -234,7 +228,6 @@ configure_sys_params() {
   local direct_swappiness=60
   local vm_swappiness=160
 
-  logi "config sys params"
   echo 0 > /proc/sys/vm/compaction_proactiveness
   echo "direct_swappiness=${direct_swappiness}" > "/proc/oplus_mem/swappiness_para"
   echo "vm_swappiness=${vm_swappiness}" > "/proc/oplus_mem/swappiness_para"
@@ -376,7 +369,6 @@ apply_corona_vm_config() {
   [ -n "$dirty_ratio" ] && echo "$dirty_ratio" > /proc/sys/vm/dirty_ratio 2>/dev/null
   [ -n "$dirty_bg" ] && echo "$dirty_bg" > /proc/sys/vm/dirty_background_ratio 2>/dev/null
   [ -n "$vfs_pressure" ] && echo "$vfs_pressure" > /proc/sys/vm/vfs_cache_pressure 2>/dev/null
-  logi "Corona: vm params applied"
 }
 
 apply_corona_kernel_features() {
@@ -393,7 +385,6 @@ apply_corona_kernel_features() {
   [ -f /proc/sys/vm/compaction_proactiveness ] && [ -n "$compaction" ] && {
     [ "$compaction" = "1" ] && echo 20 > /proc/sys/vm/compaction_proactiveness 2>/dev/null || echo 0 > /proc/sys/vm/compaction_proactiveness 2>/dev/null
   }
-  logi "Corona: kernel features applied"
 }
 
 apply_corona_le9ec() {
@@ -406,7 +397,6 @@ apply_corona_le9ec() {
   [ -n "$anon_min" ] && echo "$anon_min" > /proc/sys/vm/anon_min_kbytes 2>/dev/null
   [ -n "$clean_low" ] && echo "$clean_low" > /proc/sys/vm/clean_low_kbytes 2>/dev/null
   [ -n "$clean_min" ] && echo "$clean_min" > /proc/sys/vm/clean_min_kbytes 2>/dev/null
-  logi "Corona: le9ec applied"
 }
 
 apply_corona_lmk() {
@@ -430,7 +420,6 @@ apply_corona_lmk() {
     else minfree_levels="4096:0,5120:100,8192:200,32768:250,65536:900,96000:950"; fi
     setprop sys.lmk.minfree_levels "$minfree_levels"
   }
-  logi "Corona: lmk applied"
 }
 
 apply_corona_reclaim() {
@@ -449,7 +438,6 @@ apply_corona_reclaim() {
     echo 32768 > /dev/memcg/memory.zram_used_limit_mb 2>/dev/null
     echo 99 > /dev/memcg/memory.cpuload_threshold 2>/dev/null
   }
-  logi "Corona: reclaim disabled"
 }
 
 apply_corona_kswapd() {
@@ -466,7 +454,6 @@ apply_corona_kswapd() {
     echo 1 > /dev/cpuctl/kswapd/cpu.uclamp.latency_sensitive 2>/dev/null
     echo 100 > /dev/cpuctl/kswapd/cpu.uclamp.min 2>/dev/null
   }
-  logi "Corona: kswapd boosted"
 }
 
 apply_corona_kernel_modules() {
@@ -508,7 +495,6 @@ apply_corona_kernel_modules() {
       echo $(( slack_off_ms * 1000 * 1000 )) > "$param_dir/slack_off_ns" 2>/dev/null
     fi
   done
-  logi "Corona: kernel modules configured"
 }
 
 configure_aizerofs_parameters() {
@@ -520,7 +506,6 @@ configure_aizerofs_parameters() {
     aizerofs_supported=1
   fi
 
-  logi "config aizerofs params"
   if [ "$aizerofs_supported" -eq "1" ]; then
     local val=0
     if [ "$my_engineering_type" != "release" ]; then
@@ -529,11 +514,9 @@ configure_aizerofs_parameters() {
     echo $val > /sys/kernel/aizerofs/bug_on 2>/dev/null
 
     if [ "$aizerofs_rus_disable" -ne "1" ] 2>/dev/null; then
-      logi "aizerofs enabled"
       echo 1 > /sys/module/oplus_bsp_aizerofs/parameters/enabled 2>/dev/null
 
       if [ "$aizerofs_rus_disable" -ne "2" ] 2>/dev/null; then
-        logi "aizerofs write_enabled"
         echo 1 > /sys/module/oplus_bsp_aizerofs/parameters/write_enabled 2>/dev/null
       fi
     fi

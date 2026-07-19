@@ -12,12 +12,22 @@ THREAD_PRIORITY_FILE="$CONFIG_DIR/thread_priority.conf"
 ICONS_DIR="$MODDIR/webroot/app_icons"
 PIDFILE="$MODDIR/.app_policy_daemon.pid"
 STATEFILE="$MODDIR/.app_policy_state"
+CORONAD="$MODDIR/bin/coronad"
 
 . "$MODDIR/app_policy/common.sh"
 . "$MODDIR/app_policy/meta.sh"
 . "$MODDIR/app_policy/runtime.sh"
 
 get_daemon_pid() {
+    if [ -x "$CORONAD" ]; then
+        corona_pid=$(cat "$MODDIR/.coronad.pid" 2>/dev/null)
+        if [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ]; then
+            corona_cmdline=$(tr '\0' ' ' < "/proc/$corona_pid/cmdline" 2>/dev/null)
+            case "$corona_cmdline" in
+                *coronad*) printf '%s' "$corona_pid"; return 0 ;;
+            esac
+        fi
+    fi
     [ -f "$PIDFILE" ] || return 1
     daemon_pid=$(cat "$PIDFILE" 2>/dev/null)
     [ -n "$daemon_pid" ] && [ -d "/proc/$daemon_pid" ] || return 1
@@ -60,17 +70,36 @@ case "$1" in
     icon-file) output_icon_file "$2" "$3" ;;
     memclean) run_memclean "$2" ;;
     protect-once) apply_protection_once ;;
-    daemon) monitor_daemon ;;
+    daemon)
+        if [ -x "$CORONAD" ]; then
+            CORONA_MODDIR="$MODDIR" "$CORONAD" daemon
+        else
+            monitor_daemon
+        fi
+        ;;
     daemon-reload)
+        if [ -x "$CORONAD" ]; then
+            CORONA_MODDIR="$MODDIR" "$CORONAD" reload
+            exit $?
+        fi
         pid=$(get_daemon_pid) || exit 0
         kill -HUP "$pid" 2>/dev/null
         ;;
     daemon-stop)
+        if [ -x "$CORONAD" ]; then
+            CORONA_MODDIR="$MODDIR" "$CORONAD" stop
+            rm -f "$PIDFILE" "$STATEFILE"
+            exit $?
+        fi
         pid=$(get_daemon_pid) || { rm -f "$PIDFILE" "$STATEFILE"; exit 0; }
         kill -TERM "$pid" 2>/dev/null
         ;;
     foreground) get_foreground_package ;;
     daemon-status) get_daemon_pid ;;
     thread-list) list_package_threads "$2" ;;
+    auto-affinity)
+        shift
+        "$MODDIR/scripts/auto-affinity.sh" "$@"
+        ;;
     *) exit 1 ;;
 esac

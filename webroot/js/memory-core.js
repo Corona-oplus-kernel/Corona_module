@@ -129,6 +129,11 @@
     setSubSettingsExpanded(settings, show, options = {}) {
         if (!settings) return;
         const instant = options.instant === true || this.isInitializing;
+        const expandDuration = 320;
+        const collapseDuration = 260;
+        const hidden = settings.classList.contains('hidden');
+        const expanded = settings.classList.contains('sub-settings-expanded');
+        if (!instant && ((show && expanded && !hidden) || (!show && hidden))) return;
         const revision = (settings._expandRevision || 0) + 1;
         settings._expandRevision = revision;
         if (settings._expandTimer) {
@@ -140,7 +145,7 @@
             settings.classList.toggle('sub-settings-expanded', show);
             settings.style.maxHeight = show ? 'none' : '0px';
             settings.style.opacity = show ? '1' : '0';
-            settings.style.transform = show ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(0.985)';
+            settings.style.transform = show ? 'translateY(0)' : 'translateY(-6px)';
             settings.style.overflow = show ? 'visible' : 'hidden';
             return;
         }
@@ -152,44 +157,46 @@
             settings.style.transition = 'none';
             settings.style.maxHeight = '0px';
             settings.style.opacity = '0';
-            settings.style.transform = 'translateY(-8px) scale(0.985)';
-            requestAnimationFrame(() => requestAnimationFrame(() => {
+            settings.style.transform = 'translateY(-6px)';
+            const targetHeight = settings.scrollHeight;
+            requestAnimationFrame(() => {
                 if (settings._expandRevision !== revision) return;
-                settings.style.transition = 'max-height 440ms var(--motion-ease), opacity 260ms ease, transform 440ms var(--motion-spring)';
-                settings.style.maxHeight = `${settings.scrollHeight}px`;
+                settings.style.transition = `max-height ${expandDuration}ms var(--motion-ease), opacity 180ms ease, transform ${expandDuration}ms var(--motion-spring)`;
+                settings.style.maxHeight = `${targetHeight}px`;
                 settings.style.opacity = '1';
-                settings.style.transform = 'translateY(0) scale(1)';
+                settings.style.transform = 'translateY(0)';
                 settings.classList.add('sub-settings-expanded');
-            }));
+            });
             settings._expandTimer = setTimeout(() => {
                 if (settings._expandRevision !== revision) return;
                 settings.style.maxHeight = 'none';
                 settings.style.overflow = 'visible';
                 settings.style.willChange = 'auto';
                 settings._expandTimer = null;
-            }, 480);
+            }, expandDuration + 40);
             return;
         }
         if (settings.classList.contains('hidden')) return;
         settings.style.transition = 'none';
         settings.style.maxHeight = `${settings.scrollHeight}px`;
         settings.style.opacity = '1';
-        settings.style.transform = 'translateY(0) scale(1)';
-        requestAnimationFrame(() => requestAnimationFrame(() => {
+        settings.style.transform = 'translateY(0)';
+        void settings.offsetHeight;
+        requestAnimationFrame(() => {
             if (settings._expandRevision !== revision) return;
-            settings.style.transition = 'max-height 340ms var(--motion-ease), opacity 210ms ease, transform 340ms var(--motion-ease)';
+            settings.style.transition = `max-height ${collapseDuration}ms var(--motion-ease), opacity 160ms ease, transform ${collapseDuration}ms var(--motion-ease)`;
             settings.style.maxHeight = '0px';
             settings.style.opacity = '0';
-            settings.style.transform = 'translateY(-8px) scale(0.985)';
+            settings.style.transform = 'translateY(-6px)';
             settings.classList.remove('sub-settings-expanded');
-        }));
+        });
         settings._expandTimer = setTimeout(() => {
             if (settings._expandRevision !== revision) return;
             settings.classList.add('hidden');
             settings.style.overflow = 'hidden';
             settings.style.willChange = 'auto';
             settings._expandTimer = null;
-        }, 370);
+        }, collapseDuration + 40);
     },
     async getPreferredBlockDevice() {
         const device = (await this.exec("for d in /sys/block/*; do b=$(basename \"$d\"); case \"$b\" in loop*|ram*|zram*|dm-*) continue ;; esac; [ -d \"$d/queue\" ] || continue; echo \"$b\"; break; done")).trim();
@@ -803,7 +810,6 @@
         const settings = document.getElementById('zram-settings');
         if (!settings) return;
         this.setSubSettingsExpanded(settings, show);
-        if (show && refreshStatus && typeof this.loadZramStatus === 'function') this.loadZramStatus();
     },
     syncZramControlsFromRuntime(runtimeInfo, fields = {}) {
         if (!runtimeInfo) return;
@@ -843,10 +849,20 @@
                 : parseInt(item.dataset.value, 10) === this.state.zramPriority;
             item.classList.toggle('selected', selected);
         });
+        this.syncAnimatedOptionIndicator(list);
         const editor = document.getElementById('zram-priority-custom-editor');
         const input = document.getElementById('zram-priority-custom-input');
         if (editor) editor.classList.toggle('visible', custom);
         if (input) input.value = String(this.state.zramPriority);
+    },
+    syncAnimatedOptionIndicator(target) {
+        const list = typeof target === 'string' ? document.getElementById(target) : target;
+        if (!list) return;
+        const items = [...list.querySelectorAll('.option-item')];
+        const selectedIndex = items.findIndex(item => item.classList.contains('selected'));
+        list.style.setProperty('--animated-option-count', String(Math.max(1, items.length)));
+        list.style.setProperty('--animated-option-index', String(Math.max(0, selectedIndex)));
+        list.classList.toggle('indicator-ready', selectedIndex >= 0);
     },
     async loadZramConfig() {
         const config = await this.readConfig('zram.conf');
@@ -2345,6 +2361,7 @@
                 if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
             });
             sizeSlider.addEventListener('change', async () => {
+                if (this.loopSizeFixed) return;
                 try {
                     await this.persistLoopConfig('size_mb');
                     this.markWritebackBlockDirty();

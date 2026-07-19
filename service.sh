@@ -4,6 +4,7 @@ CONFIG_DIR=${CORONA_CONFIG_DIR:-"$MODDIR/config"}
 RUNTIME_CONF="$CONFIG_DIR/runtime.conf"
 SCRIPTS_DIR="$MODDIR/scripts.d"
 APP_POLICY_SH="$MODDIR/app_policy.sh"
+CORONAD="$MODDIR/bin/coronad"
 THREAD_PRIORITY_FILE="$CONFIG_DIR/thread_priority.conf"
 WRITEBACK_HELPER="$MODDIR/scripts/zram-writeback.sh"
 
@@ -47,6 +48,7 @@ get_managed_loop_device() {
 
 wait_until_boot_complete() { until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 5; done; }
 wait_until_login() { until [ -d "/data/data/android" ]; do sleep 5; done; }
+has_mm_sys_entry() { [ -f /odm/etc/init.oplus.mm-sys.sh ]; }
 get_active_zram_dev() {
     awk 'NR > 1 && ($1 ~ /^\/dev\/block\/zram/ || $1 ~ /^\/dev\/zram/) { print $1; exit }' /proc/swaps 2>/dev/null
 }
@@ -135,37 +137,6 @@ zram_config_needs_overlay() {
         want=$(get_conf_value "$conf" direct_swappiness)
         now=$(for node in /proc/oplus_mem/swappiness_para /proc/oplus_healthinfo/swappiness_para; do [ -r "$node" ] || continue; awk -F': *' '/^direct_swappiness:/ { print $2; exit }' "$node"; break; done)
         [ -n "$want" ] && [ -n "$now" ] && [ "$want" != "$now" ] && return 0
-    fi
-
-    if grep -q '^zram_used_limit_mb=' "$conf" && [ -r /dev/memcg/memory.zram_used_limit_mb ]; then
-        want=$(get_conf_value "$conf" zram_used_limit_mb)
-        now=$(cat /dev/memcg/memory.zram_used_limit_mb 2>/dev/null | tr -d ' \n')
-        [ -n "$want" ] && [ "$want" != "$now" ] && return 0
-    fi
-
-    for key in hybridswap_zram_increase hybridswap_quota_day; do
-        grep -q "^${key}=" "$conf" || continue
-        [ -r "/sys/block/$block/$key" ] || continue
-        want=$(get_conf_value "$conf" "$key")
-        now=$(cat "/sys/block/$block/$key" 2>/dev/null | tr -d ' \n')
-        [ -n "$want" ] && [ "$want" != "$now" ] && return 0
-    done
-
-    want=$(get_loop_mode)
-    if [ -n "$want" ]; then
-        node="/sys/block/$block/backing_dev"
-        [ -f "/sys/block/$block/hybridswap_loop_device" ] && node="/sys/block/$block/hybridswap_loop_device"
-        now=$(cat "$node" 2>/dev/null | tr -d ' \n')
-        [ "$now" = "none" ] && now=""
-        managed=$(get_managed_loop_device)
-        [ "$want" = "true" ] && { [ -z "$managed" ] || [ "$now" != "$managed" ]; } && return 0
-        if [ "$want" = "true" ]; then
-            want_size=$(get_loop_size_mb)
-            file_size_mb=$(stat -c %s /data/nandswap/corona_swapfile 2>/dev/null | awk '{ printf "%.0f", $1 / 1048576 }')
-            [ -n "$want_size" ] && [ "$file_size_mb" != "$want_size" ] && return 0
-        fi
-        [ "$want" = "false" ] && { [ -n "$managed" ] || [ -f /data/nandswap/corona_swapfile ]; } && return 0
-        [ "$want" = "default" ] && [ -f /data/nandswap/corona_swapfile ] && return 0
     fi
 
     if grep -q '^zram_used_limit_mb=' "$conf" && [ -r /dev/memcg/memory.zram_used_limit_mb ]; then
@@ -906,11 +877,21 @@ should_start_app_policy() {
     [ -n "$protect_apps" ] && return 0
     [ -n "$profile_apps" ] && return 0
     [ -f "$thread_file" ] && awk 'NF && $0 !~ /^#/ { found=1; exit } END { exit found ? 0 : 1 }' "$thread_file" 2>/dev/null && return 0
+    [ "$(get_conf_value "$MODDIR/config/memory_pressure.conf" enabled)" = "1" ] && return 0
+    [ "$(get_conf_value "$MODDIR/config/auto_affinity.conf" enabled)" = "1" ] && return 0
     return 1
 }
 
 start_app_policy_daemon() {
     should_start_app_policy || return
+    if [ -x "$CORONAD" ]; then
+        legacy_pid=$(cat "$MODDIR/.app_policy_daemon.pid" 2>/dev/null)
+        [ -n "$legacy_pid" ] && kill -TERM "$legacy_pid" 2>/dev/null
+        rm -f "$MODDIR/.app_policy_daemon.pid" "$MODDIR/.app_policy_state"
+        [ -f "$MODDIR/.memory_pressure.pid" ] && /system/bin/sh "$MODDIR/scripts/memory-pressure.sh" stop >/dev/null 2>&1
+        CORONA_MODDIR="$MODDIR" "$CORONAD" reload >/dev/null 2>&1
+        return
+    fi
     if [ -f "$MODDIR/.app_policy_daemon.pid" ]; then
         daemon_pid=$(cat "$MODDIR/.app_policy_daemon.pid" 2>/dev/null)
         if [ -n "$daemon_pid" ] && [ -d "/proc/$daemon_pid" ]; then
@@ -924,6 +905,17 @@ start_app_policy_daemon() {
 apply_memory_pressure_config() {
     helper="$MODDIR/scripts/memory-pressure.sh"
     [ -f "$helper" ] || return 0
+    if [ -x "$CORONAD" ]; then
+        [ -f "$MODDIR/.memory_pressure.pid" ] && /system/bin/sh "$helper" stop >/dev/null 2>&1
+        if [ -f "$CONFIG_DIR/memory_pressure.conf" ]; then
+            cp -f "$CONFIG_DIR/memory_pressure.conf" "$MODDIR/.memory_pressure.runtime.conf"
+        else
+            rm -f "$MODDIR/.memory_pressure.runtime.conf"
+        fi
+        corona_pid=$(cat "$MODDIR/.coronad.pid" 2>/dev/null)
+        [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ] && CORONA_MODDIR="$MODDIR" "$CORONAD" reload >/dev/null 2>&1
+        return 0
+    fi
     CORONA_PRESSURE_CONFIG="$CONFIG_DIR/memory_pressure.conf" /system/bin/sh "$helper" apply >/dev/null 2>&1
 }
 
@@ -984,7 +976,14 @@ apply_runtime_config_name() {
         cpu_hotplug.conf) apply_cpu_hotplug_config ;;
         tcp.conf) apply_tcp_config ;;
         process_priority.conf) apply_process_priority_config ;;
-        thread_priority.conf) apply_thread_priority_config ;;
+        thread_priority.conf)
+            corona_pid=$(cat "$MODDIR/.coronad.pid" 2>/dev/null)
+            if [ -x "$CORONAD" ] && [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ]; then
+                :
+            else
+                apply_thread_priority_config
+            fi
+            ;;
         device.conf) apply_device_config ;;
         protect.conf) apply_protect_config ;;
     esac

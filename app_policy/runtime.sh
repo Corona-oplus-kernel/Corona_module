@@ -408,12 +408,14 @@ profile=%s
         fi
         if [ "$foreground_changed" -eq 1 ] || [ "$profile_changed" -eq 1 ]; then
             [ -f "$THREAD_PRIORITY_FILE" ] && apply_thread_priority_once
+            [ -n "$current_pkg" ] && "$MODDIR/scripts/auto-affinity.sh" apply "$current_pkg" >/dev/null 2>&1
             last_foreground="$current_pkg"
         fi
         slow_tick=$((slow_tick + 1))
         if [ "$slow_tick" -ge 5 ]; then
             slow_tick=0
             [ -n "$protect_csv" ] && apply_protection_once cached
+            [ -n "$current_pkg" ] && "$MODDIR/scripts/auto-affinity.sh" apply "$current_pkg" >/dev/null 2>&1
         fi
         if [ "$foreground_changed" -eq 0 ] && [ "$profile_changed" -eq 0 ] && [ "$target_profile" = "base" ]; then
             daemon_sleep 6

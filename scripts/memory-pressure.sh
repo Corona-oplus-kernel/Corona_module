@@ -6,6 +6,7 @@ SOURCE_CONF=${CORONA_PRESSURE_CONFIG:-"$MODDIR/config/memory_pressure.conf"}
 RUNTIME_CONF="$MODDIR/.memory_pressure.runtime.conf"
 PID_FILE="$MODDIR/.memory_pressure.pid"
 BASELINE_FILE="$MODDIR/.memory_pressure.baseline"
+CORONAD="$MODDIR/bin/coronad"
 
 get_value() {
     [ -f "$1" ] && grep -m1 "^$2=" "$1" 2>/dev/null | cut -d'=' -f2-
@@ -108,6 +109,16 @@ apply_config() {
     fi
     enabled=$(get_value "$RUNTIME_CONF" enabled)
     stop_daemon
+    if [ -x "$CORONAD" ]; then
+        corona_pid=$(cat "$MODDIR/.coronad.pid" 2>/dev/null)
+        if [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ]; then
+            CORONA_MODDIR="$MODDIR" "$CORONAD" reload >/dev/null 2>&1
+            return $?
+        fi
+        [ "$enabled" = "1" ] || return 0
+        CORONA_MODDIR="$MODDIR" "$CORONAD" start >/dev/null 2>&1
+        return $?
+    fi
     [ "$enabled" = "1" ] || return 0
     [ -r /proc/pressure/memory ] || return 2
     nohup /system/bin/sh "$0" daemon >/dev/null 2>&1 &
@@ -117,6 +128,12 @@ case "$1" in
     daemon) run_daemon ;;
     stop) stop_daemon ;;
     status)
+        if [ -x "$CORONAD" ]; then
+            CORONA_MODDIR="$MODDIR" "$CORONAD" status 2>/dev/null | sed -n '1p'
+            echo "avg10=$(pressure_avg10)"
+            echo "swappiness=$(cat /proc/sys/vm/swappiness 2>/dev/null | tr -d ' \n')"
+            exit 0
+        fi
         pid=$(cat "$PID_FILE" 2>/dev/null)
         pid_is_daemon "$pid" && echo running=1 || echo running=0
         echo "avg10=$(pressure_avg10)"

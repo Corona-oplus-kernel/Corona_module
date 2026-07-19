@@ -10,7 +10,6 @@ BACKING_FILE="$BACKING_DIR/corona_swapfile"
 LOOP_STATE="$BACKING_DIR/corona_loop_device"
 SYSTEM_BACKING_STATE="$BACKING_DIR/corona_system_backing"
 HYBRID_STATE="$BACKING_DIR/corona_hybridswap_state"
-NANDSWAP_TOOL=/product/bin/nandswap_tool
 
 get_current_backing() {
     [ -n "$ZRAM_BLOCK" ] || return 1
@@ -54,11 +53,6 @@ remember_hybridswap_state() {
         case "$value" in ''|*[!0-9]*) continue ;; esac
         printf '%s=%s\n' "$key" "$value" >> "$HYBRID_STATE"
     done
-    node="/sys/block/$ZRAM_BLOCK/hybridswap_loglevel"
-    if [ -r "$node" ]; then
-        value=$(cat "$node" 2>/dev/null | awk '{ print $NF }')
-        case "$value" in ''|*[!0-9]*) ;; *) printf 'hybridswap_loglevel=%s\n' "$value" >> "$HYBRID_STATE" ;; esac
-    fi
 }
 
 remember_system_backing() {
@@ -74,7 +68,7 @@ restore_hybridswap_state() {
     [ -r "$HYBRID_STATE" ] || return 0
     while IFS='=' read -r key value; do
         case "$key" in
-            hybridswap_zram_increase|hybridswap_quota_day|hybridswap_swapd_pause|hybridswap_loglevel)
+            hybridswap_zram_increase|hybridswap_quota_day|hybridswap_swapd_pause)
                 node="/sys/block/$ZRAM_BLOCK/$key"
                 [ -f "$node" ] && echo "$value" > "$node" 2>/dev/null
                 ;;
@@ -199,44 +193,6 @@ cleanup_backing() {
     restore_system_backing
 }
 
-create_backing() {
-    case "$SIZE_MB" in
-        ''|*[!0-9]*) SIZE_MB=4096 ;;
-    esac
-    [ "$SIZE_MB" -lt 256 ] && SIZE_MB=256
-    [ "$SIZE_MB" -gt 32768 ] && SIZE_MB=32768
-
-    [ -x "$NANDSWAP_TOOL" ] || return 1
-    [ -e "/sys/block/$ZRAM_BLOCK" ] || return 1
-    available_kb=$(df -k /data 2>/dev/null | awk 'NR == 2 { print $4 }')
-    required_kb=$((SIZE_MB * 1024 + 524288))
-    [ -n "$available_kb" ] && [ "$available_kb" -lt "$required_kb" ] && return 1
-    mkdir -p "$BACKING_DIR" || return 1
-    remember_system_backing
-    clear_managed_binding
-    detach_backing_loop || return 1
-
-    rm -f "$BACKING_FILE"
-    touch "$BACKING_FILE" || return 1
-    "$NANDSWAP_TOOL" -s1 "$BACKING_FILE" >/dev/null 2>&1 || return 1
-    /system/bin/fallocate -l "${SIZE_MB}M" "$BACKING_FILE" 2>/dev/null || return 1
-    "$NANDSWAP_TOOL" -g "$BACKING_FILE" 2>/dev/null | grep -q pinned || return 1
-
-    loop_device=$(/system/bin/losetup -f -s "$BACKING_FILE" 2>/dev/null) || return 1
-    [ -n "$loop_device" ] || return 1
-    if ! "$NANDSWAP_TOOL" -l "$loop_device" 2>/dev/null | grep -q success; then
-        /system/bin/losetup -d "$loop_device" 2>/dev/null
-        return 1
-    fi
-
-    if ! bind_backing_device "$loop_device"; then
-        /system/bin/losetup -d "$loop_device" 2>/dev/null
-        return 1
-    fi
-
-    printf '%s\n' "$loop_device" > "$LOOP_STATE"
-}
-
 case "$ACTION" in
     detect)
         find_system_backing
@@ -248,14 +204,7 @@ case "$ACTION" in
         restore_system_backing "$3"
         ;;
     apply)
-        if [ "$MODE" = "true" ]; then
-            if ! create_backing; then
-                cleanup_backing
-                exit 1
-            fi
-        else
-            cleanup_backing
-        fi
+        cleanup_backing
         ;;
     cleanup)
         cleanup_backing

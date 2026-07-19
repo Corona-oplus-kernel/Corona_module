@@ -138,7 +138,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071560` : '';
+        return map[name] ? `${map[name]}?v=2026071605` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -279,7 +279,6 @@ class CoronaAddon {
             'zram-used-limit-slider': { unit: 'MB', decimals: 0 },
             'hybridswap-increase-slider': { unit: 'MB', decimals: 0 },
             'hybridswap-quota-slider': { unit: 'GB', decimals: 0 },
-            'zram-writeback-size-slider': { unit: 'GB', decimals: 1 },
             'swap-size-slider': { unit: 'MB', decimals: 0 }
         };
         document.querySelectorAll('.range-slider').forEach(slider => {
@@ -722,6 +721,7 @@ class CoronaAddon {
                 const priorityList = document.getElementById('zram-priority-list');
                 priorityList.querySelectorAll('.option-item').forEach(option => option.classList.remove('selected'));
                 item.classList.add('selected');
+                this.syncAnimatedOptionIndicator(priorityList);
                 const editor = document.getElementById('zram-priority-custom-editor');
                 const input = document.getElementById('zram-priority-custom-input');
                 if (item.dataset.custom === '1') {
