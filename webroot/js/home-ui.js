@@ -454,12 +454,14 @@
             { toggle: 'le9ec-toggle', content: 'le9ec-content', onExpand: loadSection('le9ec') },
             { toggle: 'io-scheduler-toggle', content: 'io-scheduler-content', onExpand: null },
             { toggle: 'cpu-governor-toggle', content: 'cpu-governor-content', onExpand: null },
-            { toggle: 'app-policy-toggle', content: 'app-policy-content', onExpand: loadSection('app-policy') },
+            { toggle: 'app-policy-toggle', content: 'app-policy-content', onExpand: () => {
+                loadSection('app-policy')();
+                this.refreshRuntimeOptimizer();
+            } },
             { toggle: 'tcp-toggle', content: 'tcp-content', onExpand: null },
             { toggle: 'custom-scripts-toggle', content: 'custom-scripts-content', onExpand: loadSection('custom-scripts') },
             { toggle: 'system-opt-toggle', content: 'system-opt-content', onExpand: loadSection('system-opt') },
             { toggle: 'corona-kernel-toggle', content: 'corona-kernel-content', onExpand: loadSection('corona-kernel') },
-            { toggle: 'runtime-optimizer-toggle', content: 'runtime-optimizer-content', onExpand: () => this.refreshRuntimeOptimizer() },
             { toggle: 'app-settings-toggle', content: 'app-settings-content', onExpand: loadSection('app-settings') }
         ];
         cards.forEach(card => {

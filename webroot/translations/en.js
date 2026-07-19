@@ -789,7 +789,6 @@
       "resetDoneReloading": "Selected settings cleared. Reloading the interface...",
       "runtimeOptimizer": "Runtime Optimizer",
       "runtimeOptimizerDesc": "Native daemon, automatic affinity, load learning, and eBPF event acceleration",
-      "runtimeCardVisibilityDesc": "Show the runtime optimizer status and settings card",
       "runtimeUnknown": "Unknown",
       "runtimeRunning": "Running",
       "runtimeStopped": "Stopped",

@@ -635,6 +635,25 @@ body.theme-dark .option-item {
     text-align: center;
 }
 
+.runtime-optimizer-section {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--glass-border);
+}
+
+.runtime-section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.runtime-section-header .section-desc {
+    display: block;
+    margin-top: 4px;
+}
+
 .runtime-status-badge[data-state="running"] {
     background: color-mix(in srgb, #25a76f 16%, transparent);
     color: #198858;
@@ -732,7 +751,7 @@ body.theme-dark .option-item {
     min-width: 0;
 }
 
-#runtime-optimizer-content .text-input {
+#runtime-optimizer-panel .text-input {
     width: 100%;
     box-sizing: border-box;
 }

@@ -789,7 +789,6 @@
       "resetDoneReloading": "所选设置已清除，正在刷新界面...",
       "runtimeOptimizer": "运行优化器",
       "runtimeOptimizerDesc": "原生守护进程、自动绑核、负载学习与 eBPF 事件加速",
-      "runtimeCardVisibilityDesc": "显示运行优化器状态和配置卡片",
       "runtimeUnknown": "未知",
       "runtimeRunning": "运行中",
       "runtimeStopped": "已停止",
