@@ -1,7 +1,7 @@
 id=Corona
 name=Corona
-version=v4.5.3
-versionCode=4503
+version=v4.5.4
+versionCode=4504
 author=Frost_Bai
 description=做为内核附加，可进行部分简单的参数设置
 updateJson=https://raw.githubusercontent.com/Corona-oplus-kernel/Corona_module/main/update.json
