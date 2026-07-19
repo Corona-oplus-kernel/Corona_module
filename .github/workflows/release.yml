@@ -39,7 +39,7 @@ jobs:
           CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$toolchain/aarch64-linux-android26-clang" \
             cargo build --locked --release --target aarch64-linux-android \
             --manifest-path native/coronad/Cargo.toml
-          install -m 0755 native/coronad/target/aarch64-linux-android/release/coronad bin/coronad
+          install -Dm 0755 native/coronad/target/aarch64-linux-android/release/coronad bin/coronad
           "$toolchain/llvm-readelf" -h bin/coronad | grep -q 'AArch64'
           "$toolchain/llvm-readelf" -l bin/coronad | grep -q '/system/bin/linker64'
 
@@ -64,8 +64,8 @@ jobs:
           git archive HEAD | tar -x -C "$package_dir"
           rm -rf "$package_dir/.github" "$package_dir/native" "$package_dir/docs"
           rm -f "$package_dir/.gitignore" "$package_dir/LICENSE" "$package_dir/README.md" \
-            "$package_dir/changelog.md" "$package_dir/update.json"
-          install -m 0755 bin/coronad "$package_dir/bin/coronad"
+            "$package_dir/changelog.md" "$package_dir/update.json" "$package_dir/bin/coronad"
+          install -Dm 0755 bin/coronad "$package_dir/bin/coronad"
           find "$package_dir" -type f -name '*.log' -delete
           (cd "$package_dir" && zip -r "$GITHUB_WORKSPACE/Corona-${{ steps.version.outputs.version }}.zip" .)
           unzip -Z1 "Corona-${{ steps.version.outputs.version }}.zip" | grep -qx 'module.prop'
