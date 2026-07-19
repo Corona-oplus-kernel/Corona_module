@@ -40,8 +40,8 @@ jobs:
             cargo build --locked --release --target aarch64-linux-android \
             --manifest-path native/coronad/Cargo.toml
           install -Dm 0755 native/coronad/target/aarch64-linux-android/release/coronad bin/coronad
-          "$toolchain/llvm-readelf" -h bin/coronad | grep -q 'AArch64'
-          "$toolchain/llvm-readelf" -l bin/coronad | grep -q '/system/bin/linker64'
+          "$toolchain/llvm-readelf" -h bin/coronad | grep 'AArch64' >/dev/null
+          "$toolchain/llvm-readelf" -l bin/coronad | grep '/system/bin/linker64' >/dev/null
 
       - name: Generate changelog
         id: changelog
