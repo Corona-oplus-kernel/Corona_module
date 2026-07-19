@@ -2244,7 +2244,7 @@
         this.easterEgg.currentCard = 'credits';
         this.easterEgg.isOverlayOpen = true;
         this.easterEgg.xinranClickCount = 0;
-        content.innerHTML = `<div class="rainbow-text credit-entry" id="xinran-credit-wrap"><span class="credit-name-text" id="xinran-credit">致谢爱人❤️然(≧ω≦)/</span><button class="credit-link-btn" data-url="https://github.com/Winkmoon" aria-label="打开然的主页">&gt;</button></div><div class="credits-section"><div class="rainbow-text credits-title">模块制作感谢名单</div>${this.buildCreditEntry('Cloud_Yun', 'https://github.com/yspbwx2010')}${this.buildCreditEntry('穆远星', 'https://github.com/MuYuanXing')}${this.buildCreditEntry('嘟嘟Ski')}${this.buildCreditEntry('Kanata')}</div>`;
+        content.innerHTML = `<div class="rainbow-text credit-entry" id="xinran-credit-wrap"><span class="credit-name-text" id="xinran-credit">致谢爱人❤️然(≧ω≦)/</span><button class="credit-link-btn" data-url="https://github.com/Winkmoon" aria-label="打开然的主页">&gt;</button></div><div class="credits-section"><div class="rainbow-text credits-title">模块制作感谢名单</div>${this.buildCreditEntry('Cloud_Yun', 'https://github.com/yspbwx2010')}${this.buildCreditEntry('穆远星', 'https://github.com/MuYuanXing')}${this.buildCreditEntry('NetizenNemo', 'https://github.com/NetizenNemo')}${this.buildCreditEntry('嘟嘟Ski')}${this.buildCreditEntry('Kanata')}</div>`;
         if (typeof this.translateDom === 'function') this.translateDom(content);
         overlay.classList.remove('hidden');
         overlay.classList.add('show');
