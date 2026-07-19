@@ -7,7 +7,7 @@
     <title data-i18n="text_3f923c3a"></title>
     <link rel="stylesheet" href="style.css?v=2026071562">
     <link rel="stylesheet" href="css/components.css?v=2026071552">
-    <link rel="stylesheet" href="css/pages/settings.css?v=2026071602">
+    <link rel="stylesheet" href="css/pages/settings.css?v=2026071901">
     <link rel="stylesheet" href="css/animations.css?v=2026071552">
     <script>
     (function () {
@@ -1302,6 +1302,73 @@
                     </div>
                 </div>
             </div>
+            <div class="module-card" id="runtime-optimizer-card" data-card-key="runtime-optimizer">
+                <div class="module-card-header">
+                    <div class="module-card-info">
+                        <div class="module-card-title" data-i18n="runtimeOptimizer"></div>
+                        <div class="module-card-subtitle" data-i18n="runtimeOptimizerDesc"></div>
+                    </div>
+                    <div class="module-card-actions">
+                        <span class="runtime-status-badge" id="runtime-status-badge" data-state="unknown" data-i18n="runtimeUnknown"></span>
+                        <div class="module-card-expand" id="runtime-optimizer-toggle">
+                            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+                        </div>
+                    </div>
+                </div>
+                <div id="runtime-optimizer-content" class="module-card-content hidden">
+                    <div class="runtime-status-grid">
+                        <div class="runtime-status-item"><span data-i18n="runtimeForeground"></span><strong id="runtime-foreground">--</strong></div>
+                        <div class="runtime-status-item"><span data-i18n="runtimeDetection"></span><strong id="runtime-detection">--</strong></div>
+                        <div class="runtime-status-item"><span data-i18n="runtimeMode"></span><strong id="runtime-mode">--</strong></div>
+                        <div class="runtime-status-item"><span data-i18n="runtimeTemperature"></span><strong id="runtime-temperature">--</strong></div>
+                        <div class="runtime-status-item"><span data-i18n="runtimeEbpfState"></span><strong id="runtime-ebpf-state">--</strong></div>
+                        <div class="runtime-status-item"><span data-i18n="runtimeKnownThreads"></span><strong id="runtime-known-threads">--</strong></div>
+                        <div class="runtime-status-item"><span data-i18n="runtimeAppliedFailed"></span><strong id="runtime-applied-failed">--</strong></div>
+                        <div class="runtime-status-item"><span data-i18n="runtimeEbpfEvents"></span><strong id="runtime-ebpf-events">--</strong></div>
+                    </div>
+                    <div class="runtime-status-note" id="runtime-ebpf-error" hidden></div>
+                    <div class="runtime-action-row">
+                        <button type="button" class="action-btn runtime-secondary-btn" id="runtime-refresh-btn" data-i18n="runtimeRefresh"></button>
+                        <button type="button" class="action-btn runtime-secondary-btn" id="runtime-restart-btn" data-i18n="runtimeRestart"></button>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info"><span class="switch-label" data-i18n="runtimeAutoAffinity"></span><span class="switch-desc" data-i18n="runtimeAutoAffinityDesc"></span></div>
+                        <label class="switch"><input type="checkbox" id="runtime-enabled-switch"><span class="slider"></span></label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info"><span class="switch-label" data-i18n="runtimeEbpf"></span><span class="switch-desc" data-i18n="runtimeEbpfDesc"></span></div>
+                        <label class="switch"><input type="checkbox" id="runtime-ebpf-switch"><span class="slider"></span></label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info"><span class="switch-label" data-i18n="runtimeLoadLearning"></span><span class="switch-desc" data-i18n="runtimeLoadLearningDesc"></span></div>
+                        <label class="switch"><input type="checkbox" id="runtime-load-learning-switch"><span class="slider"></span></label>
+                    </div>
+                    <div class="switch-container">
+                        <div class="switch-info"><span class="switch-label" data-i18n="runtimeThermalControl"></span><span class="switch-desc" data-i18n="runtimeThermalControlDesc"></span></div>
+                        <label class="switch"><input type="checkbox" id="runtime-thermal-control-switch"><span class="slider"></span></label>
+                    </div>
+                    <div class="setting-section">
+                        <span class="section-label" data-i18n="runtimeDefaultClass"></span>
+                        <div class="runtime-class-options" id="runtime-class-options">
+                            <button type="button" data-value="efficiency" data-i18n="runtimeEfficiency"></button>
+                            <button type="button" data-value="balanced" data-i18n="runtimeBalanced"></button>
+                            <button type="button" data-value="performance" data-i18n="runtimePerformance"></button>
+                        </div>
+                    </div>
+                    <div class="setting-section runtime-field-grid">
+                        <label><span data-i18n="runtimeEfficiencyCpus"></span><input type="text" class="text-input" id="runtime-efficiency-cpus" data-i18n-placeholder="runtimeCpuAuto"></label>
+                        <label><span data-i18n="runtimeBalancedCpus"></span><input type="text" class="text-input" id="runtime-balanced-cpus" data-i18n-placeholder="runtimeCpuAuto"></label>
+                        <label><span data-i18n="runtimePerformanceCpus"></span><input type="text" class="text-input" id="runtime-performance-cpus" data-i18n-placeholder="runtimeCpuAuto"></label>
+                        <label><span data-i18n="runtimeExcludedPackages"></span><input type="text" class="text-input" id="runtime-excluded-packages" data-i18n-placeholder="runtimeExcludedPackagesHint"></label>
+                    </div>
+                    <div class="setting-section runtime-number-grid">
+                        <label><span data-i18n="runtimeScanInterval"></span><input type="number" class="text-input" id="runtime-scan-interval" min="250" max="10000" step="50"></label>
+                        <label><span data-i18n="runtimeWarmThreshold"></span><input type="number" class="text-input" id="runtime-warm-threshold" min="35" max="100" step="1"></label>
+                        <label><span data-i18n="runtimeSevereThreshold"></span><input type="number" class="text-input" id="runtime-severe-threshold" min="40" max="110" step="1"></label>
+                    </div>
+                    <button type="button" class="action-btn runtime-apply-btn" id="runtime-apply-btn" data-i18n="runtimeApply"></button>
+                </div>
+            </div>
             <div class="module-card" id="app-settings-card" data-card-key="app-settings">
                 <div class="module-card-header">
                     <div class="module-card-info">
@@ -1471,6 +1538,16 @@
                                 </div>
                                 <label class="switch">
                                     <input type="checkbox" class="card-visibility-switch" data-card="corona-kernel" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="switch-container card-visibility-switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label" data-i18n="runtimeOptimizer"></span>
+                                    <span class="switch-desc" data-i18n="runtimeCardVisibilityDesc"></span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" class="card-visibility-switch" data-card="runtime-optimizer" checked>
                                     <span class="slider"></span>
                                 </label>
                             </div>
@@ -1914,6 +1991,6 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071605" defer></script>
+    <script src="script.js?v=2026071901" defer></script>
 </body>
 </html>

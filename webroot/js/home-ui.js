@@ -459,6 +459,7 @@
             { toggle: 'custom-scripts-toggle', content: 'custom-scripts-content', onExpand: loadSection('custom-scripts') },
             { toggle: 'system-opt-toggle', content: 'system-opt-content', onExpand: loadSection('system-opt') },
             { toggle: 'corona-kernel-toggle', content: 'corona-kernel-content', onExpand: loadSection('corona-kernel') },
+            { toggle: 'runtime-optimizer-toggle', content: 'runtime-optimizer-content', onExpand: () => this.refreshRuntimeOptimizer() },
             { toggle: 'app-settings-toggle', content: 'app-settings-content', onExpand: loadSection('app-settings') }
         ];
         cards.forEach(card => {

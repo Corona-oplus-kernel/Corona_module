@@ -135,10 +135,11 @@ class CoronaAddon {
             'settings-memory-page': 'js/settings-memory-page.js',
             'settings-ui': 'js/settings-ui.js',
             'home-ui': 'js/home-ui.js',
+            'runtime-optimizer': 'js/runtime-optimizer.js',
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026071605` : '';
+        return map[name] ? `${map[name]}?v=2026071901` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -198,6 +199,7 @@ class CoronaAddon {
         await Promise.all([
             this.ensureFeatureScript('settings-ui'),
             this.ensureFeatureScript('home-ui'),
+            this.ensureFeatureScript('runtime-optimizer'),
             this.ensureFeatureScript('memory-core'),
             this.ensureFeatureScript('settings-memory-page')
         ]);
@@ -226,6 +228,7 @@ class CoronaAddon {
                 this.setCategoryConfigVisibility(this.state.showCategoryConfigToggles);
             }
             this.bindAllEvents();
+            this.initRuntimeOptimizer();
             this.initNavigationHistory();
             this.initLanguageSelector();
             this.applyTranslations();

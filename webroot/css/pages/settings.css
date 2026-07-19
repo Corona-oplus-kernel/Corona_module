@@ -624,6 +624,132 @@ body.theme-dark .option-item {
     }
 }
 
+.runtime-status-badge {
+    min-width: 46px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: var(--glass-control-bg);
+    color: var(--text-sub);
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.runtime-status-badge[data-state="running"] {
+    background: color-mix(in srgb, #25a76f 16%, transparent);
+    color: #198858;
+}
+
+.runtime-status-badge[data-state="stopped"] {
+    background: color-mix(in srgb, #d94b55 14%, transparent);
+    color: #c63c47;
+}
+
+.runtime-status-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    margin-bottom: 12px;
+}
+
+.runtime-status-item {
+    min-width: 0;
+    padding: 11px 12px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-ctl);
+    background: var(--glass-surface);
+}
+
+.runtime-status-item span,
+.runtime-field-grid label > span,
+.runtime-number-grid label > span {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-sub);
+    font-size: 11px;
+}
+
+.runtime-status-item strong {
+    display: block;
+    overflow: hidden;
+    color: var(--text-main);
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.runtime-status-note {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius-ctl);
+    background: color-mix(in srgb, #d98b24 14%, transparent);
+    color: #b36a08;
+    font-size: 12px;
+    word-break: break-all;
+}
+
+.runtime-action-row,
+.runtime-class-options,
+.runtime-field-grid,
+.runtime-number-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.runtime-action-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 16px;
+}
+
+.runtime-class-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.runtime-class-options button {
+    min-height: 40px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-ctl);
+    background: var(--glass-control-bg);
+    color: var(--text-sub);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.runtime-class-options button.selected {
+    border-color: var(--primary-border);
+    background: var(--primary-dim);
+    color: var(--primary);
+}
+
+.runtime-field-grid,
+.runtime-number-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.runtime-field-grid label,
+.runtime-number-grid label {
+    min-width: 0;
+}
+
+#runtime-optimizer-content .text-input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.runtime-apply-btn {
+    width: 100%;
+    margin-top: 4px;
+}
+
+@media (max-width: 420px) {
+    .runtime-status-grid,
+    .runtime-field-grid,
+    .runtime-number-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 body.app-hidden *,
 body.app-hidden *::before,
 body.app-hidden *::after {
