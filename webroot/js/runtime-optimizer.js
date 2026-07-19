@@ -54,7 +54,6 @@
             setValue('runtime-efficiency-cpus', 'efficiency_cpus');
             setValue('runtime-balanced-cpus', 'balanced_cpus');
             setValue('runtime-performance-cpus', 'performance_cpus');
-            setValue('runtime-excluded-packages', 'exclude_packages');
             setValue('runtime-scan-interval', 'scan_interval_ms', '1000');
             setValue('runtime-warm-threshold', 'thermal_warm_c', '65');
             setValue('runtime-severe-threshold', 'thermal_severe_c', '75');
@@ -75,7 +74,6 @@
                 efficiency_cpus: document.getElementById('runtime-efficiency-cpus')?.value.trim() || null,
                 balanced_cpus: document.getElementById('runtime-balanced-cpus')?.value.trim() || null,
                 performance_cpus: document.getElementById('runtime-performance-cpus')?.value.trim() || null,
-                exclude_packages: document.getElementById('runtime-excluded-packages')?.value.trim() || null,
                 scan_interval_ms: String(this.runtimeNumberValue('runtime-scan-interval', 1000, 250, 10000)),
                 load_learning: document.getElementById('runtime-load-learning-switch')?.checked ? '1' : '0',
                 thermal_control: document.getElementById('runtime-thermal-control-switch')?.checked ? '1' : '0',
