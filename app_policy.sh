@@ -10,8 +10,8 @@ PRIORITY_FILE="$CONFIG_DIR/process_priority.conf"
 PROFILES_DIR="$CONFIG_DIR/app_profiles"
 THREAD_PRIORITY_FILE="$CONFIG_DIR/thread_priority.conf"
 ICONS_DIR="$MODDIR/webroot/app_icons"
-PIDFILE="$MODDIR/.app_policy_daemon.pid"
-STATEFILE="$MODDIR/.app_policy_state"
+PIDFILE="$CONFIG_DIR/.app_policy_daemon.pid"
+STATEFILE="$CONFIG_DIR/.app_policy_state"
 CORONAD="$MODDIR/bin/coronad"
 
 . "$MODDIR/app_policy/common.sh"
@@ -20,7 +20,7 @@ CORONAD="$MODDIR/bin/coronad"
 
 get_daemon_pid() {
     if [ -x "$CORONAD" ]; then
-        corona_pid=$(cat "$MODDIR/.coronad.pid" 2>/dev/null)
+        corona_pid=$(cat "$CONFIG_DIR/.coronad.pid" 2>/dev/null)
         if [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ]; then
             corona_cmdline=$(tr '\0' ' ' < "/proc/$corona_pid/cmdline" 2>/dev/null)
             case "$corona_cmdline" in

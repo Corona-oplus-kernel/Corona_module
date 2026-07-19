@@ -24,6 +24,25 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "versionCode=$versionCode" >> "$GITHUB_OUTPUT"
 
+      - name: Build Android daemon
+        shell: bash
+        run: |
+          rustup target add aarch64-linux-android
+          ndk_root="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-}}"
+          if [ -z "$ndk_root" ] || [ ! -d "$ndk_root/toolchains/llvm/prebuilt/linux-x86_64" ]; then
+            ndk_version="$(find "$ANDROID_SDK_ROOT/ndk" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -1)"
+            ndk_root="$ANDROID_SDK_ROOT/ndk/$ndk_version"
+          fi
+          toolchain="$ndk_root/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$toolchain/aarch64-linux-android26-clang"
+          cargo test --locked --manifest-path native/coronad/Cargo.toml
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$toolchain/aarch64-linux-android26-clang" \
+            cargo build --locked --release --target aarch64-linux-android \
+            --manifest-path native/coronad/Cargo.toml
+          install -m 0755 native/coronad/target/aarch64-linux-android/release/coronad bin/coronad
+          "$toolchain/llvm-readelf" -h bin/coronad | grep -q 'AArch64'
+          "$toolchain/llvm-readelf" -l bin/coronad | grep -q '/system/bin/linker64'
+
       - name: Generate changelog
         id: changelog
         run: |
@@ -38,11 +57,23 @@ jobs:
           printf "# Corona %s\n\n%s\n" "${{ steps.version.outputs.version }}" "$log" > changelog.md
 
       - name: Build zip
+        shell: bash
         run: |
-          zip -r "Corona-${{ steps.version.outputs.version }}.zip" . \
-            -x ".git/*" -x ".github/*" \
-            -x "docs/*" \
-            -x "LICENSE" -x "README.md" -x "changelog.md" -x "update.json"
+          package_dir="$RUNNER_TEMP/corona-package"
+          mkdir -p "$package_dir"
+          git archive HEAD | tar -x -C "$package_dir"
+          rm -rf "$package_dir/.github" "$package_dir/native" "$package_dir/docs"
+          rm -f "$package_dir/.gitignore" "$package_dir/LICENSE" "$package_dir/README.md" \
+            "$package_dir/changelog.md" "$package_dir/update.json"
+          install -m 0755 bin/coronad "$package_dir/bin/coronad"
+          find "$package_dir" -type f -name '*.log' -delete
+          (cd "$package_dir" && zip -r "$GITHUB_WORKSPACE/Corona-${{ steps.version.outputs.version }}.zip" .)
+          unzip -Z1 "Corona-${{ steps.version.outputs.version }}.zip" | grep -qx 'module.prop'
+          unzip -Z1 "Corona-${{ steps.version.outputs.version }}.zip" | grep -qx 'bin/coronad'
+          if unzip -Z1 "Corona-${{ steps.version.outputs.version }}.zip" | grep -Eq '^(native|docs|\.github)/'; then
+            echo "Unexpected development files in release package" >&2
+            exit 1
+          fi
 
       - name: Update update.json and changelog
         run: |

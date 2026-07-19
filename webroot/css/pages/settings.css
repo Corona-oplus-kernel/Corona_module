@@ -635,10 +635,44 @@ body.theme-dark .option-item {
     text-align: center;
 }
 
+.thread-runtime-overview {
+    padding: 13px 14px;
+    border: 1px solid var(--glass-border);
+    border-radius: calc(var(--radius-ctl) + 2px);
+    background: var(--glass-surface);
+}
+
+#app-policy-content .thread-runtime-overview {
+    margin-bottom: 12px;
+}
+
+.runtime-overview-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.runtime-overview-header .section-desc {
+    display: block;
+    margin-top: 4px;
+}
+
+.thread-runtime-overview .runtime-dashboard {
+    margin-bottom: 0;
+}
+
+.thread-runtime-overview .runtime-status-note {
+    margin: 10px 0 0;
+}
+
 .runtime-optimizer-section {
-    margin-top: 18px;
-    padding-top: 18px;
-    border-top: 1px solid var(--glass-border);
+    margin-bottom: 14px;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    border-radius: calc(var(--radius-ctl) + 2px);
+    background: var(--glass-surface);
 }
 
 .runtime-section-header {
@@ -646,7 +680,46 @@ body.theme-dark .option-item {
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 14px;
+    margin-bottom: 0;
+    padding: 13px 14px;
+}
+
+.runtime-settings-toggle {
+    cursor: pointer;
+    user-select: none;
+}
+
+.runtime-settings-arrow {
+    display: inline-grid;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    place-items: center;
+    color: var(--text-sub);
+    font-size: 22px;
+    line-height: 1;
+    transform: rotate(0deg);
+    transform-origin: 50% 50%;
+    transition: transform 220ms ease;
+}
+
+.runtime-settings-toggle[aria-expanded="true"] .runtime-settings-arrow {
+    transform: rotate(90deg);
+}
+
+.runtime-settings-content {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+}
+
+.runtime-settings-content.expanded {
+    opacity: 1;
+}
+
+.runtime-settings-inner {
+    padding: 0 14px 14px;
+    border-top: 1px solid var(--glass-border);
 }
 
 .runtime-section-header .section-desc {
@@ -976,27 +1049,31 @@ body.theme-dark .option-item {
 }
 
 .runtime-advanced-arrow {
+    display: inline-grid;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    place-items: center;
     color: var(--text-sub);
     font-size: 22px;
-    transform: rotate(90deg);
-    transition: transform 260ms var(--motion-spring);
+    line-height: 1;
+    transform: rotate(0deg);
+    transform-origin: 50% 50%;
+    transition: transform 220ms ease;
 }
 
 .runtime-advanced-toggle[aria-expanded="true"] .runtime-advanced-arrow {
-    transform: rotate(270deg);
+    transform: rotate(90deg);
 }
 
 .runtime-advanced-content {
     overflow: hidden;
     max-height: 0;
     opacity: 0;
-    transform: translateY(-6px);
-    transition: max-height 360ms var(--motion-spring), opacity 220ms ease, transform 320ms var(--motion-spring);
 }
 
 .runtime-advanced-content.expanded {
     opacity: 1;
-    transform: translateY(0);
 }
 
 .runtime-advanced-inner {
@@ -1025,6 +1102,8 @@ body.theme-dark .runtime-advanced {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .runtime-settings-content,
+    .runtime-settings-arrow,
     .runtime-advanced-content,
     .runtime-advanced-arrow {
         transition-duration: 0.01ms;

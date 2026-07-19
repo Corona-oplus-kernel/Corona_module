@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" id="theme-color-meta" content="#1783e8">
     <title data-i18n="text_3f923c3a"></title>
-    <link rel="stylesheet" href="style.css?v=2026071906">
+    <link rel="stylesheet" href="style.css?v=2026071915">
     <link rel="stylesheet" href="css/components.css?v=2026071552">
-    <link rel="stylesheet" href="css/pages/settings.css?v=2026071906">
+    <link rel="stylesheet" href="css/pages/settings.css?v=2026071915">
     <link rel="stylesheet" href="css/animations.css?v=2026071552">
     <script>
     (function () {
@@ -964,98 +964,8 @@
                     </div>
                 </div>
                 <div id="app-policy-content" class="module-card-content hidden">
-                    <div class="switch-container">
-                        <div class="switch-info">
-                            <span class="switch-label" data-i18n="text_bafafe48"></span>
-                            <span class="switch-desc" data-i18n="text_7da77b69"></span>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" id="app-monitor-switch">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
                     <div class="tile-actions">
                         <button class="action-btn" id="app-policy-manage-btn" data-i18n="text_01d8b3ce"></button>
-                    </div>
-                    <div class="runtime-optimizer-section" id="runtime-optimizer-panel">
-                        <div class="runtime-section-header">
-                            <div>
-                                <span class="section-label" data-i18n="runtimeOptimizer"></span>
-                                <span class="section-desc" data-i18n="runtimeOptimizerDesc"></span>
-                            </div>
-                            <div class="runtime-header-actions">
-                                <button type="button" class="runtime-refresh-icon" id="runtime-refresh-btn" data-i18n-aria-label="runtimeRefresh" aria-label="">
-                                    <svg viewBox="0 0 24 24" width="17" height="17"><path fill="currentColor" d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-                                </button>
-                                <span class="runtime-status-badge" id="runtime-status-badge" data-state="unknown" data-i18n="runtimeUnknown"></span>
-                            </div>
-                        </div>
-                        <div class="runtime-dashboard">
-                            <div class="runtime-foreground-card">
-                                <span class="runtime-dashboard-label" data-i18n="runtimeForeground"></span>
-                                <strong id="runtime-foreground">--</strong>
-                                <span class="runtime-dashboard-meta"><span data-i18n="runtimeDetection"></span> · <b id="runtime-detection">--</b></span>
-                            </div>
-                            <div class="runtime-quick-grid">
-                                <div class="runtime-quick-item"><span data-i18n="runtimeMode"></span><strong id="runtime-mode">--</strong></div>
-                                <div class="runtime-quick-item"><span data-i18n="runtimeTemperature"></span><strong id="runtime-temperature">--</strong></div>
-                                <div class="runtime-quick-item"><span data-i18n="runtimeEbpfState"></span><strong id="runtime-ebpf-state">--</strong></div>
-                                <div class="runtime-quick-item"><span data-i18n="runtimeKnownThreads"></span><strong id="runtime-known-threads">--</strong></div>
-                            </div>
-                        </div>
-                        <div class="runtime-status-note" id="runtime-ebpf-error" hidden></div>
-                        <div class="runtime-control-heading">
-                            <div>
-                                <span class="section-label" data-i18n="runtimeCoreControls"></span>
-                                <span class="section-desc" data-i18n="runtimeCoreControlsDesc"></span>
-                            </div>
-                        </div>
-                        <div class="runtime-switch-grid">
-                            <div class="switch-container runtime-switch-card">
-                                <div class="switch-info"><span class="switch-label" data-i18n="runtimeAutoAffinity"></span><span class="switch-desc" data-i18n="runtimeAutoAffinityDesc"></span></div>
-                                <label class="switch"><input type="checkbox" id="runtime-enabled-switch"><span class="slider"></span></label>
-                            </div>
-                            <div class="switch-container runtime-switch-card">
-                                <div class="switch-info"><span class="switch-label" data-i18n="runtimeEbpf"></span><span class="switch-desc" data-i18n="runtimeEbpfDesc"></span></div>
-                                <label class="switch"><input type="checkbox" id="runtime-ebpf-switch"><span class="slider"></span></label>
-                            </div>
-                            <div class="switch-container runtime-switch-card">
-                                <div class="switch-info"><span class="switch-label" data-i18n="runtimeLoadLearning"></span><span class="switch-desc" data-i18n="runtimeLoadLearningDesc"></span></div>
-                                <label class="switch"><input type="checkbox" id="runtime-load-learning-switch"><span class="slider"></span></label>
-                            </div>
-                            <div class="switch-container runtime-switch-card">
-                                <div class="switch-info"><span class="switch-label" data-i18n="runtimeThermalControl"></span><span class="switch-desc" data-i18n="runtimeThermalControlDesc"></span></div>
-                                <label class="switch"><input type="checkbox" id="runtime-thermal-control-switch"><span class="slider"></span></label>
-                            </div>
-                        </div>
-                        <div class="setting-section runtime-class-section">
-                            <span class="section-label" data-i18n="runtimeDefaultClass"></span>
-                            <div class="runtime-class-options" id="runtime-class-options">
-                                <button type="button" data-value="efficiency" data-i18n="runtimeEfficiency"></button>
-                                <button type="button" data-value="balanced" data-i18n="runtimeBalanced"></button>
-                                <button type="button" data-value="performance" data-i18n="runtimePerformance"></button>
-                            </div>
-                        </div>
-                        <div class="runtime-advanced">
-                            <button type="button" class="runtime-advanced-toggle" id="runtime-advanced-toggle" aria-expanded="false">
-                                <span><strong data-i18n="runtimeAdvanced"></strong><small data-i18n="runtimeAdvancedDesc"></small></span>
-                                <span class="runtime-advanced-arrow">›</span>
-                            </button>
-                            <div class="runtime-advanced-content" id="runtime-advanced-content" aria-hidden="true">
-                                <div class="runtime-advanced-inner">
-                                    <div class="setting-section runtime-field-grid">
-                                        <label><span data-i18n="runtimeEfficiencyCpus"></span><input type="text" class="text-input" id="runtime-efficiency-cpus" data-i18n-placeholder="runtimeCpuAuto"></label>
-                                        <label><span data-i18n="runtimeBalancedCpus"></span><input type="text" class="text-input" id="runtime-balanced-cpus" data-i18n-placeholder="runtimeCpuAuto"></label>
-                                        <label><span data-i18n="runtimePerformanceCpus"></span><input type="text" class="text-input" id="runtime-performance-cpus" data-i18n-placeholder="runtimeCpuAuto"></label>
-                                    </div>
-                                    <div class="setting-section runtime-number-grid">
-                                        <label><span data-i18n="runtimeScanInterval"></span><input type="number" class="text-input" id="runtime-scan-interval" min="250" max="10000" step="50"></label>
-                                        <label><span data-i18n="runtimeWarmThreshold"></span><input type="number" class="text-input" id="runtime-warm-threshold" min="35" max="100" step="1"></label>
-                                        <label><span data-i18n="runtimeSevereThreshold"></span><input type="number" class="text-input" id="runtime-severe-threshold" min="40" max="110" step="1"></label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1790,6 +1700,103 @@
                 <span class="detail-title" id="thread-rule-title" data-i18n="text_374e5448"></span>
             </div>
             <div class="thread-rule-flow">
+                <div class="thread-runtime-overview">
+                    <div class="runtime-overview-header">
+                        <div>
+                            <span class="section-label" data-i18n="runtimeStatusOverview"></span>
+                            <span class="section-desc" data-i18n="runtimeStatusOverviewDesc"></span>
+                        </div>
+                        <div class="runtime-header-actions">
+                            <button type="button" class="runtime-refresh-icon" id="runtime-refresh-btn" data-i18n-aria-label="runtimeRefresh" aria-label="">
+                                <svg viewBox="0 0 24 24" width="17" height="17"><path fill="currentColor" d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                            </button>
+                            <span class="runtime-status-badge" id="runtime-status-badge" data-state="unknown" data-i18n="runtimeUnknown"></span>
+                        </div>
+                    </div>
+                    <div class="runtime-dashboard">
+                        <div class="runtime-foreground-card">
+                            <span class="runtime-dashboard-label" data-i18n="runtimeForeground"></span>
+                            <strong id="runtime-foreground">--</strong>
+                            <span class="runtime-dashboard-meta"><span data-i18n="runtimeDetection"></span> · <b id="runtime-detection">--</b></span>
+                        </div>
+                        <div class="runtime-quick-grid">
+                            <div class="runtime-quick-item"><span data-i18n="runtimeMode"></span><strong id="runtime-mode">--</strong></div>
+                            <div class="runtime-quick-item"><span data-i18n="runtimeTemperature"></span><strong id="runtime-temperature">--</strong></div>
+                            <div class="runtime-quick-item"><span data-i18n="runtimeEbpfState"></span><strong id="runtime-ebpf-state">--</strong></div>
+                            <div class="runtime-quick-item"><span data-i18n="runtimeKnownThreads"></span><strong id="runtime-known-threads">--</strong></div>
+                        </div>
+                    </div>
+                    <div class="runtime-status-note" id="runtime-ebpf-error" hidden></div>
+                </div>
+                <button type="button" class="thread-app-rule-entry" id="thread-app-rule-btn">
+                    <span><strong data-i18n="threadAppRule"></strong><small data-i18n="threadAppRuleDesc"></small></span>
+                    <span class="thread-app-rule-arrow">›</span>
+                </button>
+                    <div class="runtime-optimizer-section" id="runtime-optimizer-panel">
+                        <div class="runtime-section-header runtime-settings-toggle" id="runtime-settings-toggle" role="button" tabindex="0" aria-expanded="false">
+                            <div>
+                                <span class="section-label" data-i18n="runtimeOptimizer"></span>
+                                <span class="section-desc" data-i18n="runtimeOptimizerDesc"></span>
+                            </div>
+                            <span class="runtime-settings-arrow">›</span>
+                        </div>
+                        <div class="runtime-settings-content" id="runtime-settings-content" aria-hidden="true">
+                            <div class="runtime-settings-inner">
+                        <div class="runtime-control-heading">
+                            <div>
+                                <span class="section-label" data-i18n="runtimeCoreControls"></span>
+                                <span class="section-desc" data-i18n="runtimeCoreControlsDesc"></span>
+                            </div>
+                        </div>
+                        <div class="runtime-switch-grid">
+                            <div class="switch-container runtime-switch-card">
+                                <div class="switch-info"><span class="switch-label" data-i18n="runtimeAutoAffinity"></span><span class="switch-desc" data-i18n="runtimeAutoAffinityDesc"></span></div>
+                                <label class="switch"><input type="checkbox" id="runtime-enabled-switch"><span class="slider"></span></label>
+                            </div>
+                            <div class="switch-container runtime-switch-card">
+                                <div class="switch-info"><span class="switch-label" data-i18n="runtimeEbpf"></span><span class="switch-desc" data-i18n="runtimeEbpfDesc"></span></div>
+                                <label class="switch"><input type="checkbox" id="runtime-ebpf-switch"><span class="slider"></span></label>
+                            </div>
+                            <div class="switch-container runtime-switch-card">
+                                <div class="switch-info"><span class="switch-label" data-i18n="runtimeLoadLearning"></span><span class="switch-desc" data-i18n="runtimeLoadLearningDesc"></span></div>
+                                <label class="switch"><input type="checkbox" id="runtime-load-learning-switch"><span class="slider"></span></label>
+                            </div>
+                            <div class="switch-container runtime-switch-card">
+                                <div class="switch-info"><span class="switch-label" data-i18n="runtimeThermalControl"></span><span class="switch-desc" data-i18n="runtimeThermalControlDesc"></span></div>
+                                <label class="switch"><input type="checkbox" id="runtime-thermal-control-switch"><span class="slider"></span></label>
+                            </div>
+                        </div>
+                        <div class="setting-section runtime-class-section">
+                            <span class="section-label" data-i18n="runtimeDefaultClass"></span>
+                            <div class="runtime-class-options" id="runtime-class-options">
+                                <button type="button" data-value="efficiency" data-i18n="runtimeEfficiency"></button>
+                                <button type="button" data-value="balanced" data-i18n="runtimeBalanced"></button>
+                                <button type="button" data-value="performance" data-i18n="runtimePerformance"></button>
+                            </div>
+                        </div>
+                        <div class="runtime-advanced">
+                            <button type="button" class="runtime-advanced-toggle" id="runtime-advanced-toggle" aria-expanded="false">
+                                <span><strong data-i18n="runtimeAdvanced"></strong><small data-i18n="runtimeAdvancedDesc"></small></span>
+                                <span class="runtime-advanced-arrow">›</span>
+                            </button>
+                            <div class="runtime-advanced-content" id="runtime-advanced-content" aria-hidden="true">
+                                <div class="runtime-advanced-inner">
+                                    <div class="setting-section runtime-field-grid">
+                                        <label><span data-i18n="runtimeEfficiencyCpus"></span><input type="text" class="text-input" id="runtime-efficiency-cpus" data-i18n-placeholder="runtimeCpuAuto"></label>
+                                        <label><span data-i18n="runtimeBalancedCpus"></span><input type="text" class="text-input" id="runtime-balanced-cpus" data-i18n-placeholder="runtimeCpuAuto"></label>
+                                        <label><span data-i18n="runtimePerformanceCpus"></span><input type="text" class="text-input" id="runtime-performance-cpus" data-i18n-placeholder="runtimeCpuAuto"></label>
+                                    </div>
+                                    <div class="setting-section runtime-number-grid">
+                                        <label><span data-i18n="runtimeScanInterval"></span><input type="number" class="text-input" id="runtime-scan-interval" min="250" max="10000" step="50"></label>
+                                        <label><span data-i18n="runtimeWarmThreshold"></span><input type="number" class="text-input" id="runtime-warm-threshold" min="35" max="100" step="1" value="75"></label>
+                                        <label><span data-i18n="runtimeSevereThreshold"></span><input type="number" class="text-input" id="runtime-severe-threshold" min="40" max="110" step="1" value="100"></label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                            </div>
+                        </div>
+                    </div>
                 <div class="thread-tag-form" id="thread-tag-form">
                     <input type="text" id="thread-tag-name-input" class="priority-search" data-i18n-placeholder="text_21e15ede" placeholder="">
                     <div class="thread-tag-form-actions">
@@ -1812,68 +1819,133 @@
             <div class="priority-process-info" id="thread-rule-selected-app">
                 <span class="process-name">--</span>
             </div>
-            <div class="priority-setting-section">
-                <div class="priority-setting-label" data-i18n="text_71245969"></div>
-                <input type="text" id="thread-pattern-input" class="priority-search" data-i18n-placeholder="text_cc6ea83d" placeholder="">
-                <div class="priority-setting-hint" data-i18n="text_43609790"></div>
-            </div>
-            <div class="priority-setting-section">
-                <div class="priority-setting-label" data-i18n="text_d605d266"></div>
-                <div class="thread-mode-grid" id="thread-mode-list"></div>
-            </div>
-            <div class="priority-setting-section thread-rule-grid">
-                <div>
-                    <div class="priority-setting-label" data-i18n="text_27626d16"></div>
-                    <input type="text" id="thread-affinity-input" class="priority-search" data-i18n-placeholder="text_4f63b865" placeholder="">
-                    <div class="priority-setting-hint" data-i18n="text_f2c73da4"></div>
+            <div class="priority-setting-section thread-cpu-scheduling-section">
+                <div class="priority-setting-label" data-i18n="appRuleCpuAssignment"></div>
+                <div class="priority-setting-hint" data-i18n="appRuleCpuAssignmentDesc"></div>
+                <div class="thread-rule-grid thread-cpu-placement-grid">
+                    <div>
+                        <div class="priority-setting-label" data-i18n="appRuleCpuCores"></div>
+                        <input type="text" id="thread-affinity-input" class="priority-search" data-i18n-placeholder="text_4f63b865" placeholder="">
+                        <div class="priority-setting-hint" data-i18n="appRuleCpuCoresDesc"></div>
+                    </div>
+                    <div>
+                        <div class="priority-setting-label" data-i18n="text_23fe970f"></div>
+                        <div class="rule-dropdown" data-select-id="thread-cpuset-group">
+                            <button type="button" class="rule-dropdown-trigger"><span class="rule-dropdown-value">Auto</span><span class="rule-dropdown-arrow">⌄</span></button>
+                            <div class="rule-dropdown-menu">
+                                <button type="button" data-value=""><strong>Auto</strong><small data-i18n="appRuleCpusetAutoDesc"></small></button>
+                                <button type="button" data-value="top-app"><strong>top-app</strong><small data-i18n="appRuleCpusetTopAppDesc"></small></button>
+                                <button type="button" data-value="foreground"><strong>foreground</strong><small data-i18n="appRuleCpusetForegroundDesc"></small></button>
+                                <button type="button" data-value="background"><strong>background</strong><small data-i18n="appRuleCpusetBackgroundDesc"></small></button>
+                                <button type="button" data-value="system-background"><strong>system-background</strong><small data-i18n="appRuleCpusetSystemBackgroundDesc"></small></button>
+                            </div>
+                            <select id="thread-cpuset-group" class="rule-native-select" tabindex="-1" aria-hidden="true">
+                                <option value="">Auto</option>
+                                <option value="top-app">top-app</option>
+                                <option value="foreground">foreground</option>
+                                <option value="background">background</option>
+                                <option value="system-background">system-background</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <div class="priority-setting-label" data-i18n="text_23fe970f"></div>
-                    <select id="thread-cpuset-group" class="thread-rule-select">
-                        <option value="" data-i18n="text_4f6339b5"></option>
-                        <option value="top-app">top-app</option>
-                        <option value="foreground">foreground</option>
-                        <option value="foreground_window">foreground_window</option>
-                        <option value="oiface_fg+">oiface_fg+</option>
-                        <option value="oiface_fg">oiface_fg</option>
-                        <option value="background">background</option>
-                        <option value="system-background">system-background</option>
-                    </select>
-                </div>
-            </div>
-            <div class="priority-setting-section thread-rule-grid">
-                <div>
-                    <div class="priority-setting-label">uclamp.min</div>
-                    <input type="number" id="thread-uclamp-min" class="priority-search" min="0" max="1024" step="1" placeholder="0-1024">
-                </div>
-                <div>
-                    <div class="priority-setting-label">uclamp.max</div>
-                    <input type="number" id="thread-uclamp-max" class="priority-search" min="0" max="1024" step="1" placeholder="0-1024">
-                </div>
-            </div>
-            <div class="priority-setting-section thread-rule-grid">
-                <div>
-                    <div class="priority-setting-label" data-i18n="text_03afa6a1"></div>
-                    <select id="thread-sched-policy" class="thread-rule-select">
-                        <option value="normal">normal</option>
-                        <option value="batch">batch</option>
-                        <option value="idle">idle</option>
-                        <option value="fifo">fifo</option>
-                        <option value="rr">rr</option>
-                    </select>
-                </div>
-                <div>
-                    <div class="priority-setting-label" data-i18n="text_5e90043e"></div>
-                    <input type="number" id="thread-rt-prio" class="priority-search" min="0" max="99" value="1" data-i18n-placeholder="text_14db1ff6" placeholder="">
+                <div class="switch-container thread-affinity-exclude-row hidden" id="thread-affinity-exclude-row">
+                    <div class="switch-info">
+                        <span class="switch-label" data-i18n="threadAffinityExclude"></span>
+                        <span class="switch-desc" data-i18n="threadAffinityExcludeDesc"></span>
+                    </div>
+                    <label class="switch"><input type="checkbox" id="thread-affinity-exclude-switch"><span class="slider"></span></label>
                 </div>
             </div>
-            <div class="priority-setting-section">
-                <div class="priority-setting-label" data-i18n="text_d8de62d3"></div>
-                <div class="switch-list compact-switch-list">
-                    <label class="mini-switch-row"><input type="checkbox" id="thread-walt-boost"><span class="mini-switch-copy"><span class="mini-switch-title" data-i18n="perTaskBoost"></span><span class="mini-switch-desc" data-i18n="text_3de0bce4"></span></span></label>
-                    <label class="mini-switch-row"><input type="checkbox" id="thread-walt-pipeline"><span class="mini-switch-copy"><span class="mini-switch-title" data-i18n="pipelineSpecial"></span><span class="mini-switch-desc" data-i18n="text_ee1fe896"></span></span></label>
+            <div class="priority-setting-section thread-priority-resource-section">
+                <button type="button" class="thread-resource-toggle" id="thread-resource-toggle" aria-expanded="false">
+                    <span><strong data-i18n="appRulePriorityResources"></strong><small data-i18n="appRulePriorityResourcesSimpleDesc"></small></span>
+                    <span class="thread-resource-summary" id="thread-resource-summary">Nice 0 · I/O Auto</span>
+                    <span class="thread-resource-arrow">›</span>
+                </button>
+                <div class="thread-resource-content" id="thread-resource-content" aria-hidden="true">
+                    <div class="thread-resource-inner">
+                        <div class="rule-slider-block">
+                            <div class="rule-control-heading"><span data-i18n="appRuleNice"></span><strong id="thread-nice-value">0</strong></div>
+                            <input type="range" id="thread-nice-input" class="rule-range" min="-20" max="19" step="1" value="0">
+                            <div class="rule-range-labels"><span data-i18n="appRuleHigherPriority"></span><span data-i18n="appRuleLowerPriority"></span></div>
+                        </div>
+                        <div>
+                            <div class="priority-setting-label" data-i18n="threadIoClass"></div>
+                            <div class="rule-dropdown" data-select-id="thread-io-class">
+                                <button type="button" class="rule-dropdown-trigger"><span class="rule-dropdown-value" data-i18n="threadIoBestEffort"></span><span class="rule-dropdown-arrow">⌄</span></button>
+                                <div class="rule-dropdown-menu">
+                                    <button type="button" data-value="1"><strong data-i18n="threadIoRealtime"></strong><small data-i18n="appRuleIoRealtimeDesc"></small></button>
+                                    <button type="button" data-value="2"><strong data-i18n="threadIoBestEffort"></strong><small data-i18n="appRuleIoBestEffortDesc"></small></button>
+                                    <button type="button" data-value="3"><strong data-i18n="threadIoIdle"></strong><small data-i18n="appRuleIoIdleDesc"></small></button>
+                                </div>
+                                <select id="thread-io-class" class="rule-native-select" tabindex="-1" aria-hidden="true">
+                                    <option value="1" data-i18n="threadIoRealtime"></option>
+                                    <option value="2" data-i18n="threadIoBestEffort"></option>
+                                    <option value="3" data-i18n="threadIoIdle"></option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="rule-slider-block">
+                            <div class="rule-control-heading"><span data-i18n="threadIoLevel"></span><strong id="thread-io-level-value">4</strong></div>
+                            <input type="range" id="thread-io-level" class="rule-range" min="0" max="7" step="1" value="4">
+                            <div class="rule-range-labels"><span data-i18n="appRuleIoUrgent"></span><span data-i18n="appRuleIoBackground"></span></div>
+                        </div>
+                        <div class="thread-rule-grid">
+                            <div>
+                                <div class="priority-setting-label">uclamp.min</div>
+                                <input type="number" id="thread-uclamp-min" class="priority-search" min="0" max="1024" step="1" data-i18n-placeholder="appRuleAutoPlaceholder" placeholder="">
+                            </div>
+                            <div>
+                                <div class="priority-setting-label">uclamp.max</div>
+                                <input type="number" id="thread-uclamp-max" class="priority-search" min="0" max="1024" step="1" data-i18n-placeholder="appRuleAutoPlaceholder" placeholder="">
+                            </div>
+                        </div>
+                        <div class="priority-setting-hint" data-i18n="appRuleUclampDesc"></div>
+                    </div>
                 </div>
-                <div class="priority-setting-hint" data-i18n="text_6c6e982d"></div>
+            </div>
+            <div class="priority-setting-section thread-scheduler-advanced">
+                <button type="button" class="thread-scheduler-toggle" id="thread-scheduler-toggle" aria-expanded="false">
+                    <span><strong data-i18n="appRuleAdvancedScheduler"></strong><small data-i18n="appRuleAdvancedSchedulerDesc"></small></span>
+                    <span class="thread-scheduler-arrow">›</span>
+                </button>
+                <div class="thread-scheduler-content" id="thread-scheduler-content" aria-hidden="true">
+                    <div class="thread-scheduler-inner">
+                        <div class="thread-rule-grid">
+                            <div>
+                                <div class="priority-setting-label" data-i18n="text_03afa6a1"></div>
+                                <div class="rule-dropdown" data-select-id="thread-sched-policy">
+                                    <button type="button" class="rule-dropdown-trigger"><span class="rule-dropdown-value">normal</span><span class="rule-dropdown-arrow">⌄</span></button>
+                                    <div class="rule-dropdown-menu compact">
+                                        <button type="button" data-value="normal"><strong>normal</strong><small data-i18n="appRuleSchedNormalDesc"></small></button>
+                                        <button type="button" data-value="batch"><strong>batch</strong><small data-i18n="appRuleSchedBatchDesc"></small></button>
+                                        <button type="button" data-value="idle"><strong>idle</strong><small data-i18n="appRuleSchedIdleDesc"></small></button>
+                                        <button type="button" data-value="fifo"><strong>fifo</strong><small data-i18n="appRuleSchedFifoDesc"></small></button>
+                                        <button type="button" data-value="rr"><strong>rr</strong><small data-i18n="appRuleSchedRrDesc"></small></button>
+                                    </div>
+                                    <select id="thread-sched-policy" class="rule-native-select" tabindex="-1" aria-hidden="true">
+                                        <option value="normal">normal</option>
+                                        <option value="batch">batch</option>
+                                        <option value="idle">idle</option>
+                                        <option value="fifo">fifo</option>
+                                        <option value="rr">rr</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="priority-setting-label" data-i18n="text_5e90043e"></div>
+                                <input type="number" id="thread-rt-prio" class="priority-search" min="0" max="99" value="1" data-i18n-placeholder="text_14db1ff6" placeholder="">
+                            </div>
+                        </div>
+                        <div class="priority-setting-label thread-walt-label" data-i18n="text_d8de62d3"></div>
+                        <div class="switch-list compact-switch-list">
+                            <label class="mini-switch-row"><input type="checkbox" id="thread-walt-boost"><span class="mini-switch-copy"><span class="mini-switch-title" data-i18n="perTaskBoost"></span><span class="mini-switch-desc" data-i18n="text_3de0bce4"></span></span></label>
+                            <label class="mini-switch-row"><input type="checkbox" id="thread-walt-pipeline"><span class="mini-switch-copy"><span class="mini-switch-title" data-i18n="pipelineSpecial"></span><span class="mini-switch-desc" data-i18n="text_ee1fe896"></span></span></label>
+                        </div>
+                        <div class="priority-setting-hint" data-i18n="text_6c6e982d"></div>
+                    </div>
+                </div>
             </div>
             <div class="priority-actions">
                 <button class="action-btn priority-cancel-btn" id="thread-rule-cancel-btn" data-i18n="cancel"></button>
@@ -1993,6 +2065,7 @@
             </div>
         </div>
     </div>
-    <script src="script.js?v=2026071906" defer></script>
+    </div>
+    <script src="script.js?v=2026071915" defer></script>
 </body>
 </html>

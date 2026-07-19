@@ -31,6 +31,29 @@ struct SchedParam {
 static STOP_REQUESTED: AtomicBool = AtomicBool::new(false);
 static RELOAD_REQUESTED: AtomicBool = AtomicBool::new(false);
 
+fn migrate_legacy_runtime_path(module: &Path, config: &Path, name: &str) {
+    let legacy = module.join(name);
+    let target = config.join(name);
+    if !legacy.exists() {
+        return;
+    }
+    let _ = fs::create_dir_all(config);
+    if target.exists() {
+        if legacy.is_dir() {
+            let _ = fs::remove_dir_all(legacy);
+        } else {
+            let _ = fs::remove_file(legacy);
+        }
+        return;
+    }
+    if fs::rename(&legacy, &target).is_ok() {
+        return;
+    }
+    if legacy.is_file() && fs::copy(&legacy, &target).is_ok() {
+        let _ = fs::remove_file(legacy);
+    }
+}
+
 extern "C" fn handle_signal(signal_number: i32) {
     match signal_number {
         1 => RELOAD_REQUESTED.store(true, Ordering::Release),
@@ -64,13 +87,28 @@ impl Paths {
         let config = env::var_os("CORONA_CONFIG_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|| module.join("config"));
+        for name in [
+            ".coronad.pid",
+            ".coronad_state",
+            ".coronad.reload",
+            ".coronad.stop",
+            ".memory_pressure.baseline",
+            ".memory_pressure.runtime.conf",
+            ".memory_pressure.pid",
+            ".auto_affinity_state",
+            ".app_policy_daemon.pid",
+            ".app_policy_state",
+            ".app_policy_effective",
+        ] {
+            migrate_legacy_runtime_path(&module, &config, name);
+        }
         Self {
-            pid: module.join(".coronad.pid"),
-            state: module.join(".coronad_state"),
-            reload: module.join(".coronad.reload"),
-            stop: module.join(".coronad.stop"),
-            pressure_baseline: module.join(".memory_pressure.baseline"),
-            affinity_state: module.join(".auto_affinity_state"),
+            pid: config.join(".coronad.pid"),
+            state: config.join(".coronad_state"),
+            reload: config.join(".coronad.reload"),
+            stop: config.join(".coronad.stop"),
+            pressure_baseline: config.join(".memory_pressure.baseline"),
+            affinity_state: config.join(".auto_affinity_state"),
             module,
             config,
         }
@@ -185,11 +223,41 @@ struct ConfigWatcher {
     fd: RawFd,
 }
 
+fn inotify_buffer_has_config_change(buffer: &[u8], length: usize) -> bool {
+    const HEADER_SIZE: usize = 16;
+    const RELEVANT_MASK: u32 = 0x0008 | 0x0040 | 0x0080 | 0x0100 | 0x0200;
+    let mut offset = 0;
+    let length = length.min(buffer.len());
+    while offset + HEADER_SIZE <= length {
+        let mask = u32::from_ne_bytes(buffer[offset + 4..offset + 8].try_into().unwrap());
+        let name_length = u32::from_ne_bytes(buffer[offset + 12..offset + 16].try_into().unwrap()) as usize;
+        let next = offset.saturating_add(HEADER_SIZE).saturating_add(name_length);
+        if next > length {
+            break;
+        }
+        if mask & RELEVANT_MASK != 0 {
+            if name_length == 0 {
+                return true;
+            }
+            let name = &buffer[offset + HEADER_SIZE..next];
+            let name = &name[..name.iter().position(|byte| *byte == 0).unwrap_or(name.len())];
+            if !name.is_empty()
+                && name[0] != b'.'
+                && (name.ends_with(b".conf") || name.ends_with(b".list") || name == b"app_profiles")
+            {
+                return true;
+            }
+        }
+        offset = next;
+    }
+    false
+}
+
 impl ConfigWatcher {
     fn new(path: &Path) -> Option<Self> {
         const IN_NONBLOCK: i32 = 0x800;
         const IN_CLOEXEC: i32 = 0x80000;
-        const MASK: u32 = 0x0002 | 0x0004 | 0x0008 | 0x0040 | 0x0080 | 0x0100 | 0x0200;
+        const MASK: u32 = 0x0008 | 0x0040 | 0x0080 | 0x0100 | 0x0200;
         let mut bytes = path.as_os_str().as_bytes().to_vec();
         bytes.push(0);
         let fd = unsafe { inotify_init1(IN_NONBLOCK | IN_CLOEXEC) };
@@ -205,7 +273,8 @@ impl ConfigWatcher {
 
     fn changed(&self) -> bool {
         let mut buffer = [0u8; 4096];
-        unsafe { read(self.fd, buffer.as_mut_ptr(), buffer.len()) > 0 }
+        let length = unsafe { read(self.fd, buffer.as_mut_ptr(), buffer.len()) };
+        length > 0 && inotify_buffer_has_config_change(&buffer, length as usize)
     }
 }
 
@@ -528,7 +597,7 @@ fn parse_key_values(path: impl AsRef<Path>) -> HashMap<String, String> {
 }
 
 fn effective_config_file(paths: &Paths, name: &str) -> PathBuf {
-    let effective = paths.module.join(".app_policy_effective").join(name);
+    let effective = paths.config.join(".app_policy_effective").join(name);
     if effective.is_file() {
         effective
     } else {
@@ -743,14 +812,14 @@ fn has_nonempty_lines(path: impl AsRef<Path>) -> bool {
 fn load_rules(paths: &Paths) -> Rules {
     let values = parse_key_values(paths.config.join("app_rules.conf"));
     Rules {
-        monitor_enabled: value_bool(&values, "monitor_enabled", false),
+        monitor_enabled: value_bool(&values, "monitor_enabled", true),
         notify_enabled: value_bool(&values, "notify_enabled", true),
         protect_enabled: has_nonempty_lines(paths.config.join("app_protect.list")),
     }
 }
 
 fn load_pressure(paths: &Paths) -> PressureConfig {
-    let runtime = paths.module.join(".memory_pressure.runtime.conf");
+    let runtime = paths.config.join(".memory_pressure.runtime.conf");
     let values = if runtime.is_file() {
         parse_key_values(runtime)
     } else {
@@ -785,7 +854,7 @@ fn load_affinity(paths: &Paths) -> AffinityConfig {
         .unwrap_or("balanced")
         .to_string();
     AffinityConfig {
-        enabled: value_bool(&values, "enabled", false),
+        enabled: value_bool(&values, "enabled", true),
         ebpf: value_bool(&values, "ebpf", true),
         default_class,
         efficiency: values.get("efficiency_cpus").filter(|value| !value.is_empty()).cloned(),
@@ -802,11 +871,11 @@ fn load_affinity(paths: &Paths) -> AffinityConfig {
         thermal_warm_c: values
             .get("thermal_warm_c")
             .and_then(|value| value.parse().ok())
-            .unwrap_or(65.0),
+            .unwrap_or(75.0),
         thermal_severe_c: values
             .get("thermal_severe_c")
             .and_then(|value| value.parse().ok())
-            .unwrap_or(75.0),
+            .unwrap_or(100.0),
     }
 }
 
@@ -1984,5 +2053,28 @@ mod tests {
         assert_eq!(std::mem::size_of::<BpfMapElementAttr>(), 32);
         let instruction = BpfInsn::new(0xbf, 2, 10, 0, 0);
         assert_eq!(instruction.regs, 0xa2);
+    }
+
+    #[test]
+    fn filters_inotify_events_to_runtime_configs() {
+        fn event(mask: u32, name: &str) -> Vec<u8> {
+            let mut bytes = vec![0; 16];
+            bytes[4..8].copy_from_slice(&mask.to_ne_bytes());
+            let mut name_bytes = name.as_bytes().to_vec();
+            name_bytes.push(0);
+            while name_bytes.len() % 4 != 0 {
+                name_bytes.push(0);
+            }
+            bytes[12..16].copy_from_slice(&(name_bytes.len() as u32).to_ne_bytes());
+            bytes.extend(name_bytes);
+            bytes
+        }
+
+        let hidden = event(0x0008, ".coronad_state");
+        assert!(!inotify_buffer_has_config_change(&hidden, hidden.len()));
+        let config = event(0x0080, "auto_affinity.conf");
+        assert!(inotify_buffer_has_config_change(&config, config.len()));
+        let cache = event(0x0008, "app_meta_cache.b64");
+        assert!(!inotify_buffer_has_config_change(&cache, cache.len()));
     }
 }

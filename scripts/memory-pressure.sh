@@ -3,9 +3,9 @@
 SCRIPT_DIR=${0%/*}
 MODDIR=${SCRIPT_DIR%/*}
 SOURCE_CONF=${CORONA_PRESSURE_CONFIG:-"$MODDIR/config/memory_pressure.conf"}
-RUNTIME_CONF="$MODDIR/.memory_pressure.runtime.conf"
-PID_FILE="$MODDIR/.memory_pressure.pid"
-BASELINE_FILE="$MODDIR/.memory_pressure.baseline"
+RUNTIME_CONF="$MODDIR/config/.memory_pressure.runtime.conf"
+PID_FILE="$MODDIR/config/.memory_pressure.pid"
+BASELINE_FILE="$MODDIR/config/.memory_pressure.baseline"
 CORONAD="$MODDIR/bin/coronad"
 
 get_value() {
@@ -110,7 +110,7 @@ apply_config() {
     enabled=$(get_value "$RUNTIME_CONF" enabled)
     stop_daemon
     if [ -x "$CORONAD" ]; then
-        corona_pid=$(cat "$MODDIR/.coronad.pid" 2>/dev/null)
+        corona_pid=$(cat "$MODDIR/config/.coronad.pid" 2>/dev/null)
         if [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ]; then
             CORONA_MODDIR="$MODDIR" "$CORONAD" reload >/dev/null 2>&1
             return $?

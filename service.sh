@@ -18,6 +18,35 @@ set_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/d
 lock_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/dev/null && chmod 444 "$2" 2>/dev/null; }
 get_conf_value() { [ -f "$1" ] && grep -m1 "^$2=" "$1" | cut -d'=' -f2-; }
 
+migrate_runtime_state_files() {
+    mkdir -p "$CONFIG_DIR"
+    for name in \
+        .coronad.pid \
+        .coronad_state \
+        .coronad.reload \
+        .coronad.stop \
+        .memory_pressure.baseline \
+        .memory_pressure.runtime.conf \
+        .memory_pressure.pid \
+        .auto_affinity_state \
+        .app_policy_daemon.pid \
+        .app_policy_state \
+        .app_policy_effective; do
+        legacy="$MODDIR/$name"
+        target="$CONFIG_DIR/$name"
+        [ -e "$legacy" ] || continue
+        if [ -e "$target" ]; then
+            rm -rf "$legacy"
+        else
+            mv "$legacy" "$target" 2>/dev/null || {
+                cp -af "$legacy" "$target" 2>/dev/null && rm -rf "$legacy"
+            }
+        fi
+    done
+}
+
+migrate_runtime_state_files
+
 get_loop_mode() (
     loop_conf="$CONFIG_DIR/loop.conf"
     if [ -f "$loop_conf" ]; then
@@ -871,6 +900,7 @@ should_start_app_policy() {
     profiles_file="$MODDIR/config/app_profiles.list"
     thread_file="$MODDIR/config/thread_priority.conf"
     monitor_enabled=$(get_conf_value "$rules_file" monitor_enabled)
+    [ -n "$monitor_enabled" ] || monitor_enabled=1
     protect_apps=$(cat "$protect_file" 2>/dev/null | awk 'NF {print; exit}')
     profile_apps=$(cat "$profiles_file" 2>/dev/null | awk 'NF {print; exit}')
     [ "$monitor_enabled" = "1" ] && return 0
@@ -885,15 +915,15 @@ should_start_app_policy() {
 start_app_policy_daemon() {
     should_start_app_policy || return
     if [ -x "$CORONAD" ]; then
-        legacy_pid=$(cat "$MODDIR/.app_policy_daemon.pid" 2>/dev/null)
+        legacy_pid=$(cat "$CONFIG_DIR/.app_policy_daemon.pid" 2>/dev/null)
         [ -n "$legacy_pid" ] && kill -TERM "$legacy_pid" 2>/dev/null
-        rm -f "$MODDIR/.app_policy_daemon.pid" "$MODDIR/.app_policy_state"
-        [ -f "$MODDIR/.memory_pressure.pid" ] && /system/bin/sh "$MODDIR/scripts/memory-pressure.sh" stop >/dev/null 2>&1
+        rm -f "$CONFIG_DIR/.app_policy_daemon.pid" "$CONFIG_DIR/.app_policy_state"
+        [ -f "$CONFIG_DIR/.memory_pressure.pid" ] && /system/bin/sh "$MODDIR/scripts/memory-pressure.sh" stop >/dev/null 2>&1
         CORONA_MODDIR="$MODDIR" "$CORONAD" reload >/dev/null 2>&1
         return
     fi
-    if [ -f "$MODDIR/.app_policy_daemon.pid" ]; then
-        daemon_pid=$(cat "$MODDIR/.app_policy_daemon.pid" 2>/dev/null)
+    if [ -f "$CONFIG_DIR/.app_policy_daemon.pid" ]; then
+        daemon_pid=$(cat "$CONFIG_DIR/.app_policy_daemon.pid" 2>/dev/null)
         if [ -n "$daemon_pid" ] && [ -d "/proc/$daemon_pid" ]; then
             kill -HUP "$daemon_pid" 2>/dev/null
             return
@@ -906,13 +936,13 @@ apply_memory_pressure_config() {
     helper="$MODDIR/scripts/memory-pressure.sh"
     [ -f "$helper" ] || return 0
     if [ -x "$CORONAD" ]; then
-        [ -f "$MODDIR/.memory_pressure.pid" ] && /system/bin/sh "$helper" stop >/dev/null 2>&1
+        [ -f "$CONFIG_DIR/.memory_pressure.pid" ] && /system/bin/sh "$helper" stop >/dev/null 2>&1
         if [ -f "$CONFIG_DIR/memory_pressure.conf" ]; then
-            cp -f "$CONFIG_DIR/memory_pressure.conf" "$MODDIR/.memory_pressure.runtime.conf"
+            cp -f "$CONFIG_DIR/memory_pressure.conf" "$CONFIG_DIR/.memory_pressure.runtime.conf"
         else
-            rm -f "$MODDIR/.memory_pressure.runtime.conf"
+            rm -f "$CONFIG_DIR/.memory_pressure.runtime.conf"
         fi
-        corona_pid=$(cat "$MODDIR/.coronad.pid" 2>/dev/null)
+        corona_pid=$(cat "$CONFIG_DIR/.coronad.pid" 2>/dev/null)
         [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ] && CORONA_MODDIR="$MODDIR" "$CORONAD" reload >/dev/null 2>&1
         return 0
     fi
@@ -977,7 +1007,7 @@ apply_runtime_config_name() {
         tcp.conf) apply_tcp_config ;;
         process_priority.conf) apply_process_priority_config ;;
         thread_priority.conf)
-            corona_pid=$(cat "$MODDIR/.coronad.pid" 2>/dev/null)
+            corona_pid=$(cat "$CONFIG_DIR/.coronad.pid" 2>/dev/null)
             if [ -x "$CORONAD" ] && [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ]; then
                 :
             else
@@ -991,8 +1021,8 @@ apply_runtime_config_name() {
 
 apply_runtime_config_delta() {
     target_dir="$1"
-    current_dir="$MODDIR/.app_policy_effective"
-    next_dir="$MODDIR/.app_policy_effective.next.$$"
+    current_dir="$MODDIR/config/.app_policy_effective"
+    next_dir="$MODDIR/config/.app_policy_effective.next.$$"
     [ -d "$current_dir" ] || build_effective_runtime_config "$MODDIR/config" "$current_dir"
     build_effective_runtime_config "$target_dir" "$next_dir"
     original_config_dir="$CONFIG_DIR"
@@ -1038,7 +1068,7 @@ wait_until_login
 trigger_official_nandswap_once
 apply_writeback_block_config
 apply_runtime_configs
-rm -rf "$MODDIR/.app_policy_effective" "$MODDIR"/.app_policy_effective.next.*
+rm -rf "$MODDIR/config/.app_policy_effective" "$MODDIR/config"/.app_policy_effective.next.*
 apply_fstrim_config
 run_user_scripts
 start_app_policy_daemon

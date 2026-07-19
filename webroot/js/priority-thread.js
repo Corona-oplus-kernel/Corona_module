@@ -5,7 +5,7 @@
 CoronaAddon.prototype.initPerformanceMode = function() { this.initProcessPriority();  }
 CoronaAddon.prototype.loadPerformanceModeConfig = async function() { await this.loadPriorityConfig();  }
 CoronaAddon.prototype.initProcessPriority = function() {
-        this.priorityRules = {}; this.threadPriorityRules = []; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4; this.selectedThreadRuleKey = null; this.selectedThreadRulePackage = ''; this.selectedThreadRuleLabel = ''; this.selectedThreadPattern = ''; this.selectedThreadNice = 0; this.selectedThreadIoClass = 2; this.selectedThreadIoLevel = 4; this.selectedThreadAffinity = ''; this.selectedThreadCpuset = ''; this.selectedThreadUclampMin = ''; this.selectedThreadUclampMax = ''; this.selectedThreadSchedPolicy = 'normal'; this.selectedThreadRtPrio = 1; this.selectedThreadWaltBoost = false; this.selectedThreadWaltPipeline = false; this.threadPanelState = 'rules'; this.selectedThreadModePreset = 'custom'; this.threadTagEditingIndex = -1; this.pendingThreadTagName = ''; 
+        this.priorityRules = {}; this.threadPriorityRules = []; this.priorityProcesses = []; this.selectedPriorityProcess = null; this.selectedNice = 0; this.selectedIoClass = 2; this.selectedIoLevel = 4; this.selectedThreadRuleKey = null; this.selectedThreadRulePackage = ''; this.selectedThreadRuleLabel = ''; this.selectedThreadPattern = '*'; this.selectedThreadRuleScope = 'app'; this.selectedThreadRuleTitleBase = ''; this.selectedThreadNice = 0; this.selectedThreadIoClass = 2; this.selectedThreadIoLevel = 4; this.selectedThreadAffinity = ''; this.selectedThreadCpuset = ''; this.selectedThreadUclampMin = ''; this.selectedThreadUclampMax = ''; this.selectedThreadSchedPolicy = 'normal'; this.selectedThreadRtPrio = 1; this.selectedThreadWaltBoost = false; this.selectedThreadWaltPipeline = false; this.threadPanelState = 'rules'; this.threadTagEditingIndex = -1; this.pendingThreadTagName = '';
         document.getElementById('priority-cancel-btn').addEventListener('click', () => this.hideOverlay('priority-setting-overlay'));
         document.getElementById('priority-save-btn').addEventListener('click', () => this.savePriorityRule());
         document.getElementById('priority-process-search').addEventListener('input', (e) => { this.filterPriorityProcessList(e.target.value); });
@@ -165,9 +165,132 @@ CoronaAddon.prototype.applyAllPriorityRules = async function() { const promises 
 CoronaAddon.prototype.initThreadRuleUi = function() {
         document.getElementById('thread-rule-overlay')?.addEventListener('click', (e) => { if (e.target.id === 'thread-rule-overlay') this.hideOverlay('thread-rule-overlay'); });
         document.getElementById('thread-rule-editor-overlay')?.addEventListener('click', (e) => { if (e.target.id === 'thread-rule-editor-overlay') this.hideOverlay('thread-rule-editor-overlay'); });
-        document.getElementById('thread-rule-cancel-btn')?.addEventListener('click', () => { this.hideOverlay('thread-rule-editor-overlay'); this.showOverlay('thread-rule-overlay'); this.toggleThreadTagForm(true); });
+        document.getElementById('thread-rule-cancel-btn')?.addEventListener('click', () => { this.hideOverlay('thread-rule-editor-overlay'); this.showOverlay('app-profile-overlay'); });
         document.getElementById('thread-rule-save-btn')?.addEventListener('click', () => this.saveThreadRule());
-                document.getElementById('thread-tag-save-btn')?.addEventListener('click', () => this.saveThreadTag());
+        document.getElementById('thread-tag-save-btn')?.addEventListener('click', () => this.saveThreadTag());
+        document.getElementById('thread-app-rule-btn')?.addEventListener('click', () => this.openApplicationThreadRule());
+        document.getElementById('thread-resource-toggle')?.addEventListener('click', () => this.toggleThreadResourceSection());
+        document.getElementById('thread-scheduler-toggle')?.addEventListener('click', () => this.toggleThreadSchedulerAdvanced());
+        this.initRuleDropdowns();
+        [['thread-nice-input', 'thread-nice-value'], ['thread-io-level', 'thread-io-level-value']].forEach(([inputId, valueId]) => {
+            const input = document.getElementById(inputId);
+            const value = document.getElementById(valueId);
+            input?.addEventListener('input', () => {
+                if (value) value.textContent = input.value;
+                this.updateSliderProgress(input);
+                this.updateThreadResourceSummary();
+            });
+        });
+        document.getElementById('thread-io-class')?.addEventListener('change', () => this.updateThreadResourceSummary());
+        document.getElementById('thread-affinity-exclude-switch')?.addEventListener('change', async (event) => {
+            const pkg = this.selectedThreadRulePackage;
+            if (!pkg) return;
+            await this.toggleAppPolicyPackage('affinityExclude', pkg);
+            event.currentTarget.checked = (this.appPolicy.affinityExclude || []).includes(pkg);
+        });
+    }
+CoronaAddon.prototype.syncThreadCpuSchedulingUi = function() {
+        const excludeRow = document.getElementById('thread-affinity-exclude-row');
+        if (excludeRow) excludeRow.classList.remove('hidden');
+    }
+CoronaAddon.prototype.setThreadSchedulerExpanded = function(expanded) {
+        const toggle = document.getElementById('thread-scheduler-toggle');
+        const content = document.getElementById('thread-scheduler-content');
+        if (!toggle || !content) return;
+        toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        content.setAttribute('aria-hidden', expanded ? 'false' : 'true');
+        if (expanded) {
+            content.classList.add('expanded');
+            content.style.maxHeight = `${content.scrollHeight}px`;
+        } else {
+            content.classList.remove('expanded');
+            content.style.maxHeight = '0px';
+        }
+    }
+CoronaAddon.prototype.toggleThreadSchedulerAdvanced = function() {
+        const expanded = document.getElementById('thread-scheduler-toggle')?.getAttribute('aria-expanded') === 'true';
+        this.setThreadSchedulerExpanded(!expanded);
+    }
+CoronaAddon.prototype.setThreadResourceExpanded = function(expanded) {
+        const toggle = document.getElementById('thread-resource-toggle');
+        const content = document.getElementById('thread-resource-content');
+        if (!toggle || !content) return;
+        toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        content.setAttribute('aria-hidden', expanded ? 'false' : 'true');
+        if (expanded) {
+            content.classList.add('expanded');
+            content.style.maxHeight = `${content.scrollHeight}px`;
+        } else {
+            content.classList.remove('expanded');
+            content.style.maxHeight = '0px';
+        }
+    }
+CoronaAddon.prototype.toggleThreadResourceSection = function() {
+        const expanded = document.getElementById('thread-resource-toggle')?.getAttribute('aria-expanded') === 'true';
+        this.setThreadResourceExpanded(!expanded);
+    }
+CoronaAddon.prototype.initRuleDropdowns = function() {
+        document.querySelectorAll('.rule-dropdown').forEach(dropdown => {
+            const trigger = dropdown.querySelector('.rule-dropdown-trigger');
+            const select = document.getElementById(dropdown.dataset.selectId || '');
+            trigger?.addEventListener('click', event => {
+                event.stopPropagation();
+                this.closeRuleDropdowns(dropdown);
+                const opening = !dropdown.classList.contains('open');
+                dropdown.classList.toggle('open', opening);
+                this.refreshThreadEditorSectionHeights();
+            });
+            dropdown.querySelectorAll('.rule-dropdown-menu button').forEach(option => option.addEventListener('click', event => {
+                event.stopPropagation();
+                if (select) {
+                    select.value = option.dataset.value ?? '';
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                dropdown.classList.remove('open');
+                this.syncRuleDropdown(dropdown);
+                this.refreshThreadEditorSectionHeights();
+            }));
+            select?.addEventListener('change', () => this.syncRuleDropdown(dropdown));
+            this.syncRuleDropdown(dropdown);
+        });
+        document.addEventListener('click', () => this.closeRuleDropdowns());
+    }
+CoronaAddon.prototype.closeRuleDropdowns = function(except = null) {
+        let changed = false;
+        document.querySelectorAll('.rule-dropdown.open').forEach(item => {
+            if (item === except) return;
+            item.classList.remove('open');
+            changed = true;
+        });
+        if (changed) {
+            this.refreshThreadEditorSectionHeights();
+        }
+    }
+CoronaAddon.prototype.refreshThreadEditorSectionHeights = function() {
+        [
+            ['thread-resource-toggle', 'thread-resource-content'],
+            ['thread-scheduler-toggle', 'thread-scheduler-content']
+        ].forEach(([toggleId, contentId]) => {
+            const toggle = document.getElementById(toggleId);
+            const content = document.getElementById(contentId);
+            if (toggle?.getAttribute('aria-expanded') === 'true' && content) content.style.maxHeight = `${content.scrollHeight}px`;
+        });
+    }
+CoronaAddon.prototype.syncRuleDropdown = function(dropdown) {
+        const select = document.getElementById(dropdown?.dataset.selectId || '');
+        const value = dropdown?.querySelector('.rule-dropdown-value');
+        if (!select || !value) return;
+        const option = [...dropdown.querySelectorAll('.rule-dropdown-menu button')].find(item => item.dataset.value === select.value);
+        value.textContent = option?.querySelector('strong')?.textContent?.trim() || select.options[select.selectedIndex]?.textContent?.trim() || 'Auto';
+        dropdown.querySelectorAll('.rule-dropdown-menu button').forEach(item => item.classList.toggle('selected', item.dataset.value === select.value));
+    }
+CoronaAddon.prototype.updateThreadResourceSummary = function() {
+        const nice = document.getElementById('thread-nice-input')?.value || '0';
+        const ioClass = document.getElementById('thread-io-class')?.value || '2';
+        const ioLevel = document.getElementById('thread-io-level')?.value || '4';
+        const names = { '1': this.t('threadIoRealtime'), '2': this.t('threadIoBestEffort'), '3': this.t('threadIoIdle') };
+        const summary = document.getElementById('thread-resource-summary');
+        if (summary) summary.textContent = `Nice ${nice} · I/O ${names[ioClass] || 'Auto'} ${ioLevel}`;
     }
 CoronaAddon.prototype.getThreadRuleKey = function(pkg, pattern) { return `${pkg}|${pattern}`;  }
 CoronaAddon.prototype.getThreadRulesForPackage = function(pkg) { return (this.threadPriorityRules || []).filter(rule => rule.packageName === pkg);  }
@@ -301,10 +424,31 @@ CoronaAddon.prototype.saveThreadTag = function() {
         this.openThreadRuleEditor(null, '');
         return true;
     }
-CoronaAddon.prototype.getThreadModePresets = function() { return [{ key: 'daily', label: '日用省电', desc: '偏保守，适合轻应用与低功耗', values: { nice: 2, ioClass: 3, ioLevel: 7, affinity: '', cpuset: 'background', uclampMin: '0', uclampMax: '256', schedPolicy: 'idle', rtPrio: 1, waltBoost: false, waltPipeline: false } }, { key: 'balanced', label: '均衡调度', desc: '响应与功耗平衡，适合日常常驻', values: { nice: 0, ioClass: 2, ioLevel: 4, affinity: '', cpuset: 'foreground', uclampMin: '128', uclampMax: '512', schedPolicy: 'normal', rtPrio: 1, waltBoost: false, waltPipeline: false } }, { key: 'render', label: '渲染优先', desc: '偏重渲染与交互线程，适合 UI / RenderThread', values: { nice: -6, ioClass: 2, ioLevel: 2, affinity: '', cpuset: 'top-app', uclampMin: '256', uclampMax: '768', schedPolicy: 'fifo', rtPrio: 2, waltBoost: true, waltPipeline: true } }, { key: 'extreme', label: '极限性能', desc: '高性能高功耗，适合重负载游戏线程', values: { nice: -10, ioClass: 1, ioLevel: 0, affinity: '', cpuset: 'top-app', uclampMin: '512', uclampMax: '1024', schedPolicy: 'rr', rtPrio: 4, waltBoost: true, waltPipeline: true } }, { key: 'custom', label: '自定义规则', desc: '保持当前填写内容，自由调整所有参数', values: null }];  }
-CoronaAddon.prototype.renderThreadModePresets = function(activeKey = 'custom') { const container = document.getElementById('thread-mode-list'); if (!container) return; const presets = this.getThreadModePresets(); container.innerHTML = presets.map(item => `<div class="thread-mode-chip ${item.key === activeKey ? 'active' : ''}" data-key="${this.escapeHtml(item.key)}"><div class="thread-mode-name">${this.escapeHtml(item.label)}</div></div>`).join(''); container.querySelectorAll('.thread-mode-chip').forEach(chip => chip.addEventListener('click', () => this.applyThreadModePreset(chip.dataset.key || 'custom')));  }
-CoronaAddon.prototype.applyThreadModePreset = function(key) { const preset = this.getThreadModePresets().find(item => item.key === key); this.selectedThreadModePreset = key || 'custom'; if (!preset) return; if (preset.values) { const values = preset.values; this.selectedThreadAffinity = values.affinity; this.selectedThreadCpuset = values.cpuset; this.selectedThreadUclampMin = values.uclampMin; this.selectedThreadUclampMax = values.uclampMax; this.selectedThreadSchedPolicy = values.schedPolicy; this.selectedThreadRtPrio = values.rtPrio; this.selectedThreadWaltBoost = values.waltBoost; this.selectedThreadWaltPipeline = values.waltPipeline; this.syncThreadRuleEditorFields(); } this.renderThreadModePresets(this.selectedThreadModePreset);  }
-CoronaAddon.prototype.syncThreadRuleEditorFields = function() { const affinity = document.getElementById('thread-affinity-input'); const cpuset = document.getElementById('thread-cpuset-group'); const uclampMin = document.getElementById('thread-uclamp-min'); const uclampMax = document.getElementById('thread-uclamp-max'); const sched = document.getElementById('thread-sched-policy'); const rt = document.getElementById('thread-rt-prio'); const waltBoost = document.getElementById('thread-walt-boost'); const waltPipeline = document.getElementById('thread-walt-pipeline'); if (affinity) affinity.value = this.selectedThreadAffinity; if (cpuset) cpuset.value = this.selectedThreadCpuset; if (uclampMin) uclampMin.value = this.selectedThreadUclampMin; if (uclampMax) uclampMax.value = this.selectedThreadUclampMax; if (sched) sched.value = this.selectedThreadSchedPolicy; if (rt) rt.value = String(this.selectedThreadRtPrio); if (waltBoost) waltBoost.checked = this.selectedThreadWaltBoost; if (waltPipeline) waltPipeline.checked = this.selectedThreadWaltPipeline;  }
+CoronaAddon.prototype.syncThreadRuleEditorFields = function() {
+        const values = {
+            'thread-nice-input': String(this.selectedThreadNice),
+            'thread-io-class': String(this.selectedThreadIoClass),
+            'thread-io-level': String(this.selectedThreadIoLevel),
+            'thread-affinity-input': this.selectedThreadAffinity,
+            'thread-cpuset-group': this.selectedThreadCpuset,
+            'thread-uclamp-min': this.selectedThreadUclampMin,
+            'thread-uclamp-max': this.selectedThreadUclampMax,
+            'thread-sched-policy': this.selectedThreadSchedPolicy,
+            'thread-rt-prio': String(this.selectedThreadRtPrio)
+        };
+        Object.entries(values).forEach(([id, value]) => { const element = document.getElementById(id); if (element) element.value = value; });
+        const waltBoost = document.getElementById('thread-walt-boost');
+        const waltPipeline = document.getElementById('thread-walt-pipeline');
+        if (waltBoost) waltBoost.checked = this.selectedThreadWaltBoost;
+        if (waltPipeline) waltPipeline.checked = this.selectedThreadWaltPipeline;
+        const niceValue = document.getElementById('thread-nice-value');
+        const ioLevelValue = document.getElementById('thread-io-level-value');
+        if (niceValue) niceValue.textContent = String(this.selectedThreadNice);
+        if (ioLevelValue) ioLevelValue.textContent = String(this.selectedThreadIoLevel);
+        document.querySelectorAll('.rule-dropdown').forEach(dropdown => this.syncRuleDropdown(dropdown));
+        ['thread-nice-input', 'thread-io-level'].forEach(id => { const input = document.getElementById(id); if (input) this.updateSliderProgress(input); });
+        this.updateThreadResourceSummary();
+    }
 CoronaAddon.prototype.loadLiveThreadSuggestions = async function(pkg, force = false) {
         const key = String(pkg || '').trim();
         if (!force && this.threadSuggestionCache && Array.isArray(this.threadSuggestionCache[key])) return this.threadSuggestionCache[key];
@@ -321,7 +465,7 @@ CoronaAddon.prototype.renderThreadRuleList = function() {
             list.innerHTML = '<div class="priority-empty">该应用还没有线程规则，可以切到自定义标签新建一个入口</div>'; 
             return;
         }
-        list.innerHTML = rules.map(rule => `<div class="thread-rule-item" data-key="${this.escapeHtml(rule.key)}"><div class="thread-rule-info"><div class="thread-rule-name">${this.escapeHtml(rule.threadPattern)}</div><div class="thread-rule-values">${rule.affinity ? `亲和性 ${this.escapeHtml(rule.affinity)}` : '未设置亲和性'}${rule.cpuset ? ` · cpuset ${this.escapeHtml(rule.cpuset)}` : ''}${rule.uclampMin !== '' ? ` · uclamp.min ${this.escapeHtml(String(rule.uclampMin))}` : ''}${rule.uclampMax !== '' ? ` · uclamp.max ${this.escapeHtml(String(rule.uclampMax))}` : ''}${rule.schedPolicy && rule.schedPolicy !== 'normal' ? ` · ${this.escapeHtml(rule.schedPolicy)}(${rule.rtPrio})` : ''}${rule.waltBoost ? ' · WALT boost' : ''}${rule.waltPipeline ? ' · pipeline' : ''}</div></div><div class="thread-rule-actions"><button class="priority-rule-btn edit" data-action="edit" data-key="${this.escapeHtml(rule.key)}">✎</button><button class="priority-rule-btn delete" data-action="delete" data-key="${this.escapeHtml(rule.key)}">✕</button></div></div>`).join('');
+        list.innerHTML = rules.map(rule => `<div class="thread-rule-item" data-key="${this.escapeHtml(rule.key)}"><div class="thread-rule-info"><div class="thread-rule-name">${this.escapeHtml(rule.threadPattern)}</div><div class="thread-rule-values">nice ${rule.nice} · I/O ${rule.ioClass}/${rule.ioLevel}${rule.affinity ? ` · 亲和性 ${this.escapeHtml(rule.affinity)}` : ''}${rule.cpuset ? ` · cpuset ${this.escapeHtml(rule.cpuset)}` : ''}${rule.uclampMin !== '' ? ` · uclamp.min ${this.escapeHtml(String(rule.uclampMin))}` : ''}${rule.uclampMax !== '' ? ` · uclamp.max ${this.escapeHtml(String(rule.uclampMax))}` : ''}${rule.schedPolicy && rule.schedPolicy !== 'normal' ? ` · ${this.escapeHtml(rule.schedPolicy)}(${rule.rtPrio})` : ''}${rule.waltBoost ? ' · WALT boost' : ''}${rule.waltPipeline ? ' · pipeline' : ''}</div></div><div class="thread-rule-actions"><button class="priority-rule-btn edit" data-action="edit" data-key="${this.escapeHtml(rule.key)}">✎</button><button class="priority-rule-btn delete" data-action="delete" data-key="${this.escapeHtml(rule.key)}">✕</button></div></div>`).join('');
         list.querySelectorAll('.priority-rule-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); const key = btn.dataset.key; if (btn.dataset.action === 'edit') this.openThreadRuleEditor(key); else this.deleteThreadRule(key); }));
     }
 CoronaAddon.prototype.openThreadRuleManager = async function(pkg, label) {
@@ -330,6 +474,11 @@ CoronaAddon.prototype.openThreadRuleManager = async function(pkg, label) {
         this.selectedThreadRuleKey = null;
         const title = document.getElementById('thread-rule-title');
         if (title) title.textContent = `${label || pkg} · 线程规则`;
+        const excludeSwitch = document.getElementById('thread-affinity-exclude-switch');
+        if (excludeSwitch) excludeSwitch.checked = (this.appPolicy.affinityExclude || []).includes(pkg);
+        const appRule = (this.threadPriorityRules || []).find(rule => rule.packageName === pkg && rule.threadPattern === '*');
+        const appRuleButton = document.getElementById('thread-app-rule-btn');
+        if (appRuleButton) appRuleButton.classList.toggle('active', !!appRule || !!this.priorityRules?.[pkg]);
         this.renderThreadRuleList();
         this.toggleThreadTagForm(false);
         this.renderCustomThreadTags();
@@ -337,10 +486,38 @@ CoronaAddon.prototype.openThreadRuleManager = async function(pkg, label) {
         this.showOverlay('thread-rule-overlay');
         this.toggleThreadTagForm(true);
     }
+CoronaAddon.prototype.openApplicationThreadRule = function() {
+        const pkg = this.selectedThreadRulePackage;
+        if (!pkg) return;
+        const key = this.getThreadRuleKey(pkg, '*');
+        const existing = (this.threadPriorityRules || []).find(rule => rule.key === key);
+        if (existing) {
+            this.openThreadRuleEditor(key);
+            return;
+        }
+        const legacy = this.priorityRules?.[pkg] || null;
+        this.openThreadRuleEditor(null, '*');
+        if (legacy) {
+            this.selectedThreadNice = legacy.nice;
+            this.selectedThreadIoClass = legacy.ioClass;
+            this.selectedThreadIoLevel = legacy.ioLevel;
+            this.syncThreadRuleEditorFields();
+        }
+    }
+CoronaAddon.prototype.openApplicationRuleEditor = function(pkg, label) {
+        this.selectedThreadRulePackage = pkg;
+        this.selectedThreadRuleLabel = label || pkg;
+        this.selectedThreadRuleKey = null;
+        this.hideOverlay('app-profile-overlay');
+        this.hideOverlay('app-policy-overlay');
+        this.openApplicationThreadRule();
+    }
 CoronaAddon.prototype.openThreadRuleEditor = function(ruleKey = null, presetPattern = '') {
-        const existing = ruleKey ? (this.threadPriorityRules || []).find(item => item.key === ruleKey) : null;
-        this.selectedThreadRuleKey = ruleKey || null;
-        this.selectedThreadPattern = existing?.threadPattern || presetPattern || '';
+        const appRuleKey = this.getThreadRuleKey(this.selectedThreadRulePackage, '*');
+        const existing = (this.threadPriorityRules || []).find(item => item.key === appRuleKey) || null;
+        this.selectedThreadRuleKey = existing?.key || null;
+        this.selectedThreadPattern = '*';
+        this.selectedThreadRuleScope = 'app';
         this.hideOverlay('thread-rule-overlay');
         this.selectedThreadNice = existing?.nice ?? 0;
         this.selectedThreadIoClass = existing?.ioClass ?? 2;
@@ -353,33 +530,43 @@ CoronaAddon.prototype.openThreadRuleEditor = function(ruleKey = null, presetPatt
         this.selectedThreadRtPrio = existing?.rtPrio ?? 1;
         this.selectedThreadWaltBoost = !!existing?.waltBoost;
         this.selectedThreadWaltPipeline = !!existing?.waltPipeline;
+        this.selectedThreadRuleTitleBase = this.pendingThreadTagName || this.selectedThreadRuleLabel || this.selectedThreadRulePackage;
         const title = document.getElementById('thread-rule-editor-title');
-        if (title) title.textContent = this.pendingThreadTagName ? `${this.pendingThreadTagName} · 线程规则` : `${this.selectedThreadRuleLabel || this.selectedThreadRulePackage} · 线程规则`;
+        if (title) title.textContent = `${this.selectedThreadRuleTitleBase} · 应用规则`;
         this.pendingThreadTagName = ''; 
         const appInfo = document.getElementById('thread-rule-selected-app');
         if (appInfo) appInfo.innerHTML = `<span class="process-name">${this.escapeHtml(this.selectedThreadRulePackage)}</span>`;
-        const input = document.getElementById('thread-pattern-input');
-        if (input) input.value = this.selectedThreadPattern;
-        this.selectedThreadModePreset = existing ? 'custom' : (presetPattern ? 'custom' : 'balanced');
+        this.syncThreadCpuSchedulingUi();
+        const excludeSwitch = document.getElementById('thread-affinity-exclude-switch');
+        if (excludeSwitch) excludeSwitch.checked = (this.appPolicy.affinityExclude || []).includes(this.selectedThreadRulePackage);
         this.syncThreadRuleEditorFields();
-        this.renderThreadModePresets(this.selectedThreadModePreset);
+        this.setThreadResourceExpanded(false);
+        this.setThreadSchedulerExpanded(!!existing && (this.selectedThreadSchedPolicy !== 'normal' || this.selectedThreadRtPrio > 1 || this.selectedThreadWaltBoost || this.selectedThreadWaltPipeline));
         this.showOverlay('thread-rule-editor-overlay');
     }
 CoronaAddon.prototype.collectThreadRuleEditorState = function() {
+        const niceValue = parseInt(document.getElementById('thread-nice-input')?.value || '0', 10);
+        const ioClassValue = parseInt(document.getElementById('thread-io-class')?.value || '2', 10);
+        const ioLevelValue = parseInt(document.getElementById('thread-io-level')?.value || '4', 10);
+        const rtPrioValue = parseInt(document.getElementById('thread-rt-prio')?.value || '1', 10);
         return {
-            threadPattern: (document.getElementById('thread-pattern-input')?.value || '').trim(),
+            threadPattern: '*',
+            nice: Math.max(-20, Math.min(19, Number.isFinite(niceValue) ? niceValue : 0)),
+            ioClass: Math.max(1, Math.min(3, Number.isFinite(ioClassValue) ? ioClassValue : 2)),
+            ioLevel: Math.max(0, Math.min(7, Number.isFinite(ioLevelValue) ? ioLevelValue : 4)),
             affinity: (document.getElementById('thread-affinity-input')?.value || '').trim(),
             cpuset: (document.getElementById('thread-cpuset-group')?.value || '').trim(),
             uclampMin: (document.getElementById('thread-uclamp-min')?.value || '').trim(),
             uclampMax: (document.getElementById('thread-uclamp-max')?.value || '').trim(),
             schedPolicy: (document.getElementById('thread-sched-policy')?.value || 'normal').trim(),
-            rtPrio: parseInt(document.getElementById('thread-rt-prio')?.value || '1', 10) || 1,
+            rtPrio: Math.max(0, Math.min(99, Number.isFinite(rtPrioValue) ? rtPrioValue : 1)),
             waltBoost: !!document.getElementById('thread-walt-boost')?.checked,
             waltPipeline: !!document.getElementById('thread-walt-pipeline')?.checked
         };
     }
 CoronaAddon.prototype.buildThreadRulePreviewActions = function(rule) {
         return [
+            `设置 nice=${rule.nice}、I/O=${rule.ioClass}/${rule.ioLevel}`,
             rule.affinity ? `对命中线程设置亲和性 ${rule.affinity}` : '不修改线程亲和性',
             rule.cpuset ? `将命中线程迁入 cpuset ${rule.cpuset}` : '不调整 cpuset 分组',
             rule.uclampMin !== '' ? `设置 uclamp.min=${rule.uclampMin}` : '不设置 uclamp.min',
@@ -391,25 +578,26 @@ CoronaAddon.prototype.buildThreadRulePreviewActions = function(rule) {
     }
 CoronaAddon.prototype.reopenThreadRuleManager = function() {
         this.hideOverlay('thread-rule-editor-overlay');
-        this.showOverlay('thread-rule-overlay');
-        this.toggleThreadTagForm(true);
+        this.showOverlay('app-profile-overlay');
     }
 CoronaAddon.prototype.refreshThreadRulePackageState = function(packageName, { reorder = false } = {}) {
         this.renderThreadRuleList();
         this.renderAppPolicySummary();
         this.updateAppPolicyRow(packageName);
+        const appRule = (this.threadPriorityRules || []).find(rule => rule.packageName === packageName && rule.threadPattern === '*');
+        const appRuleButton = document.getElementById('thread-app-rule-btn');
+        if (appRuleButton) appRuleButton.classList.toggle('active', !!appRule || !!this.priorityRules?.[packageName]);
         if (reorder) this.reorderAppPolicyRow(packageName);
     }
 CoronaAddon.prototype.saveThreadRule = async function() {
         const editorState = this.collectThreadRuleEditorState();
-        if (!editorState.threadPattern) { this.showToast('请输入线程名或模式'); return false; }
         const nextRule = {
             key: this.getThreadRuleKey(this.selectedThreadRulePackage, editorState.threadPattern),
             packageName: this.selectedThreadRulePackage,
             threadPattern: editorState.threadPattern,
-            nice: 0,
-            ioClass: 2,
-            ioLevel: 4,
+            nice: editorState.nice,
+            ioClass: editorState.ioClass,
+            ioLevel: editorState.ioLevel,
             affinity: editorState.affinity,
             cpuset: editorState.cpuset,
             uclampMin: editorState.uclampMin,
@@ -419,21 +607,35 @@ CoronaAddon.prototype.saveThreadRule = async function() {
             waltBoost: editorState.waltBoost,
             waltPipeline: editorState.waltPipeline
         };
-        const nextRules = (this.threadPriorityRules || []).filter(rule => rule.key !== this.selectedThreadRuleKey && rule.key !== nextRule.key);
+        const removedThreadRules = (this.threadPriorityRules || []).filter(rule => rule.packageName === this.selectedThreadRulePackage && rule.threadPattern !== '*').length;
+        const nextRules = (this.threadPriorityRules || []).filter(rule => rule.packageName !== this.selectedThreadRulePackage);
         nextRules.push(nextRule);
+        const migratesLegacyPriority = editorState.threadPattern === '*' && !!this.priorityRules?.[this.selectedThreadRulePackage];
+        const nextPriorityRules = { ...(this.priorityRules || {}) };
+        if (migratesLegacyPriority) delete nextPriorityRules[this.selectedThreadRulePackage];
+        const previewConfigs = [{ filename: 'thread_priority.conf', content: this.serializeThreadPriorityRules(nextRules) }];
+        if (migratesLegacyPriority) previewConfigs.push({ filename: 'process_priority.conf', content: this.serializePriorityRules(nextPriorityRules) || '# empty' });
         const confirmed = await this.confirmChangePreview('变更预览', {
-            summary: `即将为 ${this.selectedThreadRulePackage} 保存线程规则 ${editorState.threadPattern}。`,
-            configs: [{ filename: 'thread_priority.conf', content: this.serializeThreadPriorityRules(nextRules) }],
+            summary: `即将为 ${this.selectedThreadRulePackage} 保存应用规则。`,
+            configs: previewConfigs,
             actions: this.buildThreadRulePreviewActions(nextRule),
-            notes: ['规则会对命中的线程 TID 应用，不影响未匹配线程。']
+            notes: [
+                '规则会统一应用到该应用当前和后续创建的全部线程。',
+                ...(removedThreadRules > 0 ? [`同时合并并移除 ${removedThreadRules} 条旧的按线程规则，避免重复生效。`] : []),
+                ...(migratesLegacyPriority ? ['应用规则会接管原应用优先级配置，并删除旧的 process_priority 规则。'] : [])
+            ]
         });
         if (!confirmed) return false;
         this.threadPriorityRules = nextRules;
         await this.saveThreadPriorityConfig();
+        if (migratesLegacyPriority) {
+            this.priorityRules = nextPriorityRules;
+            await this.exec(this.getAppPolicyScript('priority-del', this.shellQuote(this.selectedThreadRulePackage)));
+        }
         await this.applyThreadPriorityRulesNow();
         this.reopenThreadRuleManager('rules');
         this.refreshThreadRulePackageState(this.selectedThreadRulePackage, { reorder: true });
-        this.showToast('线程规则已保存');
+        this.showToast('应用规则已保存');
         return true;
     }
 CoronaAddon.prototype.deleteThreadRule = async function(ruleKey) {

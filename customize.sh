@@ -42,8 +42,10 @@ mkdir -p "$MODPATH/config"
 mkdir -p "$MODPATH/scripts.d"
 if [ -x "$OLD_MODDIR/app_policy.sh" ]; then
     /system/bin/sh "$OLD_MODDIR/app_policy.sh" daemon-stop >/dev/null 2>&1
-elif [ -f "$OLD_MODDIR/.app_policy_daemon.pid" ]; then
-    old_daemon_pid=$(cat "$OLD_MODDIR/.app_policy_daemon.pid" 2>/dev/null)
+else
+    old_daemon_pid_file="$OLD_MODDIR/config/.app_policy_daemon.pid"
+    [ -f "$old_daemon_pid_file" ] || old_daemon_pid_file="$OLD_MODDIR/.app_policy_daemon.pid"
+    old_daemon_pid=$(cat "$old_daemon_pid_file" 2>/dev/null)
     [ -n "$old_daemon_pid" ] && kill -TERM "$old_daemon_pid" 2>/dev/null
 fi
 if [ -d "$OLD_MODDIR/config" ]; then
@@ -54,8 +56,8 @@ if [ -d "$OLD_MODDIR/scripts.d" ]; then
     cp -af "$OLD_MODDIR/scripts.d/." "$MODPATH/scripts.d/"
 fi
 
-rm -rf "$MODPATH/.app_policy_effective" "$MODPATH"/.app_policy_effective.next.*
-rm -f "$MODPATH/.app_policy_daemon.pid" "$MODPATH/.app_policy_state"
+rm -rf "$MODPATH/config/.app_policy_effective" "$MODPATH/config"/.app_policy_effective.next.* "$MODPATH/.app_policy_effective" "$MODPATH"/.app_policy_effective.next.*
+rm -f "$MODPATH/config/.app_policy_daemon.pid" "$MODPATH/config/.app_policy_state" "$MODPATH/.app_policy_daemon.pid" "$MODPATH/.app_policy_state"
 find "$MODPATH/config" -type f \( -name '*.tmp.*' -o -name '*.bak' \) -delete 2>/dev/null
 
 get_config_value() {

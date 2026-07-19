@@ -456,7 +456,7 @@
             { toggle: 'cpu-governor-toggle', content: 'cpu-governor-content', onExpand: null },
             { toggle: 'app-policy-toggle', content: 'app-policy-content', onExpand: () => {
                 loadSection('app-policy')();
-                this.refreshRuntimeOptimizer();
+                if (typeof this.refreshRuntimeOptimizer === 'function') this.refreshRuntimeOptimizer();
             } },
             { toggle: 'tcp-toggle', content: 'tcp-content', onExpand: null },
             { toggle: 'custom-scripts-toggle', content: 'custom-scripts-content', onExpand: loadSection('custom-scripts') },

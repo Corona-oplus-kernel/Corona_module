@@ -3697,6 +3697,79 @@ body.theme-dark .app-policy-row.active .app-policy-tag {
     letter-spacing: 0.04em;
 }
 
+.thread-affinity-exclude-row {
+    margin: 12px 0 0;
+    padding: 12px 14px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-ctl);
+    background: var(--glass-surface);
+}
+
+.thread-cpu-scheduling-section {
+    display: grid;
+    gap: 10px;
+}
+
+.thread-cpu-scheduling-section > .priority-setting-hint {
+    margin-top: -5px;
+}
+
+.thread-cpu-placement-grid {
+    margin-top: 2px;
+}
+
+.thread-app-rule-entry {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-ctl);
+    background: var(--glass-surface);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+.thread-app-rule-entry strong,
+.thread-app-rule-entry small {
+    display: block;
+}
+
+.thread-app-rule-entry strong {
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+.thread-app-rule-entry small {
+    margin-top: 3px;
+    color: var(--text-sub);
+    font-size: 11px;
+}
+
+.thread-app-rule-entry.active {
+    border-color: var(--primary-border);
+    background: var(--primary-dim);
+}
+
+.thread-app-rule-arrow {
+    color: var(--text-sub);
+    font-size: 22px;
+}
+
+.thread-rule-grid-three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 480px) {
+    .thread-rule-grid-three {
+        grid-template-columns: 1fr;
+    }
+}
+
 body.theme-dark #app-policy-overlay .detail-card,
 body.theme-dark #app-profile-overlay .detail-card {
     background: rgba(20, 22, 28, 0.78);
@@ -3834,6 +3907,437 @@ body.theme-dark #app-profile-overlay .priority-search:focus {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+}
+
+.thread-rule-scope-section,
+.thread-priority-resource-section {
+    display: grid;
+    gap: 10px;
+}
+
+.app-rule-scope-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 14px;
+    border-color: color-mix(in srgb, var(--primary) 18%, var(--glass-border));
+    background: color-mix(in srgb, var(--primary) 6%, var(--glass-surface));
+}
+
+.app-rule-scope-summary strong,
+.app-rule-scope-summary small {
+    display: block;
+}
+
+.app-rule-scope-summary strong {
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+.app-rule-scope-summary small {
+    margin-top: 3px;
+    color: var(--text-sub);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.thread-rule-scope-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.thread-rule-scope-options button {
+    padding: 12px 13px;
+    border: 1px solid var(--glass-border);
+    border-radius: 15px;
+    background: var(--glass-control-bg);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.thread-rule-scope-options button:active {
+    transform: scale(0.985);
+}
+
+.thread-rule-scope-options button.active {
+    border-color: var(--primary-border);
+    background: var(--primary-dim);
+}
+
+.thread-rule-scope-options strong,
+.thread-rule-scope-options small {
+    display: block;
+}
+
+.thread-rule-scope-options strong {
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+.thread-rule-scope-options small {
+    margin-top: 4px;
+    color: var(--text-sub);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.thread-pattern-section {
+    display: grid;
+    gap: 7px;
+}
+
+.thread-scheduler-advanced {
+    overflow: hidden;
+    padding: 0;
+}
+
+.thread-scheduler-toggle {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px 14px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+.thread-scheduler-toggle strong,
+.thread-scheduler-toggle small {
+    display: block;
+}
+
+.thread-scheduler-toggle strong {
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+.thread-scheduler-toggle small {
+    margin-top: 4px;
+    color: var(--text-sub);
+    font-size: 11px;
+}
+
+.thread-scheduler-arrow {
+    display: inline-grid;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    place-items: center;
+    color: var(--text-sub);
+    font-size: 22px;
+    line-height: 1;
+    transform: rotate(0deg);
+    transform-origin: 50% 50%;
+    transition: transform 220ms ease;
+}
+
+.thread-scheduler-toggle[aria-expanded="true"] .thread-scheduler-arrow {
+    transform: rotate(90deg);
+}
+
+.thread-scheduler-content {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 240ms ease-out, opacity 150ms ease;
+}
+
+.thread-scheduler-content.expanded {
+    opacity: 1;
+}
+
+.thread-scheduler-inner {
+    display: grid;
+    gap: 12px;
+    padding: 0 14px 14px;
+    border-top: 1px solid var(--glass-border);
+}
+
+.thread-scheduler-inner > .thread-rule-grid {
+    padding-top: 13px;
+}
+
+.thread-walt-label {
+    margin-bottom: -5px;
+}
+
+.thread-priority-resource-section {
+    overflow: hidden;
+    padding: 0;
+}
+
+.thread-resource-toggle {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 14px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+.thread-resource-toggle strong,
+.thread-resource-toggle small {
+    display: block;
+}
+
+.thread-resource-toggle strong {
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+.thread-resource-toggle small {
+    margin-top: 4px;
+    color: var(--text-sub);
+    font-size: 11px;
+}
+
+.thread-resource-summary {
+    color: var(--text-sub);
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+.thread-resource-arrow {
+    display: inline-grid;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    place-items: center;
+    color: var(--text-sub);
+    font-size: 22px;
+    line-height: 1;
+    transform: rotate(0deg);
+    transform-origin: 50% 50%;
+    transition: transform 220ms ease;
+}
+
+.thread-resource-toggle[aria-expanded="true"] .thread-resource-arrow {
+    transform: rotate(90deg);
+}
+
+.thread-resource-content {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 240ms ease-out, opacity 150ms ease;
+}
+
+.thread-resource-content.expanded {
+    opacity: 1;
+}
+
+.thread-resource-inner {
+    display: grid;
+    gap: 16px;
+    padding: 14px;
+    border-top: 1px solid var(--glass-border);
+}
+
+.rule-control-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    color: var(--text-main);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.rule-control-heading strong {
+    min-width: 38px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--primary-dim);
+    color: var(--primary);
+    text-align: center;
+}
+
+.rule-range {
+    width: 100%;
+    height: 5px;
+    appearance: none;
+    -webkit-appearance: none;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 24%, transparent);
+    outline: none;
+}
+
+.rule-range::-webkit-slider-runnable-track {
+    height: 5px;
+    border-radius: 999px;
+    background: transparent;
+}
+
+.rule-range::-webkit-slider-thumb {
+    width: 21px;
+    height: 21px;
+    margin-top: -8px;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 3px solid color-mix(in srgb, white 86%, var(--primary));
+    border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 32%, transparent);
+}
+
+.rule-range-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 9px;
+    color: var(--text-sub);
+    font-size: 10px;
+}
+
+.rule-dropdown {
+    position: relative;
+}
+
+.rule-native-select {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.rule-dropdown-trigger {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--glass-border));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--glass-control-bg) 76%, transparent);
+    color: var(--text-main);
+    font: inherit;
+    text-align: left;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+.rule-dropdown-arrow {
+    display: inline-grid;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    place-items: center;
+    color: var(--text-sub);
+    font-size: 16px;
+    line-height: 1;
+    transform: rotate(0deg);
+    transform-origin: 50% 50%;
+    transition: transform 200ms ease;
+}
+
+.rule-dropdown.open .rule-dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.rule-dropdown-menu {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    max-height: 0;
+    margin-top: 0;
+    padding: 0 6px;
+    overflow-y: auto;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--glass-control-bg) 72%, transparent);
+    box-shadow: none;
+    opacity: 0;
+    pointer-events: none;
+    backdrop-filter: blur(14px) saturate(1.08);
+    -webkit-backdrop-filter: blur(14px) saturate(1.08);
+    transition: max-height 220ms ease-out, margin-top 180ms ease, padding 180ms ease, border-color 180ms ease, opacity 140ms ease;
+}
+
+.rule-dropdown.open .rule-dropdown-menu {
+    max-height: 360px;
+    margin-top: 7px;
+    padding: 6px;
+    border-color: color-mix(in srgb, var(--primary) 12%, rgba(255, 255, 255, 0.48));
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.rule-dropdown-menu button {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 10px 11px;
+    border: 0;
+    border-radius: 15px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+.rule-dropdown-menu button + button {
+    margin-top: 3px;
+}
+
+.rule-dropdown-menu button.selected {
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.rule-dropdown-menu button.selected::after {
+    content: '✓';
+    grid-row: 1 / span 2;
+    grid-column: 2;
+    align-self: center;
+    margin-left: 12px;
+    color: var(--primary);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.rule-dropdown-menu strong,
+.rule-dropdown-menu small {
+    display: block;
+    grid-column: 1;
+}
+
+.rule-dropdown-menu strong {
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+.rule-dropdown-menu button.selected strong {
+    color: var(--primary);
+}
+
+.rule-dropdown-menu small {
+    margin-top: 3px;
+    color: var(--text-sub);
+    font-size: 10px;
+    line-height: 1.4;
+}
+
+@media (max-width: 480px) {
+    .thread-resource-toggle {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .thread-resource-summary {
+        display: none;
+    }
 }
 
 .thread-mode-chip {

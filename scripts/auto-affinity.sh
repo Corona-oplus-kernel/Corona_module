@@ -4,12 +4,12 @@ MODDIR=$(CDPATH= cd -- "${0%/*}/.." 2>/dev/null && pwd)
 CONFIG_DIR=${CORONA_CONFIG_DIR:-"$MODDIR/config"}
 CONFIG_FILE="$CONFIG_DIR/auto_affinity.conf"
 THREAD_RULES_FILE="$CONFIG_DIR/thread_priority.conf"
-STATE_FILE="$MODDIR/.auto_affinity_state"
+STATE_FILE="$CONFIG_DIR/.auto_affinity_state"
 PROC_ROOT=${CORONA_PROC_ROOT:-/proc}
 CPU_ROOT=${CORONA_CPU_ROOT:-/sys/devices/system/cpu}
 TASKSET_BIN=${CORONA_TASKSET_BIN:-taskset}
 
-enabled=0
+enabled=1
 ebpf=1
 default_class=balanced
 efficiency_cpus=
@@ -45,7 +45,7 @@ write_default_config() {
     mkdir -p "$CONFIG_DIR"
     [ -f "$CONFIG_FILE" ] && return 0
     cat > "$CONFIG_FILE" <<'EOF'
-enabled=0
+enabled=1
 ebpf=1
 default_class=balanced
 efficiency_cpus=
@@ -55,8 +55,8 @@ exclude_packages=
 scan_interval_ms=1000
 load_learning=1
 thermal_control=1
-thermal_warm_c=65
-thermal_severe_c=75
+thermal_warm_c=75
+thermal_severe_c=100
 EOF
 }
 

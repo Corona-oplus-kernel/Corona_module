@@ -14,7 +14,19 @@
         initRuntimeOptimizer() {
             if (this.runtimeOptimizerInitialized) return;
             this.runtimeOptimizerInitialized = true;
+            this.mountRuntimeOptimizerPanel();
             document.getElementById('runtime-refresh-btn')?.addEventListener('click', () => this.refreshRuntimeOptimizer(true));
+            const settingsToggle = document.getElementById('runtime-settings-toggle');
+            settingsToggle?.addEventListener('click', event => {
+                if (event.target.closest('#runtime-refresh-btn')) return;
+                this.toggleRuntimeSettings();
+            });
+            settingsToggle?.addEventListener('keydown', event => {
+                if (event.target.closest('#runtime-refresh-btn')) return;
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                this.toggleRuntimeSettings();
+            });
             document.getElementById('runtime-advanced-toggle')?.addEventListener('click', () => this.toggleRuntimeAdvanced());
             document.querySelectorAll('#runtime-class-options button').forEach(button => {
                 button.addEventListener('click', () => {
@@ -31,28 +43,40 @@
             this.loadRuntimeOptimizerConfig();
             this.refreshRuntimeOptimizer();
         },
+        mountRuntimeOptimizerPanel() {
+            const target = document.getElementById('app-policy-content');
+            const overview = document.querySelector('.thread-runtime-overview');
+            const settings = document.getElementById('runtime-optimizer-panel');
+            if (!target || !overview || !settings) return;
+            const anchor = target.firstElementChild;
+            target.insertBefore(overview, anchor);
+            target.insertBefore(settings, anchor);
+        },
+        toggleRuntimeSettings() {
+            const toggle = document.getElementById('runtime-settings-toggle');
+            const content = document.getElementById('runtime-settings-content');
+            if (!toggle || !content) return;
+            const opening = content._panelState !== 'opening' && content._panelState !== 'open';
+            if (opening) {
+                this.expandPanelContent(content, toggle, {
+                    cardEl: document.getElementById('runtime-optimizer-panel'),
+                    onExpand: () => this.refreshRuntimeOptimizer()
+                });
+            } else {
+                this.collapsePanelContent(content, toggle, {
+                    cardEl: document.getElementById('runtime-optimizer-panel')
+                });
+            }
+        },
         toggleRuntimeAdvanced() {
             const toggle = document.getElementById('runtime-advanced-toggle');
             const content = document.getElementById('runtime-advanced-content');
             if (!toggle || !content) return;
-            const opening = toggle.getAttribute('aria-expanded') !== 'true';
-            toggle.setAttribute('aria-expanded', opening ? 'true' : 'false');
-            content.setAttribute('aria-hidden', opening ? 'false' : 'true');
+            const opening = content._panelState !== 'opening' && content._panelState !== 'open';
             if (opening) {
-                content.style.maxHeight = '0px';
-                content.classList.add('expanded');
-                requestAnimationFrame(() => {
-                    content.style.maxHeight = `${content.scrollHeight}px`;
-                });
+                this.expandPanelContent(content, toggle);
             } else {
-                content.style.maxHeight = `${content.scrollHeight}px`;
-                requestAnimationFrame(() => {
-                    content.classList.remove('expanded');
-                    content.style.maxHeight = '0px';
-                });
-            }
-            if (typeof this.refreshExpandedContentHeight === 'function') {
-                setTimeout(() => this.refreshExpandedContentHeight('app-policy-content'), 360);
+                this.collapsePanelContent(content, toggle);
             }
         },
         parseRuntimeKeyValues(content) {
@@ -93,7 +117,7 @@
                 const element = document.getElementById(id);
                 if (element) element.value = config[key] ?? fallback;
             };
-            setChecked('runtime-enabled-switch', 'enabled', '0');
+            setChecked('runtime-enabled-switch', 'enabled', '1');
             setChecked('runtime-ebpf-switch', 'ebpf', '1');
             setChecked('runtime-load-learning-switch', 'load_learning', '1');
             setChecked('runtime-thermal-control-switch', 'thermal_control', '1');
@@ -102,8 +126,8 @@
             setValue('runtime-balanced-cpus', 'balanced_cpus');
             setValue('runtime-performance-cpus', 'performance_cpus');
             setValue('runtime-scan-interval', 'scan_interval_ms', '1000');
-            setValue('runtime-warm-threshold', 'thermal_warm_c', '65');
-            setValue('runtime-severe-threshold', 'thermal_severe_c', '75');
+            setValue('runtime-warm-threshold', 'thermal_warm_c', '75');
+            setValue('runtime-severe-threshold', 'thermal_severe_c', '100');
         },
         runtimeNumberValue(id, fallback, minimum, maximum) {
             const value = Number.parseInt(document.getElementById(id)?.value, 10);
@@ -112,8 +136,8 @@
         },
         async applyRuntimeOptimizerConfig(options = {}) {
             const selectedClass = document.querySelector('#runtime-class-options button.selected')?.dataset.value || 'balanced';
-            const warm = this.runtimeNumberValue('runtime-warm-threshold', 65, 35, 100);
-            const severe = this.runtimeNumberValue('runtime-severe-threshold', 75, warm + 1, 110);
+            const warm = this.runtimeNumberValue('runtime-warm-threshold', 75, 35, 100);
+            const severe = this.runtimeNumberValue('runtime-severe-threshold', 100, warm + 1, 110);
             const updates = {
                 enabled: document.getElementById('runtime-enabled-switch')?.checked ? '1' : '0',
                 ebpf: document.getElementById('runtime-ebpf-switch')?.checked ? '1' : '0',
