@@ -1,12 +1,20 @@
-# Corona v4.5.3
+# Corona v4.5.4
 
-- 更新模块版本至 v4.5.3
-- 修复档位指示器盒模型偏移
-- 修复扩展容量末档动画越界
-- 优化子设置卡片展开性能
-- 默认关闭模块界面辅助选项
-- 精简多语言刷新逻辑
-- 修复模块设置开关标签错位
-- 修复nr_requests默认值回显
-- 统一压力保护与交换优先级动画
-- 增加回写块档位切换动画
+- 修复发布工作流二进制校验
+- 更新模块版本至 v4.5.4
+- 移除仓库内预编译二进制
+- 更新模块感谢名单
+- 完善守护进程、应用规则与发布流程
+- 优化应用配置操作流程
+- Merge affinity exclusions into app configuration
+- Integrate runtime optimizer into app policy
+- Add runtime optimizer controls to WebUI
+- Add native runtime optimization daemon
+- 改为配置式回写块应用流程
+- 简化 Loop 创建关闭操作
+- 统一设置开关展开动画
+- 支持自定义 ZRAM 优先级
+- 整理 ZRAM 高级设置与 Loop 生命周期
+- 增加 OPlus ZRAM 官方扩展参数配置
+- 改为基于官方 ZRAM 流程增量覆盖配置
+- 保护系统 HybridSwap 加密回写后端
