@@ -1282,6 +1282,16 @@ body.theme-dark .cpu-core .cpu-core-load.has-usage {
     cursor: not-allowed;
 }
 
+.runtime-daemon-locked {
+    opacity: 0.45;
+    filter: saturate(0.35);
+}
+
+.runtime-daemon-locked button,
+.runtime-daemon-locked input {
+    cursor: not-allowed;
+}
+
 .cpu-cluster-badge {
     background: var(--primary-dim);
     color: var(--primary);

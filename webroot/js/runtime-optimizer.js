@@ -28,9 +28,13 @@
                 event.preventDefault();
                 this.toggleRuntimeSettings();
             });
-            document.getElementById('runtime-advanced-toggle')?.addEventListener('click', () => this.toggleRuntimeAdvanced());
+            document.getElementById('runtime-advanced-toggle')?.addEventListener('click', () => {
+                if (this.rejectDaemonDependentAction()) return;
+                this.toggleRuntimeAdvanced();
+            });
             document.querySelectorAll('#runtime-class-options button').forEach(button => {
                 button.addEventListener('click', () => {
+                    if (this.rejectDaemonDependentAction()) return;
                     this.selectRuntimeClass(button.dataset.value);
                     this.scheduleRuntimeOptimizerApply();
                 });
@@ -45,7 +49,13 @@
                 this.setRuntimeDaemonEnabled(event.target.checked);
             });
             ['runtime-efficiency-cpus', 'runtime-balanced-cpus', 'runtime-performance-cpus', 'runtime-scan-interval', 'runtime-warm-threshold', 'runtime-severe-threshold'].forEach(id => {
-                document.getElementById(id)?.addEventListener('change', () => this.scheduleRuntimeOptimizerApply());
+                const input = document.getElementById(id);
+                input?.addEventListener('pointerdown', event => {
+                    if (!this.rejectDaemonDependentAction()) return;
+                    event.preventDefault();
+                    input.blur();
+                });
+                input?.addEventListener('change', () => this.scheduleRuntimeOptimizerApply());
             });
             this.loadRuntimeOptimizerConfig();
             this.refreshRuntimeOptimizer();
@@ -103,13 +113,30 @@
         isRuntimeDaemonEnabled() {
             return this.state.runtimeDaemonEnabled === true;
         },
-        rejectDaemonDependentToggle(toggle) {
-            if (!toggle?.checked || this.isRuntimeDaemonEnabled()) return false;
+        rejectDaemonDependentAction() {
+            if (this.isRuntimeDaemonEnabled()) return false;
             this.showToast(this.t('runtimeDaemonRequired'), 'warning');
+            return true;
+        },
+        rejectDaemonDependentToggle(toggle) {
+            if (!toggle?.checked || !this.rejectDaemonDependentAction()) return false;
             setTimeout(() => {
                 toggle.checked = false;
             }, 180);
             return true;
+        },
+        updateRuntimeDaemonControlState(enabled) {
+            document.querySelector('.runtime-class-section')?.classList.toggle('runtime-daemon-locked', !enabled);
+            document.querySelector('.runtime-advanced')?.classList.toggle('runtime-daemon-locked', !enabled);
+            document.querySelectorAll('#runtime-class-options button').forEach(button => {
+                button.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+            });
+            ['runtime-efficiency-cpus', 'runtime-balanced-cpus', 'runtime-performance-cpus', 'runtime-scan-interval', 'runtime-warm-threshold', 'runtime-severe-threshold'].forEach(id => {
+                const input = document.getElementById(id);
+                if (!input) return;
+                input.readOnly = !enabled;
+                input.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+            });
         },
         scheduleRuntimeOptimizerApply() {
             if (!this.isRuntimeDaemonEnabled()) return;
@@ -121,9 +148,9 @@
             }, 350);
         },
         selectRuntimeClass(value) {
-            const normalized = ['efficiency', 'balanced', 'performance'].includes(value) ? value : 'balanced';
+            const normalized = ['efficiency', 'balanced', 'performance'].includes(value) ? value : null;
             document.querySelectorAll('#runtime-class-options button').forEach(button => {
-                button.classList.toggle('selected', button.dataset.value === normalized);
+                button.classList.toggle('selected', normalized !== null && button.dataset.value === normalized);
             });
         },
         async loadRuntimeOptimizerConfig() {
@@ -135,6 +162,7 @@
             const daemonConfig = this.parseRuntimeKeyValues(daemonConfigContent);
             const daemonEnabled = (daemonConfig.enabled ?? '0') === '1';
             this.state.runtimeDaemonEnabled = daemonEnabled;
+            this.updateRuntimeDaemonControlState(daemonEnabled);
             const setChecked = (id, key, fallback) => {
                 const element = document.getElementById(id);
                 if (element) element.checked = daemonEnabled && (config[key] ?? fallback) === '1';
@@ -149,7 +177,7 @@
             setChecked('runtime-ebpf-switch', 'ebpf', '0');
             setChecked('runtime-load-learning-switch', 'load_learning', '0');
             setChecked('runtime-thermal-control-switch', 'thermal_control', '0');
-            this.selectRuntimeClass(config.default_class || 'balanced');
+            this.selectRuntimeClass(daemonEnabled ? config.default_class || 'balanced' : null);
             setValue('runtime-efficiency-cpus', 'efficiency_cpus');
             setValue('runtime-balanced-cpus', 'balanced_cpus');
             setValue('runtime-performance-cpus', 'performance_cpus');
