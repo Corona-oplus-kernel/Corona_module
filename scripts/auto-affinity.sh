@@ -9,7 +9,7 @@ PROC_ROOT=${CORONA_PROC_ROOT:-/proc}
 CPU_ROOT=${CORONA_CPU_ROOT:-/sys/devices/system/cpu}
 TASKSET_BIN=${CORONA_TASKSET_BIN:-taskset}
 
-enabled=1
+enabled=0
 ebpf=1
 default_class=balanced
 efficiency_cpus=
@@ -45,7 +45,7 @@ write_default_config() {
     mkdir -p "$CONFIG_DIR"
     [ -f "$CONFIG_FILE" ] && return 0
     cat > "$CONFIG_FILE" <<'EOF'
-enabled=1
+enabled=0
 ebpf=1
 default_class=balanced
 efficiency_cpus=
@@ -238,7 +238,6 @@ print_status() {
     [ -f "$STATE_FILE" ] && cat "$STATE_FILE"
 }
 
-write_default_config
 load_config
 
 case "$1" in

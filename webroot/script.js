@@ -9,7 +9,7 @@ class CoronaAddon {
         this.ioNrRequestsOptions = [];
         this.ioRqAffinityOptions = [];
         this.ioNomergesOptions = [];
-        this.snapshotConfigFiles = ['zram.conf', 'loop.conf', 'memory_pressure.conf', 'le9ec.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'process_priority.conf', 'thread_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf'];
+        this.snapshotConfigFiles = ['zram.conf', 'loop.conf', 'memory_pressure.conf', 'le9ec.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'process_priority.conf', 'thread_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf', 'auto_affinity.conf', 'coronad.conf'];
         this.state = {
             algorithm: 'lz4',
             recompAlgorithm1: 'none',

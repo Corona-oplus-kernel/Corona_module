@@ -12,6 +12,10 @@ get_value() {
     [ -f "$1" ] && grep -m1 "^$2=" "$1" 2>/dev/null | cut -d'=' -f2-
 }
 
+coronad_enabled() {
+    [ "$(get_value "$MODDIR/config/coronad.conf" enabled)" = "1" ]
+}
+
 pid_is_daemon() {
     pid="$1"
     [ -n "$pid" ] && [ -d "/proc/$pid" ] || return 1
@@ -109,7 +113,7 @@ apply_config() {
     fi
     enabled=$(get_value "$RUNTIME_CONF" enabled)
     stop_daemon
-    if [ -x "$CORONAD" ]; then
+    if [ -x "$CORONAD" ] && coronad_enabled; then
         corona_pid=$(cat "$MODDIR/config/.coronad.pid" 2>/dev/null)
         if [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ]; then
             CORONA_MODDIR="$MODDIR" "$CORONAD" reload >/dev/null 2>&1
@@ -128,7 +132,7 @@ case "$1" in
     daemon) run_daemon ;;
     stop) stop_daemon ;;
     status)
-        if [ -x "$CORONAD" ]; then
+        if [ -x "$CORONAD" ] && coronad_enabled; then
             CORONA_MODDIR="$MODDIR" "$CORONAD" status 2>/dev/null | sed -n '1p'
             echo "avg10=$(pressure_avg10)"
             echo "swappiness=$(cat /proc/sys/vm/swappiness 2>/dev/null | tr -d ' \n')"

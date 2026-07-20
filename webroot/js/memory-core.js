@@ -202,6 +202,18 @@
         const device = (await this.exec("for d in /sys/block/*; do b=$(basename \"$d\"); case \"$b\" in loop*|ram*|zram*|dm-*) continue ;; esac; [ -d \"$d/queue\" ] || continue; echo \"$b\"; break; done")).trim();
         return device || '';
     },
+    setFeatureSupport(target, supported) {
+        const element = typeof target === 'string' ? document.getElementById(target) : target;
+        if (!element) return;
+        const enabled = !!supported;
+        element.classList.toggle('feature-disabled', !enabled);
+        if (element.matches('input, button, select')) element.disabled = !enabled;
+        element.querySelectorAll('input, button, select').forEach(control => { control.disabled = !enabled; });
+        element.querySelectorAll('.option-item').forEach(item => {
+            item.classList.toggle('feature-disabled', !enabled);
+            item.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+        });
+    },
     parseIoConfig(content) {
         const values = {};
         String(content || '').split('\n').forEach(line => {
@@ -366,16 +378,17 @@
         return algorithm;
     },
     getZramBlockName(zramPath) {
-        const raw = String(zramPath || '').replace('/dev/block/', '').replace('/dev/', '').trim();
+        const raw = String(zramPath || '').trim().split('/').filter(Boolean).pop() || '';
         return raw.replace(/[^a-zA-Z0-9_.-].*$/, '');
     },
     async getActiveSwapInfo(devicePath) {
         const swaps = await this.exec('cat /proc/swaps 2>/dev/null');
         if (!swaps) return null;
+        const targetBlock = String(devicePath || '').split('/').pop();
         const lines = swaps.split('\n').slice(1);
         for (const line of lines) {
             const parts = line.trim().split(/\s+/);
-            if (parts[0] === devicePath) {
+            if (parts[0]?.split('/').pop() === targetBlock) {
                 return { device: parts[0], type: parts[1], size: parts[2], used: parts[3], priority: parts[4] };
             }
         }
@@ -457,7 +470,7 @@
         }
     },
     async readRealtimeSnapshot(includeHeavy = false) {
-        const heavy = includeHeavy ? `awk '/^SwapTotal:/ { total=$2 } /^SwapFree:/ { free=$2 } END { printf "SWAP %s %s\\n", total+0, free+0 }' /proc/meminfo; df /data 2>/dev/null | awk 'END { printf "STORAGE %s %s %s\\n", $2+0, $3+0, $4+0 }'; temp=; for node in /sys/class/thermal/thermal_zone0/temp /sys/devices/virtual/thermal/thermal_zone0/temp /sys/class/hwmon/hwmon0/temp1_input; do [ -r "$node" ] || continue; read temp < "$node"; [ -n "$temp" ] && break; done; printf 'TEMP %s\\n' "\${temp:-0}";` : '';
+        const heavy = includeHeavy ? `awk '/^SwapTotal:/ { total=$2 } /^SwapFree:/ { free=$2 } END { printf "SWAP %s %s\\n", total+0, free+0 }' /proc/meminfo; df /data 2>/dev/null | awk 'END { printf "STORAGE %s %s %s\\n", $2+0, $3+0, $4+0 }'; temp=0; for zone in /sys/class/thermal/thermal_zone*; do [ -r "$zone/type" ] && [ -r "$zone/temp" ] || continue; type=$(cat "$zone/type" 2>/dev/null | tr '[:upper:]' '[:lower:]'); case "$type" in *cpu*|*cpuss*|*soc*) ;; *) continue ;; esac; value=$(cat "$zone/temp" 2>/dev/null); case "$value" in ''|*[!0-9-]*) continue ;; esac; [ "$value" -ge 10000 ] 2>/dev/null && [ "$value" -le 150000 ] 2>/dev/null || continue; [ "$value" -gt "$temp" ] && temp=$value; done; if [ "$temp" -eq 0 ]; then for node in /sys/class/thermal/thermal_zone*/temp /sys/class/hwmon/hwmon*/temp*_input; do [ -r "$node" ] || continue; value=$(cat "$node" 2>/dev/null); case "$value" in ''|*[!0-9-]*) continue ;; esac; [ "$value" -ge 10000 ] 2>/dev/null && [ "$value" -le 150000 ] 2>/dev/null || continue; temp=$value; break; done; fi; printf 'TEMP %s\\n' "$temp";` : '';
         const command = `printf 'CPU '; sed -n '1p' /proc/stat 2>/dev/null; level=; temp=; [ -r /sys/class/power_supply/battery/capacity ] && read level < /sys/class/power_supply/battery/capacity; [ -r /sys/class/power_supply/battery/temp ] && read temp < /sys/class/power_supply/battery/temp; printf 'BATTERY %s %s\\n' "\${level:-0}" "\${temp:-0}"; awk '/^MemTotal:/ { total=$2 } /^MemAvailable:/ { available=$2 } /^MemFree:/ { free=$2 } /^Buffers:/ { buffers=$2 } /^Cached:/ { cached=$2 } END { printf "MEM %s %s %s %s %s\\n", total+0, available+0, free+0, buffers+0, cached+0 }' /proc/meminfo; ${heavy}`;
         const output = await this.exec(command);
         const snapshot = { cpuStat: '', batteryLevel: '', batteryTemp: '', memory: [], swap: [], storage: [], cpuTemp: '' };
@@ -775,13 +788,14 @@
             this.loadMemoryPressureConfig()
         ];
         await Promise.all(tasks);
+        this.updateCpuControlSupport();
         await this.updateModuleDescription();
         this.updateClusterBadge();
         document.querySelectorAll('.range-slider').forEach(slider => this.updateSliderProgress(slider));
     },
     updateClusterBadge() { const badge = document.getElementById('cpu-cluster-badge'); if (badge) { badge.textContent = this.formatClusterInfo() || '--'; } },
     async detectActiveZramPath() {
-        const activePath = (await this.exec(`awk 'NR > 1 && ($1 ~ /^\/dev\/block\/zram/ || $1 ~ /^\/dev\/zram/) { print $1; exit }' /proc/swaps 2>/dev/null`)).trim();
+        const activePath = (await this.exec(`block=$(awk 'NR > 1 { dev=$1; sub(/^.*\\//, "", dev); if (dev ~ /^zram[0-9]+$/) { print dev; exit } }' /proc/swaps 2>/dev/null); if [ -n "$block" ]; then for path in /dev/block/$block /dev/$block; do [ -e "$path" ] && { echo "$path"; exit; }; done; fi`)).trim();
         if (activePath) {
             this.state.zramPath = activePath;
             const pathInput = document.getElementById('zram-path-input');
@@ -1117,7 +1131,7 @@
     },
     async readZramStatusSnapshot(configuredPath) {
         const path = this.shellQuote(configuredPath || '/dev/block/zram0');
-        const command = `emit_value() { tag="$1"; value="$2"; printf '%s ' "$tag"; printf '%s' "$value" | base64 2>/dev/null | tr -d '\\r\\n'; printf '\\n'; }; configured=${path}; active=$(awk 'NR > 1 && ($1 ~ /^\\/dev\\/block\\/zram/ || $1 ~ /^\\/dev\\/zram/) { print $1; exit }' /proc/swaps 2>/dev/null); zram_path=\${active:-$configured}; block=\${zram_path##*/}; case "$block" in zram[0-9]*) ;; *) block= ;; esac; emit_value PATH "$zram_path"; if [ -n "$block" ]; then base=/sys/block/$block; emit_value ALG "$(cat "$base/comp_algorithm" 2>/dev/null)"; emit_value SIZE "$(cat "$base/disksize" 2>/dev/null)"; emit_value MM "$(cat "$base/mm_stat" 2>/dev/null)"; emit_value BLOCK "$(cat "$base/stat" 2>/dev/null)"; fi; emit_value SWAPPINESS "$(cat /proc/sys/vm/swappiness 2>/dev/null)"; emit_value SWAP "$(awk -v path="$zram_path" 'NR > 1 && $1 == path { print $1, $2, $3, $4, $5; exit }' /proc/swaps 2>/dev/null)"`;
+        const command = `emit_value() { tag="$1"; value="$2"; printf '%s ' "$tag"; printf '%s' "$value" | base64 2>/dev/null | tr -d '\\r\\n'; printf '\\n'; }; configured=${path}; active_entry=$(awk 'NR > 1 { dev=$1; sub(/^.*\\//, "", dev); if (dev ~ /^zram[0-9]+$/) { print $1; exit } }' /proc/swaps 2>/dev/null); active_block=\${active_entry##*/}; configured_block=\${configured##*/}; block=\${active_block:-$configured_block}; case "$block" in zram[0-9]*) ;; *) block= ;; esac; zram_path=$configured; if [ -n "$active_block" ]; then for candidate in /dev/block/$active_block /dev/$active_block; do [ -e "$candidate" ] && { zram_path=$candidate; break; }; done; fi; emit_value PATH "$zram_path"; if [ -n "$block" ]; then base=/sys/block/$block; emit_value ALG "$(cat "$base/comp_algorithm" 2>/dev/null)"; emit_value SIZE "$(cat "$base/disksize" 2>/dev/null)"; emit_value MM "$(cat "$base/mm_stat" 2>/dev/null)"; emit_value BLOCK "$(cat "$base/stat" 2>/dev/null)"; fi; emit_value SWAPPINESS "$(cat /proc/sys/vm/swappiness 2>/dev/null)"; emit_value SWAP "$(awk -v block="$block" 'NR > 1 { dev=$1; sub(/^.*\\//, "", dev); if (dev == block) { print $1, $2, $3, $4, $5; exit } }' /proc/swaps 2>/dev/null)"`;
         const output = await this.exec(command);
         const values = {};
         String(output || '').split('\n').forEach(line => {
@@ -1543,7 +1557,7 @@
             this.zramFeatures && this.zramFeatures.multiComp
                 ? this.exec(`cat /sys/block/${zramBlock}/recomp_algorithm 2>/dev/null`)
                 : Promise.resolve(''),
-            checkPriority ? this.exec(`awk -v path=${this.shellQuote(zramPath)} 'NR > 1 && $1 == path { print $5; exit }' /proc/swaps 2>/dev/null`) : Promise.resolve(''),
+            checkPriority ? this.exec(`awk -v block=${this.shellQuote(zramBlock)} 'NR > 1 { dev=$1; sub(/^.*\//, "", dev); if (dev == block) { print $5; exit } }' /proc/swaps 2>/dev/null`) : Promise.resolve(''),
             extensionExpected.direct_swappiness !== undefined ? this.exec(`for node in /proc/oplus_mem/swappiness_para /proc/oplus_healthinfo/swappiness_para; do [ -r "$node" ] || continue; awk -F': *' '/^direct_swappiness:/ { print $2; exit }' "$node"; break; done`) : Promise.resolve(''),
             extensionExpected.zram_used_limit_mb !== undefined ? this.exec('cat /dev/memcg/memory.zram_used_limit_mb 2>/dev/null') : Promise.resolve(''),
             extensionExpected.hybridswap_zram_increase !== undefined ? this.exec(`cat /sys/block/${zramBlock}/hybridswap_zram_increase 2>/dev/null`) : Promise.resolve(''),
@@ -1716,12 +1730,21 @@
     },
     async loadIOConfig() {
         const preferred = await this.getPreferredBlockDevice();
-        const schedulerRaw = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/scheduler 2>/dev/null`) : '';
-        const readahead = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/read_ahead_kb 2>/dev/null`) : '';
-        const nrRequests = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/nr_requests 2>/dev/null`) : '';
-        const rqAffinity = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/rq_affinity 2>/dev/null`) : '';
-        const nomerges = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/nomerges 2>/dev/null`) : '';
-        const iostats = preferred ? await this.exec(`cat /sys/block/${preferred}/queue/iostats 2>/dev/null`) : '';
+        const queuePath = preferred ? `/sys/block/${preferred}/queue` : '';
+        const [schedulerRaw, readahead, nrRequests, rqAffinity, nomerges, iostats, supportRaw] = await Promise.all([
+            queuePath ? this.exec(`cat ${queuePath}/scheduler 2>/dev/null`) : Promise.resolve(''),
+            queuePath ? this.exec(`cat ${queuePath}/read_ahead_kb 2>/dev/null`) : Promise.resolve(''),
+            queuePath ? this.exec(`cat ${queuePath}/nr_requests 2>/dev/null`) : Promise.resolve(''),
+            queuePath ? this.exec(`cat ${queuePath}/rq_affinity 2>/dev/null`) : Promise.resolve(''),
+            queuePath ? this.exec(`cat ${queuePath}/nomerges 2>/dev/null`) : Promise.resolve(''),
+            queuePath ? this.exec(`cat ${queuePath}/iostats 2>/dev/null`) : Promise.resolve(''),
+            queuePath ? this.exec(`q=${queuePath}; for key in scheduler read_ahead_kb nr_requests rq_affinity nomerges iostats; do [ -w "$q/$key" ] && echo "$key=1" || echo "$key=0"; done`) : Promise.resolve('')
+        ]);
+        this.ioFeatureSupport = {};
+        supportRaw.split('\n').forEach(line => {
+            const match = line.match(/^([^=]+)=([01])$/);
+            if (match) this.ioFeatureSupport[match[1]] = match[2] === '1';
+        });
         const conf = await this.readConfig('io_scheduler.conf');
         const saved = this.parseIoConfig(conf);
         this.state.ioEnabled = this.parseEnabledFlag(conf, !!conf);
@@ -1753,6 +1776,7 @@
             container.innerHTML = availableSchedulers.map(s => `<div class="option-item ${s === currentScheduler ? 'selected' : ''}" data-value="${s}">${s}</div>`).join('');
             container.querySelectorAll('.option-item').forEach(item => {
                 item.addEventListener('click', async (e) => {
+                    if (!this.ioFeatureSupport?.scheduler) return;
                     container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                     e.currentTarget.classList.add('selected');
                     this.state.ioScheduler = e.currentTarget.dataset.value;
@@ -1761,26 +1785,37 @@
             });
         }
         const currentEl = document.getElementById('io-current');
-        if (currentEl) currentEl.textContent = this.state.ioEnabled ? (currentScheduler || '--') : '已禁用';
+        if (currentEl) currentEl.textContent = !this.ioFeatureSupport.scheduler ? this.t('unsupported') : (this.state.ioEnabled ? (currentScheduler || '--') : '已禁用');
         const iostatsContainer = document.getElementById('io-iostats-container');
-        if (iostatsContainer) iostatsContainer.style.display = preferred && iostats !== '' ? '' : 'none';
         const iostatsSwitch = document.getElementById('io-iostats-switch');
         if (iostatsSwitch) iostatsSwitch.checked = this.state.ioIostats;
         this.renderReadaheadOptions();
         this.renderIOAdvancedOptions();
+        this.setFeatureSupport(container?.closest('.setting-section'), this.ioFeatureSupport.scheduler);
+        this.setFeatureSupport(document.getElementById('readahead-list')?.closest('.setting-section'), this.ioFeatureSupport.read_ahead_kb);
+        this.setFeatureSupport(document.getElementById('io-nr-requests-list')?.closest('.setting-section'), this.ioFeatureSupport.nr_requests);
+        this.setFeatureSupport(document.getElementById('io-rq-affinity-list')?.closest('.setting-section'), this.ioFeatureSupport.rq_affinity);
+        this.setFeatureSupport(document.getElementById('io-nomerges-list')?.closest('.setting-section'), this.ioFeatureSupport.nomerges);
+        this.setFeatureSupport(iostatsContainer, this.ioFeatureSupport.iostats);
+        const ioSupported = Object.values(this.ioFeatureSupport).some(Boolean);
+        this.setFeatureSupport(document.getElementById('io-switch')?.closest('.switch-container'), ioSupported);
         this.refreshExpandedContentHeight('io-scheduler-content');
     },
     async applyIOSchedulerImmediate(skipPreview = false) {
         return this.applyIOConfigImmediate('scheduler', skipPreview);
     },
     async loadCpuGovernorConfig() {
-        const governorRaw = await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors 2>/dev/null');
-        const currentGovernor = await this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null');
+        const [governorRaw, currentGovernor, governorWritable] = await Promise.all([
+            this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors 2>/dev/null'),
+            this.exec('cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null'),
+            this.exec('[ -w /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ] && echo 1 || echo 0')
+        ]);
         const conf = await this.readConfig('cpu_governor.conf');
         this.state.cpuEnabled = this.parseEnabledFlag(conf, !!conf);
         const cpuSwitch = document.getElementById('cpu-switch');
         if (cpuSwitch) cpuSwitch.checked = this.state.cpuEnabled;
         const availableGovernors = governorRaw.split(/\s+/).filter(g => g);
+        this.cpuGovernorSupported = availableGovernors.length > 0 && governorWritable.trim() === '1';
         let resolved = currentGovernor.trim();
         if (conf) {
             const m = conf.match(/governor=(\S+)/);
@@ -1792,6 +1827,7 @@
             container.innerHTML = availableGovernors.map(g => `<div class="option-item ${g === this.state.cpuGovernor ? 'selected' : ''}" data-value="${g}">${g}</div>`).join('');
             container.querySelectorAll('.option-item').forEach(item => {
                 item.addEventListener('click', async (e) => {
+                    if (!this.cpuGovernorSupported) return;
                     container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                     e.currentTarget.classList.add('selected');
                     this.state.cpuGovernor = e.currentTarget.dataset.value;
@@ -1800,10 +1836,21 @@
             });
         }
         const currentEl = document.getElementById('cpu-gov-current');
-        if (currentEl) currentEl.textContent = this.state.cpuEnabled ? (this.state.cpuGovernor || '--') : '已禁用';
+        if (currentEl) currentEl.textContent = !this.cpuGovernorSupported ? this.t('unsupported') : (this.state.cpuEnabled ? (this.state.cpuGovernor || '--') : '已禁用');
+        this.setFeatureSupport(container, this.cpuGovernorSupported);
+        this.updateCpuControlSupport();
+    },
+    updateCpuControlSupport() {
+        if (typeof this.cpuGovernorSupported !== 'boolean' || typeof this.cpuHotplugSupported !== 'boolean') return;
+        const supported = this.cpuGovernorSupported || this.cpuHotplugSupported;
+        this.setFeatureSupport(document.getElementById('cpu-switch')?.closest('.switch-container'), supported);
     },
     async applyCpuGovernorImmediate(changedField = 'governor', skipPreview = false) {
       return this.withLock('governor', async () => {
+        if ((changedField === 'governor' || changedField === 'cpu') && !this.cpuGovernorSupported && this.state.cpuEnabled) {
+            this.showToast(this.t('unsupported'), 'warning');
+            return false;
+        }
         const updates = {};
         if (changedField === 'cpu' || changedField === 'enabled') updates.enabled = this.state.cpuEnabled ? '1' : '0';
         if (changedField === 'governor' || changedField === 'cpu') updates.governor = this.state.cpuGovernor;
@@ -1842,13 +1889,17 @@
       });
     },
     async loadTCPConfig() {
-        const tcpRaw = await this.exec('cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null');
-        const currentTcp = await this.exec('cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null');
+        const [tcpRaw, currentTcp, tcpWritable] = await Promise.all([
+            this.exec('cat /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null'),
+            this.exec('cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null'),
+            this.exec('[ -w /proc/sys/net/ipv4/tcp_congestion_control ] && echo 1 || echo 0')
+        ]);
         const conf = await this.readConfig('tcp.conf');
         this.state.tcpEnabled = this.parseEnabledFlag(conf, !!conf);
         const tcpSwitch = document.getElementById('tcp-switch');
         if (tcpSwitch) tcpSwitch.checked = this.state.tcpEnabled;
         const availableTcp = tcpRaw.split(/\s+/).filter(t => t);
+        this.tcpSupported = availableTcp.length > 0 && tcpWritable.trim() === '1';
         let resolved = currentTcp.trim();
         if (conf) {
             const m = conf.match(/congestion=(\S+)/);
@@ -1859,16 +1910,23 @@
         container.innerHTML = availableTcp.map(t => `<div class="option-item ${t === this.state.tcp ? 'selected' : ''}" data-value="${t}">${t}</div>`).join('');
         container.querySelectorAll('.option-item').forEach(item => {
             item.addEventListener('click', async (e) => {
+                if (!this.tcpSupported) return;
                 container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                 e.currentTarget.classList.add('selected');
                 this.state.tcp = e.currentTarget.dataset.value;
                 await this.applyTcpImmediate('congestion');
             });
         });
-        document.getElementById('tcp-current').textContent = this.state.tcpEnabled ? (this.state.tcp || '--') : '已禁用';
+        document.getElementById('tcp-current').textContent = !this.tcpSupported ? this.t('unsupported') : (this.state.tcpEnabled ? (this.state.tcp || '--') : '已禁用');
+        this.setFeatureSupport(document.getElementById('tcp-switch')?.closest('.switch-container'), this.tcpSupported);
+        this.setFeatureSupport(container, this.tcpSupported);
     },
     async applyTcpImmediate(changedField = 'congestion', skipPreview = false) {
       return this.withLock('tcp', async () => {
+        if (!this.tcpSupported && this.state.tcpEnabled) {
+            this.showToast(this.t('unsupported'), 'warning');
+            return false;
+        }
         const updates = {};
         if (changedField === 'tcp' || changedField === 'enabled') updates.enabled = this.state.tcpEnabled ? '1' : '0';
         if (changedField === 'congestion' || changedField === 'tcp') updates.congestion = this.state.tcp;
@@ -1911,32 +1969,36 @@
         const seenIds = new Set();
         for (let i = 0; i < cpuCount && this.cpuCores.length < maxCores; i++) {
             if (seenIds.has(i)) continue;
-            const [online, maxFreq, stat] = await Promise.all([
+            const [online, maxFreq, stat, writable] = await Promise.all([
                 this.exec(`cat /sys/devices/system/cpu/cpu${i}/online 2>/dev/null`),
                 this.exec(`cat /sys/devices/system/cpu/cpu${i}/cpufreq/cpuinfo_max_freq 2>/dev/null`),
-                this.exec(`grep "^cpu${i} " /proc/stat 2>/dev/null`)
+                this.exec(`grep "^cpu${i} " /proc/stat 2>/dev/null`),
+                this.exec(`[ -w /sys/devices/system/cpu/cpu${i}/online ] && echo 1 || echo 0`)
             ]);
             if (!maxFreq && !stat) continue;
             seenIds.add(i);
             const savedOnline = savedStates[`cpu${i}`];
             const effectiveOnline = i === 0 ? true : (!this.state.cpuEnabled && typeof savedOnline === 'boolean' ? savedOnline : online === '1');
-            this.cpuCores.push({ id: i, online: effectiveOnline, locked: i === 0, maxFreq: maxFreq ? parseInt(maxFreq) : 0, load: '--' });
+            this.cpuCores.push({ id: i, online: effectiveOnline, controllable: i !== 0 && writable.trim() === '1', maxFreq: maxFreq ? parseInt(maxFreq) : 0, load: '--' });
             const freqs = await this.exec(`cat /sys/devices/system/cpu/cpu${i}/cpufreq/scaling_available_frequencies 2>/dev/null`);
             if (freqs) this.cpuFreqsPerCore[i] = freqs.split(/\s+/).filter(f => f).map(Number).sort((a, b) => a - b);
         }
         this.cpuCores.sort((a, b) => a.id - b.id);
+        this.cpuHotplugSupported = this.cpuCores.some(core => core.controllable);
         this.renderCpuCores();
+        this.updateCpuControlSupport();
         await this.updateCpuLoads();
     },
     renderCpuCores() {
         const container = document.getElementById('cpu-cores-list');
         if (!container) return;
-        container.innerHTML = this.cpuCores.map(core => `<div class="cpu-core ${core.online ? 'online' : 'offline'} ${core.id === 0 ? 'locked' : ''}" data-cpu="${core.id}"><div class="cpu-core-id">CPU ${core.id}</div><div class="cpu-core-load" id="cpu-load-${core.id}">${core.online ? '--' : 'OFF'}</div></div>`).join('');
+        container.innerHTML = this.cpuCores.map(core => `<div class="cpu-core ${core.online ? 'online' : 'offline'} ${core.controllable ? '' : 'locked'}" data-cpu="${core.id}"><div class="cpu-core-id">CPU ${core.id}</div><div class="cpu-core-load" id="cpu-load-${core.id}">${core.online ? '--' : 'OFF'}</div></div>`).join('');
         container.querySelectorAll('.cpu-core').forEach(item => {
             item.addEventListener('click', async () => {
                 const cpuId = parseInt(item.dataset.cpu);
-                if (cpuId === 0) { this.showToast('CPU0 不能被关闭'); return; }
-                const core = this.cpuCores[cpuId];
+                const core = this.cpuCores.find(entry => entry.id === cpuId);
+                if (!core) return;
+                if (!core.controllable) { this.showToast(cpuId === 0 ? 'CPU0 不能被关闭' : this.t('unsupported'), 'warning'); return; }
                 const newState = core.online ? '0' : '1';
                 const nextConfig = this.cpuCores.map(c => `cpu${c.id}=${c.id === cpuId ? newState : (c.online ? '1' : '0')}`).join('\n');
                 const confirmed = await this.confirmChangePreview('变更预览', {
@@ -2021,7 +2083,7 @@
         await this.mergeConfigFile('cpu_hotplug.conf', { [`cpu${core.id}`]: core.online ? '1' : '0' }, [`cpu${core.id}`]);
     },
     async applyCpuHotplugConfigImmediate() {
-        const writes = this.cpuCores.filter(core => core.id !== 0).map(core => this.exec(`echo ${core.online ? '1' : '0'} > /sys/devices/system/cpu/cpu${core.id}/online 2>/dev/null`));
+        const writes = this.cpuCores.filter(core => core.controllable).map(core => this.exec(`echo ${core.online ? '1' : '0'} > /sys/devices/system/cpu/cpu${core.id}/online 2>/dev/null`));
         if (writes.length > 0) await Promise.all(writes);
         await this.saveCpuHotplugConfig();
         return true;
@@ -2866,12 +2928,32 @@
         this.loadVmConfig();
     },
     async loadVmConfig() {
-        const config = await this.readConfig('vm.conf');
+        const [config, supportRaw] = await Promise.all([
+            this.readConfig('vm.conf'),
+            this.exec('for key in watermark_scale_factor extra_free_kbytes dirty_ratio dirty_background_ratio vfs_cache_pressure; do [ -w "/proc/sys/vm/$key" ] && echo "$key=1" || echo "$key=0"; done')
+        ]);
+        this.vmFeatureSupport = {};
+        supportRaw.split('\n').forEach(line => {
+            const match = line.match(/^([^=]+)=([01])$/);
+            if (match) this.vmFeatureSupport[match[1]] = match[2] === '1';
+        });
+        const vmControls = {
+            watermark_scale_factor: 'watermark-slider',
+            extra_free_kbytes: 'extra-free-slider',
+            dirty_ratio: 'dirty-ratio-slider',
+            dirty_background_ratio: 'dirty-bg-slider',
+            vfs_cache_pressure: 'vfs-pressure-slider'
+        };
+        Object.entries(vmControls).forEach(([key, id]) => {
+            this.setFeatureSupport(document.getElementById(id)?.closest('.setting-section'), this.vmFeatureSupport[key]);
+        });
+        const vmSupported = Object.values(this.vmFeatureSupport).some(Boolean);
+        this.setFeatureSupport(document.getElementById('vm-switch')?.closest('.switch-container'), vmSupported);
         this.state.vmEnabled = this.parseEnabledFlag(config, !!config);
         const vmSwitch = document.getElementById('vm-switch');
         if (vmSwitch) vmSwitch.checked = this.state.vmEnabled;
         const vmStatus = document.getElementById('vm-status');
-        if (vmStatus) vmStatus.textContent = this.state.vmEnabled ? (config ? '已修改' : '默认') : '已禁用';
+        if (vmStatus) vmStatus.textContent = !vmSupported ? this.t('unsupported') : (this.state.vmEnabled ? (config ? '已修改' : '默认') : '已禁用');
         if (config) {
             const watermarkMatch = config.match(/watermark_scale_factor=(\d+)/);
             const extraFreeMatch = config.match(/extra_free_kbytes=(\d+)/);
@@ -2894,7 +2976,8 @@
     async applyVmConfig(changedKeys = null, skipPreview = false) {
       return this.withLock('vm', async () => {
         if (!await this.validateConfiguration('vm', { toast: false })) return false;
-        const keys = Array.isArray(changedKeys) ? changedKeys : (changedKeys ? [changedKeys] : ['enabled', 'watermark_scale_factor', 'extra_free_kbytes', 'dirty_ratio', 'dirty_background_ratio', 'vfs_cache_pressure']);
+        const requestedKeys = Array.isArray(changedKeys) ? changedKeys : (changedKeys ? [changedKeys] : ['enabled', 'watermark_scale_factor', 'extra_free_kbytes', 'dirty_ratio', 'dirty_background_ratio', 'vfs_cache_pressure']);
+        const keys = requestedKeys.filter(key => key === 'enabled' || this.vmFeatureSupport?.[key] !== false);
         const updates = {};
         if (keys.includes('enabled')) updates.enabled = this.state.vmEnabled ? '1' : '0';
         if (keys.includes('watermark_scale_factor')) updates.watermark_scale_factor = String(this.state.watermarkScale);

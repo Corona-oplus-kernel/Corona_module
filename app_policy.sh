@@ -18,8 +18,12 @@ CORONAD="$MODDIR/bin/coronad"
 . "$MODDIR/app_policy/meta.sh"
 . "$MODDIR/app_policy/runtime.sh"
 
+use_coronad() {
+    [ -x "$CORONAD" ] && [ "$(get_conf_value "$CONFIG_DIR/coronad.conf" enabled)" = "1" ]
+}
+
 get_daemon_pid() {
-    if [ -x "$CORONAD" ]; then
+    if use_coronad; then
         corona_pid=$(cat "$CONFIG_DIR/.coronad.pid" 2>/dev/null)
         if [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ]; then
             corona_cmdline=$(tr '\0' ' ' < "/proc/$corona_pid/cmdline" 2>/dev/null)
@@ -71,14 +75,14 @@ case "$1" in
     memclean) run_memclean "$2" ;;
     protect-once) apply_protection_once ;;
     daemon)
-        if [ -x "$CORONAD" ]; then
+        if use_coronad; then
             CORONA_MODDIR="$MODDIR" "$CORONAD" daemon
         else
             monitor_daemon
         fi
         ;;
     daemon-reload)
-        if [ -x "$CORONAD" ]; then
+        if use_coronad; then
             CORONA_MODDIR="$MODDIR" "$CORONAD" reload
             exit $?
         fi
@@ -86,7 +90,7 @@ case "$1" in
         kill -HUP "$pid" 2>/dev/null
         ;;
     daemon-stop)
-        if [ -x "$CORONAD" ]; then
+        if use_coronad; then
             CORONA_MODDIR="$MODDIR" "$CORONAD" stop
             rm -f "$PIDFILE" "$STATEFILE"
             exit $?

@@ -33,15 +33,13 @@ normalize_zram_path() {
 }
 
 get_zram_block() {
-  local zram_block="$1"
-  zram_block=${zram_block#/dev/block/}
-  zram_block=${zram_block#/dev/}
+  local zram_block=${1##*/}
   [ -n "$zram_block" ] && [ -d "/sys/block/$zram_block" ] || return 1
   echo "$zram_block"
 }
 
 get_zram_priority() {
-  awk -v dev="$1" 'NR > 1 && $1 == dev { print $5; exit }' /proc/swaps 2>/dev/null
+  awk -v dev="$1" 'BEGIN { sub(/^.*\//, "", dev) } NR > 1 { current=$1; sub(/^.*\//, "", current); if (current == dev) { print $5; exit } }' /proc/swaps 2>/dev/null
 }
 
 get_active_zram_algorithm() {

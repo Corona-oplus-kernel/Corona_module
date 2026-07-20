@@ -3,8 +3,10 @@ SKIPMOUNT=true
 PROPFILE=false
 POSTFSDATA=false
 
-BRAND=$(getprop ro.product.brand | tr '[:upper:]' '[:lower:]')
-MANUFACTURER=$(getprop ro.product.manufacturer | tr '[:upper:]' '[:lower:]')
+DEVICE_BRAND=$(getprop ro.product.brand)
+DEVICE_MANUFACTURER=$(getprop ro.product.manufacturer)
+BRAND=$(printf '%s' "$DEVICE_BRAND" | tr '[:upper:]' '[:lower:]')
+MANUFACTURER=$(printf '%s' "$DEVICE_MANUFACTURER" | tr '[:upper:]' '[:lower:]')
 is_supported_brand() {
     case "$1" in
         oneplus|oplus|oppo|realme) return 0 ;;
@@ -14,7 +16,7 @@ is_supported_brand() {
 if ! is_supported_brand "$BRAND" && ! is_supported_brand "$MANUFACTURER"; then
     ui_print "================================================"
     ui_print " 错误：此模块仅支持 OPPO / 一加 / 真我 设备"
-    ui_print " 当前品牌: $(getprop ro.product.brand)"
+    ui_print " 当前品牌: $DEVICE_BRAND"
     ui_print "================================================"
     abort "不支持的设备，安装中止"
 fi
@@ -24,6 +26,26 @@ MODULE_VERSION=$(grep -E '^version=' "${MODPATH}/module.prop" | cut -d'=' -f2-)
 ui_print "================================================"
 ui_print " ${MODULE_NAME} ${MODULE_VERSION}"
 ui_print "================================================"
+DEVICE_NAME=$(getprop ro.vendor.oplus.market.name)
+[ -n "$DEVICE_NAME" ] || DEVICE_NAME=$(getprop ro.product.model)
+ANDROID_VERSION=$(getprop ro.build.version.release)
+ANDROID_SDK=$(getprop ro.build.version.sdk)
+KERNEL_VERSION=$(uname -r)
+ZRAM_BLOCK=$(basename "$(ls -d /sys/block/zram* 2>/dev/null | head -n 1)")
+[ -n "$ZRAM_BLOCK" ] && [ -f "/sys/block/$ZRAM_BLOCK/recomp_algorithm" ] && ZRAM_RECOMP=是 || ZRAM_RECOMP=否
+[ -n "$ZRAM_BLOCK" ] && { [ -f "/sys/block/$ZRAM_BLOCK/hybridswap_loop_device" ] || [ -f "/sys/block/$ZRAM_BLOCK/backing_dev" ]; } && ZRAM_WRITEBACK=是 || ZRAM_WRITEBACK=否
+[ -r /proc/pressure/memory ] && PSI_SUPPORT=是 || PSI_SUPPORT=否
+if [ -d /proc/oplus_mem ] || [ -d /proc/oplus_healthinfo ] || [ -d /proc/oplus_qos_sched ]; then
+    OPLUS_EXTENSIONS=是
+else
+    OPLUS_EXTENSIONS=否
+fi
+ui_print "- 设备: ${DEVICE_BRAND:-未知} ${DEVICE_NAME:-未知}"
+[ -n "$DEVICE_MANUFACTURER" ] && [ "$DEVICE_MANUFACTURER" != "$DEVICE_BRAND" ] && ui_print "- 制造商: $DEVICE_MANUFACTURER"
+ui_print "- 系统: Android ${ANDROID_VERSION:-未知} (SDK ${ANDROID_SDK:-未知})"
+ui_print "- 内核: ${KERNEL_VERSION:-未知}"
+ui_print "- 能力: ZRAM重压缩=$ZRAM_RECOMP ZRAM回写=$ZRAM_WRITEBACK"
+ui_print "- 能力: PSI=$PSI_SUPPORT OPlus扩展=$OPLUS_EXTENSIONS"
 set_perm_recursive $MODPATH 0 0 0755 0644
 chmod 755 "$MODPATH/customize.sh" 2>/dev/null
 chmod 755 "$MODPATH/service.sh" 2>/dev/null
@@ -43,6 +65,25 @@ mem_total_kb=${mem_total_str:16:8}
 mem_total_gb=$(((mem_total_kb/1024+2047)/2048*2))
 ui_print "- RAM: ${mem_total_gb}GB"
 
+is_legacy_default_auto_affinity() {
+    legacy_config="$1"
+    [ -f "$legacy_config" ] || return 1
+    for expected in \
+        enabled=1 \
+        ebpf=1 \
+        default_class=balanced \
+        exclude_packages= \
+        scan_interval_ms=1000 \
+        load_learning=1 \
+        thermal_control=1 \
+        thermal_warm_c=75 \
+        thermal_severe_c=100; do
+        grep -qx "$expected" "$legacy_config" || return 1
+    done
+    grep -Ev '^(enabled=1|ebpf=1|default_class=balanced|efficiency_cpus=|balanced_cpus=|performance_cpus=|exclude_packages=|scan_interval_ms=1000|load_learning=1|thermal_control=1|thermal_warm_c=75|thermal_severe_c=100|[[:space:]]*)$' "$legacy_config" | grep -q . && return 1
+    return 0
+}
+
 OLD_MODDIR="/data/adb/modules/Corona"
 mkdir -p "$MODPATH/config"
 mkdir -p "$MODPATH/scripts.d"
@@ -60,6 +101,10 @@ if [ -d "$OLD_MODDIR/config" ]; then
 fi
 if [ -d "$OLD_MODDIR/scripts.d" ]; then
     cp -af "$OLD_MODDIR/scripts.d/." "$MODPATH/scripts.d/"
+fi
+if is_legacy_default_auto_affinity "$MODPATH/config/auto_affinity.conf"; then
+    rm -f "$MODPATH/config/auto_affinity.conf" "$MODPATH/config/.auto_affinity_state"
+    ui_print "- 移除旧版默认自动优化配置"
 fi
 
 rm -rf "$MODPATH/config/.app_policy_effective" "$MODPATH/config"/.app_policy_effective.next.* "$MODPATH/.app_policy_effective" "$MODPATH"/.app_policy_effective.next.*

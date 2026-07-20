@@ -1268,6 +1268,20 @@ body.theme-dark .cpu-core .cpu-core-load.has-usage {
     color: var(--danger);
 }
 
+.cpu-core.locked,
+.setting-section.feature-disabled,
+.switch-container.feature-disabled,
+.option-list.feature-disabled {
+    opacity: 0.45;
+    filter: saturate(0.35);
+}
+
+.cpu-core.locked,
+.feature-disabled .option-item,
+.option-item.feature-disabled {
+    cursor: not-allowed;
+}
+
 .cpu-cluster-badge {
     background: var(--primary-dim);
     color: var(--primary);

@@ -6,7 +6,7 @@ ZRAM_CONF="$MODDIR/config/zram.conf"
 LOOP_CONF="$MODDIR/config/loop.conf"
 
 official_zram_ready() {
-  awk 'NR > 1 && ($1 ~ /^\/dev\/block\/zram/ || $1 ~ /^\/dev\/zram/) { found=1; exit } END { exit found ? 0 : 1 }' /proc/swaps 2>/dev/null
+  awk 'NR > 1 { dev=$1; sub(/^.*\//, "", dev); if (dev ~ /^zram[0-9]+$/) { found=1; exit } } END { exit found ? 0 : 1 }' /proc/swaps 2>/dev/null
 }
 
 wait_for_official_zram() {

@@ -4,6 +4,7 @@
     if (window.CoronaFeatureScripts['runtime-optimizer']) return;
 
     const CONFIG_FILE = 'auto_affinity.conf';
+    const DAEMON_CONFIG_FILE = 'coronad.conf';
     const CONFIG_ORDER = [
         'enabled', 'ebpf', 'default_class', 'efficiency_cpus', 'balanced_cpus',
         'performance_cpus', 'exclude_packages', 'scan_interval_ms', 'load_learning',
@@ -36,6 +37,9 @@
             });
             ['runtime-enabled-switch', 'runtime-ebpf-switch', 'runtime-load-learning-switch', 'runtime-thermal-control-switch'].forEach(id => {
                 document.getElementById(id)?.addEventListener('change', () => this.scheduleRuntimeOptimizerApply());
+            });
+            document.getElementById('runtime-daemon-switch')?.addEventListener('change', event => {
+                this.setRuntimeDaemonEnabled(event.target.checked);
             });
             ['runtime-efficiency-cpus', 'runtime-balanced-cpus', 'runtime-performance-cpus', 'runtime-scan-interval', 'runtime-warm-threshold', 'runtime-severe-threshold'].forEach(id => {
                 document.getElementById(id)?.addEventListener('change', () => this.scheduleRuntimeOptimizerApply());
@@ -108,7 +112,12 @@
             });
         },
         async loadRuntimeOptimizerConfig() {
-            const config = this.parseRuntimeKeyValues(await this.readConfig(CONFIG_FILE));
+            const [configContent, daemonConfigContent] = await Promise.all([
+                this.readConfig(CONFIG_FILE),
+                this.readConfig(DAEMON_CONFIG_FILE)
+            ]);
+            const config = this.parseRuntimeKeyValues(configContent);
+            const daemonConfig = this.parseRuntimeKeyValues(daemonConfigContent);
             const setChecked = (id, key, fallback) => {
                 const element = document.getElementById(id);
                 if (element) element.checked = (config[key] ?? fallback) === '1';
@@ -117,7 +126,9 @@
                 const element = document.getElementById(id);
                 if (element) element.value = config[key] ?? fallback;
             };
-            setChecked('runtime-enabled-switch', 'enabled', '1');
+            const daemonSwitch = document.getElementById('runtime-daemon-switch');
+            if (daemonSwitch) daemonSwitch.checked = (daemonConfig.enabled ?? '0') === '1';
+            setChecked('runtime-enabled-switch', 'enabled', '0');
             setChecked('runtime-ebpf-switch', 'ebpf', '1');
             setChecked('runtime-load-learning-switch', 'load_learning', '1');
             setChecked('runtime-thermal-control-switch', 'thermal_control', '1');
@@ -128,6 +139,24 @@
             setValue('runtime-scan-interval', 'scan_interval_ms', '1000');
             setValue('runtime-warm-threshold', 'thermal_warm_c', '75');
             setValue('runtime-severe-threshold', 'thermal_severe_c', '100');
+        },
+        async setRuntimeDaemonEnabled(enabled) {
+            const daemonSwitch = document.getElementById('runtime-daemon-switch');
+            if (daemonSwitch) daemonSwitch.disabled = true;
+            this.showLoading(true);
+            try {
+                await this.mergeConfigFile(DAEMON_CONFIG_FILE, { enabled: enabled ? '1' : '0' }, ['enabled']);
+                await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --sync-daemon`);
+                await this.sleep(500);
+                await this.refreshRuntimeOptimizer();
+                this.showToast(this.t(enabled ? 'runtimeDaemonEnabled' : 'runtimeDaemonDisabled'));
+            } catch (error) {
+                if (daemonSwitch) daemonSwitch.checked = !enabled;
+                this.showToast(this.t('runtimeDaemonApplyFailed'), 'error');
+            } finally {
+                if (daemonSwitch) daemonSwitch.disabled = false;
+                this.showLoading(false);
+            }
         },
         runtimeNumberValue(id, fallback, minimum, maximum) {
             const value = Number.parseInt(document.getElementById(id)?.value, 10);
@@ -154,7 +183,7 @@
             if (!options.silent) this.showLoading(true);
             try {
                 await this.mergeConfigFile(CONFIG_FILE, updates, CONFIG_ORDER);
-                await this.exec(`${this.shellQuote(`${this.modDir}/bin/coronad`)} reload >/dev/null 2>&1`);
+                await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --sync-daemon`);
                 await this.sleep(350);
                 await this.loadRuntimeOptimizerConfig();
                 await this.refreshRuntimeOptimizer();
@@ -170,8 +199,7 @@
         async restartRuntimeOptimizer() {
             this.showLoading(true);
             try {
-                const binary = this.shellQuote(`${this.modDir}/bin/coronad`);
-                await this.exec(`${binary} stop >/dev/null 2>&1; ${binary} start >/dev/null 2>&1`);
+                await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --sync-daemon`);
                 await this.sleep(500);
                 await this.refreshRuntimeOptimizer();
                 this.showToast(this.t('runtimeRestarted'));

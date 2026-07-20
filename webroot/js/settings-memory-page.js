@@ -194,17 +194,19 @@
     },
     renderReadaheadOptions() {
         const container = document.getElementById('readahead-list');
-        container.innerHTML = this.readaheadOptions.map(size => `<div class="option-item ${size === this.state.readahead ? 'selected' : ''}" data-value="${size}">${size}</div>`).join('');
+        const supported = this.ioFeatureSupport?.read_ahead_kb !== false;
+        container.innerHTML = this.readaheadOptions.map(size => `<div class="option-item ${size === this.state.readahead ? 'selected' : ''} ${supported ? '' : 'feature-disabled'}" data-value="${size}" aria-disabled="${supported ? 'false' : 'true'}">${size}</div>`).join('');
         container.querySelectorAll('.option-item').forEach(item => {
-            item.addEventListener('click', async (e) => { container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.readahead = parseInt(e.currentTarget.dataset.value); await this.applyReadaheadImmediate(); });
+            item.addEventListener('click', async (e) => { if (!supported) return; container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.readahead = parseInt(e.currentTarget.dataset.value); await this.applyReadaheadImmediate(); });
         });
     },
-    renderDiscreteOptions(containerId, values, currentValue, formatter, onSelect) {
+    renderDiscreteOptions(containerId, values, currentValue, formatter, onSelect, supported = true) {
         const container = document.getElementById(containerId);
         if (!container) return;
-        container.innerHTML = values.map(value => `<div class="option-item ${value === currentValue ? 'selected' : ''}" data-value="${value}">${formatter ? formatter(value) : value}</div>`).join('');
+        container.innerHTML = values.map(value => `<div class="option-item ${value === currentValue ? 'selected' : ''} ${supported ? '' : 'feature-disabled'}" data-value="${value}" aria-disabled="${supported ? 'false' : 'true'}">${formatter ? formatter(value) : value}</div>`).join('');
         container.querySelectorAll('.option-item').forEach(item => {
             item.addEventListener('click', async (e) => {
+                if (!supported) return;
                 container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
                 e.currentTarget.classList.add('selected');
                 await onSelect(e.currentTarget.dataset.value);
@@ -228,19 +230,20 @@
         this.renderDiscreteOptions('io-nr-requests-list', this.ioNrRequestsOptions, this.state.ioNrRequests, null, async (value) => {
             this.state.ioNrRequests = parseInt(value);
             await this.applyIOConfigImmediate('nr_requests');
-        });
+        }, this.ioFeatureSupport?.nr_requests !== false);
         this.renderDiscreteOptions('io-rq-affinity-list', this.ioRqAffinityOptions, this.state.ioRqAffinity, null, async (value) => {
             this.state.ioRqAffinity = parseInt(value);
             await this.applyIOConfigImmediate('rq_affinity');
-        });
+        }, this.ioFeatureSupport?.rq_affinity !== false);
         this.renderDiscreteOptions('io-nomerges-list', this.ioNomergesOptions, this.state.ioNomerges, null, async (value) => {
             this.state.ioNomerges = parseInt(value);
             await this.applyIOConfigImmediate('nomerges');
-        });
+        }, this.ioFeatureSupport?.nomerges !== false);
         const iostatsSwitch = document.getElementById('io-iostats-switch');
         if (iostatsSwitch && !iostatsSwitch.dataset.bound) {
             iostatsSwitch.dataset.bound = '1';
             iostatsSwitch.addEventListener('change', async (e) => {
+                if (!this.ioFeatureSupport?.iostats) return;
                 this.state.ioIostats = e.target.checked;
                 await this.applyIOConfigImmediate('iostats');
             });

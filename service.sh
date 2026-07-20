@@ -73,14 +73,20 @@ wait_until_boot_complete() { until [ "$(getprop sys.boot_completed)" = "1" ]; do
 wait_until_login() { until [ -d "/data/data/android" ]; do sleep 5; done; }
 has_mm_sys_entry() { [ -f /odm/etc/init.oplus.mm-sys.sh ]; }
 get_active_zram_dev() {
-    awk 'NR > 1 && ($1 ~ /^\/dev\/block\/zram/ || $1 ~ /^\/dev\/zram/) { print $1; exit }' /proc/swaps 2>/dev/null
+    block=$(awk 'NR > 1 { dev=$1; sub(/^.*\//, "", dev); if (dev ~ /^zram[0-9]+$/) { print dev; exit } }' /proc/swaps 2>/dev/null)
+    [ -n "$block" ] || return 1
+    for candidate in "/dev/block/$block" "/dev/$block"; do
+        [ -e "$candidate" ] || continue
+        echo "$candidate"
+        return 0
+    done
+    return 1
 }
 
 get_active_zram_block() {
     dev=$(get_active_zram_dev)
     [ -n "$dev" ] || return 1
-    dev=${dev#/dev/block/}
-    dev=${dev#/dev/}
+    dev=${dev##*/}
     [ -d "/sys/block/$dev" ] || return 1
     echo "$dev"
 }
@@ -535,15 +541,13 @@ normalize_zram_path() {
 }
 
 get_zram_block() {
-    zram_block="$1"
-    zram_block=${zram_block#/dev/block/}
-    zram_block=${zram_block#/dev/}
+    zram_block=${1##*/}
     [ -n "$zram_block" ] && [ -d "/sys/block/$zram_block" ] || return 1
     echo "$zram_block"
 }
 
 get_swap_priority() {
-    awk -v dev="$1" 'NR > 1 && $1 == dev { print $5; exit }' /proc/swaps 2>/dev/null
+    awk -v dev="$1" 'BEGIN { sub(/^.*\//, "", dev) } NR > 1 { current=$1; sub(/^.*\//, "", current); if (current == dev) { print $5; exit } }' /proc/swaps 2>/dev/null
 }
 
 get_active_zram_algorithm() {
@@ -820,10 +824,9 @@ update_module_description() {
         [ -z "$current_alg" ] && current_alg="--"
         desc_parts="ZRAM:${current_alg}"
     else
-        current_zram=$(awk 'NR > 1 && ($1 ~ /^\/dev\/block\/zram/ || $1 ~ /^\/dev\/zram/) { print $1; exit }' /proc/swaps 2>/dev/null)
+        current_zram=$(get_active_zram_dev)
         if [ -n "$current_zram" ]; then
-            current_zram_block=${current_zram#/dev/block/}
-            current_zram_block=${current_zram_block#/dev/}
+            current_zram_block=${current_zram##*/}
             scheduler_raw=$(cat "/sys/block/$current_zram_block/comp_algorithm" 2>/dev/null)
             current_alg=$(echo "$scheduler_raw" | sed -n 's/.*\[\([^]]*\)\].*/\1/p')
             [ -z "$current_alg" ] && current_alg=$(echo "$scheduler_raw" | awk '{print $1}')
@@ -906,14 +909,30 @@ should_start_app_policy() {
     return 1
 }
 
+coronad_enabled() {
+    [ "$(get_conf_value "$CONFIG_DIR/coronad.conf" enabled)" = "1" ]
+}
+
+use_coronad() {
+    [ -x "$CORONAD" ] && coronad_enabled
+}
+
 start_app_policy_daemon() {
-    should_start_app_policy || return
-    if [ -x "$CORONAD" ]; then
+    policy_requested=0
+    should_start_app_policy && policy_requested=1
+    if [ "$policy_requested" = "1" ] && use_coronad; then
         legacy_pid=$(cat "$CONFIG_DIR/.app_policy_daemon.pid" 2>/dev/null)
         [ -n "$legacy_pid" ] && kill -TERM "$legacy_pid" 2>/dev/null
         rm -f "$CONFIG_DIR/.app_policy_daemon.pid" "$CONFIG_DIR/.app_policy_state"
         [ -f "$CONFIG_DIR/.memory_pressure.pid" ] && /system/bin/sh "$MODDIR/scripts/memory-pressure.sh" stop >/dev/null 2>&1
         CORONA_MODDIR="$MODDIR" "$CORONAD" reload >/dev/null 2>&1
+        return
+    fi
+    [ -x "$CORONAD" ] && CORONA_MODDIR="$MODDIR" "$CORONAD" stop >/dev/null 2>&1
+    if [ "$policy_requested" != "1" ]; then
+        legacy_pid=$(cat "$CONFIG_DIR/.app_policy_daemon.pid" 2>/dev/null)
+        [ -n "$legacy_pid" ] && kill -TERM "$legacy_pid" 2>/dev/null
+        rm -f "$CONFIG_DIR/.app_policy_daemon.pid" "$CONFIG_DIR/.app_policy_state"
         return
     fi
     if [ -f "$CONFIG_DIR/.app_policy_daemon.pid" ]; then
@@ -929,7 +948,7 @@ start_app_policy_daemon() {
 apply_memory_pressure_config() {
     helper="$MODDIR/scripts/memory-pressure.sh"
     [ -f "$helper" ] || return 0
-    if [ -x "$CORONAD" ]; then
+    if use_coronad; then
         [ -f "$CONFIG_DIR/.memory_pressure.pid" ] && /system/bin/sh "$helper" stop >/dev/null 2>&1
         if [ -f "$CONFIG_DIR/memory_pressure.conf" ]; then
             cp -f "$CONFIG_DIR/memory_pressure.conf" "$CONFIG_DIR/.memory_pressure.runtime.conf"
@@ -1002,7 +1021,7 @@ apply_runtime_config_name() {
         process_priority.conf) apply_process_priority_config ;;
         thread_priority.conf)
             corona_pid=$(cat "$CONFIG_DIR/.coronad.pid" 2>/dev/null)
-            if [ -x "$CORONAD" ] && [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ]; then
+            if use_coronad && [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ]; then
                 :
             else
                 apply_thread_priority_config
@@ -1055,6 +1074,13 @@ fi
 if [ "$1" = "--apply-writeback-block" ]; then
     apply_writeback_block_config
     exit $?
+fi
+
+if [ "$1" = "--sync-daemon" ]; then
+    mkdir -p "$CONFIG_DIR"
+    start_app_policy_daemon
+    apply_memory_pressure_config
+    exit 0
 fi
 
 wait_until_boot_complete

@@ -609,7 +609,7 @@ CoronaAddon.prototype.toggleAppPolicyPackage = async function(mode, pkg) {
     this.refreshAppPolicyPackage(pkg, { reorder: true, toast: `${pkg} 已${adding ? '加入' : '移出'}${label}` });
     if (key === 'affinityExclude') {
         await this.mergeConfigFile('auto_affinity.conf', { exclude_packages: nextItems.join(',') }, ['enabled', 'ebpf', 'default_class', 'efficiency_cpus', 'balanced_cpus', 'performance_cpus', 'exclude_packages', 'scan_interval_ms', 'load_learning', 'thermal_control', 'thermal_warm_c', 'thermal_severe_c']);
-        await this.exec(`${this.shellQuote(`${this.modDir}/bin/coronad`)} reload >/dev/null 2>&1`);
+        await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --sync-daemon`);
         return;
     }
     this.exec(this.getAppPolicyScript('list-set', key, adding ? 'add' : 'del', this.shellQuote(pkg))).catch(() => {});

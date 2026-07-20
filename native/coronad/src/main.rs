@@ -854,7 +854,7 @@ fn load_affinity(paths: &Paths) -> AffinityConfig {
         .unwrap_or("balanced")
         .to_string();
     AffinityConfig {
-        enabled: value_bool(&values, "enabled", true),
+        enabled: value_bool(&values, "enabled", false),
         ebpf: value_bool(&values, "ebpf", true),
         default_class,
         efficiency: values.get("efficiency_cpus").filter(|value| !value.is_empty()).cloned(),
