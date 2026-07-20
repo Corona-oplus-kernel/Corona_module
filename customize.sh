@@ -5,9 +5,15 @@ POSTFSDATA=false
 
 BRAND=$(getprop ro.product.brand | tr '[:upper:]' '[:lower:]')
 MANUFACTURER=$(getprop ro.product.manufacturer | tr '[:upper:]' '[:lower:]')
-if [ "$BRAND" != "oneplus" ] && [ "$MANUFACTURER" != "oneplus" ] && [ "$BRAND" != "oplus" ] && [ "$MANUFACTURER" != "oplus" ]; then
+is_supported_brand() {
+    case "$1" in
+        oneplus|oplus|oppo|realme) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+if ! is_supported_brand "$BRAND" && ! is_supported_brand "$MANUFACTURER"; then
     ui_print "================================================"
-    ui_print " 错误：此模块仅支持 OnePlus/一加 设备"
+    ui_print " 错误：此模块仅支持 OPPO / 一加 / 真我 设备"
     ui_print " 当前品牌: $(getprop ro.product.brand)"
     ui_print "================================================"
     abort "不支持的设备，安装中止"

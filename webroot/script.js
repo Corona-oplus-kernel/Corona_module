@@ -207,13 +207,6 @@ class CoronaAddon {
         this.showInitOverlay(true, this.t('initDefault'));
         try {
             this.updateInitOverlayMessage(this.t('initResolve'));
-            const brand = (await this.exec('getprop ro.product.brand')).toLowerCase();
-            const manufacturer = (await this.exec('getprop ro.product.manufacturer')).toLowerCase();
-            const allowedBrands = new Set(['oneplus', 'oplus', 'oppo', 'realme']);
-            if (!allowedBrands.has(brand) && !allowedBrands.has(manufacturer)) {
-                this.showUnsupportedDevice(brand || manufacturer);
-                return;
-            }
             this.updateInitOverlayMessage(this.t('initPrepare'));
             await this.ensureConfigDir();
             await this.loadRuntimeConfig();

@@ -2126,11 +2126,6 @@
         const text = document.getElementById('loading')?.querySelector('.loading-text');
         if (text) text.textContent = message || this.t('initDefault');
     },
-    showUnsupportedDevice(brand) {
-        document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;padding:24px;text-align:center;font-family:system-ui,sans-serif">
-            <div><h2 style="color:#e53935;margin-bottom:12px">${this.t('unsupportedTitle')}</h2>
-            <p style="color:#666;font-size:14px">${this.t('unsupportedBody')}<br>Brand: ${brand}</p></div></div>`;
-    },
     showLoading(show) {
         if (this.isInitializing) return;
         const el = document.getElementById('loading');

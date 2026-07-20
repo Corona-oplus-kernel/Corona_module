@@ -8,12 +8,6 @@ CORONAD="$MODDIR/bin/coronad"
 THREAD_PRIORITY_FILE="$CONFIG_DIR/thread_priority.conf"
 WRITEBACK_HELPER="$MODDIR/scripts/zram-writeback.sh"
 
-BRAND=$(getprop ro.product.brand | tr '[:upper:]' '[:lower:]')
-MANUFACTURER=$(getprop ro.product.manufacturer | tr '[:upper:]' '[:lower:]')
-if [ "$BRAND" != "oneplus" ] && [ "$MANUFACTURER" != "oneplus" ] && [ "$BRAND" != "oplus" ] && [ "$MANUFACTURER" != "oplus" ]; then
-    exit 0
-fi
-
 set_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/dev/null; }
 lock_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/dev/null && chmod 444 "$2" 2>/dev/null; }
 get_conf_value() { [ -f "$1" ] && grep -m1 "^$2=" "$1" | cut -d'=' -f2-; }
