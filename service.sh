@@ -7,6 +7,7 @@ APP_POLICY_SH="$MODDIR/app_policy.sh"
 CORONAD="$MODDIR/bin/coronad"
 THREAD_PRIORITY_FILE="$CONFIG_DIR/thread_priority.conf"
 WRITEBACK_HELPER="$MODDIR/scripts/zram-writeback.sh"
+ZRAM_POLICY_HELPER="$MODDIR/scripts/zram-policy.sh"
 
 set_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/dev/null; }
 lock_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/dev/null && chmod 444 "$2" 2>/dev/null; }
@@ -22,6 +23,9 @@ migrate_runtime_state_files() {
         .memory_pressure.baseline \
         .memory_pressure.runtime.conf \
         .memory_pressure.pid \
+        .zram_policy.pid \
+        .zram_policy_state \
+        .zram_policy.baseline \
         .auto_affinity_state \
         .app_policy_daemon.pid \
         .app_policy_state \
@@ -962,6 +966,16 @@ apply_memory_pressure_config() {
     CORONA_PRESSURE_CONFIG="$CONFIG_DIR/memory_pressure.conf" /system/bin/sh "$helper" apply >/dev/null 2>&1
 }
 
+apply_zram_policy_config() {
+    [ -x "$ZRAM_POLICY_HELPER" ] || return 0
+    /system/bin/sh "$ZRAM_POLICY_HELPER" apply >/dev/null 2>&1
+}
+
+start_zram_policy_daemon() {
+    [ -x "$ZRAM_POLICY_HELPER" ] || return 0
+    /system/bin/sh "$ZRAM_POLICY_HELPER" start >/dev/null 2>&1
+}
+
 apply_runtime_configs() {
     get_system_info
     mkdir -p "$CONFIG_DIR"
@@ -1083,15 +1097,23 @@ if [ "$1" = "--sync-daemon" ]; then
     exit 0
 fi
 
+if [ "$1" = "--sync-zram-policy" ]; then
+    mkdir -p "$CONFIG_DIR"
+    apply_zram_policy_config
+    exit 0
+fi
+
 wait_until_boot_complete
 wait_until_login
 trigger_official_nandswap_once
 apply_writeback_block_config
 apply_runtime_configs
+apply_zram_policy_config
 rm -rf "$MODDIR/config/.app_policy_effective" "$MODDIR/config"/.app_policy_effective.next.*
 apply_fstrim_config
 run_user_scripts
 start_app_policy_daemon
+start_zram_policy_daemon
 
 sleep 30
 trigger_official_nandswap_once
@@ -1105,6 +1127,7 @@ if ! has_mm_sys_entry; then
     apply_kswapd_config
 fi
 start_app_policy_daemon
+start_zram_policy_daemon
 update_module_description
 
 exit 0

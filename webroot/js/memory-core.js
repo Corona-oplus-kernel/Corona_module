@@ -542,6 +542,7 @@
                 if (typeof this.initSliderProgress === 'function') this.initSliderProgress();
                 if (typeof this.initSwapSettings === 'function') this.initSwapSettings();
                 if (typeof this.initMemoryPressureSettings === 'function') this.initMemoryPressureSettings();
+                if (typeof this.initZramPolicySettings === 'function') this.initZramPolicySettings();
                 if (typeof this.initVmSettings === 'function') this.initVmSettings();
                 if (typeof this.initZramWriteback === 'function') this.initZramWriteback();
                 if (typeof this.initZstdLevel === 'function') this.initZstdLevel();
@@ -785,7 +786,8 @@
             this.loadTCPConfig(),
             this.loadCpuCores(),
             this.loadSwapStatus(),
-            this.loadMemoryPressureConfig()
+            this.loadMemoryPressureConfig(),
+            this.loadZramPolicyConfig()
         ];
         await Promise.all(tasks);
         this.updateCpuControlSupport();
@@ -2517,6 +2519,61 @@
                 setTimeout(() => overlay.remove(), 300);
             }
         });
+    },
+    initZramPolicySettings() {
+        const toggle = document.getElementById('zram-policy-switch');
+        if (!toggle || toggle.dataset.bound) return;
+        toggle.dataset.bound = '1';
+        toggle.addEventListener('change', async () => {
+            const enabled = toggle.checked;
+            toggle.disabled = true;
+            try {
+                await this.mergeConfigFile('zram_policy.conf', { enabled: enabled ? '1' : '0' }, ['enabled']);
+                await this.exec(`/system/bin/sh ${this.shellQuote(`${this.modDir}/service.sh`)} --sync-zram-policy`);
+                await this.sleep(500);
+                await this.loadZramPolicyStatus();
+                this.showToast(this.t(enabled ? 'zramPolicyEnabled' : 'zramPolicyDisabled'));
+            } catch (error) {
+                toggle.checked = !enabled;
+                this.showToast(this.t('zramPolicyApplyFailed'), 'error');
+            } finally {
+                toggle.disabled = false;
+            }
+        });
+    },
+    async loadZramPolicyConfig() {
+        const config = this.parseIoConfig(await this.readConfig('zram_policy.conf'));
+        const toggle = document.getElementById('zram-policy-switch');
+        if (toggle) toggle.checked = config.enabled === '1';
+        return this.loadZramPolicyStatus();
+    },
+    async loadZramPolicyStatus() {
+        const status = this.parseIoConfig(await this.exec(`/system/bin/sh ${this.shellQuote(`${this.modDir}/scripts/zram-policy.sh`)} status 2>/dev/null`));
+        const supported = status.supported === '1';
+        const running = status.running === '1';
+        const badge = document.getElementById('zram-policy-status');
+        if (badge) badge.textContent = this.t(!supported ? 'unsupported' : running ? 'running' : 'inactive');
+        const setText = (id, value) => {
+            const element = document.getElementById(id);
+            if (element) element.textContent = value || '--';
+        };
+        setText('zram-policy-usage', status.usage_percent ? `${status.usage_percent}%` : '--');
+        setText('zram-policy-overhead', status.overhead_mb ? `${status.overhead_mb} MB` : '--');
+        setText('zram-policy-pressure', status.pressure_avg10 ? `${status.pressure_avg10}%` : '--');
+        setText('zram-policy-oplus', status.oplus_vm_swappiness ? `${status.oplus_vm_swappiness} / ${status.oplus_direct_swappiness || '--'} / ${status.oplus_swapd_swappiness || '--'}` : '--');
+        setText('zram-policy-writeback', running ? (status.hybridswap_paused === '1' ? this.t('zramPolicyWritebackPaused') : this.t('zramPolicyWritebackAllowed')) : '--');
+        const dailyWriteback = Number.parseInt(status.hybridswap_daily_mb || '0', 10);
+        const dailyQuota = Number.parseInt(status.hybridswap_quota_mb || '0', 10);
+        setText('zram-policy-daily-writeback', dailyQuota > 0 ? `${dailyWriteback} / ${dailyQuota} MB` : dailyWriteback > 0 ? `${dailyWriteback} MB` : '--');
+        const actionKey = {
+            recompress: 'zramPolicyActionRecompress',
+            compact: 'zramPolicyActionCompact',
+            idle: 'zramPolicyActionIdle'
+        }[status.last_action] || 'zramPolicyActionIdle';
+        const saved = Number.parseInt(status.recompress_saved_mb || '0', 10);
+        const actionText = this.t(actionKey);
+        setText('zram-policy-action', running ? (saved > 0 && status.last_action === 'recompress' ? `${actionText} (-${saved} MB)` : actionText) : '--');
+        return { supported, running };
     },
     initMemoryPressureSettings() {
         const toggle = document.getElementById('memory-pressure-switch');

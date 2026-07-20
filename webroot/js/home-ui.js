@@ -643,6 +643,7 @@
         const subCards = [
             { toggle: 'zram-toggle', content: 'zram-content', onExpand: () => this.startZramMetricsRefresh(), onCollapse: () => this.stopZramMetricsRefresh() },
             { toggle: 'zram-loop-toggle', content: 'zram-loop-body', onExpand: () => this.refreshZramLoopDevice(false) },
+            { toggle: 'zram-policy-toggle', content: 'zram-policy-content', onExpand: () => this.loadZramPolicyStatus() },
             { toggle: 'memory-pressure-toggle', content: 'memory-pressure-content', onExpand: () => this.loadMemoryPressureStatus() },
             { toggle: 'swap-toggle', content: 'swap-content', onExpand: () => this.loadSwapStatus() },
             { toggle: 'lru-toggle', content: 'lru-content', onExpand: null },
@@ -948,7 +949,7 @@
     },
     getDetailedResetConfigs() {
         return [
-            { key: 'resetConfigZram', files: ['zram.conf'] },
+            { key: 'resetConfigZram', files: ['zram.conf', 'zram_policy.conf'] },
             { key: 'resetConfigLoop', files: ['loop.conf'] },
             { key: 'resetConfigPressure', files: ['memory_pressure.conf'] },
             { key: 'resetConfigSwap', files: ['swap.conf'] },
@@ -1023,7 +1024,7 @@
     },
     getResetScopeFiles(scope) {
         const groups = {
-            memory: ['zram.conf', 'loop.conf', 'memory_pressure.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'le9ec.conf', 'lmk.conf', 'reclaim.conf', 'kswapd.conf'],
+            memory: ['zram.conf', 'zram_policy.conf', 'loop.conf', 'memory_pressure.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'le9ec.conf', 'lmk.conf', 'reclaim.conf', 'kswapd.conf'],
             system: ['io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'corona_kernel.conf', 'device.conf', 'protect.conf', 'fstrim.conf'],
             scripts: ['custom_scripts.b64'],
             snapshots: ['parameter_snapshots.b64'],

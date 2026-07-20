@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" id="theme-color-meta" content="#1783e8">
     <title data-i18n="text_3f923c3a"></title>
-    <link rel="stylesheet" href="style.css?v=2026072004">
+    <link rel="stylesheet" href="style.css?v=2026072005">
     <link rel="stylesheet" href="css/components.css?v=2026071552">
-    <link rel="stylesheet" href="css/pages/settings.css?v=2026072004">
+    <link rel="stylesheet" href="css/pages/settings.css?v=2026072005">
     <link rel="stylesheet" href="css/animations.css?v=2026071552">
     <script>
     (function () {
@@ -511,6 +511,37 @@
                                 <div class="zram-actions-sep"></div>
                                 <button type="button" class="action-btn loop-action-btn" id="zram-loop-action" data-i18n="applyWritebackBlock"></button>
                             </div>
+                        </div>
+                    </div>
+                    <div class="sub-card" id="zram-policy-sub">
+                        <div class="sub-card-header" id="zram-policy-toggle">
+                            <span class="sub-card-title" data-i18n="zramAdaptivePolicy"></span>
+                            <span class="current-badge" id="zram-policy-status" data-i18n="inactive"></span>
+                            <span class="expand-icon">❯</span>
+                        </div>
+                        <div id="zram-policy-content" class="sub-expandable-content">
+                            <div class="zram-status-card">
+                                <div class="info-list">
+                                    <div class="info-item"><span class="info-label" data-i18n="zramPolicyUsage"></span><span class="info-value" id="zram-policy-usage">--</span></div>
+                                    <div class="info-item"><span class="info-label" data-i18n="zramPolicyOverhead"></span><span class="info-value" id="zram-policy-overhead">--</span></div>
+                                    <div class="info-item"><span class="info-label" data-i18n="pressurePsiAvg10"></span><span class="info-value" id="zram-policy-pressure">--</span></div>
+                                    <div class="info-item"><span class="info-label" data-i18n="zramPolicyOplusSwap"></span><span class="info-value" id="zram-policy-oplus">--</span></div>
+                                    <div class="info-item"><span class="info-label" data-i18n="zramPolicyWriteback"></span><span class="info-value" id="zram-policy-writeback">--</span></div>
+                                    <div class="info-item"><span class="info-label" data-i18n="zramPolicyDailyWriteback"></span><span class="info-value" id="zram-policy-daily-writeback">--</span></div>
+                                    <div class="info-item"><span class="info-label" data-i18n="zramPolicyLastAction"></span><span class="info-value" id="zram-policy-action">--</span></div>
+                                </div>
+                            </div>
+                            <div class="switch-container">
+                                <div class="switch-info">
+                                    <span class="switch-label" data-i18n="enableZramAdaptivePolicy"></span>
+                                    <span class="switch-desc" data-i18n="zramAdaptivePolicyDesc"></span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="zram-policy-switch">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="setting-hint" data-i18n="zramAdaptivePolicyHint"></div>
                         </div>
                     </div>
                     <div class="sub-card" id="memory-pressure-sub">
@@ -2076,6 +2107,6 @@
         </div>
     </div>
     </div>
-    <script src="script.js?v=2026072004" defer></script>
+    <script src="script.js?v=2026072005" defer></script>
 </body>
 </html>

@@ -52,6 +52,7 @@ chmod 755 "$MODPATH/service.sh" 2>/dev/null
 chmod 755 "$MODPATH/uninstall.sh" 2>/dev/null
 chmod 755 "$MODPATH/app_policy.sh" 2>/dev/null
 chmod 755 "$MODPATH/scripts/zram-writeback.sh" 2>/dev/null
+chmod 755 "$MODPATH/scripts/zram-policy.sh" 2>/dev/null
 chmod 755 "$MODPATH/scripts/apply-loop.sh" 2>/dev/null
 chmod 755 "$MODPATH/scripts/memory-pressure.sh" 2>/dev/null
 chmod 755 "$MODPATH/scripts/auto-affinity.sh" 2>/dev/null
