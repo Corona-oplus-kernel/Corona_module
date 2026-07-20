@@ -36,7 +36,10 @@
                 });
             });
             ['runtime-enabled-switch', 'runtime-ebpf-switch', 'runtime-load-learning-switch', 'runtime-thermal-control-switch'].forEach(id => {
-                document.getElementById(id)?.addEventListener('change', () => this.scheduleRuntimeOptimizerApply());
+                document.getElementById(id)?.addEventListener('change', event => {
+                    if (this.rejectDaemonDependentToggle(event.currentTarget)) return;
+                    this.scheduleRuntimeOptimizerApply();
+                });
             });
             document.getElementById('runtime-daemon-switch')?.addEventListener('change', event => {
                 this.setRuntimeDaemonEnabled(event.target.checked);
@@ -97,7 +100,19 @@
             const key = state === 'saving' ? 'runtimeAutoSaving' : state === 'error' ? 'runtimeAutoSaveFailed' : 'runtimeAutoSaved';
             element.textContent = this.t(key);
         },
+        isRuntimeDaemonEnabled() {
+            return this.state.runtimeDaemonEnabled === true;
+        },
+        rejectDaemonDependentToggle(toggle) {
+            if (!toggle?.checked || this.isRuntimeDaemonEnabled()) return false;
+            this.showToast(this.t('runtimeDaemonRequired'), 'warning');
+            setTimeout(() => {
+                toggle.checked = false;
+            }, 180);
+            return true;
+        },
         scheduleRuntimeOptimizerApply() {
+            if (!this.isRuntimeDaemonEnabled()) return;
             this.setRuntimeSaveState('saving');
             if (this.runtimeOptimizerApplyTimer) clearTimeout(this.runtimeOptimizerApplyTimer);
             this.runtimeOptimizerApplyTimer = setTimeout(() => {
@@ -118,20 +133,22 @@
             ]);
             const config = this.parseRuntimeKeyValues(configContent);
             const daemonConfig = this.parseRuntimeKeyValues(daemonConfigContent);
+            const daemonEnabled = (daemonConfig.enabled ?? '0') === '1';
+            this.state.runtimeDaemonEnabled = daemonEnabled;
             const setChecked = (id, key, fallback) => {
                 const element = document.getElementById(id);
-                if (element) element.checked = (config[key] ?? fallback) === '1';
+                if (element) element.checked = daemonEnabled && (config[key] ?? fallback) === '1';
             };
             const setValue = (id, key, fallback = '') => {
                 const element = document.getElementById(id);
                 if (element) element.value = config[key] ?? fallback;
             };
             const daemonSwitch = document.getElementById('runtime-daemon-switch');
-            if (daemonSwitch) daemonSwitch.checked = (daemonConfig.enabled ?? '0') === '1';
+            if (daemonSwitch) daemonSwitch.checked = daemonEnabled;
             setChecked('runtime-enabled-switch', 'enabled', '0');
-            setChecked('runtime-ebpf-switch', 'ebpf', '1');
-            setChecked('runtime-load-learning-switch', 'load_learning', '1');
-            setChecked('runtime-thermal-control-switch', 'thermal_control', '1');
+            setChecked('runtime-ebpf-switch', 'ebpf', '0');
+            setChecked('runtime-load-learning-switch', 'load_learning', '0');
+            setChecked('runtime-thermal-control-switch', 'thermal_control', '0');
             this.selectRuntimeClass(config.default_class || 'balanced');
             setValue('runtime-efficiency-cpus', 'efficiency_cpus');
             setValue('runtime-balanced-cpus', 'balanced_cpus');
@@ -142,15 +159,24 @@
         },
         async setRuntimeDaemonEnabled(enabled) {
             const daemonSwitch = document.getElementById('runtime-daemon-switch');
+            const previous = this.isRuntimeDaemonEnabled();
+            if (!enabled && this.runtimeOptimizerApplyTimer) {
+                clearTimeout(this.runtimeOptimizerApplyTimer);
+                this.runtimeOptimizerApplyTimer = null;
+                this.setRuntimeSaveState('saved');
+            }
             if (daemonSwitch) daemonSwitch.disabled = true;
             this.showLoading(true);
             try {
                 await this.mergeConfigFile(DAEMON_CONFIG_FILE, { enabled: enabled ? '1' : '0' }, ['enabled']);
                 await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --sync-daemon`);
+                this.state.runtimeDaemonEnabled = enabled;
                 await this.sleep(500);
+                await this.loadRuntimeOptimizerConfig();
                 await this.refreshRuntimeOptimizer();
                 this.showToast(this.t(enabled ? 'runtimeDaemonEnabled' : 'runtimeDaemonDisabled'));
             } catch (error) {
+                this.state.runtimeDaemonEnabled = previous;
                 if (daemonSwitch) daemonSwitch.checked = !enabled;
                 this.showToast(this.t('runtimeDaemonApplyFailed'), 'error');
             } finally {
@@ -164,6 +190,7 @@
             return Math.max(minimum, Math.min(maximum, value));
         },
         async applyRuntimeOptimizerConfig(options = {}) {
+            if (!this.isRuntimeDaemonEnabled()) return false;
             const selectedClass = document.querySelector('#runtime-class-options button.selected')?.dataset.value || 'balanced';
             const warm = this.runtimeNumberValue('runtime-warm-threshold', 75, 35, 100);
             const severe = this.runtimeNumberValue('runtime-severe-threshold', 100, warm + 1, 110);

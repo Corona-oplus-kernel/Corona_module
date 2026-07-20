@@ -589,6 +589,10 @@ CoronaAddon.prototype.toggleAppPolicyPackage = async function(mode, pkg) {
     const previous = [...(this.appPolicy[key] || [])];
     const set = new Set(previous);
     const adding = !set.has(pkg);
+    if (key === 'affinityExclude' && adding && !this.isRuntimeDaemonEnabled()) {
+        this.showToast(this.t('runtimeDaemonRequired'), 'warning');
+        return false;
+    }
     if (adding) set.add(pkg); else set.delete(pkg);
     const nextItems = [...set];
     const label = key === 'whitelist' ? '白名单' : key === 'protect' ? '保护列表' : key === 'affinityExclude' ? '自动绑核排除' : '列表';

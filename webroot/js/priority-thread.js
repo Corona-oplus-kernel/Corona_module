@@ -183,10 +183,11 @@ CoronaAddon.prototype.initThreadRuleUi = function() {
         });
         document.getElementById('thread-io-class')?.addEventListener('change', () => this.updateThreadResourceSummary());
         document.getElementById('thread-affinity-exclude-switch')?.addEventListener('change', async (event) => {
+            if (this.rejectDaemonDependentToggle(event.currentTarget)) return;
             const pkg = this.selectedThreadRulePackage;
             if (!pkg) return;
             await this.toggleAppPolicyPackage('affinityExclude', pkg);
-            event.currentTarget.checked = (this.appPolicy.affinityExclude || []).includes(pkg);
+            event.currentTarget.checked = this.isRuntimeDaemonEnabled() && (this.appPolicy.affinityExclude || []).includes(pkg);
         });
     }
 CoronaAddon.prototype.syncThreadCpuSchedulingUi = function() {
@@ -475,7 +476,7 @@ CoronaAddon.prototype.openThreadRuleManager = async function(pkg, label) {
         const title = document.getElementById('thread-rule-title');
         if (title) title.textContent = `${label || pkg} · 线程规则`;
         const excludeSwitch = document.getElementById('thread-affinity-exclude-switch');
-        if (excludeSwitch) excludeSwitch.checked = (this.appPolicy.affinityExclude || []).includes(pkg);
+        if (excludeSwitch) excludeSwitch.checked = this.isRuntimeDaemonEnabled() && (this.appPolicy.affinityExclude || []).includes(pkg);
         const appRule = (this.threadPriorityRules || []).find(rule => rule.packageName === pkg && rule.threadPattern === '*');
         const appRuleButton = document.getElementById('thread-app-rule-btn');
         if (appRuleButton) appRuleButton.classList.toggle('active', !!appRule || !!this.priorityRules?.[pkg]);
@@ -538,7 +539,7 @@ CoronaAddon.prototype.openThreadRuleEditor = function(ruleKey = null, presetPatt
         if (appInfo) appInfo.innerHTML = `<span class="process-name">${this.escapeHtml(this.selectedThreadRulePackage)}</span>`;
         this.syncThreadCpuSchedulingUi();
         const excludeSwitch = document.getElementById('thread-affinity-exclude-switch');
-        if (excludeSwitch) excludeSwitch.checked = (this.appPolicy.affinityExclude || []).includes(this.selectedThreadRulePackage);
+        if (excludeSwitch) excludeSwitch.checked = this.isRuntimeDaemonEnabled() && (this.appPolicy.affinityExclude || []).includes(this.selectedThreadRulePackage);
         this.syncThreadRuleEditorFields();
         this.setThreadResourceExpanded(false);
         this.setThreadSchedulerExpanded(!!existing && (this.selectedThreadSchedPolicy !== 'normal' || this.selectedThreadRtPrio > 1 || this.selectedThreadWaltBoost || this.selectedThreadWaltPipeline));

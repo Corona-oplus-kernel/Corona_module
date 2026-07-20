@@ -806,6 +806,7 @@
       "runtimeDaemonEnabled": "原生守护进程已开启",
       "runtimeDaemonDisabled": "原生守护进程已关闭，已切换到 Shell 回退",
       "runtimeDaemonApplyFailed": "守护进程设置失败",
+      "runtimeDaemonRequired": "守护进程未开启，请到模块设置中开启",
       "runtimeAutoAffinity": "自动绑核",
       "runtimeAutoAffinityDesc": "根据前台应用、线程负载与运行模式动态选择 CPU",
       "runtimeEbpf": "eBPF 事件加速",

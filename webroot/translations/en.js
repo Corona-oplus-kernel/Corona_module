@@ -806,6 +806,7 @@
       "runtimeDaemonEnabled": "Native daemon enabled",
       "runtimeDaemonDisabled": "Native daemon disabled; using Shell fallback",
       "runtimeDaemonApplyFailed": "Failed to update daemon setting",
+      "runtimeDaemonRequired": "The native daemon is disabled. Enable it in Module Settings.",
       "runtimeAutoAffinity": "Automatic affinity",
       "runtimeAutoAffinityDesc": "Select CPUs dynamically from foreground app, thread load, and runtime mode",
       "runtimeEbpf": "eBPF event acceleration",
