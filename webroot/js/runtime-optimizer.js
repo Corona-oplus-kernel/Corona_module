@@ -149,6 +149,7 @@
         },
         selectRuntimeClass(value) {
             const normalized = ['efficiency', 'balanced', 'performance'].includes(value) ? value : null;
+            this.runtimeSelectedClass = normalized;
             document.querySelectorAll('#runtime-class-options button').forEach(button => {
                 button.classList.toggle('selected', normalized !== null && button.dataset.value === normalized);
             });
@@ -219,7 +220,9 @@
         },
         async applyRuntimeOptimizerConfig(options = {}) {
             if (!this.isRuntimeDaemonEnabled()) return false;
-            const selectedClass = document.querySelector('#runtime-class-options button.selected')?.dataset.value || 'balanced';
+            const selectedClass = ['efficiency', 'balanced', 'performance'].includes(this.runtimeSelectedClass)
+                ? this.runtimeSelectedClass
+                : document.querySelector('#runtime-class-options button.selected')?.dataset.value || 'balanced';
             const warm = this.runtimeNumberValue('runtime-warm-threshold', 75, 35, 100);
             const severe = this.runtimeNumberValue('runtime-severe-threshold', 100, warm + 1, 110);
             const updates = {
