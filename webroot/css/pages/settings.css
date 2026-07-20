@@ -986,12 +986,27 @@ body.theme-dark .option-item {
     font: inherit;
     font-size: 12px;
     font-weight: 700;
+    cursor: pointer;
+    transition: border-color 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .runtime-class-options button.selected {
     border-color: var(--primary-border);
     background: var(--primary-dim);
     color: var(--primary);
+    box-shadow: 0 5px 14px color-mix(in srgb, var(--primary) 18%, transparent);
+    transform: translateY(-1px);
+}
+
+.runtime-class-options button.runtime-class-selecting {
+    animation: runtime-class-select 280ms var(--motion-ease);
+}
+
+@keyframes runtime-class-select {
+    0% { transform: translateY(0) scale(1); }
+    38% { transform: translateY(1px) scale(0.96); }
+    72% { transform: translateY(-2px) scale(1.035); }
+    100% { transform: translateY(-1px) scale(1); }
 }
 
 .runtime-field-grid,
@@ -1105,8 +1120,13 @@ body.theme-dark .runtime-advanced {
     .runtime-settings-content,
     .runtime-settings-arrow,
     .runtime-advanced-content,
-    .runtime-advanced-arrow {
+    .runtime-advanced-arrow,
+    .runtime-class-options button {
         transition-duration: 0.01ms;
+    }
+
+    .runtime-class-options button.runtime-class-selecting {
+        animation: none;
     }
 }
 

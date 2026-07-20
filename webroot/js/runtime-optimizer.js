@@ -35,9 +35,10 @@
             document.querySelectorAll('#runtime-class-options button').forEach(button => {
                 button.addEventListener('click', () => {
                     if (this.rejectDaemonDependentAction()) return;
-                    this.selectRuntimeClass(button.dataset.value);
+                    this.selectRuntimeClass(button.dataset.value, { animate: true });
                     this.scheduleRuntimeOptimizerApply();
                 });
+                button.addEventListener('animationend', () => button.classList.remove('runtime-class-selecting'));
             });
             ['runtime-enabled-switch', 'runtime-ebpf-switch', 'runtime-load-learning-switch', 'runtime-thermal-control-switch'].forEach(id => {
                 document.getElementById(id)?.addEventListener('change', event => {
@@ -149,11 +150,17 @@
                 this.applyRuntimeOptimizerConfig({ silent: true, revision });
             }, 350);
         },
-        selectRuntimeClass(value) {
+        selectRuntimeClass(value, options = {}) {
             const normalized = ['efficiency', 'balanced', 'performance'].includes(value) ? value : null;
             this.runtimeSelectedClass = normalized;
             document.querySelectorAll('#runtime-class-options button').forEach(button => {
-                button.classList.toggle('selected', normalized !== null && button.dataset.value === normalized);
+                const selected = normalized !== null && button.dataset.value === normalized;
+                button.classList.toggle('selected', selected);
+                if (selected && options.animate) {
+                    button.classList.remove('runtime-class-selecting');
+                    void button.offsetWidth;
+                    button.classList.add('runtime-class-selecting');
+                }
             });
         },
         async loadRuntimeOptimizerConfig(options = {}) {
