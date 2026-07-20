@@ -140,11 +140,13 @@
         },
         scheduleRuntimeOptimizerApply() {
             if (!this.isRuntimeDaemonEnabled()) return;
+            const revision = (this.runtimeOptimizerRevision || 0) + 1;
+            this.runtimeOptimizerRevision = revision;
             this.setRuntimeSaveState('saving');
             if (this.runtimeOptimizerApplyTimer) clearTimeout(this.runtimeOptimizerApplyTimer);
             this.runtimeOptimizerApplyTimer = setTimeout(() => {
                 this.runtimeOptimizerApplyTimer = null;
-                this.applyRuntimeOptimizerConfig({ silent: true });
+                this.applyRuntimeOptimizerConfig({ silent: true, revision });
             }, 350);
         },
         selectRuntimeClass(value) {
@@ -154,11 +156,15 @@
                 button.classList.toggle('selected', normalized !== null && button.dataset.value === normalized);
             });
         },
-        async loadRuntimeOptimizerConfig() {
+        async loadRuntimeOptimizerConfig(options = {}) {
+            const loadToken = (this.runtimeOptimizerLoadToken || 0) + 1;
+            this.runtimeOptimizerLoadToken = loadToken;
             const [configContent, daemonConfigContent] = await Promise.all([
                 this.readConfig(CONFIG_FILE),
                 this.readConfig(DAEMON_CONFIG_FILE)
             ]);
+            if (loadToken !== this.runtimeOptimizerLoadToken) return false;
+            if (options.revision !== undefined && options.revision !== (this.runtimeOptimizerRevision || 0)) return false;
             const config = this.parseRuntimeKeyValues(configContent);
             const daemonConfig = this.parseRuntimeKeyValues(daemonConfigContent);
             const daemonEnabled = (daemonConfig.enabled ?? '0') === '1';
@@ -189,6 +195,8 @@
         async setRuntimeDaemonEnabled(enabled) {
             const daemonSwitch = document.getElementById('runtime-daemon-switch');
             const previous = this.isRuntimeDaemonEnabled();
+            const revision = (this.runtimeOptimizerRevision || 0) + 1;
+            this.runtimeOptimizerRevision = revision;
             if (!enabled && this.runtimeOptimizerApplyTimer) {
                 clearTimeout(this.runtimeOptimizerApplyTimer);
                 this.runtimeOptimizerApplyTimer = null;
@@ -201,7 +209,7 @@
                 await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --sync-daemon`);
                 this.state.runtimeDaemonEnabled = enabled;
                 await this.sleep(500);
-                await this.loadRuntimeOptimizerConfig();
+                await this.loadRuntimeOptimizerConfig({ revision });
                 await this.refreshRuntimeOptimizer();
                 this.showToast(this.t(enabled ? 'runtimeDaemonEnabled' : 'runtimeDaemonDisabled'));
             } catch (error) {
@@ -220,6 +228,7 @@
         },
         async applyRuntimeOptimizerConfig(options = {}) {
             if (!this.isRuntimeDaemonEnabled()) return false;
+            const revision = options.revision ?? (this.runtimeOptimizerRevision || 0);
             const selectedClass = ['efficiency', 'balanced', 'performance'].includes(this.runtimeSelectedClass)
                 ? this.runtimeSelectedClass
                 : document.querySelector('#runtime-class-options button.selected')?.dataset.value || 'balanced';
@@ -243,13 +252,17 @@
                 await this.mergeConfigFile(CONFIG_FILE, updates, CONFIG_ORDER);
                 await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --sync-daemon`);
                 await this.sleep(350);
-                await this.loadRuntimeOptimizerConfig();
+                if (revision !== (this.runtimeOptimizerRevision || 0)) return false;
+                await this.loadRuntimeOptimizerConfig({ revision });
+                if (revision !== (this.runtimeOptimizerRevision || 0)) return false;
                 await this.refreshRuntimeOptimizer();
                 this.setRuntimeSaveState('saved');
                 if (!options.silent) this.showToast(this.t('runtimeApplied'));
             } catch (error) {
-                this.setRuntimeSaveState('error');
-                if (!options.silent) this.showToast(this.t('runtimeApplyFailed'), 'error');
+                if (revision === (this.runtimeOptimizerRevision || 0)) {
+                    this.setRuntimeSaveState('error');
+                    if (!options.silent) this.showToast(this.t('runtimeApplyFailed'), 'error');
+                }
             } finally {
                 if (!options.silent) this.showLoading(false);
             }

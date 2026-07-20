@@ -1992,13 +1992,13 @@
     renderCpuCores() {
         const container = document.getElementById('cpu-cores-list');
         if (!container) return;
-        container.innerHTML = this.cpuCores.map(core => `<div class="cpu-core ${core.online ? 'online' : 'offline'} ${core.controllable ? '' : 'locked'}" data-cpu="${core.id}"><div class="cpu-core-id">CPU ${core.id}</div><div class="cpu-core-load" id="cpu-load-${core.id}">${core.online ? '--' : 'OFF'}</div></div>`).join('');
+        container.innerHTML = this.cpuCores.map(core => `<div class="cpu-core ${core.online ? 'online' : 'offline'} ${core.controllable || core.id === 0 ? '' : 'locked'}" data-cpu="${core.id}"><div class="cpu-core-id">CPU ${core.id}</div><div class="cpu-core-load" id="cpu-load-${core.id}">${core.online ? '--' : 'OFF'}</div></div>`).join('');
         container.querySelectorAll('.cpu-core').forEach(item => {
             item.addEventListener('click', async () => {
                 const cpuId = parseInt(item.dataset.cpu);
                 const core = this.cpuCores.find(entry => entry.id === cpuId);
                 if (!core) return;
-                if (!core.controllable) { this.showToast(cpuId === 0 ? 'CPU0 不能被关闭' : this.t('unsupported'), 'warning'); return; }
+                if (!core.controllable) { this.showToast(cpuId === 0 ? this.t('text_7e92b27c') : this.t('unsupported'), 'warning'); return; }
                 const newState = core.online ? '0' : '1';
                 const nextConfig = this.cpuCores.map(c => `cpu${c.id}=${c.id === cpuId ? newState : (c.online ? '1' : '0')}`).join('\n');
                 const confirmed = await this.confirmChangePreview('变更预览', {
