@@ -2567,6 +2567,7 @@
         }[status.memory_backend] || '--';
         setText('zram-policy-backend', running ? backendText : '--');
         setText('zram-policy-reclaim-window', running && status.reclaim_window_mb ? `${status.reclaim_window_mb} MB` : '--');
+        setText('zram-policy-vendor-clean', running ? (status.atomic_clean_disabled === 'true' ? this.t('zramPolicyVendorCleanDisabled') : this.t('zramPolicyVendorCleanDefault')) : '--');
         setText('zram-policy-oplus', status.oplus_vm_swappiness ? `${status.oplus_vm_swappiness} / ${status.oplus_direct_swappiness || '--'} / ${status.oplus_swapd_swappiness || '--'}` : '--');
         setText('zram-policy-writeback', running ? (status.memory_backend === 'erm' ? this.t('zramPolicyWritebackSystem') : status.hybridswap_paused === '1' ? this.t('zramPolicyWritebackPaused') : this.t('zramPolicyWritebackAllowed')) : '--');
         const dailyWriteback = Number.parseInt(status.hybridswap_daily_mb || '0', 10);

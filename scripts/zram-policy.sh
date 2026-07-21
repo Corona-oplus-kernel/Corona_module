@@ -87,24 +87,52 @@ select_memory_profile() {
         PROFILE_WM_DIRECT=196608
         PROFILE_WM_MIN=163840
         PROFILE_ZRAM_INCREASE=2048
+        PROFILE_ZRAM_LIMIT=10240
     elif [ "$mem_total_mb" -ge 10240 ]; then
         PROFILE_MIN_MB=3200
         PROFILE_HIGH_MB=3600
         PROFILE_WM_DIRECT=163840
         PROFILE_WM_MIN=131072
         PROFILE_ZRAM_INCREASE=1536
+        PROFILE_ZRAM_LIMIT=8192
     elif [ "$mem_total_mb" -ge 7168 ]; then
         PROFILE_MIN_MB=2400
         PROFILE_HIGH_MB=2800
         PROFILE_WM_DIRECT=131072
         PROFILE_WM_MIN=98304
         PROFILE_ZRAM_INCREASE=1024
+        PROFILE_ZRAM_LIMIT=6144
     else
         PROFILE_MIN_MB=1600
         PROFILE_HIGH_MB=1900
         PROFILE_WM_DIRECT=98304
         PROFILE_WM_MIN=81920
         PROFILE_ZRAM_INCREASE=512
+        PROFILE_ZRAM_LIMIT=4096
+    fi
+}
+
+select_erm_profile() {
+    if [ "$mem_total_mb" -ge 14336 ]; then
+        PROFILE_MIN_MB=4500
+        PROFILE_HIGH_MB=5000
+        PROFILE_WM_DIRECT=229376
+        PROFILE_WM_MIN=196608
+    elif [ "$mem_total_mb" -ge 10240 ]; then
+        PROFILE_MIN_MB=3600
+        PROFILE_HIGH_MB=4000
+        PROFILE_WM_DIRECT=196608
+        PROFILE_WM_MIN=163840
+    elif [ "$mem_total_mb" -ge 7168 ]; then
+        PROFILE_MIN_MB=2800
+        PROFILE_HIGH_MB=3200
+        PROFILE_WM_DIRECT=163840
+        PROFILE_WM_MIN=131072
+    else
+        PROFILE_MIN_MB=1800
+        PROFILE_HIGH_MB=2200
+        PROFILE_WM_DIRECT=114688
+        PROFILE_WM_MIN=98304
     fi
 }
 
@@ -122,22 +150,40 @@ apply_memory_profile() {
     block="$1"
     select_memory_profile
     MEMORY_BACKEND=$(detect_memory_backend "$block")
+    TARGET_VM=160
+    TARGET_DIRECT=120
+    TARGET_KSWAPD_FIRST=120
+    TARGET_KSWAPD_SECOND=160
+    TARGET_THRASHING=25
+    if [ "$MEMORY_BACKEND" = "erm" ]; then
+        select_erm_profile
+        TARGET_VM=180
+        TARGET_DIRECT=140
+        TARGET_KSWAPD_FIRST=140
+        TARGET_KSWAPD_SECOND=180
+        TARGET_THRASHING=30
+    fi
     RECLAIM_WINDOW_MB="$PROFILE_MIN_MB-$PROFILE_HIGH_MB"
 
-    write_if_supported /proc/sys/vm/swappiness 160
-    write_oplus_value vm_swappiness 160
-    write_oplus_value direct_swappiness 120
+    write_if_supported /proc/sys/vm/swappiness "$TARGET_VM"
+    write_oplus_value vm_swappiness "$TARGET_VM"
+    write_oplus_value direct_swappiness "$TARGET_DIRECT"
     write_oplus_value swapd_swappiness 200
-    write_if_supported /proc/oplus_mem/dynamic_swappiness '120 4096 160 2048'
-    write_if_supported /proc/oplus_healthinfo/dynamic_swappiness '120 4096 160 2048'
+    write_if_supported /proc/oplus_mem/dynamic_swappiness "$TARGET_KSWAPD_FIRST 4096 $TARGET_KSWAPD_SECOND 2048"
+    write_if_supported /proc/oplus_healthinfo/dynamic_swappiness "$TARGET_KSWAPD_FIRST 4096 $TARGET_KSWAPD_SECOND 2048"
 
     if [ "$MEMORY_BACKEND" = "erm" ]; then
         write_if_supported /dev/memcg/memory.erm_avail_buffer "$PROFILE_MIN_MB $PROFILE_HIGH_MB"
         write_if_supported /sys/kernel/oplus_mm/erm/wmarks "$PROFILE_WM_DIRECT $PROFILE_WM_MIN"
-        write_if_supported /sys/kernel/oplus_mm/erm/kswapd_swappiness1 '4096 120'
-        write_if_supported /sys/kernel/oplus_mm/erm/kswapd_swappiness2 '2048 160'
-        write_if_supported /sys/kernel/oplus_mm/erm/direct_swappiness1 '2048 120'
-        write_if_supported /sys/kernel/oplus_mm/erm/thrashing_limit_pct 25
+        write_if_supported /sys/kernel/oplus_mm/erm/kswapd_swappiness1 "4096 $TARGET_KSWAPD_FIRST"
+        write_if_supported /sys/kernel/oplus_mm/erm/kswapd_swappiness2 "2048 $TARGET_KSWAPD_SECOND"
+        write_if_supported /sys/kernel/oplus_mm/erm/direct_swappiness1 "2048 $TARGET_DIRECT"
+        write_if_supported /sys/kernel/oplus_mm/erm/thrashing_limit_pct "$TARGET_THRASHING"
+        write_if_supported /dev/memcg/memory.zram_used_limit_mb "$PROFILE_ZRAM_LIMIT"
+        if command -v resetprop >/dev/null 2>&1; then
+            [ "$(getprop persist.debug.disable_atomic_clean 2>/dev/null)" = "true" ] || resetprop -p persist.debug.disable_atomic_clean true 2>/dev/null
+            [ "$(getprop sys.nirvana.enable_lowfree_cch_clean 2>/dev/null)" = "false" ] || resetprop sys.nirvana.enable_lowfree_cch_clean false 2>/dev/null
+        fi
     else
         write_if_supported /dev/memcg/memory.avail_buffers "$PROFILE_HIGH_MB $PROFILE_MIN_MB $PROFILE_HIGH_MB 1536"
         write_if_supported /dev/memcg/memory.zram_wm_ratio 75
@@ -146,8 +192,9 @@ apply_memory_profile() {
     fi
 
     write_if_supported "/sys/block/$block/hybridswap_zram_increase" "$PROFILE_ZRAM_INCREASE"
-    SYNC_VM=160
-    SYNC_DIRECT=120
+    ATOMIC_CLEAN_DISABLED=$(getprop persist.debug.disable_atomic_clean 2>/dev/null)
+    SYNC_VM=$TARGET_VM
+    SYNC_DIRECT=$TARGET_DIRECT
     SYNC_SWAPD=200
 }
 
@@ -178,6 +225,9 @@ capture_baseline() {
         printf 'cpuload_threshold=%s\n' "$(cat /dev/memcg/memory.cpuload_threshold 2>/dev/null | tr -d ' \r\n')"
         printf 'swapd_max_reclaim_size=%s\n' "$(cat /dev/memcg/memory.swapd_max_reclaim_size 2>/dev/null | awk '{ print $NF }')"
         printf 'hybridswap_zram_increase=%s\n' "$(cat "/sys/block/$block/hybridswap_zram_increase" 2>/dev/null | tr -d ' \r\n')"
+        printf 'zram_used_limit_mb=%s\n' "$(cat /dev/memcg/memory.zram_used_limit_mb 2>/dev/null | tr -d ' \r\n')"
+        printf 'atomic_clean_disabled=%s\n' "$(getprop persist.debug.disable_atomic_clean 2>/dev/null)"
+        printf 'nirvana_lowfree_clean=%s\n' "$(getprop sys.nirvana.enable_lowfree_cch_clean 2>/dev/null)"
         if [ -n "$block" ] && [ -r "/sys/block/$block/hybridswap_swapd_pause" ]; then
             printf 'hybridswap_swapd_pause=%s\n' "$(cat "/sys/block/$block/hybridswap_swapd_pause" 2>/dev/null | tr -d ' \r\n')"
         fi
@@ -212,12 +262,27 @@ restore_baseline() {
         'zram_wm_ratio:/dev/memcg/memory.zram_wm_ratio' \
         'cpuload_threshold:/dev/memcg/memory.cpuload_threshold' \
         'swapd_max_reclaim_size:/dev/memcg/memory.swapd_max_reclaim_size' \
+        'zram_used_limit_mb:/dev/memcg/memory.zram_used_limit_mb' \
         "hybridswap_zram_increase:/sys/block/$block/hybridswap_zram_increase"; do
         key=${item%%:*}
         node=${item#*:}
         value=$(get_value "$BASELINE_FILE" "$key")
         [ -n "$value" ] && write_if_supported "$node" "$value"
     done
+    if command -v resetprop >/dev/null 2>&1; then
+        value=$(get_value "$BASELINE_FILE" atomic_clean_disabled)
+        if [ -n "$value" ]; then
+            resetprop -p persist.debug.disable_atomic_clean "$value" 2>/dev/null
+        else
+            resetprop -p -d persist.debug.disable_atomic_clean 2>/dev/null
+        fi
+        value=$(get_value "$BASELINE_FILE" nirvana_lowfree_clean)
+        if [ -n "$value" ]; then
+            resetprop sys.nirvana.enable_lowfree_cch_clean "$value" 2>/dev/null
+        else
+            resetprop -d sys.nirvana.enable_lowfree_cch_clean 2>/dev/null
+        fi
+    fi
     pause=$(get_value "$BASELINE_FILE" hybridswap_swapd_pause)
     [ -n "$block" ] && [ -n "$pause" ] && [ -w "/sys/block/$block/hybridswap_swapd_pause" ] && echo "$pause" > "/sys/block/$block/hybridswap_swapd_pause" 2>/dev/null
     rm -f "$BASELINE_FILE"
@@ -326,6 +391,7 @@ write_state() {
         printf 'hybridswap_quota_mb=%s\n' "$HYBRID_QUOTA_MB"
         printf 'memory_backend=%s\n' "$MEMORY_BACKEND"
         printf 'reclaim_window_mb=%s\n' "$RECLAIM_WINDOW_MB"
+        printf 'atomic_clean_disabled=%s\n' "$ATOMIC_CLEAN_DISABLED"
         printf 'oplus_vm_swappiness=%s\n' "$SYNC_VM"
         printf 'oplus_direct_swappiness=%s\n' "$SYNC_DIRECT"
         printf 'oplus_swapd_swappiness=%s\n' "$SYNC_SWAPD"
@@ -353,6 +419,7 @@ run_once() {
     HYBRID_QUOTA_MB=0
     MEMORY_BACKEND=generic
     RECLAIM_WINDOW_MB=--
+    ATOMIC_CLEAN_DISABLED=$(getprop persist.debug.disable_atomic_clean 2>/dev/null)
     SYNC_VM=$(read_oplus_value vm_swappiness)
     SYNC_DIRECT=$(read_oplus_value direct_swappiness)
     SYNC_SWAPD=$(read_oplus_value swapd_swappiness)
