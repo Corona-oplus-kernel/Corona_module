@@ -196,6 +196,28 @@ struct GpuRuntime {
     state: &'static str,
 }
 
+#[derive(Clone, Copy, Default)]
+struct DiskCounters {
+    read_ops: u64,
+    read_sectors: u64,
+    write_ops: u64,
+    write_sectors: u64,
+}
+
+#[derive(Default)]
+struct IoRuntime {
+    last: HashMap<String, DiskCounters>,
+    baselines: HashMap<PathBuf, String>,
+    targets: HashMap<PathBuf, String>,
+    idle_rounds: HashMap<String, u8>,
+    elapsed_ms: u64,
+    applied: u64,
+    active_devices: usize,
+    read_ahead_kb: u64,
+    nr_requests: u64,
+    state: &'static str,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum RuntimeMode {
     Normal,
@@ -609,6 +631,7 @@ struct Daemon {
     irq_runtime: IrqRuntime,
     ufs_runtime: UfsRuntime,
     gpu_runtime: GpuRuntime,
+    io_runtime: IoRuntime,
     last_foreground: String,
     last_profile: String,
     tick: u64,
@@ -1413,6 +1436,27 @@ fn storage_io_sectors(text: &str) -> u64 {
         .sum()
 }
 
+fn parse_disk_counters(text: &str) -> HashMap<String, DiskCounters> {
+    text.lines()
+        .filter_map(|line| {
+            let fields = line.split_ascii_whitespace().collect::<Vec<_>>();
+            let name = fields.get(2)?.to_string();
+            if !name.starts_with("sd") || name.len() != 3 {
+                return None;
+            }
+            Some((
+                name,
+                DiskCounters {
+                    read_ops: fields.get(3)?.parse().ok()?,
+                    read_sectors: fields.get(5)?.parse().ok()?,
+                    write_ops: fields.get(7)?.parse().ok()?,
+                    write_sectors: fields.get(9)?.parse().ok()?,
+                },
+            ))
+        })
+        .collect()
+}
+
 fn parse_numeric(value: &str) -> Option<u64> {
     let value = value.trim();
     value
@@ -1803,6 +1847,132 @@ impl GpuRuntime {
     }
 }
 
+impl IoRuntime {
+    fn apply(&mut self, path: &Path, value: u64) {
+        let value = value.to_string();
+        if self.targets.get(path) == Some(&value) {
+            return;
+        }
+        let current = read_text(path).trim().to_string();
+        if current.is_empty() {
+            return;
+        }
+        self.baselines.entry(path.to_path_buf()).or_insert(current.clone());
+        if current == value || write_text(path, value.as_bytes()).is_ok() {
+            if current != value {
+                self.applied += 1;
+            }
+            self.targets.insert(path.to_path_buf(), value);
+        }
+    }
+
+    fn restore_device(&mut self, device: &str) {
+        for node in ["read_ahead_kb", "nr_requests"] {
+            let path = Path::new("/sys/block").join(device).join("queue").join(node);
+            if !self.targets.contains_key(&path) {
+                continue;
+            }
+            let Some(value) = self.baselines.get(&path) else {
+                continue;
+            };
+            let current = read_text(&path);
+            if current.trim() == value || write_text(&path, value.as_bytes()).is_ok() {
+                if current.trim() != value {
+                    self.applied += 1;
+                }
+                self.targets.remove(&path);
+            }
+        }
+    }
+
+    fn step(&mut self, mode: RuntimeMode, elapsed_ms: u64) {
+        self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
+        if self.elapsed_ms < 2_000 {
+            return;
+        }
+        self.elapsed_ms = 0;
+        let counters = parse_disk_counters(&read_text(proc_root().join("diskstats")));
+        self.active_devices = 0;
+        self.state = "idle";
+        self.read_ahead_kb = 0;
+        self.nr_requests = 0;
+        let mut dominant_sectors = 0u64;
+        for (device, current) in counters {
+            let previous = self.last.insert(device.clone(), current).unwrap_or(current);
+            let read_ops = current.read_ops.saturating_sub(previous.read_ops);
+            let read_sectors = current.read_sectors.saturating_sub(previous.read_sectors);
+            let write_ops = current.write_ops.saturating_sub(previous.write_ops);
+            let write_sectors = current.write_sectors.saturating_sub(previous.write_sectors);
+            let total_ops = read_ops.saturating_add(write_ops);
+            let total_sectors = read_sectors.saturating_add(write_sectors);
+            let queue = Path::new("/sys/block").join(&device).join("queue");
+            let read_ahead_path = queue.join("read_ahead_kb");
+            let requests_path = queue.join("nr_requests");
+            if !read_ahead_path.is_file() || !requests_path.is_file() {
+                continue;
+            }
+            self.baselines
+                .entry(read_ahead_path.clone())
+                .or_insert_with(|| read_text(&read_ahead_path).trim().to_string());
+            self.baselines
+                .entry(requests_path.clone())
+                .or_insert_with(|| read_text(&requests_path).trim().to_string());
+            let active = total_ops >= 64 || total_sectors >= 16_384;
+            if !active || !matches!(mode, RuntimeMode::Normal | RuntimeMode::Warm) {
+                let rounds = self.idle_rounds.entry(device.clone()).or_default();
+                *rounds = rounds.saturating_add(1);
+                if *rounds >= 1 {
+                    self.restore_device(&device);
+                }
+                continue;
+            }
+            self.idle_rounds.insert(device.clone(), 0);
+            self.active_devices += 1;
+            let baseline_read_ahead = self
+                .baselines
+                .get(&read_ahead_path)
+                .and_then(|value| value.parse::<u64>().ok())
+                .or_else(|| read_text(&read_ahead_path).trim().parse().ok())
+                .unwrap_or(512);
+            let baseline_requests = self
+                .baselines
+                .get(&requests_path)
+                .and_then(|value| value.parse::<u64>().ok())
+                .or_else(|| read_text(&requests_path).trim().parse().ok())
+                .unwrap_or(128);
+            let average_read_sectors = if read_ops > 0 { read_sectors / read_ops } else { 0 };
+            let (state, read_ahead, requests) = if read_sectors > write_sectors.saturating_mul(2)
+                && read_sectors >= 32_768
+            {
+                ("sequential", baseline_read_ahead.max(1_024).min(2_048), baseline_requests.max(192).min(256))
+            } else if read_ops >= 32 && read_sectors <= 65_536 && average_read_sectors < 64 {
+                ("random", baseline_read_ahead.min(128), baseline_requests.min(64))
+            } else if write_sectors >= read_sectors && write_sectors >= 8_192 {
+                ("write", baseline_read_ahead.min(256), baseline_requests.max(192).min(256))
+            } else {
+                ("mixed", baseline_read_ahead.min(256), baseline_requests)
+            };
+            self.apply(&read_ahead_path, read_ahead);
+            self.apply(&requests_path, requests);
+            if total_sectors >= dominant_sectors {
+                dominant_sectors = total_sectors;
+                self.state = state;
+                self.read_ahead_kb = read_ahead;
+                self.nr_requests = requests;
+            }
+        }
+        if self.active_devices == 0 && !matches!(mode, RuntimeMode::Normal | RuntimeMode::Warm) {
+            self.state = "limited";
+        }
+    }
+
+    fn cleanup(&self) {
+        for (path, value) in &self.baselines {
+            let _ = write_text(path, value.as_bytes());
+        }
+    }
+}
+
 fn parse_task_stat(path: &Path) -> Option<(u64, u64)> {
     parse_task_stat_text(&read_text(path))
 }
@@ -1998,6 +2168,7 @@ impl Daemon {
             irq_runtime: IrqRuntime::default(),
             ufs_runtime: UfsRuntime::default(),
             gpu_runtime: GpuRuntime::default(),
+            io_runtime: IoRuntime::default(),
             last_foreground: String::new(),
             last_profile: String::new(),
             tick: 0,
@@ -2318,7 +2489,7 @@ impl Daemon {
 
     fn write_state(&self, foreground: &str, foreground_source: &str) {
         let state = format!(
-            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
+            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
             process::id(),
             foreground,
             foreground_source,
@@ -2352,6 +2523,11 @@ impl Daemon {
             self.gpu_runtime.busy_percent,
             self.gpu_runtime.target_min_freq,
             self.gpu_runtime.applied,
+            self.io_runtime.state,
+            self.io_runtime.active_devices,
+            self.io_runtime.read_ahead_kb,
+            self.io_runtime.nr_requests,
+            self.io_runtime.applied,
             self.thread_states.len(),
             self.stats.loops,
             self.stats.foreground_changes,
@@ -2421,6 +2597,7 @@ impl Daemon {
         self.ufs_runtime
             .step(self.runtime_mode, self.irq_runtime.storage_delta_sectors);
         self.gpu_runtime.step(self.runtime_mode, interval_ms);
+        self.io_runtime.step(self.runtime_mode, interval_ms);
         if self.protect_elapsed_ms >= 30_000 {
             self.protect_apps();
             self.protect_elapsed_ms = 0;
@@ -2438,6 +2615,7 @@ impl Daemon {
         self.irq_runtime.cleanup();
         self.ufs_runtime.cleanup();
         self.gpu_runtime.cleanup();
+        self.io_runtime.cleanup();
         if self.pressure.enabled {
             if let Some(baseline) = self.pressure_baseline {
                 write_swappiness(baseline);

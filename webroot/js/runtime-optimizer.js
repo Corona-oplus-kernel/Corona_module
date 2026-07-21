@@ -327,6 +327,18 @@
                 unsupported: 'unsupported'
             }[status.gpu_policy] || 'runtimeGpuIdle';
             this.setRuntimeText('runtime-gpu-policy', `${this.t(gpuState)} · ${status.gpu_busy_percent || 0}%`);
+            const ioState = {
+                sequential: 'runtimeIoSequential',
+                random: 'runtimeIoRandom',
+                write: 'runtimeIoWrite',
+                mixed: 'runtimeIoMixed',
+                limited: 'runtimeIoLimited',
+                idle: 'runtimeIoIdle'
+            }[status.io_policy] || 'runtimeIoIdle';
+            const ioValues = status.io_read_ahead_kb && status.io_read_ahead_kb !== '0'
+                ? ` · ${status.io_read_ahead_kb}/${status.io_nr_requests || 0}`
+                : '';
+            this.setRuntimeText('runtime-io-policy', `${this.t(ioState)}${ioValues}`);
             this.setRuntimeText('runtime-applied-failed', `${status.affinity_applied || status.applied || 0} / ${status.affinity_failed || status.failed || 0}`);
             this.setRuntimeText('runtime-ebpf-events', status.bpf_events || '0');
             const error = document.getElementById('runtime-ebpf-error');
