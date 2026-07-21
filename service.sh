@@ -928,7 +928,7 @@ start_app_policy_daemon() {
         legacy_pid=$(cat "$CONFIG_DIR/.app_policy_daemon.pid" 2>/dev/null)
         [ -n "$legacy_pid" ] && kill -TERM "$legacy_pid" 2>/dev/null
         rm -f "$CONFIG_DIR/.app_policy_daemon.pid" "$CONFIG_DIR/.app_policy_state"
-        [ -f "$CONFIG_DIR/.memory_pressure.pid" ] && /system/bin/sh "$MODDIR/scripts/memory-pressure.sh" stop >/dev/null 2>&1
+        /system/bin/sh "$MODDIR/scripts/memory-pressure.sh" stop >/dev/null 2>&1
         CORONA_MODDIR="$MODDIR" "$CORONAD" reload >/dev/null 2>&1
         return
     fi
@@ -953,7 +953,7 @@ apply_memory_pressure_config() {
     helper="$MODDIR/scripts/memory-pressure.sh"
     [ -f "$helper" ] || return 0
     if use_coronad; then
-        [ -f "$CONFIG_DIR/.memory_pressure.pid" ] && /system/bin/sh "$helper" stop >/dev/null 2>&1
+        /system/bin/sh "$helper" stop >/dev/null 2>&1
         if [ -f "$CONFIG_DIR/memory_pressure.conf" ]; then
             cp -f "$CONFIG_DIR/memory_pressure.conf" "$CONFIG_DIR/.memory_pressure.runtime.conf"
         else

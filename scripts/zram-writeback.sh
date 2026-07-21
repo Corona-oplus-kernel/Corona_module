@@ -150,6 +150,14 @@ bind_backing_device() {
     return 1
 }
 
+verify_eswap_health() {
+    [ -n "$ZRAM_BLOCK" ] || return 1
+    meminfo="/sys/block/$ZRAM_BLOCK/hybridswap_meminfo"
+    [ -r "$meminfo" ] || return 1
+    est=$(awk '$1 == "EST:" { print $2; exit }' "$meminfo" 2>/dev/null)
+    [ -n "$est" ] && [ "$est" -gt 0 ] 2>/dev/null
+}
+
 restore_system_backing() {
     system_backing=$(find_system_backing "$1") || return 0
     current=$(get_current_backing)

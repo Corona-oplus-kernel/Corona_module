@@ -405,7 +405,9 @@ apply_corona_lmk() {
   local sdk_version=$(getprop ro.build.version.sdk)
   local lowmemorykiller='/sys/module/lowmemorykiller/parameters'
   [ -d "$lowmemorykiller" ] && {
-    if [ "$mem_total_kb" -gt 8388608 ]; then echo "4096,5120,32768,96000,131072,204800" > $lowmemorykiller/minfree 2>/dev/null
+    if [ "$mem_total_kb" -gt 20971520 ]; then echo "4096,8192,65536,184320,262144,393216" > $lowmemorykiller/minfree 2>/dev/null
+    elif [ "$mem_total_kb" -gt 12582912 ]; then echo "4096,8192,32768,122880,184320,262144" > $lowmemorykiller/minfree 2>/dev/null
+    elif [ "$mem_total_kb" -gt 8388608 ]; then echo "4096,5120,32768,96000,131072,204800" > $lowmemorykiller/minfree 2>/dev/null
     elif [ "$mem_total_kb" -gt 6291456 ]; then echo "4096,5120,8192,32768,96000,131072" > $lowmemorykiller/minfree 2>/dev/null
     elif [ "$mem_total_kb" -gt 4194304 ]; then echo "4096,5120,8192,32768,65536,96000" > $lowmemorykiller/minfree 2>/dev/null
     else echo "4096,5120,8192,16384,24576,39936" > $lowmemorykiller/minfree 2>/dev/null; fi
@@ -413,7 +415,9 @@ apply_corona_lmk() {
   }
   [ "$sdk_version" -gt 28 ] && {
     local minfree_levels
-    if [ "$mem_total_kb" -gt 8388608 ]; then minfree_levels="4096:0,5120:100,32768:200,96000:250,131072:900,204800:950"
+    if [ "$mem_total_kb" -gt 20971520 ]; then minfree_levels="4096:0,8192:100,65536:200,184320:250,262144:900,393216:950"
+    elif [ "$mem_total_kb" -gt 12582912 ]; then minfree_levels="4096:0,8192:100,32768:200,122880:250,184320:900,262144:950"
+    elif [ "$mem_total_kb" -gt 8388608 ]; then minfree_levels="4096:0,5120:100,32768:200,96000:250,131072:900,204800:950"
     elif [ "$mem_total_kb" -gt 6291456 ]; then minfree_levels="4096:0,5120:100,8192:200,32768:250,96000:900,131072:950"
     else minfree_levels="4096:0,5120:100,8192:200,32768:250,65536:900,96000:950"; fi
     setprop sys.lmk.minfree_levels "$minfree_levels"

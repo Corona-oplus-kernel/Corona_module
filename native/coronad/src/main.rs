@@ -571,6 +571,7 @@ struct Daemon {
     pressure_elapsed_ms: u64,
     protect_elapsed_ms: u64,
     environment_elapsed_ms: u64,
+    battery_saver_elapsed_ms: u64,
     fallback_reload_elapsed_ms: u64,
 }
 
@@ -1471,6 +1472,7 @@ impl Daemon {
             pressure_elapsed_ms: 0,
             protect_elapsed_ms: 0,
             environment_elapsed_ms: 10_000,
+            battery_saver_elapsed_ms: 30_000,
             fallback_reload_elapsed_ms: 0,
             paths,
         };
@@ -1566,8 +1568,12 @@ impl Daemon {
 
     fn update_environment(&mut self) {
         self.max_temperature_c = max_temperature_c();
-        self.battery_saver = battery_saver_enabled();
         self.screen_on = screen_is_on();
+        self.battery_saver_elapsed_ms += 10_000;
+        if self.battery_saver_elapsed_ms >= 30_000 {
+            self.battery_saver_elapsed_ms = 0;
+            self.battery_saver = battery_saver_enabled();
+        }
         let next = runtime_mode(
             &self.affinity,
             self.max_temperature_c,
