@@ -6,7 +6,13 @@
     const CONFIG_FILE = 'auto_affinity.conf';
     const DAEMON_CONFIG_FILE = 'coronad.conf';
     const HARDWARE_CONFIG_FILE = 'hardware_policy.conf';
-    const HARDWARE_CONFIG_ORDER = ['irq_enabled', 'ufs_enabled', 'gpu_enabled', 'io_enabled'];
+    const HARDWARE_POLICIES = [
+        { id: 'runtime-irq-switch', key: 'irq_enabled' },
+        { id: 'runtime-ufs-switch', key: 'ufs_enabled' },
+        { id: 'runtime-gpu-switch', key: 'gpu_enabled' },
+        { id: 'runtime-io-switch', key: 'io_enabled' }
+    ];
+    const HARDWARE_CONFIG_ORDER = HARDWARE_POLICIES.map(policy => policy.key);
     const CONFIG_ORDER = [
         'enabled', 'ebpf', 'default_class', 'efficiency_cpus', 'balanced_cpus',
         'performance_cpus', 'exclude_packages', 'scan_interval_ms', 'load_learning',
@@ -51,14 +57,9 @@
             document.getElementById('runtime-daemon-switch')?.addEventListener('change', event => {
                 this.setRuntimeDaemonEnabled(event.target.checked);
             });
-            [
-                ['runtime-irq-switch', 'irq_enabled'],
-                ['runtime-ufs-switch', 'ufs_enabled'],
-                ['runtime-gpu-switch', 'gpu_enabled'],
-                ['runtime-io-switch', 'io_enabled']
-            ].forEach(([id, key]) => {
-                document.getElementById(id)?.addEventListener('change', event => {
-                    this.setHardwarePolicyEnabled(event.currentTarget, key);
+            HARDWARE_POLICIES.forEach(policy => {
+                document.getElementById(policy.id)?.addEventListener('change', event => {
+                    this.scheduleHardwarePolicyApply(event.currentTarget);
                 });
             });
             ['runtime-efficiency-cpus', 'runtime-balanced-cpus', 'runtime-performance-cpus', 'runtime-scan-interval', 'runtime-warm-threshold', 'runtime-severe-threshold'].forEach(id => {
@@ -207,14 +208,10 @@
             setChecked('runtime-ebpf-switch', 'ebpf', '0');
             setChecked('runtime-load-learning-switch', 'load_learning', '0');
             setChecked('runtime-thermal-control-switch', 'thermal_control', '0');
-            const setHardwareChecked = (id, key) => {
-                const element = document.getElementById(id);
-                if (element) element.checked = daemonEnabled && (hardwareConfig[key] ?? '1') === '1';
-            };
-            setHardwareChecked('runtime-irq-switch', 'irq_enabled');
-            setHardwareChecked('runtime-ufs-switch', 'ufs_enabled');
-            setHardwareChecked('runtime-gpu-switch', 'gpu_enabled');
-            setHardwareChecked('runtime-io-switch', 'io_enabled');
+            HARDWARE_POLICIES.forEach(policy => {
+                const element = document.getElementById(policy.id);
+                if (element) element.checked = daemonEnabled && (hardwareConfig[policy.key] ?? '0') === '1';
+            });
             this.selectRuntimeClass(daemonEnabled ? config.default_class || 'balanced' : null);
             setValue('runtime-efficiency-cpus', 'efficiency_cpus');
             setValue('runtime-balanced-cpus', 'balanced_cpus');
@@ -223,23 +220,35 @@
             setValue('runtime-warm-threshold', 'thermal_warm_c', '75');
             setValue('runtime-severe-threshold', 'thermal_severe_c', '100');
         },
-        async setHardwarePolicyEnabled(toggle, key) {
-            if (!toggle || !HARDWARE_CONFIG_ORDER.includes(key)) return;
+        scheduleHardwarePolicyApply(toggle) {
             if (this.rejectDaemonDependentToggle(toggle)) return;
-            const enabled = toggle.checked;
-            await this.waitForUiPaint();
-            toggle.disabled = true;
+            const revision = (this.hardwarePolicyRevision || 0) + 1;
+            this.hardwarePolicyRevision = revision;
+            if (this.hardwarePolicyApplyTimer) clearTimeout(this.hardwarePolicyApplyTimer);
+            this.hardwarePolicyApplyTimer = setTimeout(() => {
+                this.hardwarePolicyApplyTimer = null;
+                const updates = Object.fromEntries(HARDWARE_POLICIES.map(policy => [
+                    policy.key,
+                    document.getElementById(policy.id)?.checked ? '1' : '0'
+                ]));
+                const previous = this.hardwarePolicyApplyQueue || Promise.resolve();
+                this.hardwarePolicyApplyQueue = previous
+                    .catch(() => {})
+                    .then(() => this.applyHardwarePolicyConfig(revision, updates));
+            }, 300);
+        },
+        async applyHardwarePolicyConfig(revision, updates) {
+            if (revision !== (this.hardwarePolicyRevision || 0) || !this.isRuntimeDaemonEnabled()) return;
             try {
-                await this.mergeConfigFile(HARDWARE_CONFIG_FILE, { [key]: enabled ? '1' : '0' }, HARDWARE_CONFIG_ORDER);
+                await this.mergeConfigFile(HARDWARE_CONFIG_FILE, updates, HARDWARE_CONFIG_ORDER);
                 await this.exec(`${this.shellQuote(`${this.modDir}/bin/coronad`)} reload`);
                 await this.sleep(350);
+                if (revision !== (this.hardwarePolicyRevision || 0)) return;
                 await this.refreshRuntimeOptimizer();
                 this.showToast(this.t('runtimeHardwareSaved'));
             } catch (error) {
-                toggle.checked = !enabled;
+                await this.loadRuntimeOptimizerConfig();
                 this.showToast(this.t('runtimeHardwareSaveFailed'), 'error');
-            } finally {
-                toggle.disabled = false;
             }
         },
         async setRuntimeDaemonEnabled(enabled) {
@@ -251,6 +260,10 @@
                 clearTimeout(this.runtimeOptimizerApplyTimer);
                 this.runtimeOptimizerApplyTimer = null;
                 this.setRuntimeSaveState('saved');
+            }
+            if (!enabled && this.hardwarePolicyApplyTimer) {
+                clearTimeout(this.hardwarePolicyApplyTimer);
+                this.hardwarePolicyApplyTimer = null;
             }
             await this.waitForUiPaint();
             if (daemonSwitch) daemonSwitch.disabled = true;

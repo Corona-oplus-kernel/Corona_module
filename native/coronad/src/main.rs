@@ -170,7 +170,6 @@ struct IrqRuntime {
     targets: HashMap<PathBuf, String>,
     last_counts: HashMap<u32, u64>,
     net_counts: HashMap<String, u64>,
-    last_storage_sectors: u64,
     idle_rounds: HashMap<u32, u8>,
     elapsed_ms: u64,
     managed: usize,
@@ -178,7 +177,6 @@ struct IrqRuntime {
     applied: u64,
     supported: bool,
     state: &'static str,
-    storage_delta_sectors: u64,
 }
 
 #[derive(Default)]
@@ -650,6 +648,8 @@ struct Daemon {
     environment_elapsed_ms: u64,
     battery_saver_elapsed_ms: u64,
     fallback_reload_elapsed_ms: u64,
+    storage_elapsed_ms: u64,
+    last_storage_sectors: u64,
 }
 
 fn read_text(path: impl AsRef<Path>) -> String {
@@ -959,10 +959,10 @@ fn load_affinity(paths: &Paths) -> AffinityConfig {
 
 fn hardware_config(values: &HashMap<String, String>) -> HardwareConfig {
     HardwareConfig {
-        irq_enabled: value_bool(values, "irq_enabled", true),
-        ufs_enabled: value_bool(values, "ufs_enabled", true),
-        gpu_enabled: value_bool(values, "gpu_enabled", true),
-        io_enabled: value_bool(values, "io_enabled", true),
+        irq_enabled: value_bool(values, "irq_enabled", false),
+        ufs_enabled: value_bool(values, "ufs_enabled", false),
+        gpu_enabled: value_bool(values, "gpu_enabled", false),
+        io_enabled: value_bool(values, "io_enabled", false),
     }
 }
 
@@ -1143,7 +1143,7 @@ fn classify_thread<'a>(package: &str, thread_name: &str, default_class: &'a str)
     }
 }
 
-fn adapt_class<'a>(class: &'a str, mode: RuntimeMode) -> &'a str {
+fn adapt_class(class: &str, mode: RuntimeMode) -> &str {
     match mode {
         RuntimeMode::Normal => class,
         RuntimeMode::Warm => match class {
@@ -1626,7 +1626,13 @@ impl IrqRuntime {
         }
     }
 
-    fn step(&mut self, topology: &CpuTopology, mode: RuntimeMode, elapsed_ms: u64) {
+    fn step(
+        &mut self,
+        topology: &CpuTopology,
+        mode: RuntimeMode,
+        elapsed_ms: u64,
+        storage_delta: u64,
+    ) {
         self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
         if self.elapsed_ms < 2_000 {
             return;
@@ -1639,15 +1645,6 @@ impl IrqRuntime {
         let efficiency = cpu_list_string(&topology.efficiency);
         let upper = upper_cpu_list(topology);
         let upper_list = cpu_list_string(&upper);
-        let storage_sectors = storage_io_sectors(&read_text(proc_root().join("diskstats")));
-        let storage_delta = if self.last_storage_sectors == 0 {
-            0
-        } else {
-            storage_sectors.saturating_sub(self.last_storage_sectors)
-        };
-        self.last_storage_sectors = storage_sectors;
-        self.storage_delta_sectors = storage_delta;
-
         for (irq, count, name) in samples {
             let previous = self.last_counts.insert(irq, count).unwrap_or(count);
             let delta = count.saturating_sub(previous);
@@ -2026,11 +2023,11 @@ impl IoRuntime {
             let (state, read_ahead, requests) = if read_sectors > write_sectors.saturating_mul(2)
                 && read_sectors >= 32_768
             {
-                ("sequential", baseline_read_ahead.max(1_024).min(2_048), baseline_requests.max(192).min(256))
+                ("sequential", baseline_read_ahead.clamp(1_024, 2_048), baseline_requests.clamp(192, 256))
             } else if read_ops >= 32 && read_sectors <= 65_536 && average_read_sectors < 64 {
                 ("random", baseline_read_ahead.min(128), baseline_requests.min(64))
             } else if write_sectors >= read_sectors && write_sectors >= 8_192 {
-                ("write", baseline_read_ahead.min(256), baseline_requests.max(192).min(256))
+                ("write", baseline_read_ahead.min(256), baseline_requests.clamp(192, 256))
             } else {
                 ("mixed", baseline_read_ahead.min(256), baseline_requests)
             };
@@ -2274,12 +2271,35 @@ impl Daemon {
             environment_elapsed_ms: 10_000,
             battery_saver_elapsed_ms: 30_000,
             fallback_reload_elapsed_ms: 0,
+            storage_elapsed_ms: 0,
+            last_storage_sectors: 0,
             paths,
         };
         daemon.update_environment();
         constrain_daemon(&daemon.topology);
         apply_walt_hints(&daemon.manual_rules);
         daemon
+    }
+
+    fn sample_storage_delta(&mut self, elapsed_ms: u64) -> u64 {
+        if !self.hardware.irq_enabled && !self.hardware.ufs_enabled {
+            self.storage_elapsed_ms = 0;
+            self.last_storage_sectors = 0;
+            return 0;
+        }
+        self.storage_elapsed_ms = self.storage_elapsed_ms.saturating_add(elapsed_ms);
+        if self.storage_elapsed_ms < 2_000 {
+            return 0;
+        }
+        self.storage_elapsed_ms = 0;
+        let current = storage_io_sectors(&read_text(proc_root().join("diskstats")));
+        let delta = if self.last_storage_sectors == 0 {
+            0
+        } else {
+            current.saturating_sub(self.last_storage_sectors)
+        };
+        self.last_storage_sectors = current;
+        delta
     }
 
     fn reload(&mut self) {
@@ -2390,9 +2410,7 @@ impl Daemon {
     }
 
     fn thread_class(&self, package: &str, thread_name: &str, tid: i32, pid: u32, score: i8) -> &str {
-        let base = if tid == pid as i32 {
-            "performance"
-        } else if self.affinity.load_learning && score >= 2 {
+        let base = if tid == pid as i32 || (self.affinity.load_learning && score >= 2) {
             "performance"
         } else if self.affinity.load_learning && score <= -3 {
             "efficiency"
@@ -2692,14 +2710,15 @@ impl Daemon {
         }
         self.process_bpf_events(&foreground);
         self.scan_threads(&foreground);
+        let storage_delta = self.sample_storage_delta(interval_ms);
         if self.hardware.irq_enabled {
-            self.irq_runtime.step(&self.topology, self.runtime_mode, interval_ms);
+            self.irq_runtime
+                .step(&self.topology, self.runtime_mode, interval_ms, storage_delta);
         } else {
             self.irq_runtime.disable();
         }
         if self.hardware.ufs_enabled {
-            self.ufs_runtime
-                .step(self.runtime_mode, self.irq_runtime.storage_delta_sectors);
+            self.ufs_runtime.step(self.runtime_mode, storage_delta);
         } else {
             self.ufs_runtime.disable();
         }
@@ -2841,22 +2860,22 @@ mod tests {
     }
 
     #[test]
-    fn loads_hardware_switches_with_enabled_defaults() {
+    fn loads_hardware_switches_with_disabled_defaults() {
         let defaults = hardware_config(&HashMap::new());
-        assert!(defaults.irq_enabled);
-        assert!(defaults.ufs_enabled);
-        assert!(defaults.gpu_enabled);
-        assert!(defaults.io_enabled);
+        assert!(!defaults.irq_enabled);
+        assert!(!defaults.ufs_enabled);
+        assert!(!defaults.gpu_enabled);
+        assert!(!defaults.io_enabled);
 
         let values = HashMap::from([
-            ("irq_enabled".to_string(), "0".to_string()),
-            ("gpu_enabled".to_string(), "false".to_string()),
+            ("irq_enabled".to_string(), "1".to_string()),
+            ("gpu_enabled".to_string(), "true".to_string()),
         ]);
         let configured = hardware_config(&values);
-        assert!(!configured.irq_enabled);
-        assert!(configured.ufs_enabled);
-        assert!(!configured.gpu_enabled);
-        assert!(configured.io_enabled);
+        assert!(configured.irq_enabled);
+        assert!(!configured.ufs_enabled);
+        assert!(configured.gpu_enabled);
+        assert!(!configured.io_enabled);
     }
 
     #[test]
