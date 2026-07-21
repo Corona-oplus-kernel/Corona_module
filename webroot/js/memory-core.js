@@ -2569,13 +2569,24 @@
         setText('zram-policy-reclaim-window', running && status.reclaim_window_mb ? `${status.reclaim_window_mb} MB` : '--');
         setText('zram-policy-vendor-clean', running ? (status.atomic_clean_disabled === 'true' ? this.t('zramPolicyVendorCleanDisabled') : this.t('zramPolicyVendorCleanDefault')) : '--');
         setText('zram-policy-oplus', status.oplus_vm_swappiness ? `${status.oplus_vm_swappiness} / ${status.oplus_direct_swappiness || '--'} / ${status.oplus_swapd_swappiness || '--'}` : '--');
-        setText('zram-policy-writeback', running ? (status.memory_backend === 'erm' ? this.t('zramPolicyWritebackSystem') : status.hybridswap_paused === '1' ? this.t('zramPolicyWritebackPaused') : this.t('zramPolicyWritebackAllowed')) : '--');
-        const dailyWriteback = Number.parseInt(status.hybridswap_daily_mb || '0', 10);
-        const dailyQuota = Number.parseInt(status.hybridswap_quota_mb || '0', 10);
-        setText('zram-policy-daily-writeback', dailyQuota > 0 ? `${dailyWriteback} / ${dailyQuota} MB` : dailyWriteback > 0 ? `${dailyWriteback} MB` : '--');
+        const eswapAvailable = status.eswap_available === '1';
+        const writebackRow = document.getElementById('zram-policy-writeback')?.closest('.info-item');
+        const dailyWritebackRow = document.getElementById('zram-policy-daily-writeback')?.closest('.info-item');
+        if (eswapAvailable) {
+            if (writebackRow) writebackRow.style.display = '';
+            if (dailyWritebackRow) dailyWritebackRow.style.display = '';
+            setText('zram-policy-writeback', running ? (status.memory_backend === 'erm' ? this.t('zramPolicyWritebackSystem') : status.hybridswap_paused === '1' ? this.t('zramPolicyWritebackPaused') : this.t('zramPolicyWritebackAllowed')) : '--');
+            const writebackUsed = Number.parseInt(status.hybridswap_used_mb || '0', 10);
+            const writebackCapacity = Number.parseInt(status.hybridswap_capacity_mb || '0', 10);
+            setText('zram-policy-daily-writeback', writebackCapacity > 0 ? `${writebackUsed} / ${writebackCapacity} MB` : '--');
+        } else {
+            if (writebackRow) writebackRow.style.display = 'none';
+            if (dailyWritebackRow) dailyWritebackRow.style.display = 'none';
+        }
         const actionKey = {
             recompress: 'zramPolicyActionRecompress',
             compact: 'zramPolicyActionCompact',
+            writeback: 'zramPolicyActionWriteback',
             idle: 'zramPolicyActionIdle'
         }[status.last_action] || 'zramPolicyActionIdle';
         const waitingKey = {
@@ -2587,8 +2598,14 @@
             no_zram: 'zramPolicyWaitNoZram'
         }[status.last_reason];
         const saved = Number.parseInt(status.recompress_saved_mb || '0', 10);
+        const written = Number.parseInt(status.writeback_mb || '0', 10);
         const actionText = this.t(status.last_action === 'idle' && waitingKey ? waitingKey : actionKey);
-        setText('zram-policy-action', running ? (saved > 0 && status.last_action === 'recompress' ? `${actionText} (-${saved} MB)` : actionText) : '--');
+        const actionDetail = status.last_action === 'recompress' && saved > 0
+            ? `${actionText} (-${saved} MB)`
+            : status.last_action === 'writeback' && written > 0
+                ? `${actionText} (${written} MB)`
+                : actionText;
+        setText('zram-policy-action', running ? actionDetail : '--');
         return { supported, running };
     },
     initMemoryPressureSettings() {
