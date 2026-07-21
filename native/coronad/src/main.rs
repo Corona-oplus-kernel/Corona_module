@@ -155,6 +155,22 @@ struct CpuTopology {
     performance: Vec<usize>,
 }
 
+#[derive(Default)]
+struct IrqRuntime {
+    baselines: HashMap<PathBuf, String>,
+    targets: HashMap<PathBuf, String>,
+    last_counts: HashMap<u32, u64>,
+    net_counts: HashMap<String, u64>,
+    last_storage_sectors: u64,
+    idle_rounds: HashMap<u32, u8>,
+    elapsed_ms: u64,
+    managed: usize,
+    busy: usize,
+    applied: u64,
+    supported: bool,
+    state: &'static str,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum RuntimeMode {
     Normal,
@@ -565,6 +581,7 @@ struct Daemon {
     stats: Stats,
     pressure_baseline: Option<u32>,
     pressure_last_target: Option<u32>,
+    irq_runtime: IrqRuntime,
     last_foreground: String,
     last_profile: String,
     tick: u64,
@@ -1274,6 +1291,272 @@ fn cpu_list_string(cpus: &[usize]) -> String {
     cpus.iter().map(usize::to_string).collect::<Vec<_>>().join(",")
 }
 
+fn cpu_mask_string(cpus: &[usize]) -> String {
+    let Some(max_cpu) = cpus.iter().copied().max() else {
+        return String::new();
+    };
+    let mut groups = vec![0u32; max_cpu / 32 + 1];
+    for cpu in cpus {
+        groups[cpu / 32] |= 1u32 << (cpu % 32);
+    }
+    groups
+        .iter()
+        .rev()
+        .enumerate()
+        .map(|(index, value)| {
+            if index == 0 {
+                format!("{value:x}")
+            } else {
+                format!("{value:08x}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn upper_cpu_list(topology: &CpuTopology) -> Vec<usize> {
+    let mut cpus = topology.balanced.clone();
+    cpus.extend(topology.performance.iter().copied());
+    cpus.sort_unstable();
+    cpus.dedup();
+    if cpus.len() <= 2 {
+        return cpus;
+    }
+    cpus.split_off(cpus.len() / 2)
+}
+
+fn parse_interrupt_samples(text: &str) -> Vec<(u32, u64, String)> {
+    let mut samples = Vec::new();
+    for line in text.lines() {
+        let Some((irq, remainder)) = line.split_once(':') else {
+            continue;
+        };
+        let Ok(irq) = irq.trim().parse::<u32>() else {
+            continue;
+        };
+        let fields = remainder.split_ascii_whitespace().collect::<Vec<_>>();
+        let mut total = 0u64;
+        let mut index = 0usize;
+        while index < fields.len() {
+            let Ok(value) = fields[index].parse::<u64>() else {
+                break;
+            };
+            total = total.saturating_add(value);
+            index += 1;
+        }
+        let name = fields[index..].join(" ");
+        let lower = name.to_ascii_lowercase();
+        if lower.contains("ufshcd")
+            || lower.contains("wlan")
+            || lower.contains("wifi")
+            || lower.contains("ipa")
+            || lower.contains("rmnet")
+        {
+            samples.push((irq, total, lower));
+        }
+    }
+    samples
+}
+
+fn parse_network_samples(text: &str) -> Vec<(String, u64)> {
+    text.lines()
+        .filter_map(|line| {
+            let (name, values) = line.split_once(':')?;
+            let name = name.trim().to_string();
+            let fields = values.split_ascii_whitespace().collect::<Vec<_>>();
+            let receive = fields.first()?.parse::<u64>().ok()?;
+            let transmit = fields.get(8)?.parse::<u64>().ok()?;
+            Some((name, receive.saturating_add(transmit)))
+        })
+        .collect()
+}
+
+fn storage_io_sectors(text: &str) -> u64 {
+    text.lines()
+        .filter_map(|line| {
+            let fields = line.split_ascii_whitespace().collect::<Vec<_>>();
+            let name = *fields.get(2)?;
+            if !name.starts_with("sd") || name.len() != 3 {
+                return None;
+            }
+            let read = fields.get(5)?.parse::<u64>().ok()?;
+            let written = fields.get(9)?.parse::<u64>().ok()?;
+            Some(read.saturating_add(written))
+        })
+        .sum()
+}
+
+fn network_queue_paths(interfaces: &HashSet<String>) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    let root = Path::new("/sys/class/net");
+    let Ok(entries) = fs::read_dir(root) else {
+        return paths;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+        if !interfaces.contains(&name) {
+            continue;
+        }
+        let Ok(queues) = fs::read_dir(entry.path().join("queues")) else {
+            continue;
+        };
+        for queue in queues.flatten() {
+            for node in ["rps_cpus", "xps_cpus"] {
+                let path = queue.path().join(node);
+                if path.is_file() {
+                    paths.push(path);
+                }
+            }
+        }
+    }
+    paths
+}
+
+impl IrqRuntime {
+    fn apply(&mut self, path: &Path, value: &str) {
+        if self.targets.get(path).map(String::as_str) == Some(value) {
+            return;
+        }
+        let current = read_text(path).trim().to_string();
+        if current.is_empty() {
+            return;
+        }
+        self.baselines.entry(path.to_path_buf()).or_insert(current.clone());
+        if current == value || write_text(path, value.as_bytes()).is_ok() {
+            if current != value {
+                self.applied += 1;
+            }
+            self.targets.insert(path.to_path_buf(), value.to_string());
+        }
+    }
+
+    fn restore(&mut self, path: &Path) {
+        if self.targets.remove(path).is_none() {
+            return;
+        }
+        let Some(value) = self.baselines.get(path) else {
+            return;
+        };
+        if read_text(path).trim() != value && write_text(path, value.as_bytes()).is_ok() {
+            self.applied += 1;
+        }
+    }
+
+    fn step(&mut self, topology: &CpuTopology, mode: RuntimeMode, elapsed_ms: u64) {
+        self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
+        if self.elapsed_ms < 2_000 {
+            return;
+        }
+        self.elapsed_ms = 0;
+        let samples = parse_interrupt_samples(&read_text(proc_root().join("interrupts")));
+        self.supported = !samples.is_empty();
+        self.managed = samples.len();
+        self.busy = 0;
+        let efficiency = cpu_list_string(&topology.efficiency);
+        let upper = upper_cpu_list(topology);
+        let upper_list = cpu_list_string(&upper);
+        let storage_sectors = storage_io_sectors(&read_text(proc_root().join("diskstats")));
+        let storage_delta = storage_sectors.saturating_sub(self.last_storage_sectors);
+        self.last_storage_sectors = storage_sectors;
+
+        for (irq, count, name) in samples {
+            let previous = self.last_counts.insert(irq, count).unwrap_or(count);
+            let delta = count.saturating_sub(previous);
+            let busy = if name.contains("ufshcd") {
+                storage_delta >= 8_192
+            } else {
+                delta >= 128
+            };
+            if busy {
+                self.busy += 1;
+            }
+            let path = proc_root().join("irq").join(irq.to_string()).join("smp_affinity_list");
+            if !path.is_file() {
+                continue;
+            }
+            if matches!(mode, RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe) {
+                self.apply(&path, &efficiency);
+                self.idle_rounds.insert(irq, 0);
+            } else if busy {
+                self.apply(&path, &upper_list);
+                self.idle_rounds.insert(irq, 0);
+            } else {
+                let rounds = self.idle_rounds.entry(irq).or_default();
+                *rounds = rounds.saturating_add(1);
+                if *rounds >= 3 {
+                    self.restore(&path);
+                }
+            }
+        }
+
+        let mut active_interfaces = HashSet::new();
+        for (name, count) in parse_network_samples(&read_text(proc_root().join("net/dev"))) {
+            let lower = name.to_ascii_lowercase();
+            if !(lower.starts_with("wlan")
+                || lower.starts_with("wifi")
+                || lower.starts_with("p2p")
+                || lower.starts_with("rmnet")
+                || lower.starts_with("r_rmnet"))
+            {
+                continue;
+            }
+            let previous = self.net_counts.insert(lower.clone(), count).unwrap_or(count);
+            let delta = count.saturating_sub(previous);
+            let online = read_text(Path::new("/sys/class/net").join(&lower).join("operstate")).trim() == "up";
+            if delta >= 65_536
+                || (online
+                    && matches!(
+                        mode,
+                        RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe
+                    ))
+            {
+                active_interfaces.insert(lower);
+            }
+        }
+        let queue_target = if matches!(
+            mode,
+            RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe
+        ) {
+            Some(cpu_mask_string(&topology.efficiency))
+        } else if !active_interfaces.is_empty() {
+            Some(cpu_mask_string(&upper))
+        } else {
+            None
+        };
+        for path in network_queue_paths(&active_interfaces) {
+            if let Some(target) = queue_target.as_deref() {
+                self.apply(&path, target);
+            }
+        }
+        if queue_target.is_none() {
+            let queue_paths = self
+                .targets
+                .keys()
+                .filter(|path| path.starts_with("/sys/class/net"))
+                .cloned()
+                .collect::<Vec<_>>();
+            for path in queue_paths {
+                self.restore(&path);
+            }
+        }
+        self.state = if !self.supported {
+            "unsupported"
+        } else if matches!(mode, RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe) {
+            "efficient"
+        } else if self.busy > 0 {
+            "active"
+        } else {
+            "idle"
+        };
+    }
+
+    fn cleanup(&self) {
+        for (path, value) in &self.baselines {
+            let _ = write_text(path, value.as_bytes());
+        }
+    }
+}
+
 fn parse_task_stat(path: &Path) -> Option<(u64, u64)> {
     parse_task_stat_text(&read_text(path))
 }
@@ -1466,6 +1749,7 @@ impl Daemon {
             affinity,
             pressure_baseline,
             pressure_last_target: None,
+            irq_runtime: IrqRuntime::default(),
             last_foreground: String::new(),
             last_profile: String::new(),
             tick: 0,
@@ -1786,7 +2070,7 @@ impl Daemon {
 
     fn write_state(&self, foreground: &str, foreground_source: &str) {
         let state = format!(
-            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
+            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
             process::id(),
             foreground,
             foreground_source,
@@ -1808,6 +2092,10 @@ impl Daemon {
             self.max_temperature_c,
             u8::from(self.battery_saver),
             u8::from(self.screen_on),
+            self.irq_runtime.state,
+            self.irq_runtime.managed,
+            self.irq_runtime.busy,
+            self.irq_runtime.applied,
             self.thread_states.len(),
             self.stats.loops,
             self.stats.foreground_changes,
@@ -1873,6 +2161,7 @@ impl Daemon {
         }
         self.process_bpf_events(&foreground);
         self.scan_threads(&foreground);
+        self.irq_runtime.step(&self.topology, self.runtime_mode, interval_ms);
         if self.protect_elapsed_ms >= 30_000 {
             self.protect_apps();
             self.protect_elapsed_ms = 0;
@@ -1887,6 +2176,7 @@ impl Daemon {
     }
 
     fn cleanup(&self) {
+        self.irq_runtime.cleanup();
         if self.pressure.enabled {
             if let Some(baseline) = self.pressure_baseline {
                 write_swappiness(baseline);

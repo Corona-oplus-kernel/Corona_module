@@ -924,6 +924,7 @@ use_coronad() {
 start_app_policy_daemon() {
     policy_requested=0
     should_start_app_policy && policy_requested=1
+    coronad_enabled && policy_requested=1
     if [ "$policy_requested" = "1" ] && use_coronad; then
         legacy_pid=$(cat "$CONFIG_DIR/.app_policy_daemon.pid" 2>/dev/null)
         [ -n "$legacy_pid" ] && kill -TERM "$legacy_pid" 2>/dev/null

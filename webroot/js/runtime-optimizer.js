@@ -306,6 +306,13 @@
             const active = status.ebpf_active === '1';
             this.setRuntimeText('runtime-ebpf-state', this.t(active ? 'runtimeEbpfActive' : requested ? 'runtimeEbpfFallback' : 'runtimeEbpfIdle'));
             this.setRuntimeText('runtime-known-threads', status.known_threads);
+            const irqState = {
+                active: 'runtimeIrqActive',
+                efficient: 'runtimeIrqEfficient',
+                idle: 'runtimeIrqIdle',
+                unsupported: 'unsupported'
+            }[status.irq_policy] || 'runtimeIrqIdle';
+            this.setRuntimeText('runtime-irq-policy', `${this.t(irqState)} · ${status.irq_busy || 0}/${status.irq_managed || 0}`);
             this.setRuntimeText('runtime-applied-failed', `${status.affinity_applied || status.applied || 0} / ${status.affinity_failed || status.failed || 0}`);
             this.setRuntimeText('runtime-ebpf-events', status.bpf_events || '0');
             const error = document.getElementById('runtime-ebpf-error');
