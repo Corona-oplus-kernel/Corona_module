@@ -312,7 +312,8 @@
                 idle: 'runtimeIrqIdle',
                 unsupported: 'unsupported'
             }[status.irq_policy] || 'runtimeIrqIdle';
-            this.setRuntimeText('runtime-irq-policy', `${this.t(irqState)} · ${status.irq_busy || 0}/${status.irq_managed || 0}`);
+            const irqCpus = status.irq_target_cpus ? ` ${status.irq_target_cpus}` : '';
+            this.setRuntimeText('runtime-irq-policy', `${this.t(irqState)}${irqCpus} · ${status.irq_busy || 0}/${status.irq_managed || 0}`);
             const ufsState = {
                 boost: 'runtimeUfsBoost',
                 flush: 'runtimeUfsFlush',

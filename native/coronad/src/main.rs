@@ -153,6 +153,7 @@ struct CpuTopology {
     efficiency: Vec<usize>,
     balanced: Vec<usize>,
     performance: Vec<usize>,
+    latency: Vec<usize>,
 }
 
 #[derive(Default)]
@@ -996,6 +997,41 @@ fn detect_topology(config: &AffinityConfig) -> CpuTopology {
         }
     }
     policies.sort_by_key(|entry| entry.0);
+    let capacities = online
+        .iter()
+        .filter_map(|cpu| {
+            read_text(cpu_root.join(format!("cpu{cpu}/cpu_capacity")))
+                .trim()
+                .parse::<u64>()
+                .ok()
+                .map(|capacity| (*cpu, capacity))
+        })
+        .collect::<Vec<_>>();
+    let minimum_capacity = capacities.iter().map(|entry| entry.1).min();
+    let mut latency = minimum_capacity
+        .map(|minimum| {
+            capacities
+                .iter()
+                .filter(|entry| entry.1 > minimum)
+                .map(|entry| entry.0)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if latency.is_empty() && policies.len() > 1 {
+        latency = policies
+            .iter()
+            .skip(1)
+            .flat_map(|entry| entry.1.iter().copied())
+            .collect();
+        latency.sort_unstable();
+        latency.dedup();
+    }
+    if latency.is_empty() {
+        latency = online.clone();
+        if latency.len() > 2 {
+            latency = latency.split_off(latency.len() / 2);
+        }
+    }
     let efficiency = config
         .efficiency
         .as_deref()
@@ -1020,6 +1056,7 @@ fn detect_topology(config: &AffinityConfig) -> CpuTopology {
         efficiency,
         balanced,
         performance,
+        latency,
     }
 }
 
@@ -1365,14 +1402,7 @@ fn cpu_mask_string(cpus: &[usize]) -> String {
 }
 
 fn upper_cpu_list(topology: &CpuTopology) -> Vec<usize> {
-    let mut cpus = topology.balanced.clone();
-    cpus.extend(topology.performance.iter().copied());
-    cpus.sort_unstable();
-    cpus.dedup();
-    if cpus.len() <= 2 {
-        return cpus;
-    }
-    cpus.split_off(cpus.len() / 2)
+    topology.latency.clone()
 }
 
 fn parse_interrupt_samples(text: &str) -> Vec<(u32, u64, String)> {
@@ -2489,7 +2519,7 @@ impl Daemon {
 
     fn write_state(&self, foreground: &str, foreground_source: &str) {
         let state = format!(
-            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
+            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_target_cpus={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
             process::id(),
             foreground,
             foreground_source,
@@ -2512,6 +2542,7 @@ impl Daemon {
             u8::from(self.battery_saver),
             u8::from(self.screen_on),
             self.irq_runtime.state,
+            cpu_list_string(&self.topology.latency),
             self.irq_runtime.managed,
             self.irq_runtime.busy,
             self.irq_runtime.applied,
