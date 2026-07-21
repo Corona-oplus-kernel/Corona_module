@@ -46,6 +46,7 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
+          version="${{ steps.version.outputs.version }}"
           prev_tag=$(git tag --sort=-v:refname | head -1)
           if [ -n "$prev_tag" ]; then
             log=$(git log "$prev_tag"..HEAD --pretty=format:"- %s" --no-merges | grep -v "^- bump:" | grep -v "^- update:")
@@ -53,8 +54,15 @@ jobs:
             log=$(git log --pretty=format:"- %s" --no-merges -20 | grep -v "^- bump:" | grep -v "^- update:")
           fi
           [ -z "$log" ] && log="- 版本更新"
-          : > changelog.md
-          printf "# Corona %s\n\n%s\n" "${{ steps.version.outputs.version }}" "$log" > changelog.md
+          if [ "$prev_tag" = "$version" ] && [ -f changelog.md ]; then
+            tmp=$(mktemp)
+            printf "# Corona %s\n\n%s\n" "$version" "$log" > "$tmp"
+            tail -n +2 changelog.md >> "$tmp"
+            mv "$tmp" changelog.md
+          else
+            : > changelog.md
+            printf "# Corona %s\n\n%s\n" "$version" "$log" > changelog.md
+          fi
 
       - name: Build zip
         shell: bash
