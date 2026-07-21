@@ -436,9 +436,9 @@ memcg_min_oom_adj() {
 }
 
 find_writeback_target() {
-    budget_kb="$1"
-    minimum_kb="$2"
-    minimum_adj="$3"
+    minimum_kb="$1"
+    minimum_adj="$2"
+    exclude="$3"
     best_size=0
     best_group=
     for stat in /dev/memcg/apps/*/memory.swap_stat; do
@@ -446,11 +446,11 @@ find_writeback_target() {
         group=${stat%/memory.swap_stat}
         name=${group##*/}
         case "$name" in active|inactive|systemserver) continue ;; esac
+        case ",$exclude," in *",$name,"*) continue ;; esac
         [ -w "$group/memory.force_swapout" ] || continue
         size=$(awk '$1 == "zramCompressedSize:" { print $2; exit }' "$stat" 2>/dev/null)
         size=$(number_or_default "$size" 0)
         [ "$size" -ge "$minimum_kb" ] || continue
-        [ "$size" -le "$budget_kb" ] || continue
         adj=$(memcg_min_oom_adj "$group")
         [ "$adj" -ge "$minimum_adj" ] || continue
         if [ "$size" -gt "$best_size" ]; then
@@ -468,44 +468,51 @@ perform_proactive_writeback() {
     [ "$TEMPERATURE_C" -le "$compact_thermal_limit" ] || return 0
     { [ "$battery" -ge "$battery_min" ] || [ "$charging" = "1" ]; } || return 0
     awk -v value="$PRESSURE_AVG10" 'BEGIN { exit value <= 0.5 ? 0 : 1 }' || return 0
-    [ $((now - LAST_WRITEBACK)) -ge 900 ] || return 0
+    [ $((now - LAST_WRITEBACK)) -ge 600 ] || return 0
     if [ "$SCREEN_ON" = "1" ]; then
-        [ "$MEMORY_BACKEND" = "erm" ] || return 0
-        awk -v value="$PRESSURE_AVG10" 'BEGIN { exit value <= 0.1 ? 0 : 1 }' || return 0
-        [ "$USAGE_PERCENT" -ge 50 ] || return 0
+        awk -v value="$PRESSURE_AVG10" 'BEGIN { exit value <= 0.2 ? 0 : 1 }' || return 0
+        [ "$USAGE_PERCENT" -ge 40 ] || return 0
     fi
 
     total_kb=$(hybridswap_meminfo_kb "$ZRAM_BLOCK" EST)
     used_kb=$(hybridswap_meminfo_kb "$ZRAM_BLOCK" ESU_C)
     [ "$total_kb" -gt 0 ] || return 0
-    cap_kb=$((total_kb * 70 / 100))
+    cap_pct=80
+    [ "$SCREEN_ON" = "0" ] && cap_pct=90
+    cap_kb=$((total_kb * cap_pct / 100))
     [ "$used_kb" -lt "$cap_kb" ] || return 0
 
-    budget_kb=$((total_kb / 4))
-    [ "$budget_kb" -lt 131072 ] && budget_kb=131072
-    [ "$budget_kb" -gt 524288 ] && budget_kb=524288
     remaining_capacity=$((cap_kb - used_kb))
-    [ "$budget_kb" -gt "$remaining_capacity" ] && budget_kb=$remaining_capacity
+    budget_kb=$remaining_capacity
+    max_budget=$((total_kb / 2))
+    [ "$budget_kb" -gt "$max_budget" ] && budget_kb=$max_budget
     [ "$budget_kb" -ge 8192 ] || return 0
 
     written_kb=0
     targets=
-    while [ "$budget_kb" -ge 8192 ]; do
-        candidate=$(find_writeback_target "$budget_kb" 8192 700)
+    tried=
+    fail_count=0
+    while [ "$budget_kb" -ge 8192 ] && [ "$fail_count" -lt 3 ]; do
+        candidate=$(find_writeback_target 8192 600 "$tried")
         [ -n "$candidate" ] || break
         set -- $candidate
         group="$1"
         expected_kb="$2"
-        [ -n "$group" ] && [ -n "$expected_kb" ] || break
+        [ -n "$group" ] || break
+        name=${group##*/}
+        tried="$tried,$name"
         before_kb=$(hybridswap_meminfo_kb "$ZRAM_BLOCK" ESU_C)
-        echo 1 > "$group/memory.force_swapout" 2>/dev/null || break
+        echo 1 > "$group/memory.force_swapout" 2>/dev/null || { fail_count=$((fail_count + 1)); continue; }
         after_kb=$(hybridswap_meminfo_kb "$ZRAM_BLOCK" ESU_C)
         delta_kb=$((after_kb - before_kb))
-        [ "$delta_kb" -gt 0 ] || break
-        written_kb=$((written_kb + delta_kb))
-        budget_kb=$((budget_kb - expected_kb))
-        name=${group##*/}
-        [ -n "$targets" ] && targets="$targets,$name" || targets=$name
+        if [ "$delta_kb" -gt 0 ]; then
+            written_kb=$((written_kb + delta_kb))
+            budget_kb=$((budget_kb - delta_kb))
+            [ -n "$targets" ] && targets="$targets,$name" || targets=$name
+            fail_count=0
+        else
+            fail_count=$((fail_count + 1))
+        fi
     done
 
     if [ "$written_kb" -gt 0 ]; then
