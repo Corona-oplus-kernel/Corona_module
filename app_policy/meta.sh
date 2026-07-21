@@ -30,7 +30,7 @@ humanize_package_name() {
 get_package_label() {
     pkg="$1"
     label=$(dumpsys package "$pkg" 2>/dev/null | sed -n 's/^[[:space:]]*application-label://p' | head -n1)
-    [ -n "$label" ] || label="$pkg"
+    [ -n "$label" ] || label=$(humanize_package_name "$pkg")
     echo "$label" | tr '	
 ' '   '
 }
@@ -44,9 +44,27 @@ output_label() {
     pkg="$1"
     component="${2:-$(resolve_launcher_component "$pkg") }"
     component=$(printf '%s' "$component" | sed 's/[[:space:]]*$//')
+    label=$(run_package_meta label "$pkg" "$component")
+    [ -n "$label" ] && [ "$label" != "$pkg" ] && { printf '%s' "$label"; return 0; }
     label=$(run_launcher_meta label "$pkg" "$component")
     [ -n "$label" ] && { printf '%s' "$label"; return 0; }
     get_package_label "$pkg"
+}
+
+output_label_batch() {
+    payload="$1"
+    batch=$(run_package_meta label-batch "$payload")
+    [ -n "$batch" ] || batch=$(run_launcher_meta label-batch "$payload")
+    if [ -n "$batch" ]; then
+        printf '%s\n' "$batch"
+        return 0
+    fi
+    printf '%s\n' "$payload" | while IFS='|' read -r pkg component; do
+        [ -n "$pkg" ] || continue
+        component=$(printf '%s' "$component" | sed 's/[[:space:]]*$//')
+        label=$(output_label "$pkg" "$component")
+        printf '%s|%s|%s\n' "$pkg" "$component" "$label"
+    done
 }
 
 list_apps() {
@@ -145,7 +163,7 @@ output_icon_file() {
 output_app_meta() {
     payload=$(list_apps)
     [ -n "$payload" ] || return 0
-    batch=$(run_launcher_meta label-batch "$payload")
+    batch=$(output_label_batch "$payload")
     if [ -n "$batch" ]; then
         printf '%s\n' "$batch"
     else

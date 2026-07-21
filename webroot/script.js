@@ -139,7 +139,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072005` : '';
+        return map[name] ? `${map[name]}?v=2026072101` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -547,7 +547,7 @@ class CoronaAddon {
             const parsed = JSON.parse(json);
             const version = parsed && typeof parsed === 'object' ? parsed.__version : 0;
             const source = parsed && typeof parsed === 'object' && parsed.apps ? parsed.apps : parsed;
-            if (version !== 9 || !source || typeof source !== 'object' || Array.isArray(source)) return;
+            if (version !== 10 || !source || typeof source !== 'object' || Array.isArray(source)) return;
             Object.entries(source).forEach(([pkg, meta]) => {
                 if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return;
                 const next = { ...meta };
@@ -563,7 +563,7 @@ class CoronaAddon {
             this.appMetaCache = {};
         }
         const path = `${this.configDir}/app_meta_cache.b64`;
-        const payload = JSON.stringify({ __version: 9, apps: this.appMetaCache || {} });
+        const payload = JSON.stringify({ __version: 10, apps: this.appMetaCache || {} });
         const base64Data = btoa(unescape(encodeURIComponent(payload)));
         await this.exec(`echo '${base64Data}' > ${this.shellQuote(path)}`);
     }

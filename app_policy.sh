@@ -56,7 +56,7 @@ case "$1" in
             component=$(resolve_launcher_component "$pkg")
             printf '%s|%s\n' "$pkg" "$component"
         done)
-        batch=$(run_launcher_meta label-batch "$payload")
+        batch=$(output_label_batch "$payload")
         if [ -n "$batch" ]; then
             printf '%s\n' "$batch" | while IFS='|' read -r pkg component label; do
                 [ -n "$pkg" ] || continue
