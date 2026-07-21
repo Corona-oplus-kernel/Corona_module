@@ -114,6 +114,12 @@
         isRuntimeDaemonEnabled() {
             return this.state.runtimeDaemonEnabled === true;
         },
+        setRuntimeDaemonState(enabled) {
+            this.state.runtimeDaemonEnabled = enabled;
+            this.updateRuntimeDaemonControlState(enabled);
+            const daemonSwitch = document.getElementById('runtime-daemon-switch');
+            if (daemonSwitch) daemonSwitch.checked = enabled;
+        },
         rejectDaemonDependentAction() {
             if (this.isRuntimeDaemonEnabled()) return false;
             this.showToast(this.t('runtimeDaemonRequired'), 'warning');
@@ -173,10 +179,8 @@
             if (loadToken !== this.runtimeOptimizerLoadToken) return false;
             if (options.revision !== undefined && options.revision !== (this.runtimeOptimizerRevision || 0)) return false;
             const config = this.parseRuntimeKeyValues(configContent);
-            const daemonConfig = this.parseRuntimeKeyValues(daemonConfigContent);
-            const daemonEnabled = (daemonConfig.enabled ?? '0') === '1';
-            this.state.runtimeDaemonEnabled = daemonEnabled;
-            this.updateRuntimeDaemonControlState(daemonEnabled);
+            const daemonEnabled = this.parseEnabledFlag(daemonConfigContent);
+            this.setRuntimeDaemonState(daemonEnabled);
             const setChecked = (id, key, fallback) => {
                 const element = document.getElementById(id);
                 if (element) element.checked = daemonEnabled && (config[key] ?? fallback) === '1';
@@ -185,8 +189,6 @@
                 const element = document.getElementById(id);
                 if (element) element.value = config[key] ?? fallback;
             };
-            const daemonSwitch = document.getElementById('runtime-daemon-switch');
-            if (daemonSwitch) daemonSwitch.checked = daemonEnabled;
             setChecked('runtime-enabled-switch', 'enabled', '0');
             setChecked('runtime-ebpf-switch', 'ebpf', '0');
             setChecked('runtime-load-learning-switch', 'load_learning', '0');
@@ -209,19 +211,21 @@
                 this.runtimeOptimizerApplyTimer = null;
                 this.setRuntimeSaveState('saved');
             }
+            await this.waitForUiPaint();
             if (daemonSwitch) daemonSwitch.disabled = true;
             this.showLoading(true);
             try {
                 await this.mergeConfigFile(DAEMON_CONFIG_FILE, { enabled: enabled ? '1' : '0' }, ['enabled']);
                 await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --sync-daemon`);
-                this.state.runtimeDaemonEnabled = enabled;
+                this.setRuntimeDaemonState(enabled);
                 await this.sleep(500);
                 await this.loadRuntimeOptimizerConfig({ revision });
                 await this.refreshRuntimeOptimizer();
+                if (typeof this.loadZramPolicyConfig === 'function') await this.loadZramPolicyConfig();
                 this.showToast(this.t(enabled ? 'runtimeDaemonEnabled' : 'runtimeDaemonDisabled'));
             } catch (error) {
-                this.state.runtimeDaemonEnabled = previous;
-                if (daemonSwitch) daemonSwitch.checked = !enabled;
+                this.setRuntimeDaemonState(previous);
+                await this.waitForUiPaint();
                 this.showToast(this.t('runtimeDaemonApplyFailed'), 'error');
             } finally {
                 if (daemonSwitch) daemonSwitch.disabled = false;

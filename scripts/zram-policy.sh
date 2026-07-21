@@ -29,7 +29,24 @@ find_zram_block() {
 pid_is_daemon() {
     pid="$1"
     [ -n "$pid" ] && [ -d "/proc/$pid" ] || return 1
-    tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q 'zram-policy.sh.*daemon'
+    command_line=$(cat "/proc/$pid/cmdline" 2>/dev/null | tr '\0' ' ')
+    case "$command_line" in
+        "/system/bin/sh $0 daemon "|"$0 daemon ") return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+find_daemon_pids() {
+    for process in /proc/[0-9]*; do
+        [ -d "$process" ] || continue
+        pid=${process##*/}
+        case "$pid" in *[!0-9]*) continue ;; esac
+        [ "$pid" = "$$" ] && continue
+        command_line=$(cat "$process/cmdline" 2>/dev/null | tr '\0' ' ')
+        case "$command_line" in
+            "/system/bin/sh $0 daemon "|"$0 daemon ") echo "$pid" ;;
+        esac
+    done
 }
 
 read_oplus_value() {
@@ -130,6 +147,50 @@ select_memory_profile() {
     fi
 }
 
+select_hybridswapd_profile() {
+    block="$1"
+    mem_total_mb=$(awk '/^MemTotal:/ { print int($2 / 1024); exit }' /proc/meminfo 2>/dev/null)
+    mem_total_mb=$(number_or_default "$mem_total_mb" 8192)
+    baseline_window=$(get_value "$BASELINE_FILE" avail_buffers)
+    set -- $baseline_window
+    baseline_min=$(number_or_default "$2" 0)
+    baseline_high=$(number_or_default "$3" 0)
+    free_swap_threshold=$(number_or_default "$4" 1536)
+    if [ "$baseline_min" -le 0 ] || [ "$baseline_high" -lt "$baseline_min" ]; then
+        select_memory_profile
+        baseline_min=$PROFILE_MIN_MB
+        baseline_high=$PROFILE_HIGH_MB
+    fi
+
+    calculated_min_mb=$((mem_total_mb * 20 / 100))
+    calculated_high_mb=$((mem_total_mb * 23 / 100))
+    [ "$calculated_high_mb" -lt "$baseline_high" ] && calculated_high_mb=$baseline_high
+    [ "$calculated_min_mb" -lt "$baseline_min" ] && calculated_min_mb=$baseline_min
+    [ "$calculated_min_mb" -gt $((calculated_high_mb - 384)) ] && calculated_min_mb=$((calculated_high_mb - 384))
+    PROFILE_MIN_MB=$calculated_min_mb
+    PROFILE_HIGH_MB=$calculated_high_mb
+    reclaim_gap_mb=$((PROFILE_MIN_MB - baseline_min))
+    [ "$reclaim_gap_mb" -lt 0 ] && reclaim_gap_mb=0
+
+    baseline_vm=$(number_or_default "$(get_value "$BASELINE_FILE" vm_swappiness)" 160)
+    baseline_direct=$(number_or_default "$(get_value "$BASELINE_FILE" direct_swappiness)" 60)
+    baseline_swapd=$(number_or_default "$(get_value "$BASELINE_FILE" swapd_swappiness)" 200)
+    baseline_zram_wm=$(number_or_default "$(get_value "$BASELINE_FILE" zram_wm_ratio)" 80)
+    baseline_cpuload=$(number_or_default "$(get_value "$BASELINE_FILE" cpuload_threshold)" 60)
+    baseline_reclaim=$(number_or_default "$(get_value "$BASELINE_FILE" swapd_max_reclaim_size)" 50)
+    TARGET_VM=$((baseline_vm + reclaim_gap_mb / 48))
+    [ "$TARGET_VM" -gt 180 ] && TARGET_VM=180
+    TARGET_DIRECT=$((baseline_direct + reclaim_gap_mb / 20))
+    [ "$TARGET_DIRECT" -gt 110 ] && TARGET_DIRECT=110
+    TARGET_SWAPD=$baseline_swapd
+    TARGET_ZRAM_WM=$((baseline_zram_wm + reclaim_gap_mb / 128))
+    [ "$TARGET_ZRAM_WM" -gt 90 ] && TARGET_ZRAM_WM=90
+    TARGET_CPULOAD=$((baseline_cpuload + reclaim_gap_mb / 48))
+    [ "$TARGET_CPULOAD" -gt 80 ] && TARGET_CPULOAD=80
+    TARGET_MAX_RECLAIM=$((baseline_reclaim + reclaim_gap_mb / 12))
+    [ "$TARGET_MAX_RECLAIM" -gt 128 ] && TARGET_MAX_RECLAIM=128
+}
+
 select_erm_profile() {
     if [ "$mem_total_mb" -ge 14336 ]; then
         PROFILE_MIN_MB=4500
@@ -164,10 +225,42 @@ detect_memory_backend() {
     fi
 }
 
+read_reclaim_window() {
+    backend="$1"
+    if [ "$backend" = "erm" ] && [ -r /dev/memcg/memory.erm_avail_buffer ]; then
+        cat /dev/memcg/memory.erm_avail_buffer 2>/dev/null | tr -d '[]\r\n' | tr ' ' '-'
+        return
+    fi
+    if [ -r /dev/memcg/memory.avail_buffers ]; then
+        minimum=$(awk '$1 == "min_avail_buffers:" { print $2; exit }' /dev/memcg/memory.avail_buffers 2>/dev/null)
+        high=$(awk '$1 == "high_avail_buffers:" { print $2; exit }' /dev/memcg/memory.avail_buffers 2>/dev/null)
+        [ -n "$minimum" ] && [ -n "$high" ] && printf '%s-%s\n' "$minimum" "$high" && return
+    fi
+    echo --
+}
+
 apply_memory_profile() {
     block="$1"
-    select_memory_profile
     MEMORY_BACKEND=$(detect_memory_backend "$block")
+    if [ "$MEMORY_BACKEND" = "hybridswapd" ]; then
+        select_hybridswapd_profile "$block"
+        RECLAIM_WINDOW_MB="$PROFILE_MIN_MB-$PROFILE_HIGH_MB"
+        coronad_manages_pressure || write_if_changed /proc/sys/vm/swappiness "$TARGET_VM"
+        write_oplus_value vm_swappiness "$TARGET_VM"
+        write_oplus_value direct_swappiness "$TARGET_DIRECT"
+        write_oplus_value swapd_swappiness "$TARGET_SWAPD"
+        write_if_changed /dev/memcg/memory.avail_buffers "$PROFILE_HIGH_MB $PROFILE_MIN_MB $PROFILE_HIGH_MB $free_swap_threshold"
+        write_if_changed /dev/memcg/memory.zram_wm_ratio "$TARGET_ZRAM_WM"
+        write_if_changed /dev/memcg/memory.cpuload_threshold "$TARGET_CPULOAD"
+        write_if_changed /dev/memcg/memory.swapd_max_reclaim_size "$TARGET_MAX_RECLAIM"
+        ATOMIC_CLEAN_DISABLED=$(getprop persist.debug.disable_atomic_clean 2>/dev/null)
+        SYNC_VM=$TARGET_VM
+        SYNC_DIRECT=$TARGET_DIRECT
+        SYNC_SWAPD=$TARGET_SWAPD
+        return
+    fi
+
+    select_memory_profile
     TARGET_VM=160
     TARGET_DIRECT=120
     TARGET_KSWAPD_FIRST=120
@@ -203,7 +296,7 @@ apply_memory_profile() {
             [ "$(getprop persist.debug.disable_atomic_clean 2>/dev/null)" = "true" ] || resetprop -p persist.debug.disable_atomic_clean true 2>/dev/null
             [ "$(getprop sys.nirvana.enable_lowfree_cch_clean 2>/dev/null)" = "false" ] || resetprop sys.nirvana.enable_lowfree_cch_clean false 2>/dev/null
         fi
-    else
+    elif [ "$MEMORY_BACKEND" = "generic" ]; then
         write_if_changed /dev/memcg/memory.avail_buffers "$PROFILE_HIGH_MB $PROFILE_MIN_MB $PROFILE_HIGH_MB 1536"
         write_if_changed /dev/memcg/memory.zram_wm_ratio 70
         write_if_changed /dev/memcg/memory.cpuload_threshold 80
@@ -211,7 +304,7 @@ apply_memory_profile() {
         write_if_changed /dev/memcg/memory.zram_used_limit_mb "$PROFILE_ZRAM_LIMIT"
     fi
 
-    write_if_supported "/sys/block/$block/hybridswap_zram_increase" "$PROFILE_ZRAM_INCREASE"
+    [ "$MEMORY_BACKEND" = "erm" ] && write_if_supported "/sys/block/$block/hybridswap_zram_increase" "$PROFILE_ZRAM_INCREASE"
     ATOMIC_CLEAN_DISABLED=$(getprop persist.debug.disable_atomic_clean 2>/dev/null)
     SYNC_VM=$TARGET_VM
     SYNC_DIRECT=$TARGET_DIRECT
@@ -399,6 +492,16 @@ check_eswap_usable() {
     result=0
     total_kb=$(hybridswap_meminfo_kb "$block" EST)
     [ "$total_kb" -gt 0 ] || { echo 0 > "$ESWAP_CACHE_FILE" 2>/dev/null; echo 0; return; }
+    backend=$(detect_memory_backend "$block")
+    if [ "$backend" = "hybridswapd" ]; then
+        echo 1 > "$ESWAP_CACHE_FILE" 2>/dev/null
+        echo 1
+        return
+    fi
+    if [ "$backend" = "erm" ] && [ "$SCREEN_ON" = "1" ]; then
+        echo -1
+        return
+    fi
     probe_group=
     for stat in /dev/memcg/apps/*/memory.swap_stat; do
         [ -r "$stat" ] || continue
@@ -435,72 +538,216 @@ memcg_min_oom_adj() {
     [ "$found" = "1" ] && echo "$minimum" || echo 1000
 }
 
-find_writeback_target() {
+list_writeback_targets() {
     minimum_kb="$1"
     minimum_adj="$2"
-    exclude="$3"
-    best_size=0
-    best_group=
     for stat in /dev/memcg/apps/*/memory.swap_stat; do
         [ -r "$stat" ] || continue
         group=${stat%/memory.swap_stat}
         name=${group##*/}
         case "$name" in active|inactive|systemserver) continue ;; esac
-        case ",$exclude," in *",$name,"*) continue ;; esac
         [ -w "$group/memory.force_swapout" ] || continue
         size=$(awk '$1 == "zramCompressedSize:" { print $2; exit }' "$stat" 2>/dev/null)
         size=$(number_or_default "$size" 0)
         [ "$size" -ge "$minimum_kb" ] || continue
         adj=$(memcg_min_oom_adj "$group")
         [ "$adj" -ge "$minimum_adj" ] || continue
-        if [ "$size" -gt "$best_size" ]; then
-            best_size=$size
-            best_group=$group
+        printf '%s:%s\n' "$size" "$group"
+    done | sort -t':' -k1,1nr
+}
+
+list_reclaim_targets() {
+    minimum_kb="$1"
+    minimum_adj="$2"
+    for node in /dev/memcg/apps/*/memory.force_shrink_anon; do
+        [ -w "$node" ] || continue
+        group=${node%/memory.force_shrink_anon}
+        name=${group##*/}
+        case "$name" in active|inactive|systemserver) continue ;; esac
+        size_bytes=$(awk '$1 == "total_inactive_anon" { print $2; exit }' "$group/memory.stat" 2>/dev/null)
+        size_bytes=$(number_or_default "$size_bytes" 0)
+        size_kb=$((size_bytes / 1024))
+        [ "$size_kb" -ge "$minimum_kb" ] || continue
+        adj=$(memcg_min_oom_adj "$group")
+        [ "$adj" -ge "$minimum_adj" ] || continue
+        printf '%s:%s\n' "$size_kb" "$group"
+    done | sort -t':' -k1,1nr
+}
+
+zram_swap_used_kb() {
+    block="$1"
+    awk -v block="$block" 'NR > 1 { dev=$1; sub(/^.*\//, "", dev); if (dev == block) { print $4; exit } }' /proc/swaps 2>/dev/null
+}
+
+perform_hybridswapd_reclaim() {
+    [ "$MEMORY_BACKEND" = "hybridswapd" ] || return 0
+    [ "$battery" -ge "$battery_min" ] || return 0
+
+    target_pct=55
+    budget_pct=2
+    budget_cap_kb=196608
+    minimum_budget_kb=32768
+    minimum_adj=900
+    aggregate_allowed=0
+    reclaim_cooldown=$(number_or_default "$(get_value "$CONFIG_FILE" reclaim_cooldown_seconds)" 900)
+    reclaim_thermal_limit=$(number_or_default "$(get_value "$CONFIG_FILE" reclaim_thermal_limit_c)" 68)
+    pressure_limit=0.2
+    if [ "$SCREEN_ON" = "1" ]; then
+        target_pct=60
+        budget_pct=4
+        budget_cap_kb=393216
+        minimum_budget_kb=32768
+        minimum_adj=800
+        aggregate_allowed=0
+        reclaim_cooldown=$(number_or_default "$(get_value "$CONFIG_FILE" reclaim_screen_on_cooldown_seconds)" 180)
+        reclaim_thermal_limit=$(number_or_default "$(get_value "$CONFIG_FILE" reclaim_screen_on_thermal_limit_c)" 72)
+        pressure_limit=0.1
+    fi
+    [ "$TEMPERATURE_C" -le "$reclaim_thermal_limit" ] || return 0
+    awk -v value="$PRESSURE_AVG10" -v limit="$pressure_limit" 'BEGIN { exit value <= limit ? 0 : 1 }' || return 0
+    [ $((now - LAST_RECLAIM)) -ge "$reclaim_cooldown" ] || return 0
+
+    total_kb=$(awk -v block="$ZRAM_BLOCK" 'NR > 1 { dev=$1; sub(/^.*\//, "", dev); if (dev == block) { print $3; exit } }' /proc/swaps 2>/dev/null)
+    used_kb=$(zram_swap_used_kb "$ZRAM_BLOCK")
+    total_kb=$(number_or_default "$total_kb" 0)
+    used_kb=$(number_or_default "$used_kb" 0)
+    [ "$total_kb" -gt 0 ] || return 0
+    target_kb=$((total_kb * target_pct / 100))
+    [ "$used_kb" -lt "$target_kb" ] || return 0
+    budget_kb=$((total_kb * budget_pct / 100))
+    [ "$budget_kb" -gt "$budget_cap_kb" ] && budget_kb=$budget_cap_kb
+    remaining_kb=$((target_kb - used_kb))
+    [ "$budget_kb" -gt "$remaining_kb" ] && budget_kb=$remaining_kb
+    [ "$budget_kb" -ge "$minimum_budget_kb" ] || return 0
+
+    reclaimed_kb=0
+    reclaimed_apps=0
+    fail_count=0
+    aggregate_reclaimed=0
+    reclaim_candidates=$(list_reclaim_targets 4096 "$minimum_adj")
+    inactive_group=/dev/memcg/apps/inactive
+    aggregate_bytes=$(awk '$1 == "total_inactive_anon" { print $2; exit }' "$inactive_group/memory.stat" 2>/dev/null)
+    aggregate_bytes=$(number_or_default "$aggregate_bytes" 0)
+    aggregate_kb=$((aggregate_bytes / 1024))
+    if [ "$aggregate_allowed" = "1" ] && [ -w "$inactive_group/memory.force_shrink_anon" ] && [ "$aggregate_kb" -ge 65536 ] && [ "$aggregate_kb" -le "$budget_kb" ]; then
+        aggregate_apps=$(printf '%s\n' "$reclaim_candidates" | awk 'NF { count++ } END { print count + 0 }')
+        before_kb=$(zram_swap_used_kb "$ZRAM_BLOCK")
+        if echo 0 > "$inactive_group/memory.force_shrink_anon" 2>/dev/null; then
+            after_kb=$(zram_swap_used_kb "$ZRAM_BLOCK")
+            delta_kb=$((after_kb - before_kb))
+            if [ "$delta_kb" -gt 0 ]; then
+                reclaimed_kb=$delta_kb
+                budget_kb=$((budget_kb - delta_kb))
+                reclaimed_apps=$aggregate_apps
+                aggregate_reclaimed=1
+            fi
+        fi
+    fi
+    [ "$aggregate_reclaimed" = "1" ] && reclaim_candidates=
+    for candidate in $reclaim_candidates; do
+        [ "$budget_kb" -ge 4096 ] || break
+        [ "$fail_count" -lt 4 ] || break
+        expected_kb=${candidate%%:*}
+        group=${candidate#*:}
+        before_kb=$(zram_swap_used_kb "$ZRAM_BLOCK")
+        echo 0 > "$group/memory.force_shrink_anon" 2>/dev/null || { fail_count=$((fail_count + 1)); continue; }
+        after_kb=$(zram_swap_used_kb "$ZRAM_BLOCK")
+        delta_kb=$((after_kb - before_kb))
+        if [ "$delta_kb" -gt 0 ]; then
+            reclaimed_kb=$((reclaimed_kb + delta_kb))
+            budget_kb=$((budget_kb - delta_kb))
+            reclaimed_apps=$((reclaimed_apps + 1))
+            fail_count=0
+        else
+            budget_kb=$((budget_kb - expected_kb))
+            fail_count=$((fail_count + 1))
         fi
     done
-    [ -n "$best_group" ] && printf '%s %s\n' "$best_group" "$best_size"
+
+    if [ "$reclaimed_kb" -gt 0 ]; then
+        LAST_RECLAIM=$now
+        RECLAIM_MB=$((reclaimed_kb / 1024))
+        RECLAIM_APPS=$reclaimed_apps
+        LAST_ACTION=reclaim
+        ACTION_THIS_RUN=reclaim
+        LAST_REASON=background_anon_reclaim
+        read_mm_stat "$ZRAM_BLOCK"
+        USAGE_PERCENT=$(zram_usage_percent "$ZRAM_BLOCK")
+        COMPRESSED_MB=$(bytes_to_mb "$MM_COMPR")
+        MEMORY_USED_MB=$(bytes_to_mb "$MM_USED")
+        OVERHEAD_MB=$(positive_difference_mb "$MM_USED" "$MM_COMPR")
+    fi
 }
 
 perform_proactive_writeback() {
     case "$MEMORY_BACKEND" in erm|hybridswapd) ;; *) return 0 ;; esac
     [ "$ESWAP_AVAILABLE" = "1" ] || return 0
-    [ "$USAGE_PERCENT" -ge 25 ] || return 0
-    [ "$TEMPERATURE_C" -le "$compact_thermal_limit" ] || return 0
-    { [ "$battery" -ge "$battery_min" ] || [ "$charging" = "1" ]; } || return 0
+    [ "$battery" -ge "$battery_min" ] || return 0
     awk -v value="$PRESSURE_AVG10" 'BEGIN { exit value <= 0.5 ? 0 : 1 }' || return 0
-    [ $((now - LAST_WRITEBACK)) -ge 600 ] || return 0
-    if [ "$SCREEN_ON" = "1" ]; then
-        awk -v value="$PRESSURE_AVG10" 'BEGIN { exit value <= 0.2 ? 0 : 1 }' || return 0
-        [ "$USAGE_PERCENT" -ge 40 ] || return 0
+    minimum_usage=25
+    minimum_adj=600
+    writeback_cooldown=600
+    cap_pct=80
+    daily_multiplier=2
+    budget_divisor=2
+    if [ "$SCREEN_ON" = "0" ]; then
+        cap_pct=90
     fi
+    if [ "$MEMORY_BACKEND" = "hybridswapd" ]; then
+        writeback_cooldown=300
+        daily_multiplier=3
+        writeback_thermal_limit=$(number_or_default "$(get_value "$CONFIG_FILE" writeback_thermal_limit_c)" 72)
+        if [ "$SCREEN_ON" = "1" ]; then
+            minimum_usage=25
+            minimum_adj=900
+            cap_pct=70
+            budget_divisor=10
+            awk -v value="$PRESSURE_AVG10" 'BEGIN { exit value <= 0.1 ? 0 : 1 }' || return 0
+        else
+            minimum_usage=25
+            minimum_adj=900
+            cap_pct=75
+            budget_divisor=10
+            writeback_cooldown=900
+            awk -v value="$PRESSURE_AVG10" 'BEGIN { exit value <= 0.2 ? 0 : 1 }' || return 0
+        fi
+    elif [ "$SCREEN_ON" = "1" ]; then
+        minimum_usage=40
+        writeback_thermal_limit=$(number_or_default "$(get_value "$CONFIG_FILE" writeback_thermal_limit_c)" 70)
+        awk -v value="$PRESSURE_AVG10" 'BEGIN { exit value <= 0.2 ? 0 : 1 }' || return 0
+    else
+        writeback_thermal_limit=$(number_or_default "$(get_value "$CONFIG_FILE" writeback_thermal_limit_c)" 70)
+    fi
+    [ "$TEMPERATURE_C" -le "$writeback_thermal_limit" ] || return 0
+    [ "$USAGE_PERCENT" -ge "$minimum_usage" ] || return 0
+    [ $((now - LAST_WRITEBACK)) -ge "$writeback_cooldown" ] || return 0
 
     total_kb=$(hybridswap_meminfo_kb "$ZRAM_BLOCK" EST)
     used_kb=$(hybridswap_meminfo_kb "$ZRAM_BLOCK" ESU_C)
+    daily_kb=$(hybridswap_daily_kb "$ZRAM_BLOCK")
     [ "$total_kb" -gt 0 ] || return 0
-    cap_pct=80
-    [ "$SCREEN_ON" = "0" ] && cap_pct=90
     cap_kb=$((total_kb * cap_pct / 100))
     [ "$used_kb" -lt "$cap_kb" ] || return 0
+    daily_cap_kb=$((total_kb * daily_multiplier))
+    [ "$daily_kb" -lt "$daily_cap_kb" ] || return 0
 
     remaining_capacity=$((cap_kb - used_kb))
     budget_kb=$remaining_capacity
-    max_budget=$((total_kb / 2))
+    max_budget=$((total_kb / budget_divisor))
     [ "$budget_kb" -gt "$max_budget" ] && budget_kb=$max_budget
+    remaining_daily=$((daily_cap_kb - daily_kb))
+    [ "$budget_kb" -gt "$remaining_daily" ] && budget_kb=$remaining_daily
     [ "$budget_kb" -ge 8192 ] || return 0
 
     written_kb=0
-    targets=
-    tried=
+    writeback_apps=0
     fail_count=0
-    while [ "$budget_kb" -ge 8192 ] && [ "$fail_count" -lt 3 ]; do
-        candidate=$(find_writeback_target 8192 600 "$tried")
-        [ -n "$candidate" ] || break
-        set -- $candidate
-        group="$1"
-        expected_kb="$2"
-        [ -n "$group" ] || break
-        name=${group##*/}
-        tried="$tried,$name"
+    writeback_candidates=$(list_writeback_targets 8192 "$minimum_adj")
+    for candidate in $writeback_candidates; do
+        [ "$budget_kb" -ge 8192 ] || break
+        [ "$fail_count" -lt 3 ] || break
+        expected_kb=${candidate%%:*}
+        group=${candidate#*:}
         before_kb=$(hybridswap_meminfo_kb "$ZRAM_BLOCK" ESU_C)
         echo 1 > "$group/memory.force_swapout" 2>/dev/null || { fail_count=$((fail_count + 1)); continue; }
         after_kb=$(hybridswap_meminfo_kb "$ZRAM_BLOCK" ESU_C)
@@ -508,9 +755,10 @@ perform_proactive_writeback() {
         if [ "$delta_kb" -gt 0 ]; then
             written_kb=$((written_kb + delta_kb))
             budget_kb=$((budget_kb - delta_kb))
-            [ -n "$targets" ] && targets="$targets,$name" || targets=$name
+            writeback_apps=$((writeback_apps + 1))
             fail_count=0
         else
+            budget_kb=$((budget_kb - expected_kb))
             fail_count=$((fail_count + 1))
         fi
     done
@@ -518,7 +766,7 @@ perform_proactive_writeback() {
     if [ "$written_kb" -gt 0 ]; then
         LAST_WRITEBACK=$now
         WRITEBACK_MB=$((written_kb / 1024))
-        WRITEBACK_TARGETS=$targets
+        WRITEBACK_APPS=$writeback_apps
         LAST_ACTION=writeback
         ACTION_THIS_RUN=writeback
         LAST_REASON=background_cold_pages
@@ -569,9 +817,12 @@ write_state() {
         printf 'last_recompress_epoch=%s\n' "$LAST_RECOMPRESS"
         printf 'last_compact_epoch=%s\n' "$LAST_COMPACT"
         printf 'last_writeback_epoch=%s\n' "$LAST_WRITEBACK"
+        printf 'last_reclaim_epoch=%s\n' "$LAST_RECLAIM"
         printf 'recompress_saved_mb=%s\n' "$RECOMPRESS_SAVED_MB"
         printf 'writeback_mb=%s\n' "$WRITEBACK_MB"
-        printf 'writeback_targets=%s\n' "$WRITEBACK_TARGETS"
+        printf 'writeback_apps=%s\n' "$WRITEBACK_APPS"
+        printf 'reclaim_mb=%s\n' "$RECLAIM_MB"
+        printf 'reclaim_apps=%s\n' "$RECLAIM_APPS"
     } > "$tmp" && mv -f "$tmp" "$STATE_FILE"
 }
 
@@ -604,9 +855,12 @@ run_once() {
     LAST_RECOMPRESS=$(number_or_default "$(get_value "$STATE_FILE" last_recompress_epoch)" 0)
     LAST_COMPACT=$(number_or_default "$(get_value "$STATE_FILE" last_compact_epoch)" 0)
     LAST_WRITEBACK=$(number_or_default "$(get_value "$STATE_FILE" last_writeback_epoch)" 0)
+    LAST_RECLAIM=$(number_or_default "$(get_value "$STATE_FILE" last_reclaim_epoch)" 0)
     RECOMPRESS_SAVED_MB=$(number_or_default "$(get_value "$STATE_FILE" recompress_saved_mb)" 0)
     WRITEBACK_MB=$(number_or_default "$(get_value "$STATE_FILE" writeback_mb)" 0)
-    WRITEBACK_TARGETS=$(get_value "$STATE_FILE" writeback_targets)
+    WRITEBACK_APPS=$(number_or_default "$(get_value "$STATE_FILE" writeback_apps)" 0)
+    RECLAIM_MB=$(number_or_default "$(get_value "$STATE_FILE" reclaim_mb)" 0)
+    RECLAIM_APPS=$(number_or_default "$(get_value "$STATE_FILE" reclaim_apps)" 0)
     ACTION_THIS_RUN=none
 
     if [ -z "$ZRAM_BLOCK" ] || [ ! -r "/sys/block/$ZRAM_BLOCK/mm_stat" ]; then
@@ -634,7 +888,7 @@ run_once() {
     [ "$USAGE_PERCENT" -ge 75 ] && critical=1
     pause_node="/sys/block/$ZRAM_BLOCK/hybridswap_swapd_pause"
     if [ -w "$pause_node" ]; then
-        if [ "$MEMORY_BACKEND" = "erm" ]; then
+        if [ "$MEMORY_BACKEND" = "erm" ] || [ "$MEMORY_BACKEND" = "hybridswapd" ]; then
             desired_pause=0
         elif [ "$ESWAP_AVAILABLE" = "0" ]; then
             desired_pause=1
@@ -699,7 +953,11 @@ run_once() {
             LAST_REASON=recompress_cooldown
         fi
     elif [ "$SCREEN_ON" = "1" ]; then
-        LAST_REASON=screen_on
+        if [ "$MEMORY_BACKEND" = "hybridswapd" ]; then
+            LAST_REASON=hybridswap_adaptive
+        else
+            LAST_REASON=screen_on
+        fi
     elif [ "$USAGE_PERCENT" -lt "$recompress_usage" ]; then
         LAST_REASON=low_usage
     elif [ "$TEMPERATURE_C" -gt "$thermal_limit" ]; then
@@ -740,6 +998,7 @@ run_once() {
     fi
 
     [ "$ACTION_THIS_RUN" = "none" ] && perform_proactive_writeback
+    [ "$ACTION_THIS_RUN" = "none" ] && perform_hybridswapd_reclaim
     HYBRID_USED_MB=$(kb_to_mb "$(hybridswap_meminfo_kb "$ZRAM_BLOCK" ESU_C)")
     HYBRID_CAPACITY_MB=$(kb_to_mb "$(hybridswap_meminfo_kb "$ZRAM_BLOCK" EST)")
     [ "$ESWAP_AVAILABLE" = "-1" ] && ESWAP_AVAILABLE=$(check_eswap_usable "$ZRAM_BLOCK")
@@ -750,7 +1009,6 @@ run_once() {
 
 run_daemon() {
     echo $$ > "$PID_FILE"
-    rm -f "$ESWAP_CACHE_FILE"
     cleanup() {
         trap - TERM INT EXIT
         rm -f "$PID_FILE"
@@ -767,32 +1025,48 @@ run_daemon() {
 }
 
 stop_daemon() {
-    pid=$(cat "$PID_FILE" 2>/dev/null)
-    if pid_is_daemon "$pid"; then
+    pids=$({ cat "$PID_FILE" 2>/dev/null; find_daemon_pids; } | sort -u)
+    for pid in $pids; do
+        pid_is_daemon "$pid" || continue
         kill -TERM "$pid" 2>/dev/null
+    done
+    for pid in $pids; do
+        pid_is_daemon "$pid" || continue
         count=0
         while [ -d "/proc/$pid" ] && [ "$count" -lt 30 ]; do
             sleep 0.1
             count=$((count + 1))
         done
-    fi
+    done
     rm -f "$PID_FILE"
     restore_baseline
-    if [ -f "$STATE_FILE" ]; then
-        sed -i 's/^running=.*/running=0/' "$STATE_FILE" 2>/dev/null
-    fi
+    rm -f "$STATE_FILE" "$ESWAP_CACHE_FILE"
 }
 
 start_daemon() {
     policy_enabled || return 0
     pid=$(cat "$PID_FILE" 2>/dev/null)
     pid_is_daemon "$pid" && { kill -HUP "$pid" 2>/dev/null; return 0; }
-    nohup /system/bin/sh "$0" daemon >/dev/null 2>&1 &
+    for pid in $(find_daemon_pids); do
+        pid_is_daemon "$pid" || continue
+        echo "$pid" > "$PID_FILE"
+        kill -HUP "$pid" 2>/dev/null
+        return 0
+    done
+    if command -v setsid >/dev/null 2>&1; then
+        nohup setsid -d /system/bin/sh "$0" daemon </dev/null >/dev/null 2>&1 &
+    else
+        nohup /system/bin/sh "$0" daemon </dev/null >/dev/null 2>&1 &
+    fi
 }
 
 print_status() {
     actual_running=0
     pid=$(cat "$PID_FILE" 2>/dev/null)
+    if ! pid_is_daemon "$pid"; then
+        pid=
+        rm -f "$PID_FILE"
+    fi
     if policy_enabled && pid_is_daemon "$pid"; then
         actual_running=1
     fi

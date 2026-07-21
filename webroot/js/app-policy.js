@@ -467,7 +467,7 @@ CoronaAddon.prototype.openAppPolicyOverlay = async function(mode) {
     }
 
     // yield so overlay animation can start (animation must not block on list build)
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await this.waitForUiPaint();
 
     try {
         await this.loadInstalledApps();

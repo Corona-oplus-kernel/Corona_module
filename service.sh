@@ -966,14 +966,21 @@ apply_memory_pressure_config() {
     CORONA_PRESSURE_CONFIG="$CONFIG_DIR/memory_pressure.conf" /system/bin/sh "$helper" apply >/dev/null 2>&1
 }
 
-apply_zram_policy_config() {
+sync_zram_policy() {
+    action="$1"
     [ -x "$ZRAM_POLICY_HELPER" ] || return 0
-    /system/bin/sh "$ZRAM_POLICY_HELPER" apply >/dev/null 2>&1
+    if ! coronad_enabled; then
+        action=stop
+    fi
+    /system/bin/sh "$ZRAM_POLICY_HELPER" "$action" >/dev/null 2>&1
+}
+
+apply_zram_policy_config() {
+    sync_zram_policy apply
 }
 
 start_zram_policy_daemon() {
-    [ -x "$ZRAM_POLICY_HELPER" ] || return 0
-    /system/bin/sh "$ZRAM_POLICY_HELPER" start >/dev/null 2>&1
+    sync_zram_policy start
 }
 
 apply_runtime_configs() {
@@ -1094,6 +1101,7 @@ if [ "$1" = "--sync-daemon" ]; then
     mkdir -p "$CONFIG_DIR"
     start_app_policy_daemon
     apply_memory_pressure_config
+    apply_zram_policy_config
     exit 0
 fi
 

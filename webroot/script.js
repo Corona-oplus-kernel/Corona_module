@@ -139,7 +139,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072101` : '';
+        return map[name] ? `${map[name]}?v=2026072102` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -174,6 +174,19 @@ class CoronaAddon {
         if (!content) return defaultValue;
         const match = String(content).match(/^enabled=(\d)/m);
         return match ? match[1] === '1' : defaultValue;
+    }
+    waitForUiPaint() {
+        return new Promise(resolve => {
+            let settled = false;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(fallbackTimer);
+                resolve();
+            };
+            const fallbackTimer = setTimeout(finish, 120);
+            requestAnimationFrame(() => requestAnimationFrame(finish));
+        });
     }
     parseCpuHotplugConfig(content) {
         const saved = {};
@@ -755,7 +768,7 @@ class CoronaAddon {
             e.stopPropagation();
             await this.applyZramImmediate();
         });
-        document.getElementById('le9ec-switch').addEventListener('change', async (e) => { this.state.le9ecEnabled = e.target.checked; this.toggleLe9ecSettings(e.target.checked); await this.saveLe9ecConfig(['enabled']); });
+        document.getElementById('le9ec-switch').addEventListener('change', async (e) => { this.state.le9ecEnabled = e.target.checked; this.toggleLe9ecSettings(e.target.checked); await this.waitForUiPaint(); await this.saveLe9ecConfig(['enabled']); });
         document.getElementById('le9ec-anon-slider').addEventListener('input', (e) => { this.state.le9ecAnon = parseInt(e.target.value) * 1024; document.getElementById('le9ec-anon-value').textContent = `${e.target.value} MB`; });
         document.getElementById('le9ec-anon-slider').addEventListener('change', (e) => { this.state.le9ecAnon = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(['anon_min']); else this.saveLe9ecConfig(['anon_min']); });
         document.getElementById('le9ec-clean-low-slider').addEventListener('input', (e) => { this.state.le9ecCleanLow = parseInt(e.target.value) * 1024; document.getElementById('le9ec-clean-low-value').textContent = `${e.target.value} MB`; });
@@ -764,27 +777,31 @@ class CoronaAddon {
         document.getElementById('le9ec-clean-min-slider').addEventListener('change', (e) => { this.state.le9ecCleanMin = parseInt(e.target.value) * 1024; if (this.state.le9ecEnabled) this.applyLe9ecImmediate(['clean_min']); else this.saveLe9ecConfig(['clean_min']); });
         document.getElementById('io-switch')?.addEventListener('change', async (e) => {
             this.state.ioEnabled = e.target.checked;
-            await this.applyIOConfigImmediate('enabled', true);
             const el = document.getElementById('io-current');
             if (el && !this.state.ioEnabled) el.textContent = '已禁用';
+            await this.waitForUiPaint();
+            await this.applyIOConfigImmediate('enabled', true);
         });
         document.getElementById('cpu-switch')?.addEventListener('change', async (e) => {
             this.state.cpuEnabled = e.target.checked;
-            await this.applyCpuGovernorImmediate('enabled', true);
             const el = document.getElementById('cpu-gov-current');
             if (el && !this.state.cpuEnabled) el.textContent = '已禁用';
+            await this.waitForUiPaint();
+            await this.applyCpuGovernorImmediate('enabled', true);
         });
         document.getElementById('tcp-switch')?.addEventListener('change', async (e) => {
             this.state.tcpEnabled = e.target.checked;
-            await this.applyTcpImmediate('enabled', true);
             const el = document.getElementById('tcp-current');
             if (el && !this.state.tcpEnabled) el.textContent = '已禁用';
+            await this.waitForUiPaint();
+            await this.applyTcpImmediate('enabled', true);
         });
         document.getElementById('vm-switch')?.addEventListener('change', async (e) => {
             this.state.vmEnabled = e.target.checked;
-            await this.applyVmConfig(['enabled'], true);
             const el = document.getElementById('vm-status');
             if (el) el.textContent = this.state.vmEnabled ? '已修改' : '已禁用';
+            await this.waitForUiPaint();
+            await this.applyVmConfig(['enabled'], true);
         });
     }
     resetUiLayout() {

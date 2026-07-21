@@ -2526,15 +2526,29 @@
         toggle.dataset.bound = '1';
         toggle.addEventListener('change', async () => {
             const enabled = toggle.checked;
+            await this.waitForUiPaint();
             toggle.disabled = true;
+            if (enabled) {
+                const daemonEnabled = this.parseEnabledFlag(await this.readConfig('coronad.conf'));
+                this.state.runtimeDaemonEnabled = daemonEnabled;
+                if (!daemonEnabled) {
+                    this.showToast(this.t('runtimeDaemonRequired'), 'warning');
+                    setTimeout(() => {
+                        toggle.checked = false;
+                        toggle.disabled = false;
+                    }, 180);
+                    return;
+                }
+            }
             try {
                 await this.mergeConfigFile('zram_policy.conf', { enabled: enabled ? '1' : '0' }, ['enabled']);
                 await this.exec(`/system/bin/sh ${this.shellQuote(`${this.modDir}/service.sh`)} --sync-zram-policy`);
                 await this.sleep(500);
-                await this.loadZramPolicyStatus();
+                await this.loadZramPolicyConfig();
                 this.showToast(this.t(enabled ? 'zramPolicyEnabled' : 'zramPolicyDisabled'));
             } catch (error) {
                 toggle.checked = !enabled;
+                await this.waitForUiPaint();
                 this.showToast(this.t('zramPolicyApplyFailed'), 'error');
             } finally {
                 toggle.disabled = false;
@@ -2542,13 +2556,22 @@
         });
     },
     async loadZramPolicyConfig() {
-        const config = this.parseIoConfig(await this.readConfig('zram_policy.conf'));
+        const [configContent, daemonConfigContent, statusContent] = await Promise.all([
+            this.readConfig('zram_policy.conf'),
+            this.readConfig('coronad.conf'),
+            this.exec(`/system/bin/sh ${this.shellQuote(`${this.modDir}/scripts/zram-policy.sh`)} status 2>/dev/null`)
+        ]);
+        const config = this.parseIoConfig(configContent);
+        const daemonEnabled = this.parseEnabledFlag(daemonConfigContent);
+        this.state.runtimeDaemonEnabled = daemonEnabled;
         const toggle = document.getElementById('zram-policy-switch');
-        if (toggle) toggle.checked = config.enabled === '1';
-        return this.loadZramPolicyStatus();
+        if (toggle) toggle.checked = daemonEnabled && config.enabled === '1';
+        return this.loadZramPolicyStatus(statusContent);
     },
-    async loadZramPolicyStatus() {
-        const status = this.parseIoConfig(await this.exec(`/system/bin/sh ${this.shellQuote(`${this.modDir}/scripts/zram-policy.sh`)} status 2>/dev/null`));
+    async loadZramPolicyStatus(statusContent) {
+        if (statusContent === undefined) await this.waitForUiPaint();
+        const content = statusContent ?? await this.exec(`/system/bin/sh ${this.shellQuote(`${this.modDir}/scripts/zram-policy.sh`)} status 2>/dev/null`);
+        const status = this.parseIoConfig(content);
         const supported = status.supported === '1';
         const running = status.running === '1';
         const badge = document.getElementById('zram-policy-status');
@@ -2575,7 +2598,12 @@
         if (eswapAvailable) {
             if (writebackRow) writebackRow.style.display = '';
             if (dailyWritebackRow) dailyWritebackRow.style.display = '';
-            setText('zram-policy-writeback', running ? (status.memory_backend === 'erm' ? this.t('zramPolicyWritebackSystem') : status.hybridswap_paused === '1' ? this.t('zramPolicyWritebackPaused') : this.t('zramPolicyWritebackAllowed')) : '--');
+            const writebackStatus = status.memory_backend === 'hybridswapd' || status.memory_backend === 'erm'
+                ? this.t('zramPolicyWritebackAdaptive')
+                    : status.hybridswap_paused === '1'
+                        ? this.t('zramPolicyWritebackPaused')
+                        : this.t('zramPolicyWritebackAllowed');
+            setText('zram-policy-writeback', running ? writebackStatus : '--');
             const writebackUsed = Number.parseInt(status.hybridswap_used_mb || '0', 10);
             const writebackCapacity = Number.parseInt(status.hybridswap_capacity_mb || '0', 10);
             setText('zram-policy-daily-writeback', writebackCapacity > 0 ? `${writebackUsed} / ${writebackCapacity} MB` : '--');
@@ -2586,10 +2614,13 @@
         const actionKey = {
             recompress: 'zramPolicyActionRecompress',
             compact: 'zramPolicyActionCompact',
+            reclaim: 'zramPolicyActionReclaim',
             writeback: 'zramPolicyActionWriteback',
             idle: 'zramPolicyActionIdle'
         }[status.last_action] || 'zramPolicyActionIdle';
         const waitingKey = {
+            system_managed: 'zramPolicyWaitSystemManaged',
+            hybridswap_adaptive: 'zramPolicyWaitHybridAdaptive',
             screen_on: 'zramPolicyWaitScreenOff',
             low_usage: 'zramPolicyWaitLowUsage',
             high_temperature: 'zramPolicyWaitTemperature',
@@ -2599,9 +2630,12 @@
         }[status.last_reason];
         const saved = Number.parseInt(status.recompress_saved_mb || '0', 10);
         const written = Number.parseInt(status.writeback_mb || '0', 10);
+        const reclaimed = Number.parseInt(status.reclaim_mb || '0', 10);
         const actionText = this.t(status.last_action === 'idle' && waitingKey ? waitingKey : actionKey);
         const actionDetail = status.last_action === 'recompress' && saved > 0
             ? `${actionText} (-${saved} MB)`
+            : status.last_action === 'reclaim' && reclaimed > 0
+                ? `${actionText} (${reclaimed} MB)`
             : status.last_action === 'writeback' && written > 0
                 ? `${actionText} (${written} MB)`
                 : actionText;
