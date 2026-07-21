@@ -320,6 +320,13 @@
                 unsupported: 'unsupported'
             }[status.ufs_policy] || 'runtimeUfsIdle';
             this.setRuntimeText('runtime-ufs-policy', `${this.t(ufsState)} · ${status.ufs_wb_available || 0}`);
+            const gpuState = {
+                burst: 'runtimeGpuBurst',
+                limited: 'runtimeGpuLimited',
+                idle: 'runtimeGpuIdle',
+                unsupported: 'unsupported'
+            }[status.gpu_policy] || 'runtimeGpuIdle';
+            this.setRuntimeText('runtime-gpu-policy', `${this.t(gpuState)} · ${status.gpu_busy_percent || 0}%`);
             this.setRuntimeText('runtime-applied-failed', `${status.affinity_applied || status.applied || 0} / ${status.affinity_failed || status.failed || 0}`);
             this.setRuntimeText('runtime-ebpf-events', status.bpf_events || '0');
             const error = document.getElementById('runtime-ebpf-error');

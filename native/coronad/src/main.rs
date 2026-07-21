@@ -184,6 +184,18 @@ struct UfsRuntime {
     state: &'static str,
 }
 
+#[derive(Default)]
+struct GpuRuntime {
+    root: Option<PathBuf>,
+    baseline_min_freq: Option<String>,
+    target_min_freq: u64,
+    hold_rounds: u8,
+    elapsed_ms: u64,
+    applied: u64,
+    busy_percent: u64,
+    state: &'static str,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum RuntimeMode {
     Normal,
@@ -596,6 +608,7 @@ struct Daemon {
     pressure_last_target: Option<u32>,
     irq_runtime: IrqRuntime,
     ufs_runtime: UfsRuntime,
+    gpu_runtime: GpuRuntime,
     last_foreground: String,
     last_profile: String,
     tick: u64,
@@ -1431,6 +1444,36 @@ fn find_ufs_root() -> Option<PathBuf> {
     visit(Path::new("/sys/devices/platform"), 4)
 }
 
+fn find_gpu_root() -> Option<PathBuf> {
+    let path = PathBuf::from("/sys/class/kgsl/kgsl-3d0");
+    (path.join("devfreq/min_freq").is_file()
+        && (path.join("gpu_busy_percentage").is_file() || path.join("gpubusy").is_file()))
+    .then_some(path)
+}
+
+fn first_numeric(value: &str) -> Option<u64> {
+    value
+        .split_ascii_whitespace()
+        .find_map(|value| value.parse::<u64>().ok())
+}
+
+fn select_gpu_floor(root: &Path) -> u64 {
+    let maximum = first_numeric(&read_text(root.join("devfreq/max_freq"))).unwrap_or(0);
+    let requested = maximum.saturating_mul(40) / 100;
+    let mut frequencies = read_text(root.join("devfreq/available_frequencies"))
+        .split_ascii_whitespace()
+        .filter_map(|value| value.parse::<u64>().ok())
+        .filter(|value| *value <= maximum)
+        .collect::<Vec<_>>();
+    frequencies.sort_unstable();
+    frequencies
+        .iter()
+        .copied()
+        .find(|value| *value >= requested)
+        .or_else(|| frequencies.last().copied())
+        .unwrap_or(0)
+}
+
 fn network_queue_paths(interfaces: &HashSet<String>) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     let root = Path::new("/sys/class/net");
@@ -1692,6 +1735,74 @@ impl UfsRuntime {
     }
 }
 
+impl GpuRuntime {
+    fn step(&mut self, mode: RuntimeMode, elapsed_ms: u64) {
+        self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
+        if self.elapsed_ms < 1_000 {
+            return;
+        }
+        self.elapsed_ms = 0;
+        if self.root.is_none() {
+            self.root = find_gpu_root();
+        }
+        let Some(root) = self.root.clone() else {
+            self.state = "unsupported";
+            return;
+        };
+        let min_freq = root.join("devfreq/min_freq");
+        self.busy_percent = first_numeric(&read_text(root.join("gpu_busy_percentage")))
+            .or_else(|| {
+                let values = read_text(root.join("gpubusy"))
+                    .split_ascii_whitespace()
+                    .filter_map(|value| value.parse::<u64>().ok())
+                    .collect::<Vec<_>>();
+                let busy = *values.first()?;
+                let total = *values.get(1)?;
+                (total > 0).then_some(busy.saturating_mul(100) / total)
+            })
+            .unwrap_or(0)
+            .min(100);
+        if self.baseline_min_freq.is_none() {
+            let baseline = read_text(&min_freq).trim().to_string();
+            if !baseline.is_empty() {
+                self.baseline_min_freq = Some(baseline);
+            }
+            self.target_min_freq = select_gpu_floor(&root);
+        }
+        let allowed = matches!(mode, RuntimeMode::Normal | RuntimeMode::Warm);
+        if allowed && self.busy_percent >= 25 {
+            self.hold_rounds = 3;
+        } else if self.hold_rounds > 0 {
+            self.hold_rounds -= 1;
+        }
+        if allowed && self.hold_rounds > 0 && self.target_min_freq > 0 {
+            let target = self.target_min_freq.to_string();
+            if read_text(&min_freq).trim() != target
+                && write_text(&min_freq, target.as_bytes()).is_ok()
+            {
+                self.applied += 1;
+            }
+            self.state = "burst";
+        } else {
+            if let Some(baseline) = self.baseline_min_freq.as_deref() {
+                if read_text(&min_freq).trim() != baseline
+                    && write_text(&min_freq, baseline.as_bytes()).is_ok()
+                {
+                    self.applied += 1;
+                }
+            }
+            self.hold_rounds = 0;
+            self.state = if allowed { "idle" } else { "limited" };
+        }
+    }
+
+    fn cleanup(&self) {
+        if let (Some(root), Some(baseline)) = (&self.root, &self.baseline_min_freq) {
+            let _ = write_text(root.join("devfreq/min_freq"), baseline.as_bytes());
+        }
+    }
+}
+
 fn parse_task_stat(path: &Path) -> Option<(u64, u64)> {
     parse_task_stat_text(&read_text(path))
 }
@@ -1886,6 +1997,7 @@ impl Daemon {
             pressure_last_target: None,
             irq_runtime: IrqRuntime::default(),
             ufs_runtime: UfsRuntime::default(),
+            gpu_runtime: GpuRuntime::default(),
             last_foreground: String::new(),
             last_profile: String::new(),
             tick: 0,
@@ -2206,7 +2318,7 @@ impl Daemon {
 
     fn write_state(&self, foreground: &str, foreground_source: &str) {
         let state = format!(
-            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
+            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
             process::id(),
             foreground,
             foreground_source,
@@ -2236,6 +2348,10 @@ impl Daemon {
             self.ufs_runtime.available_buffer,
             self.ufs_runtime.current_buffer,
             self.ufs_runtime.applied,
+            self.gpu_runtime.state,
+            self.gpu_runtime.busy_percent,
+            self.gpu_runtime.target_min_freq,
+            self.gpu_runtime.applied,
             self.thread_states.len(),
             self.stats.loops,
             self.stats.foreground_changes,
@@ -2304,6 +2420,7 @@ impl Daemon {
         self.irq_runtime.step(&self.topology, self.runtime_mode, interval_ms);
         self.ufs_runtime
             .step(self.runtime_mode, self.irq_runtime.storage_delta_sectors);
+        self.gpu_runtime.step(self.runtime_mode, interval_ms);
         if self.protect_elapsed_ms >= 30_000 {
             self.protect_apps();
             self.protect_elapsed_ms = 0;
@@ -2320,6 +2437,7 @@ impl Daemon {
     fn cleanup(&self) {
         self.irq_runtime.cleanup();
         self.ufs_runtime.cleanup();
+        self.gpu_runtime.cleanup();
         if self.pressure.enabled {
             if let Some(baseline) = self.pressure_baseline {
                 write_swappiness(baseline);
