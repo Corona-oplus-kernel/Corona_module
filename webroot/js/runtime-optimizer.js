@@ -5,6 +5,8 @@
 
     const CONFIG_FILE = 'auto_affinity.conf';
     const DAEMON_CONFIG_FILE = 'coronad.conf';
+    const HARDWARE_CONFIG_FILE = 'hardware_policy.conf';
+    const HARDWARE_CONFIG_ORDER = ['irq_enabled', 'ufs_enabled', 'gpu_enabled', 'io_enabled'];
     const CONFIG_ORDER = [
         'enabled', 'ebpf', 'default_class', 'efficiency_cpus', 'balanced_cpus',
         'performance_cpus', 'exclude_packages', 'scan_interval_ms', 'load_learning',
@@ -48,6 +50,16 @@
             });
             document.getElementById('runtime-daemon-switch')?.addEventListener('change', event => {
                 this.setRuntimeDaemonEnabled(event.target.checked);
+            });
+            [
+                ['runtime-irq-switch', 'irq_enabled'],
+                ['runtime-ufs-switch', 'ufs_enabled'],
+                ['runtime-gpu-switch', 'gpu_enabled'],
+                ['runtime-io-switch', 'io_enabled']
+            ].forEach(([id, key]) => {
+                document.getElementById(id)?.addEventListener('change', event => {
+                    this.setHardwarePolicyEnabled(event.currentTarget, key);
+                });
             });
             ['runtime-efficiency-cpus', 'runtime-balanced-cpus', 'runtime-performance-cpus', 'runtime-scan-interval', 'runtime-warm-threshold', 'runtime-severe-threshold'].forEach(id => {
                 const input = document.getElementById(id);
@@ -172,13 +184,15 @@
         async loadRuntimeOptimizerConfig(options = {}) {
             const loadToken = (this.runtimeOptimizerLoadToken || 0) + 1;
             this.runtimeOptimizerLoadToken = loadToken;
-            const [configContent, daemonConfigContent] = await Promise.all([
+            const [configContent, daemonConfigContent, hardwareConfigContent] = await Promise.all([
                 this.readConfig(CONFIG_FILE),
-                this.readConfig(DAEMON_CONFIG_FILE)
+                this.readConfig(DAEMON_CONFIG_FILE),
+                this.readConfig(HARDWARE_CONFIG_FILE)
             ]);
             if (loadToken !== this.runtimeOptimizerLoadToken) return false;
             if (options.revision !== undefined && options.revision !== (this.runtimeOptimizerRevision || 0)) return false;
             const config = this.parseRuntimeKeyValues(configContent);
+            const hardwareConfig = this.parseRuntimeKeyValues(hardwareConfigContent);
             const daemonEnabled = this.parseEnabledFlag(daemonConfigContent);
             this.setRuntimeDaemonState(daemonEnabled);
             const setChecked = (id, key, fallback) => {
@@ -193,6 +207,14 @@
             setChecked('runtime-ebpf-switch', 'ebpf', '0');
             setChecked('runtime-load-learning-switch', 'load_learning', '0');
             setChecked('runtime-thermal-control-switch', 'thermal_control', '0');
+            const setHardwareChecked = (id, key) => {
+                const element = document.getElementById(id);
+                if (element) element.checked = daemonEnabled && (hardwareConfig[key] ?? '1') === '1';
+            };
+            setHardwareChecked('runtime-irq-switch', 'irq_enabled');
+            setHardwareChecked('runtime-ufs-switch', 'ufs_enabled');
+            setHardwareChecked('runtime-gpu-switch', 'gpu_enabled');
+            setHardwareChecked('runtime-io-switch', 'io_enabled');
             this.selectRuntimeClass(daemonEnabled ? config.default_class || 'balanced' : null);
             setValue('runtime-efficiency-cpus', 'efficiency_cpus');
             setValue('runtime-balanced-cpus', 'balanced_cpus');
@@ -200,6 +222,25 @@
             setValue('runtime-scan-interval', 'scan_interval_ms', '1000');
             setValue('runtime-warm-threshold', 'thermal_warm_c', '75');
             setValue('runtime-severe-threshold', 'thermal_severe_c', '100');
+        },
+        async setHardwarePolicyEnabled(toggle, key) {
+            if (!toggle || !HARDWARE_CONFIG_ORDER.includes(key)) return;
+            if (this.rejectDaemonDependentToggle(toggle)) return;
+            const enabled = toggle.checked;
+            await this.waitForUiPaint();
+            toggle.disabled = true;
+            try {
+                await this.mergeConfigFile(HARDWARE_CONFIG_FILE, { [key]: enabled ? '1' : '0' }, HARDWARE_CONFIG_ORDER);
+                await this.exec(`${this.shellQuote(`${this.modDir}/bin/coronad`)} reload`);
+                await this.sleep(350);
+                await this.refreshRuntimeOptimizer();
+                this.showToast(this.t('runtimeHardwareSaved'));
+            } catch (error) {
+                toggle.checked = !enabled;
+                this.showToast(this.t('runtimeHardwareSaveFailed'), 'error');
+            } finally {
+                toggle.disabled = false;
+            }
         },
         async setRuntimeDaemonEnabled(enabled) {
             const daemonSwitch = document.getElementById('runtime-daemon-switch');
@@ -310,6 +351,7 @@
                 active: 'runtimeIrqActive',
                 efficient: 'runtimeIrqEfficient',
                 idle: 'runtimeIrqIdle',
+                disabled: 'runtimePolicyDisabled',
                 unsupported: 'unsupported'
             }[status.irq_policy] || 'runtimeIrqIdle';
             const irqCpus = status.irq_target_cpus ? ` ${status.irq_target_cpus}` : '';
@@ -318,6 +360,7 @@
                 boost: 'runtimeUfsBoost',
                 flush: 'runtimeUfsFlush',
                 idle: 'runtimeUfsIdle',
+                disabled: 'runtimePolicyDisabled',
                 unsupported: 'unsupported'
             }[status.ufs_policy] || 'runtimeUfsIdle';
             this.setRuntimeText('runtime-ufs-policy', `${this.t(ufsState)} · ${status.ufs_wb_available || 0}`);
@@ -325,6 +368,7 @@
                 burst: 'runtimeGpuBurst',
                 limited: 'runtimeGpuLimited',
                 idle: 'runtimeGpuIdle',
+                disabled: 'runtimePolicyDisabled',
                 unsupported: 'unsupported'
             }[status.gpu_policy] || 'runtimeGpuIdle';
             this.setRuntimeText('runtime-gpu-policy', `${this.t(gpuState)} · ${status.gpu_busy_percent || 0}%`);
@@ -334,7 +378,8 @@
                 write: 'runtimeIoWrite',
                 mixed: 'runtimeIoMixed',
                 limited: 'runtimeIoLimited',
-                idle: 'runtimeIoIdle'
+                idle: 'runtimeIoIdle',
+                disabled: 'runtimePolicyDisabled'
             }[status.io_policy] || 'runtimeIoIdle';
             const ioValues = status.io_read_ahead_kb && status.io_read_ahead_kb !== '0'
                 ? ` · ${status.io_read_ahead_kb}/${status.io_nr_requests || 0}`

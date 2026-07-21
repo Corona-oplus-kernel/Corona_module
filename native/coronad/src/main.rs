@@ -149,6 +149,14 @@ struct AffinityConfig {
 }
 
 #[derive(Clone)]
+struct HardwareConfig {
+    irq_enabled: bool,
+    ufs_enabled: bool,
+    gpu_enabled: bool,
+    io_enabled: bool,
+}
+
+#[derive(Clone)]
 struct CpuTopology {
     efficiency: Vec<usize>,
     balanced: Vec<usize>,
@@ -615,6 +623,7 @@ struct Daemon {
     rules: Rules,
     pressure: PressureConfig,
     affinity: AffinityConfig,
+    hardware: HardwareConfig,
     topology: CpuTopology,
     manual_rules: Vec<ManualRule>,
     manual_packages: HashSet<String>,
@@ -946,6 +955,19 @@ fn load_affinity(paths: &Paths) -> AffinityConfig {
             .and_then(|value| value.parse().ok())
             .unwrap_or(100.0),
     }
+}
+
+fn hardware_config(values: &HashMap<String, String>) -> HardwareConfig {
+    HardwareConfig {
+        irq_enabled: value_bool(values, "irq_enabled", true),
+        ufs_enabled: value_bool(values, "ufs_enabled", true),
+        gpu_enabled: value_bool(values, "gpu_enabled", true),
+        io_enabled: value_bool(values, "io_enabled", true),
+    }
+}
+
+fn load_hardware(paths: &Paths) -> HardwareConfig {
+    hardware_config(&parse_key_values(paths.config.join("hardware_policy.conf")))
 }
 
 fn parse_cpu_list(value: &str) -> Vec<usize> {
@@ -1722,6 +1744,17 @@ impl IrqRuntime {
             let _ = write_text(path, value.as_bytes());
         }
     }
+
+    fn disable(&mut self) {
+        if self.state == "disabled" {
+            return;
+        }
+        self.cleanup();
+        self.targets.clear();
+        self.idle_rounds.clear();
+        self.busy = 0;
+        self.state = "disabled";
+    }
 }
 
 impl UfsRuntime {
@@ -1807,6 +1840,16 @@ impl UfsRuntime {
             let _ = write_text(path, value.as_bytes());
         }
     }
+
+    fn disable(&mut self) {
+        if self.state == "disabled" {
+            return;
+        }
+        self.cleanup();
+        self.targets.clear();
+        self.hold_rounds = 0;
+        self.state = "disabled";
+    }
 }
 
 impl GpuRuntime {
@@ -1874,6 +1917,15 @@ impl GpuRuntime {
         if let (Some(root), Some(baseline)) = (&self.root, &self.baseline_min_freq) {
             let _ = write_text(root.join("devfreq/min_freq"), baseline.as_bytes());
         }
+    }
+
+    fn disable(&mut self) {
+        if self.state == "disabled" {
+            return;
+        }
+        self.cleanup();
+        self.hold_rounds = 0;
+        self.state = "disabled";
     }
 }
 
@@ -2000,6 +2052,19 @@ impl IoRuntime {
         for (path, value) in &self.baselines {
             let _ = write_text(path, value.as_bytes());
         }
+    }
+
+    fn disable(&mut self) {
+        if self.state == "disabled" {
+            return;
+        }
+        self.cleanup();
+        self.targets.clear();
+        self.idle_rounds.clear();
+        self.active_devices = 0;
+        self.read_ahead_kb = 0;
+        self.nr_requests = 0;
+        self.state = "disabled";
     }
 }
 
@@ -2157,6 +2222,7 @@ fn bpf_should_attach(config: &AffinityConfig, manual_rules: &[ManualRule]) -> bo
 impl Daemon {
     fn new(paths: Paths) -> Self {
         let affinity = load_affinity(&paths);
+        let hardware = load_hardware(&paths);
         let topology = detect_topology(&affinity);
         let manual_rules = load_manual_rules(&paths);
         let manual_packages = manual_rules
@@ -2193,6 +2259,7 @@ impl Daemon {
             screen_on: true,
             stats,
             affinity,
+            hardware,
             pressure_baseline,
             pressure_last_target: None,
             irq_runtime: IrqRuntime::default(),
@@ -2227,6 +2294,7 @@ impl Daemon {
             let _ = fs::remove_file(&self.paths.pressure_baseline);
         }
         self.affinity = load_affinity(&self.paths);
+        self.hardware = load_hardware(&self.paths);
         self.topology = detect_topology(&self.affinity);
         self.manual_rules = load_manual_rules(&self.paths);
         self.manual_packages = self
@@ -2624,11 +2692,27 @@ impl Daemon {
         }
         self.process_bpf_events(&foreground);
         self.scan_threads(&foreground);
-        self.irq_runtime.step(&self.topology, self.runtime_mode, interval_ms);
-        self.ufs_runtime
-            .step(self.runtime_mode, self.irq_runtime.storage_delta_sectors);
-        self.gpu_runtime.step(self.runtime_mode, interval_ms);
-        self.io_runtime.step(self.runtime_mode, interval_ms);
+        if self.hardware.irq_enabled {
+            self.irq_runtime.step(&self.topology, self.runtime_mode, interval_ms);
+        } else {
+            self.irq_runtime.disable();
+        }
+        if self.hardware.ufs_enabled {
+            self.ufs_runtime
+                .step(self.runtime_mode, self.irq_runtime.storage_delta_sectors);
+        } else {
+            self.ufs_runtime.disable();
+        }
+        if self.hardware.gpu_enabled {
+            self.gpu_runtime.step(self.runtime_mode, interval_ms);
+        } else {
+            self.gpu_runtime.disable();
+        }
+        if self.hardware.io_enabled {
+            self.io_runtime.step(self.runtime_mode, interval_ms);
+        } else {
+            self.io_runtime.disable();
+        }
         if self.protect_elapsed_ms >= 30_000 {
             self.protect_apps();
             self.protect_elapsed_ms = 0;
@@ -2754,6 +2838,25 @@ mod tests {
     #[test]
     fn parses_cpu_ranges() {
         assert_eq!(parse_cpu_list("0-2, 4 6"), vec![0, 1, 2, 4, 6]);
+    }
+
+    #[test]
+    fn loads_hardware_switches_with_enabled_defaults() {
+        let defaults = hardware_config(&HashMap::new());
+        assert!(defaults.irq_enabled);
+        assert!(defaults.ufs_enabled);
+        assert!(defaults.gpu_enabled);
+        assert!(defaults.io_enabled);
+
+        let values = HashMap::from([
+            ("irq_enabled".to_string(), "0".to_string()),
+            ("gpu_enabled".to_string(), "false".to_string()),
+        ]);
+        let configured = hardware_config(&values);
+        assert!(!configured.irq_enabled);
+        assert!(configured.ufs_enabled);
+        assert!(!configured.gpu_enabled);
+        assert!(configured.io_enabled);
     }
 
     #[test]
