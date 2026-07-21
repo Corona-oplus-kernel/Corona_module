@@ -313,6 +313,13 @@
                 unsupported: 'unsupported'
             }[status.irq_policy] || 'runtimeIrqIdle';
             this.setRuntimeText('runtime-irq-policy', `${this.t(irqState)} · ${status.irq_busy || 0}/${status.irq_managed || 0}`);
+            const ufsState = {
+                boost: 'runtimeUfsBoost',
+                flush: 'runtimeUfsFlush',
+                idle: 'runtimeUfsIdle',
+                unsupported: 'unsupported'
+            }[status.ufs_policy] || 'runtimeUfsIdle';
+            this.setRuntimeText('runtime-ufs-policy', `${this.t(ufsState)} · ${status.ufs_wb_available || 0}`);
             this.setRuntimeText('runtime-applied-failed', `${status.affinity_applied || status.applied || 0} / ${status.affinity_failed || status.failed || 0}`);
             this.setRuntimeText('runtime-ebpf-events', status.bpf_events || '0');
             const error = document.getElementById('runtime-ebpf-error');

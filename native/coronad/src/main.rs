@@ -169,6 +169,19 @@ struct IrqRuntime {
     applied: u64,
     supported: bool,
     state: &'static str,
+    storage_delta_sectors: u64,
+}
+
+#[derive(Default)]
+struct UfsRuntime {
+    root: Option<PathBuf>,
+    baselines: HashMap<PathBuf, String>,
+    targets: HashMap<PathBuf, String>,
+    hold_rounds: u8,
+    applied: u64,
+    available_buffer: u64,
+    current_buffer: u64,
+    state: &'static str,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -582,6 +595,7 @@ struct Daemon {
     pressure_baseline: Option<u32>,
     pressure_last_target: Option<u32>,
     irq_runtime: IrqRuntime,
+    ufs_runtime: UfsRuntime,
     last_foreground: String,
     last_profile: String,
     tick: u64,
@@ -1386,6 +1400,37 @@ fn storage_io_sectors(text: &str) -> u64 {
         .sum()
 }
 
+fn parse_numeric(value: &str) -> Option<u64> {
+    let value = value.trim();
+    value
+        .strip_prefix("0x")
+        .and_then(|value| u64::from_str_radix(value, 16).ok())
+        .or_else(|| value.parse().ok())
+}
+
+fn find_ufs_root() -> Option<PathBuf> {
+    fn visit(path: &Path, depth: usize) -> Option<PathBuf> {
+        if path.join("auto_hibern8").is_file()
+            && (path.join("wb_on").is_file()
+                || path.join("capabilities/write_booster").is_file())
+        {
+            return Some(path.to_path_buf());
+        }
+        if depth == 0 {
+            return None;
+        }
+        for entry in fs::read_dir(path).ok()?.flatten() {
+            if entry.file_type().ok()?.is_dir() {
+                if let Some(found) = visit(&entry.path(), depth - 1) {
+                    return Some(found);
+                }
+            }
+        }
+        None
+    }
+    visit(Path::new("/sys/devices/platform"), 4)
+}
+
 fn network_queue_paths(interfaces: &HashSet<String>) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     let root = Path::new("/sys/class/net");
@@ -1456,8 +1501,13 @@ impl IrqRuntime {
         let upper = upper_cpu_list(topology);
         let upper_list = cpu_list_string(&upper);
         let storage_sectors = storage_io_sectors(&read_text(proc_root().join("diskstats")));
-        let storage_delta = storage_sectors.saturating_sub(self.last_storage_sectors);
+        let storage_delta = if self.last_storage_sectors == 0 {
+            0
+        } else {
+            storage_sectors.saturating_sub(self.last_storage_sectors)
+        };
         self.last_storage_sectors = storage_sectors;
+        self.storage_delta_sectors = storage_delta;
 
         for (irq, count, name) in samples {
             let previous = self.last_counts.insert(irq, count).unwrap_or(count);
@@ -1548,6 +1598,91 @@ impl IrqRuntime {
         } else {
             "idle"
         };
+    }
+
+    fn cleanup(&self) {
+        for (path, value) in &self.baselines {
+            let _ = write_text(path, value.as_bytes());
+        }
+    }
+}
+
+impl UfsRuntime {
+    fn apply(&mut self, path: &Path, value: &str) {
+        if self.targets.get(path).map(String::as_str) == Some(value) {
+            return;
+        }
+        let current = read_text(path).trim().to_string();
+        if current.is_empty() {
+            return;
+        }
+        self.baselines.entry(path.to_path_buf()).or_insert(current.clone());
+        if current == value || write_text(path, value.as_bytes()).is_ok() {
+            if current != value {
+                self.applied += 1;
+            }
+            self.targets.insert(path.to_path_buf(), value.to_string());
+        }
+    }
+
+    fn restore(&mut self, path: &Path) {
+        if self.targets.remove(path).is_none() {
+            return;
+        }
+        let Some(value) = self.baselines.get(path) else {
+            return;
+        };
+        if read_text(path).trim() != value && write_text(path, value.as_bytes()).is_ok() {
+            self.applied += 1;
+        }
+    }
+
+    fn step(&mut self, mode: RuntimeMode, storage_delta_sectors: u64) {
+        if self.root.is_none() {
+            self.root = find_ufs_root();
+        }
+        let Some(root) = self.root.clone() else {
+            self.state = "unsupported";
+            return;
+        };
+        let hibern8 = root.join("auto_hibern8");
+        let flush = root.join("enable_wb_buf_flush");
+        let wb_on = root.join("wb_on");
+        self.available_buffer =
+            parse_numeric(&read_text(root.join("attributes/wb_avail_buf"))).unwrap_or(0);
+        self.current_buffer =
+            parse_numeric(&read_text(root.join("attributes/wb_cur_buf"))).unwrap_or(0);
+        let heavy_write = storage_delta_sectors >= 32_768;
+        if heavy_write && matches!(mode, RuntimeMode::Normal | RuntimeMode::Warm) {
+            self.hold_rounds = 3;
+        } else if self.hold_rounds > 0 {
+            self.hold_rounds -= 1;
+        }
+        let buffer_low = self.available_buffer > 0 && self.available_buffer <= 2;
+        if self.hold_rounds > 0 && !buffer_low {
+            if wb_on.is_file() {
+                self.apply(&wb_on, "1");
+            }
+            if flush.is_file() {
+                self.apply(&flush, "0");
+            }
+            if hibern8.is_file() {
+                self.apply(&hibern8, "0");
+            }
+            self.state = "boost";
+        } else if buffer_low || matches!(mode, RuntimeMode::ScreenOff) {
+            if flush.is_file() {
+                self.apply(&flush, "1");
+            }
+            self.restore(&hibern8);
+            self.restore(&wb_on);
+            self.state = if buffer_low { "flush" } else { "idle" };
+        } else {
+            self.restore(&flush);
+            self.restore(&hibern8);
+            self.restore(&wb_on);
+            self.state = "idle";
+        }
     }
 
     fn cleanup(&self) {
@@ -1750,6 +1885,7 @@ impl Daemon {
             pressure_baseline,
             pressure_last_target: None,
             irq_runtime: IrqRuntime::default(),
+            ufs_runtime: UfsRuntime::default(),
             last_foreground: String::new(),
             last_profile: String::new(),
             tick: 0,
@@ -2070,7 +2206,7 @@ impl Daemon {
 
     fn write_state(&self, foreground: &str, foreground_source: &str) {
         let state = format!(
-            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
+            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
             process::id(),
             foreground,
             foreground_source,
@@ -2096,6 +2232,10 @@ impl Daemon {
             self.irq_runtime.managed,
             self.irq_runtime.busy,
             self.irq_runtime.applied,
+            self.ufs_runtime.state,
+            self.ufs_runtime.available_buffer,
+            self.ufs_runtime.current_buffer,
+            self.ufs_runtime.applied,
             self.thread_states.len(),
             self.stats.loops,
             self.stats.foreground_changes,
@@ -2162,6 +2302,8 @@ impl Daemon {
         self.process_bpf_events(&foreground);
         self.scan_threads(&foreground);
         self.irq_runtime.step(&self.topology, self.runtime_mode, interval_ms);
+        self.ufs_runtime
+            .step(self.runtime_mode, self.irq_runtime.storage_delta_sectors);
         if self.protect_elapsed_ms >= 30_000 {
             self.protect_apps();
             self.protect_elapsed_ms = 0;
@@ -2177,6 +2319,7 @@ impl Daemon {
 
     fn cleanup(&self) {
         self.irq_runtime.cleanup();
+        self.ufs_runtime.cleanup();
         if self.pressure.enabled {
             if let Some(baseline) = self.pressure_baseline {
                 write_swappiness(baseline);
