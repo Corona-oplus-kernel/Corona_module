@@ -2560,8 +2560,15 @@
         setText('zram-policy-usage', status.usage_percent ? `${status.usage_percent}%` : '--');
         setText('zram-policy-overhead', status.overhead_mb ? `${status.overhead_mb} MB` : '--');
         setText('zram-policy-pressure', status.pressure_avg10 ? `${status.pressure_avg10}%` : '--');
+        const backendText = {
+            erm: 'OPlus ERM',
+            hybridswapd: 'HybridSwapD',
+            generic: this.t('zramPolicyBackendGeneric')
+        }[status.memory_backend] || '--';
+        setText('zram-policy-backend', running ? backendText : '--');
+        setText('zram-policy-reclaim-window', running && status.reclaim_window_mb ? `${status.reclaim_window_mb} MB` : '--');
         setText('zram-policy-oplus', status.oplus_vm_swappiness ? `${status.oplus_vm_swappiness} / ${status.oplus_direct_swappiness || '--'} / ${status.oplus_swapd_swappiness || '--'}` : '--');
-        setText('zram-policy-writeback', running ? (status.hybridswap_paused === '1' ? this.t('zramPolicyWritebackPaused') : this.t('zramPolicyWritebackAllowed')) : '--');
+        setText('zram-policy-writeback', running ? (status.memory_backend === 'erm' ? this.t('zramPolicyWritebackSystem') : status.hybridswap_paused === '1' ? this.t('zramPolicyWritebackPaused') : this.t('zramPolicyWritebackAllowed')) : '--');
         const dailyWriteback = Number.parseInt(status.hybridswap_daily_mb || '0', 10);
         const dailyQuota = Number.parseInt(status.hybridswap_quota_mb || '0', 10);
         setText('zram-policy-daily-writeback', dailyQuota > 0 ? `${dailyWriteback} / ${dailyQuota} MB` : dailyWriteback > 0 ? `${dailyWriteback} MB` : '--');

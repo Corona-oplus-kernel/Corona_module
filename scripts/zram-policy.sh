@@ -67,14 +67,117 @@ write_oplus_value() {
     esac
 }
 
+read_erm_stat() {
+    [ -r /sys/kernel/oplus_mm/erm/stats ] || return 1
+    awk -v key="$1" '$1 == key { print $2; exit }' /sys/kernel/oplus_mm/erm/stats 2>/dev/null
+}
+
+write_if_supported() {
+    node="$1"
+    value="$2"
+    [ -w "$node" ] && echo "$value" > "$node" 2>/dev/null
+}
+
+select_memory_profile() {
+    mem_total_mb=$(awk '/^MemTotal:/ { print int($2 / 1024); exit }' /proc/meminfo 2>/dev/null)
+    mem_total_mb=$(number_or_default "$mem_total_mb" 8192)
+    if [ "$mem_total_mb" -ge 14336 ]; then
+        PROFILE_MIN_MB=4000
+        PROFILE_HIGH_MB=4500
+        PROFILE_WM_DIRECT=196608
+        PROFILE_WM_MIN=163840
+        PROFILE_ZRAM_INCREASE=2048
+    elif [ "$mem_total_mb" -ge 10240 ]; then
+        PROFILE_MIN_MB=3200
+        PROFILE_HIGH_MB=3600
+        PROFILE_WM_DIRECT=163840
+        PROFILE_WM_MIN=131072
+        PROFILE_ZRAM_INCREASE=1536
+    elif [ "$mem_total_mb" -ge 7168 ]; then
+        PROFILE_MIN_MB=2400
+        PROFILE_HIGH_MB=2800
+        PROFILE_WM_DIRECT=131072
+        PROFILE_WM_MIN=98304
+        PROFILE_ZRAM_INCREASE=1024
+    else
+        PROFILE_MIN_MB=1600
+        PROFILE_HIGH_MB=1900
+        PROFILE_WM_DIRECT=98304
+        PROFILE_WM_MIN=81920
+        PROFILE_ZRAM_INCREASE=512
+    fi
+}
+
+detect_memory_backend() {
+    if [ -r /sys/kernel/oplus_mm/erm/stats ] && [ -w /dev/memcg/memory.erm_avail_buffer ]; then
+        echo erm
+    elif [ -r "/sys/block/$1/hybridswap_vmstat" ]; then
+        echo hybridswapd
+    else
+        echo generic
+    fi
+}
+
+apply_memory_profile() {
+    block="$1"
+    select_memory_profile
+    MEMORY_BACKEND=$(detect_memory_backend "$block")
+    RECLAIM_WINDOW_MB="$PROFILE_MIN_MB-$PROFILE_HIGH_MB"
+
+    write_if_supported /proc/sys/vm/swappiness 160
+    write_oplus_value vm_swappiness 160
+    write_oplus_value direct_swappiness 120
+    write_oplus_value swapd_swappiness 200
+    write_if_supported /proc/oplus_mem/dynamic_swappiness '120 4096 160 2048'
+    write_if_supported /proc/oplus_healthinfo/dynamic_swappiness '120 4096 160 2048'
+
+    if [ "$MEMORY_BACKEND" = "erm" ]; then
+        write_if_supported /dev/memcg/memory.erm_avail_buffer "$PROFILE_MIN_MB $PROFILE_HIGH_MB"
+        write_if_supported /sys/kernel/oplus_mm/erm/wmarks "$PROFILE_WM_DIRECT $PROFILE_WM_MIN"
+        write_if_supported /sys/kernel/oplus_mm/erm/kswapd_swappiness1 '4096 120'
+        write_if_supported /sys/kernel/oplus_mm/erm/kswapd_swappiness2 '2048 160'
+        write_if_supported /sys/kernel/oplus_mm/erm/direct_swappiness1 '2048 120'
+        write_if_supported /sys/kernel/oplus_mm/erm/thrashing_limit_pct 25
+    else
+        write_if_supported /dev/memcg/memory.avail_buffers "$PROFILE_HIGH_MB $PROFILE_MIN_MB $PROFILE_HIGH_MB 1536"
+        write_if_supported /dev/memcg/memory.zram_wm_ratio 75
+        write_if_supported /dev/memcg/memory.cpuload_threshold 80
+        write_if_supported /dev/memcg/memory.swapd_max_reclaim_size 100
+    fi
+
+    write_if_supported "/sys/block/$block/hybridswap_zram_increase" "$PROFILE_ZRAM_INCREASE"
+    SYNC_VM=160
+    SYNC_DIRECT=120
+    SYNC_SWAPD=200
+}
+
 capture_baseline() {
     [ -f "$BASELINE_FILE" ] && return 0
     mkdir -p "$MODDIR/config"
     block=$(find_zram_block)
     {
+        printf 'sys_vm_swappiness=%s\n' "$(cat /proc/sys/vm/swappiness 2>/dev/null | tr -d ' \r\n')"
         printf 'vm_swappiness=%s\n' "$(read_oplus_value vm_swappiness)"
         printf 'direct_swappiness=%s\n' "$(read_oplus_value direct_swappiness)"
         printf 'swapd_swappiness=%s\n' "$(read_oplus_value swapd_swappiness)"
+        printf 'dynamic_swappiness=%s\n' "$(cat /proc/oplus_mem/dynamic_swappiness 2>/dev/null | tr -d '\r\n')"
+        printf 'erm_avail_buffer=%s\n' "$(cat /dev/memcg/memory.erm_avail_buffer 2>/dev/null | tr -d '[]\r\n' | tr '-' ' ')"
+        printf 'erm_wmarks=%s %s\n' "$(read_erm_stat wm_direct)" "$(read_erm_stat wm_min)"
+        printf 'erm_kswapd1=%s %s\n' "$(read_erm_stat kswapd_threshold1)" "$(read_erm_stat kswapd_swappiness1)"
+        printf 'erm_kswapd2=%s %s\n' "$(read_erm_stat kswapd_threshold2)" "$(read_erm_stat kswapd_swappiness2)"
+        printf 'erm_direct1=%s %s\n' "$(read_erm_stat direct_threshold1)" "$(read_erm_stat direct_swappiness1)"
+        printf 'erm_thrashing_limit=%s\n' "$(read_erm_stat thrashing_limit_pct)"
+        if [ -r /dev/memcg/memory.avail_buffers ]; then
+            printf 'avail_buffers=%s %s %s %s\n' \
+                "$(awk '$1 == "avail_buffers:" { print $2 }' /dev/memcg/memory.avail_buffers)" \
+                "$(awk '$1 == "min_avail_buffers:" { print $2 }' /dev/memcg/memory.avail_buffers)" \
+                "$(awk '$1 == "high_avail_buffers:" { print $2 }' /dev/memcg/memory.avail_buffers)" \
+                "$(awk '$1 == "free_swap_threshold:" { print $2 }' /dev/memcg/memory.avail_buffers)"
+        fi
+        printf 'zram_wm_ratio=%s\n' "$(cat /dev/memcg/memory.zram_wm_ratio 2>/dev/null | tr -d ' \r\n')"
+        printf 'cpuload_threshold=%s\n' "$(cat /dev/memcg/memory.cpuload_threshold 2>/dev/null | tr -d ' \r\n')"
+        printf 'swapd_max_reclaim_size=%s\n' "$(cat /dev/memcg/memory.swapd_max_reclaim_size 2>/dev/null | awk '{ print $NF }')"
+        printf 'hybridswap_zram_increase=%s\n' "$(cat "/sys/block/$block/hybridswap_zram_increase" 2>/dev/null | tr -d ' \r\n')"
         if [ -n "$block" ] && [ -r "/sys/block/$block/hybridswap_swapd_pause" ]; then
             printf 'hybridswap_swapd_pause=%s\n' "$(cat "/sys/block/$block/hybridswap_swapd_pause" 2>/dev/null | tr -d ' \r\n')"
         fi
@@ -84,9 +187,36 @@ capture_baseline() {
 restore_baseline() {
     [ -r "$BASELINE_FILE" ] || return 0
     block=$(find_zram_block)
+    value=$(get_value "$BASELINE_FILE" sys_vm_swappiness)
+    [ -n "$value" ] && write_if_supported /proc/sys/vm/swappiness "$value"
     for key in vm_swappiness direct_swappiness swapd_swappiness; do
         value=$(get_value "$BASELINE_FILE" "$key")
         [ -n "$value" ] && write_oplus_value "$key" "$value"
+    done
+    value=$(get_value "$BASELINE_FILE" dynamic_swappiness)
+    [ -n "$value" ] && write_if_supported /proc/oplus_mem/dynamic_swappiness "$value"
+    value=$(get_value "$BASELINE_FILE" erm_avail_buffer)
+    [ -n "$value" ] && write_if_supported /dev/memcg/memory.erm_avail_buffer "$value"
+    value=$(get_value "$BASELINE_FILE" erm_wmarks)
+    [ -n "$value" ] && write_if_supported /sys/kernel/oplus_mm/erm/wmarks "$value"
+    value=$(get_value "$BASELINE_FILE" erm_kswapd1)
+    [ -n "$value" ] && write_if_supported /sys/kernel/oplus_mm/erm/kswapd_swappiness1 "$value"
+    value=$(get_value "$BASELINE_FILE" erm_kswapd2)
+    [ -n "$value" ] && write_if_supported /sys/kernel/oplus_mm/erm/kswapd_swappiness2 "$value"
+    value=$(get_value "$BASELINE_FILE" erm_direct1)
+    case "$value" in 0\ 0|'') ;; *) write_if_supported /sys/kernel/oplus_mm/erm/direct_swappiness1 "$value" ;; esac
+    value=$(get_value "$BASELINE_FILE" erm_thrashing_limit)
+    [ -n "$value" ] && write_if_supported /sys/kernel/oplus_mm/erm/thrashing_limit_pct "$value"
+    for item in \
+        'avail_buffers:/dev/memcg/memory.avail_buffers' \
+        'zram_wm_ratio:/dev/memcg/memory.zram_wm_ratio' \
+        'cpuload_threshold:/dev/memcg/memory.cpuload_threshold' \
+        'swapd_max_reclaim_size:/dev/memcg/memory.swapd_max_reclaim_size' \
+        "hybridswap_zram_increase:/sys/block/$block/hybridswap_zram_increase"; do
+        key=${item%%:*}
+        node=${item#*:}
+        value=$(get_value "$BASELINE_FILE" "$key")
+        [ -n "$value" ] && write_if_supported "$node" "$value"
     done
     pause=$(get_value "$BASELINE_FILE" hybridswap_swapd_pause)
     [ -n "$block" ] && [ -n "$pause" ] && [ -w "/sys/block/$block/hybridswap_swapd_pause" ] && echo "$pause" > "/sys/block/$block/hybridswap_swapd_pause" 2>/dev/null
@@ -178,20 +308,6 @@ zram_usage_percent() {
     awk -v block="$block" 'NR > 1 { dev=$1; sub(/^.*\//, "", dev); if (dev == block) { print ($3 > 0 ? int($4 * 100 / $3) : 0); exit } }' /proc/swaps 2>/dev/null
 }
 
-sync_oplus_swappiness() {
-    target=$(cat /proc/sys/vm/swappiness 2>/dev/null | tr -d ' \r\n')
-    target=$(number_or_default "$target" 100)
-    direct=$target
-    [ "$direct" -gt 100 ] && direct=100
-    swapd=200
-    write_oplus_value vm_swappiness "$target"
-    write_oplus_value direct_swappiness "$direct"
-    write_oplus_value swapd_swappiness "$swapd"
-    SYNC_VM=$target
-    SYNC_DIRECT=$direct
-    SYNC_SWAPD=$swapd
-}
-
 write_state() {
     tmp="$STATE_FILE.tmp.$$"
     {
@@ -208,6 +324,8 @@ write_state() {
         printf 'hybridswap_paused=%s\n' "$HYBRID_PAUSED"
         printf 'hybridswap_daily_mb=%s\n' "$HYBRID_DAILY_MB"
         printf 'hybridswap_quota_mb=%s\n' "$HYBRID_QUOTA_MB"
+        printf 'memory_backend=%s\n' "$MEMORY_BACKEND"
+        printf 'reclaim_window_mb=%s\n' "$RECLAIM_WINDOW_MB"
         printf 'oplus_vm_swappiness=%s\n' "$SYNC_VM"
         printf 'oplus_direct_swappiness=%s\n' "$SYNC_DIRECT"
         printf 'oplus_swapd_swappiness=%s\n' "$SYNC_SWAPD"
@@ -233,6 +351,8 @@ run_once() {
     HYBRID_PAUSED=0
     HYBRID_DAILY_MB=0
     HYBRID_QUOTA_MB=0
+    MEMORY_BACKEND=generic
+    RECLAIM_WINDOW_MB=--
     SYNC_VM=$(read_oplus_value vm_swappiness)
     SYNC_DIRECT=$(read_oplus_value direct_swappiness)
     SYNC_SWAPD=$(read_oplus_value swapd_swappiness)
@@ -259,14 +379,16 @@ run_once() {
     MEMORY_USED_MB=$(bytes_to_mb "$MM_USED")
     OVERHEAD_MB=$(positive_difference_mb "$MM_USED" "$MM_COMPR")
 
-    sync_oplus_swappiness
+    apply_memory_profile "$ZRAM_BLOCK"
 
     critical=0
-    awk -v value="$PRESSURE_AVG10" 'BEGIN { exit value >= 5.0 ? 0 : 1 }' && critical=1
-    [ "$USAGE_PERCENT" -ge 92 ] && critical=1
+    awk -v value="$PRESSURE_AVG10" 'BEGIN { exit value >= 1.0 ? 0 : 1 }' && critical=1
+    [ "$USAGE_PERCENT" -ge 75 ] && critical=1
     pause_node="/sys/block/$ZRAM_BLOCK/hybridswap_swapd_pause"
     if [ -w "$pause_node" ]; then
-        if [ "$SCREEN_ON" = "1" ] && [ "$critical" = "0" ]; then
+        if [ "$MEMORY_BACKEND" = "erm" ]; then
+            desired_pause=0
+        elif [ "$SCREEN_ON" = "1" ] && [ "$critical" = "0" ]; then
             desired_pause=1
         else
             desired_pause=0
@@ -320,7 +442,7 @@ run_once() {
         LAST_REASON=low_battery
     fi
 
-    if [ "$ACTION_THIS_RUN" != "recompress" ] && [ -w "/sys/block/$ZRAM_BLOCK/compact" ] && [ $((now - LAST_COMPACT)) -ge "$compact_cooldown" ]; then
+    if [ "$ACTION_THIS_RUN" != "recompress" ] && [ "$SCREEN_ON" = "0" ] && [ "$TEMPERATURE_C" -le "$thermal_limit" ] && { [ "$battery" -ge "$battery_min" ] || [ "$charging" = "1" ]; } && [ -w "/sys/block/$ZRAM_BLOCK/compact" ] && [ $((now - LAST_COMPACT)) -ge "$compact_cooldown" ]; then
         if [ "$OVERHEAD_MB" -ge "$compact_overhead_mb" ] && [ "$overhead_percent" -ge "$compact_overhead_percent" ]; then
             if echo 1 > "/sys/block/$ZRAM_BLOCK/compact" 2>/dev/null; then
                 LAST_COMPACT=$now
