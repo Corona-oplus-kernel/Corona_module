@@ -483,6 +483,122 @@ hybridswap_meminfo_kb() {
     number_or_default "$value" 0
 }
 
+hybridswap_stat_kb() {
+    block="$1"
+    key="$2:"
+    file="/sys/block/$block/hybridswap_stat_snap"
+    [ -r "$file" ] || { echo 0; return; }
+    value=$(awk -v key="$key" '$1 == key { print $2; exit }' "$file" 2>/dev/null)
+    number_or_default "$value" 0
+}
+
+hybridswap_vmstat_value() {
+    block="$1"
+    key="$2"
+    file="/sys/block/$block/hybridswap_vmstat"
+    [ -r "$file" ] || { echo 0; return; }
+    value=$(awk -v key="$key" '$1 == key { print $2; exit }' "$file" 2>/dev/null)
+    number_or_default "$value" 0
+}
+
+compression_ratio_percent() {
+    original="$1"
+    compressed="$2"
+    awk -v original="$original" -v compressed="$compressed" 'BEGIN { print (compressed > 0 ? int(original * 100 / compressed) : 0) }'
+}
+
+select_adaptive_scales() {
+    if [ "$COMPRESSION_RATIO_PERCENT" -ge 300 ]; then
+        compression_scale=125
+    elif [ "$COMPRESSION_RATIO_PERCENT" -ge 240 ]; then
+        compression_scale=115
+    elif [ "$COMPRESSION_RATIO_PERCENT" -ge 180 ]; then
+        compression_scale=100
+    elif [ "$COMPRESSION_RATIO_PERCENT" -ge 150 ]; then
+        compression_scale=85
+    elif [ "$COMPRESSION_RATIO_PERCENT" -gt 0 ]; then
+        compression_scale=70
+    else
+        compression_scale=100
+    fi
+
+    case "$ADAPTIVE_FEEDBACK_LEVEL" in
+        1)
+            feedback_scale=75
+            WRITEBACK_BUDGET_SCALE_PERCENT=75
+            ADAPTIVE_COOLDOWN_PERCENT=150
+            ADAPTIVE_ADJ_BONUS=25
+            ;;
+        2)
+            feedback_scale=55
+            WRITEBACK_BUDGET_SCALE_PERCENT=55
+            ADAPTIVE_COOLDOWN_PERCENT=220
+            ADAPTIVE_ADJ_BONUS=50
+            ;;
+        3)
+            feedback_scale=35
+            WRITEBACK_BUDGET_SCALE_PERCENT=35
+            ADAPTIVE_COOLDOWN_PERCENT=300
+            ADAPTIVE_ADJ_BONUS=100
+            ;;
+        *)
+            ADAPTIVE_FEEDBACK_LEVEL=0
+            feedback_scale=100
+            WRITEBACK_BUDGET_SCALE_PERCENT=100
+            ADAPTIVE_COOLDOWN_PERCENT=100
+            ADAPTIVE_ADJ_BONUS=0
+            ;;
+    esac
+    RECLAIM_BUDGET_SCALE_PERCENT=$((compression_scale * feedback_scale / 100))
+}
+
+update_adaptive_feedback() {
+    CURRENT_REOUT_KB=$(hybridswap_stat_kb "$ZRAM_BLOCK" reout_bytes)
+    CURRENT_FAULT_COUNT=$(hybridswap_stat_kb "$ZRAM_BLOCK" fault_cnt)
+    CURRENT_REFAULT_HITS=$(hybridswap_vmstat_value "$ZRAM_BLOCK" swapd_hit_refaults)
+    LAST_REFAULT_MB=0
+
+    if [ "$FEEDBACK_SAMPLE_EPOCH" -gt 0 ] && [ "$FEEDBACK_SAMPLE_WRITEBACK_KB" -gt 0 ]; then
+        sample_age=$((now - FEEDBACK_SAMPLE_EPOCH))
+        reout_delta_kb=$((CURRENT_REOUT_KB - FEEDBACK_SAMPLE_REOUT_KB))
+        [ "$reout_delta_kb" -lt 0 ] && reout_delta_kb=0
+        refault_threshold_kb=$((FEEDBACK_SAMPLE_WRITEBACK_KB * 35 / 100))
+        [ "$refault_threshold_kb" -lt 16384 ] && refault_threshold_kb=16384
+        if [ "$sample_age" -ge 120 ] && [ "$reout_delta_kb" -ge "$refault_threshold_kb" ]; then
+            ADAPTIVE_FEEDBACK_LEVEL=$((ADAPTIVE_FEEDBACK_LEVEL + 1))
+            [ "$ADAPTIVE_FEEDBACK_LEVEL" -gt 3 ] && ADAPTIVE_FEEDBACK_LEVEL=3
+            FEEDBACK_LAST_ADJUST_EPOCH=$now
+            LAST_REFAULT_MB=$((reout_delta_kb / 1024))
+            FEEDBACK_SAMPLE_EPOCH=0
+            FEEDBACK_SAMPLE_WRITEBACK_KB=0
+        elif [ "$sample_age" -ge 900 ]; then
+            [ "$ADAPTIVE_FEEDBACK_LEVEL" -gt 0 ] && ADAPTIVE_FEEDBACK_LEVEL=$((ADAPTIVE_FEEDBACK_LEVEL - 1))
+            FEEDBACK_LAST_ADJUST_EPOCH=$now
+            LAST_REFAULT_MB=$((reout_delta_kb / 1024))
+            FEEDBACK_SAMPLE_EPOCH=0
+            FEEDBACK_SAMPLE_WRITEBACK_KB=0
+        fi
+    elif [ "$ADAPTIVE_FEEDBACK_LEVEL" -gt 0 ] && [ "$FEEDBACK_LAST_ADJUST_EPOCH" -gt 0 ] && [ $((now - FEEDBACK_LAST_ADJUST_EPOCH)) -ge 1800 ]; then
+        ADAPTIVE_FEEDBACK_LEVEL=$((ADAPTIVE_FEEDBACK_LEVEL - 1))
+        FEEDBACK_LAST_ADJUST_EPOCH=$now
+    fi
+
+    select_adaptive_scales
+}
+
+record_writeback_feedback_sample() {
+    written_kb="$1"
+    if [ "$FEEDBACK_SAMPLE_EPOCH" -le 0 ]; then
+        FEEDBACK_SAMPLE_EPOCH=$now
+        FEEDBACK_SAMPLE_REOUT_KB=$CURRENT_REOUT_KB
+        FEEDBACK_SAMPLE_FAULT_COUNT=$CURRENT_FAULT_COUNT
+        FEEDBACK_SAMPLE_REFAULT_HITS=$CURRENT_REFAULT_HITS
+        FEEDBACK_SAMPLE_WRITEBACK_KB=$written_kb
+    else
+        FEEDBACK_SAMPLE_WRITEBACK_KB=$((FEEDBACK_SAMPLE_WRITEBACK_KB + written_kb))
+    fi
+}
+
 check_eswap_usable() {
     block="$1"
     if [ -f "$ESWAP_CACHE_FILE" ]; then
@@ -582,6 +698,12 @@ zram_swap_used_kb() {
 perform_hybridswapd_reclaim() {
     [ "$MEMORY_BACKEND" = "hybridswapd" ] || return 0
     [ "$battery" -ge "$battery_min" ] || return 0
+    if [ "$RECLAIM_BLOCKED_UNTIL" -gt "$now" ]; then
+        RECLAIM_CIRCUIT_ACTIVE=1
+        return 0
+    fi
+    RECLAIM_BLOCKED_UNTIL=0
+    RECLAIM_CIRCUIT_ACTIVE=0
 
     target_pct=55
     budget_pct=2
@@ -603,6 +725,9 @@ perform_hybridswapd_reclaim() {
         reclaim_thermal_limit=$(number_or_default "$(get_value "$CONFIG_FILE" reclaim_screen_on_thermal_limit_c)" 72)
         pressure_limit=0.1
     fi
+    reclaim_cooldown=$((reclaim_cooldown * ADAPTIVE_COOLDOWN_PERCENT / 100))
+    minimum_adj=$((minimum_adj + ADAPTIVE_ADJ_BONUS))
+    [ "$minimum_adj" -gt 1000 ] && minimum_adj=1000
     [ "$TEMPERATURE_C" -le "$reclaim_thermal_limit" ] || return 0
     awk -v value="$PRESSURE_AVG10" -v limit="$pressure_limit" 'BEGIN { exit value <= limit ? 0 : 1 }' || return 0
     [ $((now - LAST_RECLAIM)) -ge "$reclaim_cooldown" ] || return 0
@@ -615,6 +740,8 @@ perform_hybridswapd_reclaim() {
     target_kb=$((total_kb * target_pct / 100))
     [ "$used_kb" -lt "$target_kb" ] || return 0
     budget_kb=$((total_kb * budget_pct / 100))
+    budget_kb=$((budget_kb * RECLAIM_BUDGET_SCALE_PERCENT / 100))
+    budget_cap_kb=$((budget_cap_kb * RECLAIM_BUDGET_SCALE_PERCENT / 100))
     [ "$budget_kb" -gt "$budget_cap_kb" ] && budget_kb=$budget_cap_kb
     remaining_kb=$((target_kb - used_kb))
     [ "$budget_kb" -gt "$remaining_kb" ] && budget_kb=$remaining_kb
@@ -623,6 +750,7 @@ perform_hybridswapd_reclaim() {
     reclaimed_kb=0
     reclaimed_apps=0
     fail_count=0
+    attempt_count=0
     aggregate_reclaimed=0
     reclaim_candidates=$(list_reclaim_targets 4096 "$minimum_adj")
     inactive_group=/dev/memcg/apps/inactive
@@ -630,6 +758,7 @@ perform_hybridswapd_reclaim() {
     aggregate_bytes=$(number_or_default "$aggregate_bytes" 0)
     aggregate_kb=$((aggregate_bytes / 1024))
     if [ "$aggregate_allowed" = "1" ] && [ -w "$inactive_group/memory.force_shrink_anon" ] && [ "$aggregate_kb" -ge 65536 ] && [ "$aggregate_kb" -le "$budget_kb" ]; then
+        attempt_count=$((attempt_count + 1))
         aggregate_apps=$(printf '%s\n' "$reclaim_candidates" | awk 'NF { count++ } END { print count + 0 }')
         before_kb=$(zram_swap_used_kb "$ZRAM_BLOCK")
         if echo 0 > "$inactive_group/memory.force_shrink_anon" 2>/dev/null; then
@@ -649,6 +778,7 @@ perform_hybridswapd_reclaim() {
         [ "$fail_count" -lt 4 ] || break
         expected_kb=${candidate%%:*}
         group=${candidate#*:}
+        attempt_count=$((attempt_count + 1))
         before_kb=$(zram_swap_used_kb "$ZRAM_BLOCK")
         echo 0 > "$group/memory.force_shrink_anon" 2>/dev/null || { fail_count=$((fail_count + 1)); continue; }
         after_kb=$(zram_swap_used_kb "$ZRAM_BLOCK")
@@ -665,6 +795,8 @@ perform_hybridswapd_reclaim() {
     done
 
     if [ "$reclaimed_kb" -gt 0 ]; then
+        RECLAIM_FAIL_STREAK=0
+        RECLAIM_BLOCKED_UNTIL=0
         LAST_RECLAIM=$now
         RECLAIM_MB=$((reclaimed_kb / 1024))
         RECLAIM_APPS=$reclaimed_apps
@@ -676,6 +808,13 @@ perform_hybridswapd_reclaim() {
         COMPRESSED_MB=$(bytes_to_mb "$MM_COMPR")
         MEMORY_USED_MB=$(bytes_to_mb "$MM_USED")
         OVERHEAD_MB=$(positive_difference_mb "$MM_USED" "$MM_COMPR")
+    elif [ "$attempt_count" -gt 0 ]; then
+        RECLAIM_FAIL_STREAK=$((RECLAIM_FAIL_STREAK + 1))
+        if [ "$RECLAIM_FAIL_STREAK" -ge 3 ]; then
+            RECLAIM_FAIL_STREAK=0
+            RECLAIM_BLOCKED_UNTIL=$((now + 900))
+            RECLAIM_CIRCUIT_ACTIVE=1
+        fi
     fi
 }
 
@@ -684,6 +823,13 @@ perform_proactive_writeback() {
     [ "$ESWAP_AVAILABLE" = "1" ] || return 0
     [ "$battery" -ge "$battery_min" ] || return 0
     awk -v value="$PRESSURE_AVG10" 'BEGIN { exit value <= 0.5 ? 0 : 1 }' || return 0
+    if [ "$WRITEBACK_BLOCKED_UNTIL" -gt "$now" ]; then
+        WRITEBACK_CIRCUIT_ACTIVE=1
+        return 0
+    fi
+    WRITEBACK_BLOCKED_UNTIL=0
+    WRITEBACK_CIRCUIT_ACTIVE=0
+
     minimum_usage=25
     minimum_adj=600
     writeback_cooldown=600
@@ -693,6 +839,9 @@ perform_proactive_writeback() {
     if [ "$SCREEN_ON" = "0" ]; then
         cap_pct=90
     fi
+    writeback_cooldown=$((writeback_cooldown * ADAPTIVE_COOLDOWN_PERCENT / 100))
+    minimum_adj=$((minimum_adj + ADAPTIVE_ADJ_BONUS))
+    [ "$minimum_adj" -gt 1000 ] && minimum_adj=1000
     if [ "$MEMORY_BACKEND" = "hybridswapd" ]; then
         writeback_cooldown=300
         daily_multiplier=3
@@ -734,6 +883,7 @@ perform_proactive_writeback() {
     remaining_capacity=$((cap_kb - used_kb))
     budget_kb=$remaining_capacity
     max_budget=$((total_kb / budget_divisor))
+    max_budget=$((max_budget * WRITEBACK_BUDGET_SCALE_PERCENT / 100))
     [ "$budget_kb" -gt "$max_budget" ] && budget_kb=$max_budget
     remaining_daily=$((daily_cap_kb - daily_kb))
     [ "$budget_kb" -gt "$remaining_daily" ] && budget_kb=$remaining_daily
@@ -742,12 +892,14 @@ perform_proactive_writeback() {
     written_kb=0
     writeback_apps=0
     fail_count=0
+    attempt_count=0
     writeback_candidates=$(list_writeback_targets 8192 "$minimum_adj")
     for candidate in $writeback_candidates; do
         [ "$budget_kb" -ge 8192 ] || break
         [ "$fail_count" -lt 3 ] || break
         expected_kb=${candidate%%:*}
         group=${candidate#*:}
+        attempt_count=$((attempt_count + 1))
         before_kb=$(hybridswap_meminfo_kb "$ZRAM_BLOCK" ESU_C)
         echo 1 > "$group/memory.force_swapout" 2>/dev/null || { fail_count=$((fail_count + 1)); continue; }
         after_kb=$(hybridswap_meminfo_kb "$ZRAM_BLOCK" ESU_C)
@@ -764,6 +916,8 @@ perform_proactive_writeback() {
     done
 
     if [ "$written_kb" -gt 0 ]; then
+        WRITEBACK_FAIL_STREAK=0
+        WRITEBACK_BLOCKED_UNTIL=0
         LAST_WRITEBACK=$now
         WRITEBACK_MB=$((written_kb / 1024))
         WRITEBACK_APPS=$writeback_apps
@@ -771,6 +925,14 @@ perform_proactive_writeback() {
         ACTION_THIS_RUN=writeback
         LAST_REASON=background_cold_pages
         HYBRID_DAILY_MB=$(kb_to_mb "$(hybridswap_daily_kb "$ZRAM_BLOCK")")
+        record_writeback_feedback_sample "$written_kb"
+    elif [ "$attempt_count" -gt 0 ]; then
+        WRITEBACK_FAIL_STREAK=$((WRITEBACK_FAIL_STREAK + 1))
+        if [ "$WRITEBACK_FAIL_STREAK" -ge 3 ]; then
+            WRITEBACK_FAIL_STREAK=0
+            WRITEBACK_BLOCKED_UNTIL=$((now + 900))
+            WRITEBACK_CIRCUIT_ACTIVE=1
+        fi
     fi
 }
 
@@ -823,6 +985,26 @@ write_state() {
         printf 'writeback_apps=%s\n' "$WRITEBACK_APPS"
         printf 'reclaim_mb=%s\n' "$RECLAIM_MB"
         printf 'reclaim_apps=%s\n' "$RECLAIM_APPS"
+        printf 'compression_ratio_percent=%s\n' "$COMPRESSION_RATIO_PERCENT"
+        printf 'reclaim_budget_scale_percent=%s\n' "$RECLAIM_BUDGET_SCALE_PERCENT"
+        printf 'writeback_budget_scale_percent=%s\n' "$WRITEBACK_BUDGET_SCALE_PERCENT"
+        printf 'adaptive_feedback_level=%s\n' "$ADAPTIVE_FEEDBACK_LEVEL"
+        printf 'last_refault_mb=%s\n' "$LAST_REFAULT_MB"
+        printf 'current_reout_kb=%s\n' "$CURRENT_REOUT_KB"
+        printf 'current_fault_count=%s\n' "$CURRENT_FAULT_COUNT"
+        printf 'current_refault_hits=%s\n' "$CURRENT_REFAULT_HITS"
+        printf 'feedback_sample_epoch=%s\n' "$FEEDBACK_SAMPLE_EPOCH"
+        printf 'feedback_sample_reout_kb=%s\n' "$FEEDBACK_SAMPLE_REOUT_KB"
+        printf 'feedback_sample_fault_count=%s\n' "$FEEDBACK_SAMPLE_FAULT_COUNT"
+        printf 'feedback_sample_refault_hits=%s\n' "$FEEDBACK_SAMPLE_REFAULT_HITS"
+        printf 'feedback_sample_writeback_kb=%s\n' "$FEEDBACK_SAMPLE_WRITEBACK_KB"
+        printf 'feedback_last_adjust_epoch=%s\n' "$FEEDBACK_LAST_ADJUST_EPOCH"
+        printf 'writeback_fail_streak=%s\n' "$WRITEBACK_FAIL_STREAK"
+        printf 'reclaim_fail_streak=%s\n' "$RECLAIM_FAIL_STREAK"
+        printf 'writeback_blocked_until=%s\n' "$WRITEBACK_BLOCKED_UNTIL"
+        printf 'reclaim_blocked_until=%s\n' "$RECLAIM_BLOCKED_UNTIL"
+        printf 'writeback_circuit_active=%s\n' "$WRITEBACK_CIRCUIT_ACTIVE"
+        printf 'reclaim_circuit_active=%s\n' "$RECLAIM_CIRCUIT_ACTIVE"
     } > "$tmp" && mv -f "$tmp" "$STATE_FILE"
 }
 
@@ -861,6 +1043,28 @@ run_once() {
     WRITEBACK_APPS=$(number_or_default "$(get_value "$STATE_FILE" writeback_apps)" 0)
     RECLAIM_MB=$(number_or_default "$(get_value "$STATE_FILE" reclaim_mb)" 0)
     RECLAIM_APPS=$(number_or_default "$(get_value "$STATE_FILE" reclaim_apps)" 0)
+    COMPRESSION_RATIO_PERCENT=0
+    RECLAIM_BUDGET_SCALE_PERCENT=100
+    WRITEBACK_BUDGET_SCALE_PERCENT=100
+    ADAPTIVE_COOLDOWN_PERCENT=100
+    ADAPTIVE_ADJ_BONUS=0
+    ADAPTIVE_FEEDBACK_LEVEL=$(number_or_default "$(get_value "$STATE_FILE" adaptive_feedback_level)" 0)
+    LAST_REFAULT_MB=$(number_or_default "$(get_value "$STATE_FILE" last_refault_mb)" 0)
+    CURRENT_REOUT_KB=0
+    CURRENT_FAULT_COUNT=0
+    CURRENT_REFAULT_HITS=0
+    FEEDBACK_SAMPLE_EPOCH=$(number_or_default "$(get_value "$STATE_FILE" feedback_sample_epoch)" 0)
+    FEEDBACK_SAMPLE_REOUT_KB=$(number_or_default "$(get_value "$STATE_FILE" feedback_sample_reout_kb)" 0)
+    FEEDBACK_SAMPLE_FAULT_COUNT=$(number_or_default "$(get_value "$STATE_FILE" feedback_sample_fault_count)" 0)
+    FEEDBACK_SAMPLE_REFAULT_HITS=$(number_or_default "$(get_value "$STATE_FILE" feedback_sample_refault_hits)" 0)
+    FEEDBACK_SAMPLE_WRITEBACK_KB=$(number_or_default "$(get_value "$STATE_FILE" feedback_sample_writeback_kb)" 0)
+    FEEDBACK_LAST_ADJUST_EPOCH=$(number_or_default "$(get_value "$STATE_FILE" feedback_last_adjust_epoch)" 0)
+    WRITEBACK_FAIL_STREAK=$(number_or_default "$(get_value "$STATE_FILE" writeback_fail_streak)" 0)
+    RECLAIM_FAIL_STREAK=$(number_or_default "$(get_value "$STATE_FILE" reclaim_fail_streak)" 0)
+    WRITEBACK_BLOCKED_UNTIL=$(number_or_default "$(get_value "$STATE_FILE" writeback_blocked_until)" 0)
+    RECLAIM_BLOCKED_UNTIL=$(number_or_default "$(get_value "$STATE_FILE" reclaim_blocked_until)" 0)
+    WRITEBACK_CIRCUIT_ACTIVE=0
+    RECLAIM_CIRCUIT_ACTIVE=0
     ACTION_THIS_RUN=none
 
     if [ -z "$ZRAM_BLOCK" ] || [ ! -r "/sys/block/$ZRAM_BLOCK/mm_stat" ]; then
@@ -880,6 +1084,7 @@ run_once() {
     COMPRESSED_MB=$(bytes_to_mb "$MM_COMPR")
     MEMORY_USED_MB=$(bytes_to_mb "$MM_USED")
     OVERHEAD_MB=$(positive_difference_mb "$MM_USED" "$MM_COMPR")
+    COMPRESSION_RATIO_PERCENT=$(compression_ratio_percent "$MM_ORIG" "$MM_COMPR")
 
     apply_memory_profile "$ZRAM_BLOCK"
 
@@ -903,6 +1108,17 @@ run_once() {
     fi
 
     now=$(date +%s)
+    if [ "$WRITEBACK_BLOCKED_UNTIL" -gt "$now" ]; then
+        WRITEBACK_CIRCUIT_ACTIVE=1
+    else
+        WRITEBACK_BLOCKED_UNTIL=0
+    fi
+    if [ "$RECLAIM_BLOCKED_UNTIL" -gt "$now" ]; then
+        RECLAIM_CIRCUIT_ACTIVE=1
+    else
+        RECLAIM_BLOCKED_UNTIL=0
+    fi
+    update_adaptive_feedback
     base_interval=$(number_or_default "$(get_value "$CONFIG_FILE" interval_seconds)" 30)
     if [ "$SCREEN_ON" = "1" ]; then
         if [ "$ACTION_THIS_RUN" != "none" ]; then
@@ -1037,6 +1253,7 @@ stop_daemon() {
             sleep 0.1
             count=$((count + 1))
         done
+        pid_is_daemon "$pid" && kill -KILL "$pid" 2>/dev/null
     done
     rm -f "$PID_FILE"
     restore_baseline

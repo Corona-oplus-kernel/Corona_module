@@ -2582,6 +2582,24 @@
         };
         setText('zram-policy-usage', status.usage_percent ? `${status.usage_percent}%` : '--');
         setText('zram-policy-overhead', status.overhead_mb ? `${status.overhead_mb} MB` : '--');
+        const compressionRatioPercent = Number.parseInt(status.compression_ratio_percent || '0', 10);
+        const reclaimScalePercent = Number.parseInt(status.reclaim_budget_scale_percent || '100', 10);
+        const compressionRatio = compressionRatioPercent > 0
+            ? (compressionRatioPercent / 100).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')
+            : '';
+        setText('zram-policy-compression-benefit', running && compressionRatio
+            ? `${compressionRatio}:1 · ${reclaimScalePercent}%`
+            : '--');
+        const feedbackLevel = Math.min(3, Math.max(0, Number.parseInt(status.adaptive_feedback_level || '0', 10)));
+        const writebackCircuit = status.writeback_circuit_active === '1';
+        const reclaimCircuit = status.reclaim_circuit_active === '1';
+        let feedbackKey = ['zramPolicyFeedbackNormal', 'zramPolicyFeedbackReduced', 'zramPolicyFeedbackConservative', 'zramPolicyFeedbackProtected'][feedbackLevel];
+        if (writebackCircuit && reclaimCircuit) feedbackKey = 'zramPolicyFeedbackCircuitBoth';
+        else if (writebackCircuit) feedbackKey = 'zramPolicyFeedbackCircuitWriteback';
+        else if (reclaimCircuit) feedbackKey = 'zramPolicyFeedbackCircuitReclaim';
+        const refaultMb = Number.parseInt(status.last_refault_mb || '0', 10);
+        const feedbackText = `${this.t(feedbackKey)}${refaultMb > 0 ? ` · ${this.t('zramPolicyRefault')} ${refaultMb} MB` : ''}`;
+        setText('zram-policy-adaptive-feedback', running ? feedbackText : '--');
         setText('zram-policy-pressure', status.pressure_avg10 ? `${status.pressure_avg10}%` : '--');
         const backendText = {
             erm: 'OPlus ERM',
