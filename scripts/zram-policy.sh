@@ -569,19 +569,31 @@ start_daemon() {
     nohup /system/bin/sh "$0" daemon >/dev/null 2>&1 &
 }
 
+print_status() {
+    actual_running=0
+    pid=$(cat "$PID_FILE" 2>/dev/null)
+    if policy_enabled && pid_is_daemon "$pid"; then
+        actual_running=1
+    fi
+    if [ -r "$STATE_FILE" ]; then
+        awk -v running="$actual_running" '
+            BEGIN { found = 0 }
+            /^running=/ { print "running=" running; found = 1; next }
+            { print }
+            END { if (!found) print "running=" running }
+        ' "$STATE_FILE"
+    else
+        echo "running=$actual_running"
+        [ -n "$(find_zram_block)" ] && echo supported=1 || echo supported=0
+    fi
+}
+
 case "$1" in
     daemon) run_daemon ;;
     start) start_daemon ;;
     stop) stop_daemon ;;
     once) policy_enabled && run_once >/dev/null ;;
-    status)
-        if [ -r "$STATE_FILE" ]; then
-            cat "$STATE_FILE"
-        else
-            echo running=0
-            [ -n "$(find_zram_block)" ] && echo supported=1 || echo supported=0
-        fi
-        ;;
+    status) print_status ;;
     apply)
         stop_daemon
         start_daemon

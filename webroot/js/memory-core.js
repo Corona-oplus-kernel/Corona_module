@@ -2578,8 +2578,16 @@
             compact: 'zramPolicyActionCompact',
             idle: 'zramPolicyActionIdle'
         }[status.last_action] || 'zramPolicyActionIdle';
+        const waitingKey = {
+            screen_on: 'zramPolicyWaitScreenOff',
+            low_usage: 'zramPolicyWaitLowUsage',
+            high_temperature: 'zramPolicyWaitTemperature',
+            low_battery: 'zramPolicyWaitBattery',
+            recompress_cooldown: 'zramPolicyWaitCooldown',
+            no_zram: 'zramPolicyWaitNoZram'
+        }[status.last_reason];
         const saved = Number.parseInt(status.recompress_saved_mb || '0', 10);
-        const actionText = this.t(actionKey);
+        const actionText = this.t(status.last_action === 'idle' && waitingKey ? waitingKey : actionKey);
         setText('zram-policy-action', running ? (saved > 0 && status.last_action === 'recompress' ? `${actionText} (-${saved} MB)` : actionText) : '--');
         return { supported, running };
     },
