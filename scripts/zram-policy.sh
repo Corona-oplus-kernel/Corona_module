@@ -654,22 +654,30 @@ memcg_min_oom_adj() {
     [ "$found" = "1" ] && echo "$minimum" || echo 1000
 }
 
-list_writeback_targets() {
+find_writeback_target() {
     minimum_kb="$1"
     minimum_adj="$2"
+    exclude="$3"
+    best_size=0
+    best_group=
     for stat in /dev/memcg/apps/*/memory.swap_stat; do
         [ -r "$stat" ] || continue
         group=${stat%/memory.swap_stat}
         name=${group##*/}
         case "$name" in active|inactive|systemserver) continue ;; esac
+        case ",$exclude," in *",$name,"*) continue ;; esac
         [ -w "$group/memory.force_swapout" ] || continue
         size=$(awk '$1 == "zramCompressedSize:" { print $2; exit }' "$stat" 2>/dev/null)
         size=$(number_or_default "$size" 0)
         [ "$size" -ge "$minimum_kb" ] || continue
         adj=$(memcg_min_oom_adj "$group")
         [ "$adj" -ge "$minimum_adj" ] || continue
-        printf '%s:%s\n' "$size" "$group"
-    done | sort -t':' -k1,1nr
+        if [ "$size" -gt "$best_size" ]; then
+            best_size=$size
+            best_group=$group
+        fi
+    done
+    [ -n "$best_group" ] && printf '%s %s\n' "$best_group" "$best_size"
 }
 
 list_reclaim_targets() {
@@ -839,9 +847,6 @@ perform_proactive_writeback() {
     if [ "$SCREEN_ON" = "0" ]; then
         cap_pct=90
     fi
-    writeback_cooldown=$((writeback_cooldown * ADAPTIVE_COOLDOWN_PERCENT / 100))
-    minimum_adj=$((minimum_adj + ADAPTIVE_ADJ_BONUS))
-    [ "$minimum_adj" -gt 1000 ] && minimum_adj=1000
     if [ "$MEMORY_BACKEND" = "hybridswapd" ]; then
         writeback_cooldown=300
         daily_multiplier=3
@@ -867,6 +872,9 @@ perform_proactive_writeback() {
     else
         writeback_thermal_limit=$(number_or_default "$(get_value "$CONFIG_FILE" writeback_thermal_limit_c)" 70)
     fi
+    writeback_cooldown=$((writeback_cooldown * ADAPTIVE_COOLDOWN_PERCENT / 100))
+    minimum_adj=$((minimum_adj + ADAPTIVE_ADJ_BONUS))
+    [ "$minimum_adj" -gt 1000 ] && minimum_adj=1000
     [ "$TEMPERATURE_C" -le "$writeback_thermal_limit" ] || return 0
     [ "$USAGE_PERCENT" -ge "$minimum_usage" ] || return 0
     [ $((now - LAST_WRITEBACK)) -ge "$writeback_cooldown" ] || return 0
@@ -893,12 +901,16 @@ perform_proactive_writeback() {
     writeback_apps=0
     fail_count=0
     attempt_count=0
-    writeback_candidates=$(list_writeback_targets 8192 "$minimum_adj")
-    for candidate in $writeback_candidates; do
-        [ "$budget_kb" -ge 8192 ] || break
-        [ "$fail_count" -lt 3 ] || break
-        expected_kb=${candidate%%:*}
-        group=${candidate#*:}
+    tried=
+    while [ "$budget_kb" -ge 8192 ] && [ "$fail_count" -lt 3 ]; do
+        candidate=$(find_writeback_target 8192 "$minimum_adj" "$tried")
+        [ -n "$candidate" ] || break
+        set -- $candidate
+        group="$1"
+        expected_kb="$2"
+        [ -n "$group" ] || break
+        name=${group##*/}
+        tried="$tried,$name"
         attempt_count=$((attempt_count + 1))
         before_kb=$(hybridswap_meminfo_kb "$ZRAM_BLOCK" ESU_C)
         echo 1 > "$group/memory.force_swapout" 2>/dev/null || { fail_count=$((fail_count + 1)); continue; }
