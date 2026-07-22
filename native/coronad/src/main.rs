@@ -750,6 +750,7 @@ struct Daemon {
     system_pressure_elapsed_ms: u64,
     battery_saver_elapsed_ms: u64,
     fallback_reload_elapsed_ms: u64,
+    state_elapsed_ms: u64,
     storage_elapsed_ms: u64,
     last_storage_counters: DiskCounters,
     storage_learning: StorageLearning,
@@ -761,6 +762,7 @@ struct Daemon {
     zram_policy_action: String,
     zram_policy_reason: String,
     zram_policy_child: Option<Child>,
+    last_affinity_state: String,
 }
 
 fn read_text(path: impl AsRef<Path>) -> String {
@@ -769,6 +771,21 @@ fn read_text(path: impl AsRef<Path>) -> String {
 
 fn write_text(path: impl AsRef<Path>, value: impl AsRef<[u8]>) -> io::Result<()> {
     fs::write(path, value)
+}
+
+fn write_text_atomic(path: impl AsRef<Path>, value: impl AsRef<[u8]>) -> io::Result<()> {
+    let path = path.as_ref();
+    let mut temporary_name = path.as_os_str().to_os_string();
+    temporary_name.push(".tmp");
+    let temporary = PathBuf::from(temporary_name);
+    fs::write(&temporary, value)?;
+    match fs::rename(&temporary, path) {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            let _ = fs::remove_file(temporary);
+            Err(error)
+        }
+    }
 }
 
 fn parse_key_values(path: impl AsRef<Path>) -> HashMap<String, String> {
@@ -2682,6 +2699,7 @@ impl Daemon {
             system_pressure_elapsed_ms: 2_000,
             battery_saver_elapsed_ms: 30_000,
             fallback_reload_elapsed_ms: 0,
+            state_elapsed_ms: 2_000,
             storage_elapsed_ms: 0,
             last_storage_counters: DiskCounters::default(),
             storage_learning: StorageLearning::default(),
@@ -2693,6 +2711,7 @@ impl Daemon {
             zram_policy_action: String::new(),
             zram_policy_reason: String::new(),
             zram_policy_child: None,
+            last_affinity_state: String::new(),
             paths,
         };
         daemon.update_environment();
@@ -3268,7 +3287,7 @@ impl Daemon {
         }
     }
 
-    fn write_state(&self, foreground: &str, foreground_source: &str) {
+    fn write_state(&mut self, foreground: &str, foreground_source: &str) {
         let mut state = format!(
             "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\ncpu_pressure_avg10={:.2}\nio_pressure_avg10={:.2}\ncpu_pressure_level={}\nio_pressure_level={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_target_cpus={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_write_ops={}\nufs_write_sectors={}\nufs_average_write_sectors={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nefficiency_cpus={}\nbalanced_cpus={}\nperformance_cpus={}\nlatency_cpus={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
             process::id(),
@@ -3376,7 +3395,7 @@ impl Daemon {
                 decision.tick, decision.area, decision.action, decision.reason,
             ));
         }
-        let _ = write_text(&self.paths.state, state);
+        let _ = write_text_atomic(&self.paths.state, state);
         let affinity_state = format!(
             "status=active\npackage={}\napplied={}\nfailed={}\nmanual={}\nefficiency={}\nbalanced={}\nperformance={}\nlatency={}\nmode={}\n",
             foreground,
@@ -3389,7 +3408,11 @@ impl Daemon {
             cpu_list_string(&self.topology.latency),
             self.runtime_mode.name(),
         );
-        let _ = write_text(&self.paths.affinity_state, affinity_state);
+        if affinity_state != self.last_affinity_state
+            && write_text_atomic(&self.paths.affinity_state, &affinity_state).is_ok()
+        {
+            self.last_affinity_state = affinity_state;
+        }
     }
 
     fn step(&mut self) -> u64 {
@@ -3401,6 +3424,7 @@ impl Daemon {
         self.environment_elapsed_ms += interval_ms;
         self.system_pressure_elapsed_ms += interval_ms;
         self.fallback_reload_elapsed_ms += interval_ms;
+        self.state_elapsed_ms += interval_ms;
         let watched_change = self.watcher.as_ref().map(ConfigWatcher::changed).unwrap_or(false);
         if self.paths.reload.exists()
             || RELOAD_REQUESTED.swap(false, Ordering::AcqRel)
@@ -3513,8 +3537,10 @@ impl Daemon {
             self.update_pressure();
         }
         self.record_decisions(&foreground.package, foreground_changed);
-        self.write_state(&foreground.package, foreground.source);
-        let _ = profile_changed;
+        if foreground_changed || profile_changed || self.state_elapsed_ms >= 2_000 {
+            self.write_state(&foreground.package, foreground.source);
+            self.state_elapsed_ms = 0;
+        }
         interval_ms
     }
 
