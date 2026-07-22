@@ -1,6 +1,6 @@
 # Corona Auto Affinity
 
-Corona Auto Affinity 是独立实现的前台应用线程亲和性功能，不包含第三方模块的代码、二进制或规则资产。
+Corona Auto Affinity 是独立实现的前台应用线程亲和性功能
 
 配置文件位于 `/data/adb/modules/Corona/config/auto_affinity.conf`。
 
