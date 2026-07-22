@@ -819,23 +819,52 @@ fn package_from_dumpsys(text: &str) -> Option<String> {
 }
 
 fn package_from_pid(pid: u32) -> Option<String> {
-    let package = process_base_from_pid(pid)?;
-    if package.contains('.')
-        && package != "android"
-        && package != "com.android.shell"
-        && package != "me.weishu.kernelsu"
-    {
-        Some(package)
-    } else {
-        None
+    process_base_from_pid(pid)
+}
+
+fn valid_package_name(value: &str) -> bool {
+    value.contains('.')
+        && value.split('.').all(|part| {
+            !part.is_empty()
+                && part
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        })
+        && value != "android"
+        && value != "com.android.shell"
+        && value != "me.weishu.kernelsu"
+}
+
+fn package_from_process_name(process_name: &str) -> Option<String> {
+    let base = process_name.split(':').next().unwrap_or_default().trim();
+    if base.is_empty() {
+        return None;
     }
+    if !base.starts_with('/') {
+        return valid_package_name(base).then(|| base.to_string());
+    }
+
+    let parts = base.split('/').filter(|part| !part.is_empty()).collect::<Vec<_>>();
+    for (index, part) in parts.iter().enumerate() {
+        let candidate = match *part {
+            "user" | "user_de"
+                if parts.get(index + 1).is_some_and(|value| {
+                    value.bytes().all(|byte| byte.is_ascii_digit())
+                }) => parts.get(index + 2).copied(),
+            "data" if parts.get(index + 1) == Some(&"data") => parts.get(index + 2).copied(),
+            _ => None,
+        };
+        if let Some(candidate) = candidate.filter(|value| valid_package_name(value)) {
+            return Some(candidate.to_string());
+        }
+    }
+    None
 }
 
 fn process_base_from_pid(pid: u32) -> Option<String> {
     let cmdline = fs::read(proc_root().join(pid.to_string()).join("cmdline")).ok()?;
-    let process_name = String::from_utf8_lossy(cmdline.split(|byte| *byte == 0).next()?).to_string();
-    let base = process_name.split(':').next().unwrap_or_default().trim();
-    (!base.is_empty()).then(|| base.to_string())
+    let process_name = String::from_utf8_lossy(cmdline.split(|byte| *byte == 0).next()?);
+    package_from_process_name(&process_name)
 }
 
 fn top_app_package() -> Option<String> {
@@ -1410,13 +1439,11 @@ fn scan_requested_processes(packages: &HashSet<String>) -> HashMap<String, Vec<u
         let Ok(pid) = entry.file_name().to_string_lossy().parse::<u32>() else {
             continue;
         };
-        let Ok(cmdline) = fs::read(entry.path().join("cmdline")) else {
+        let Some(package) = process_base_from_pid(pid) else {
             continue;
         };
-        let process_name = String::from_utf8_lossy(cmdline.split(|byte| *byte == 0).next().unwrap_or_default());
-        let base = process_name.split(':').next().unwrap_or_default();
-        if packages.contains(base) {
-            found.entry(base.to_string()).or_default().push(pid);
+        if packages.contains(&package) {
+            found.entry(package).or_default().push(pid);
         }
     }
     found
@@ -1505,12 +1532,38 @@ fn parse_network_samples(text: &str) -> Vec<(String, u64)> {
         .collect()
 }
 
+fn whole_block_device(name: &str) -> bool {
+    let suffix_is_digits = |prefix: &str| {
+        name.strip_prefix(prefix).is_some_and(|suffix| {
+            !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit())
+        })
+    };
+    let suffix_is_letters = |prefix: &str| {
+        name.strip_prefix(prefix).is_some_and(|suffix| {
+            !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_lowercase())
+        })
+    };
+    suffix_is_letters("sd")
+        || suffix_is_letters("vd")
+        || suffix_is_letters("xvd")
+        || suffix_is_digits("mmcblk")
+        || name.strip_prefix("nvme").is_some_and(|suffix| {
+            let Some((controller, namespace)) = suffix.split_once('n') else {
+                return false;
+            };
+            !controller.is_empty()
+                && !namespace.is_empty()
+                && controller.bytes().all(|byte| byte.is_ascii_digit())
+                && namespace.bytes().all(|byte| byte.is_ascii_digit())
+        })
+}
+
 fn parse_disk_counters(text: &str) -> HashMap<String, DiskCounters> {
     text.lines()
         .filter_map(|line| {
             let fields = line.split_ascii_whitespace().collect::<Vec<_>>();
             let name = fields.get(2)?.to_string();
-            if !name.starts_with("sd") || name.len() != 3 {
+            if !whole_block_device(&name) {
                 return None;
             }
             Some((
@@ -3087,6 +3140,23 @@ mod tests {
     }
 
     #[test]
+    fn normalizes_android_process_names() {
+        assert_eq!(
+            package_from_process_name("com.example.game:renderer").as_deref(),
+            Some("com.example.game")
+        );
+        assert_eq!(
+            package_from_process_name("/data/user/0/bin.mt.plus/files/mtio").as_deref(),
+            Some("bin.mt.plus")
+        );
+        assert_eq!(
+            package_from_process_name("/data/data/com.termux/files/usr/bin/bash").as_deref(),
+            Some("com.termux")
+        );
+        assert_eq!(package_from_process_name("/system/bin/surfaceflinger"), None);
+    }
+
+    #[test]
     fn parses_cpu_ranges() {
         assert_eq!(parse_cpu_list("0-2, 4 6"), vec![0, 1, 2, 4, 6]);
     }
@@ -3178,6 +3248,16 @@ mod tests {
         assert_eq!(ufs_write_pattern(1_024, 8_192), UfsWritePattern::SmallRandom);
         assert_eq!(ufs_write_pattern(64, 65_536), UfsWritePattern::LargeSequential);
         assert_eq!(ufs_write_pattern(16, 16_384), UfsWritePattern::Mixed);
+    }
+
+    #[test]
+    fn recognizes_whole_block_devices() {
+        for name in ["sda", "sdaa", "vda", "xvdb", "mmcblk0", "nvme0n1"] {
+            assert!(whole_block_device(name), "{name}");
+        }
+        for name in ["sda1", "mmcblk0p1", "nvme0n1p1", "dm-0", "loop0"] {
+            assert!(!whole_block_device(name), "{name}");
+        }
     }
 
     #[test]
