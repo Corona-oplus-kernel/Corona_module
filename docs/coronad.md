@@ -207,6 +207,22 @@ IO 压力等级：
 | `2..10` | `1` | `256` | `128` |
 | `>= 10` | `2` | `128` | `64` |
 
+## 能力探测
+
+守护进程启动和重载时直接检查节点，不读取品牌或机型表。
+
+| 能力 | 检查内容 |
+| --- | --- |
+| CPU/IO/内存 PSI | `/proc/pressure/cpu`、`io`、`memory` 是否存在 |
+| IRQ | `/proc/interrupts` 与 `/proc/irq/*/smp_affinity*` 是否存在且可写 |
+| UFS | `auto_hibern8` 与 Write Booster 节点是否存在且可写 |
+| GPU | KGSL `devfreq/min_freq` 与忙碌率节点是否存在 |
+| 块设备队列 | 整盘设备的 `read_ahead_kb`、`nr_requests` 是否存在且可写 |
+| ZRAM | `/sys/block/zram0/disksize` 是否存在 |
+| OPlus ERM | `erm/stats` 是否可读，`memory.erm_avail_buffer` 是否可写 |
+
+状态中的 `capability_*_reason` 使用 `available`、`missing_node`、`read_only` 或 `kernel_disabled`。
+
 ## IRQ 与网络队列
 
 每 `2` 秒读取 `/proc/interrupts`，只处理名称包含 `ufshcd`、`wlan`、`wifi`、`ipa` 或 `rmnet` 的 IRQ。
@@ -241,15 +257,23 @@ delta = current_bytes - previous_bytes
 - `enable_wb_buf_flush`
 - `auto_hibern8`
 
-写入类型按两秒采样计算：
+守护进程启动后先采集 `12` 轮、每轮 `2` 秒的官方存储活动。第 `75%` 分位用于计算阈值：
+
+```text
+active_sectors = clamp(p75_total_sectors × 2, 8192, 65536)
+sequential_write_sectors = clamp(p75_write_sectors × 4, 32768, 131072)
+random_write_ops = clamp(p75_write_ops × 2, 64, 256)
+```
+
+学习完成前不修改 UFS 和块设备队列。写入类型按同一份两秒采样计算：
 
 ```text
 average_write_sectors = write_sectors / write_ops
 ```
 
 - `write_sectors < 8192` 或没有写操作：空闲。
-- `write_ops >= 64` 且平均请求不超过 `8` 扇区：小块随机写。
-- `write_sectors >= 32768` 且平均请求不少于 `32` 扇区：连续大写。
+- `write_ops >= random_write_ops` 且平均请求不超过 `8` 扇区：小块随机写。
+- `write_sectors >= sequential_write_sectors` 且平均请求不少于 `32` 扇区：连续大写。
 - 其它情况：混合写入。
 
 只有连续大写且运行模式为 `normal` 或 `warm` 时：
@@ -275,12 +299,41 @@ average_write_sectors = write_sectors / write_ops
 
 ## 块设备队列
 
-每 `2` 秒读取 `/proc/diskstats`，仅处理名称为 `sdX` 且存在以下节点的设备：
+每 `2` 秒只读取一次 `/proc/diskstats`，UFS、IRQ 和块设备策略共用该采样。支持 `sdX`、`mmcblkX`、`nvmeXnX`、`vdX` 和 `xvdX` 整盘设备，不处理分区、`dm-*` 或 `loop*`。
 
 - `/sys/block/sdX/queue/read_ahead_kb`
 - `/sys/block/sdX/queue/nr_requests`
 
-设备满足 `总操作数 >= 64` 或 `总扇区数 >= 16384` 时判定活跃。
+设备满足 `总操作数 >= 64` 或 `总扇区数 >= active_sectors` 时判定活跃。
+
+## 节点写入与恢复
+
+IRQ、UFS、GPU 和块设备队列通过同一个节点管理器写入。
+
+1. 批量写入前读取所有节点并保存首次值。
+2. 任一节点缺失、为空或被其它策略占用时，不执行该批写入。
+3. 写入中途失败时，按相反顺序恢复本批已经修改的节点。
+4. 同一节点被外部服务连续覆盖三次后暂停继续抢写。
+5. 关闭功能、停止守护进程或卸载时按策略所有者恢复首次值。
+
+状态字段 `node_managed`、`node_apply_failed`、`node_external_changes` 和 `node_suspended` 用于检查写入结果。
+
+## ZRAM 与 ERM 调度
+
+启用 `zram_policy.conf` 后不再启动 `zram-policy.sh daemon`。`coronad` 按脚本上次返回的间隔调用：
+
+```text
+/system/bin/sh scripts/zram-policy.sh tick
+```
+
+调用时通过环境变量传入已经采集的状态：
+
+- `CORONA_SCREEN_ON`
+- `CORONA_TEMPERATURE_C`
+- `CORONA_PRESSURE_AVG10`
+- `CORONA_RUNTIME_MODE`
+
+Shell 侧继续负责 OPlus ERM、HybridSwap 和 ZRAM 专用节点计算，但不再保留第二个常驻轮询进程。
 
 | IO 类型 | 判定 | `read_ahead_kb` | `nr_requests` |
 | --- | --- | --- | --- |
@@ -312,6 +365,7 @@ average_write_sectors = write_sectors / write_ops
 - 保护进程刷新：`30s`
 - IRQ、网络、UFS 和 IO：`2s`
 - GPU：`1s`
+- ZRAM/ERM：使用上次策略计算返回的 `5..3600s` 间隔
 
 停止时恢复 IRQ affinity、网络 RPS/XPS、UFS、GPU、块设备队列和 swappiness 的首次读取值。
 
@@ -328,3 +382,8 @@ average_write_sectors = write_sectors / write_ops
 - GPU 忙碌率、最低频率和 IO 队列参数
 - 已扫描线程数、亲和性成功/失败次数
 - 前台变化次数、重载次数和循环次数
+- 硬件能力与不可用原因
+- 存储基线学习进度和动态阈值
+- 节点所有权、写入失败与外部覆盖次数
+- ZRAM 策略间隔、动作和触发原因
+- 最近 `32` 条内存决策记录；停止守护进程后随运行状态文件一起删除
