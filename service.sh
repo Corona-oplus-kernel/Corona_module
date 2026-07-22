@@ -45,6 +45,59 @@ migrate_runtime_state_files() {
 
 migrate_runtime_state_files
 
+config_has_user_settings() {
+    awk '
+        /^[[:space:]]*($|#)/ { next }
+        {
+            found = 1
+            separator = index($0, "=")
+            if (separator <= 0) {
+                settings = 1
+                next
+            }
+            key = substr($0, 1, separator - 1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+            if (key != "enabled" && key !~ /_enabled$/) settings = 1
+        }
+        END { exit found && settings ? 0 : 1 }
+    ' "$1" 2>/dev/null
+}
+
+config_has_enabled_switch() {
+    awk '
+        /^[[:space:]]*($|#)/ { next }
+        {
+            separator = index($0, "=")
+            if (separator <= 0) next
+            key = substr($0, 1, separator - 1)
+            value = substr($0, separator + 1)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            if ((key == "enabled" || key ~ /_enabled$/) && value == "1") found = 1
+        }
+        END { exit found ? 0 : 1 }
+    ' "$1" 2>/dev/null
+}
+
+compact_enable_only_configs() {
+    for file in "$CONFIG_DIR"/*.conf; do
+        [ -f "$file" ] || continue
+        config_has_user_settings "$file" && continue
+        case "${file##*/}" in
+            app_rules.conf|coronad.conf|hardware_policy.conf|zram_policy.conf|corona_kernel.conf|lmk.conf|device.conf|reclaim.conf|kswapd.conf|protect.conf|fstrim.conf)
+                config_has_enabled_switch "$file" && continue
+                ;;
+        esac
+        rm -f "$file"
+    done
+}
+
+compact_enable_only_configs
+
+if [ "$1" = "--compact-configs" ]; then
+    exit 0
+fi
+
 get_loop_mode() (
     loop_conf="$CONFIG_DIR/loop.conf"
     if [ -f "$loop_conf" ]; then
@@ -901,7 +954,7 @@ should_start_app_policy() {
     profiles_file="$MODDIR/config/app_profiles.list"
     thread_file="$MODDIR/config/thread_priority.conf"
     monitor_enabled=$(get_conf_value "$rules_file" monitor_enabled)
-    [ -n "$monitor_enabled" ] || monitor_enabled=1
+    [ -n "$monitor_enabled" ] || monitor_enabled=0
     protect_apps=$(cat "$protect_file" 2>/dev/null | awk 'NF {print; exit}')
     profile_apps=$(cat "$profiles_file" 2>/dev/null | awk 'NF {print; exit}')
     [ "$monitor_enabled" = "1" ] && return 0

@@ -244,6 +244,7 @@
                 await this.exec(`${this.shellQuote(`${this.modDir}/bin/coronad`)} reload`);
                 await this.sleep(350);
                 if (revision !== (this.hardwarePolicyRevision || 0)) return;
+                await this.loadRuntimeOptimizerConfig();
                 await this.refreshRuntimeOptimizer();
                 this.showToast(this.t('runtimeHardwareSaved'));
             } catch (error) {
@@ -269,14 +270,15 @@
             if (daemonSwitch) daemonSwitch.disabled = true;
             this.showLoading(true);
             try {
-                await this.mergeConfigFile(DAEMON_CONFIG_FILE, { enabled: enabled ? '1' : '0' }, ['enabled']);
+                const content = await this.mergeConfigFile(DAEMON_CONFIG_FILE, { enabled: enabled ? '1' : null }, ['enabled']);
+                const actualEnabled = this.parseEnabledFlag(content, false);
                 await this.exec(`sh ${this.shellQuote(`${this.modDir}/service.sh`)} --sync-daemon`);
-                this.setRuntimeDaemonState(enabled);
+                this.setRuntimeDaemonState(actualEnabled);
                 await this.sleep(500);
                 await this.loadRuntimeOptimizerConfig({ revision });
                 await this.refreshRuntimeOptimizer();
                 if (typeof this.loadZramPolicyConfig === 'function') await this.loadZramPolicyConfig();
-                this.showToast(this.t(enabled ? 'runtimeDaemonEnabled' : 'runtimeDaemonDisabled'));
+                this.showToast(this.t(actualEnabled ? 'runtimeDaemonEnabled' : 'runtimeDaemonDisabled'));
             } catch (error) {
                 this.setRuntimeDaemonState(previous);
                 await this.waitForUiPaint();

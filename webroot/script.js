@@ -1,3 +1,17 @@
+const SWITCH_ONLY_CONFIG_FILES = new Set([
+    'app_rules.conf',
+    'coronad.conf',
+    'hardware_policy.conf',
+    'zram_policy.conf',
+    'corona_kernel.conf',
+    'lmk.conf',
+    'device.conf',
+    'reclaim.conf',
+    'kswapd.conf',
+    'protect.conf',
+    'fstrim.conf'
+]);
+
 class CoronaAddon {
     constructor() {
         this.moduleId = '';
@@ -139,7 +153,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072111` : '';
+        return map[name] ? `${map[name]}?v=2026072202` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -416,8 +430,27 @@ class CoronaAddon {
     normalizeConfigContent(content) {
         return String(content ?? '').replace(/\r/g, '').replace(/\n+$/, '');
     }
+    isEnableControlKey(key) {
+        return key === 'enabled' || key.endsWith('_enabled');
+    }
+    compactConfigContent(filename, content) {
+        const normalized = this.normalizeConfigContent(content);
+        const lines = normalized.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+        if (!lines.length) return '';
+        const entries = this.parseSimpleConfig(normalized);
+        if (entries.length !== lines.length) return `${normalized}\n`;
+        if (entries.every(([key]) => this.isEnableControlKey(key))) {
+            const configName = this.normalizeConfigFilename(filename).split('/').pop();
+            const switchEnabled = entries.some(([, value]) => value === '1');
+            if (!SWITCH_ONLY_CONFIG_FILES.has(configName) || !switchEnabled) return '';
+        }
+        return this.buildSimpleConfig(entries);
+    }
     async configFileMatches(filename, expectedContent) {
         const path = this.shellQuote(this.getConfigPath(filename));
+        if (!this.normalizeConfigContent(expectedContent)) {
+            return (await this.exec(`[ ! -e ${path} ] && echo 1 || echo 0`)).trim() === '1';
+        }
         const marker = '__CORONA_CONFIG_EXISTS__';
         const output = await this.exec(`if [ -f ${path} ]; then printf '${marker}\\n'; cat ${path}; fi`);
         if (!String(output || '').startsWith(marker)) return false;
@@ -427,6 +460,12 @@ class CoronaAddon {
     async writeConfigUnlocked(filename, content) {
         const path = this.getConfigPath(filename);
         const parent = path.slice(0, path.lastIndexOf('/'));
+        content = this.compactConfigContent(filename, content);
+        if (!content) {
+            const result = await this.execResult(`rm -f ${this.shellQuote(path)}`);
+            if (result.code !== 0) throw new Error(result.stderr || `Failed to remove ${filename}`);
+            return '';
+        }
         const b64 = btoa(unescape(encodeURIComponent(String(content))));
         const quotedPath = this.shellQuote(path);
         const result = await this.execResult(`mkdir -p ${this.shellQuote(parent)}; tmp=${quotedPath}.tmp.$$; echo '${b64}' | base64 -d > "$tmp" && mv -f "$tmp" ${quotedPath}; code=$?; [ "$code" -eq 0 ] || rm -f "$tmp"; exit "$code"`);
@@ -468,7 +507,7 @@ class CoronaAddon {
             else map.set(key, String(value));
         });
         const keys = [...new Set([...order, ...map.keys()])].filter(key => map.has(key));
-        return this.buildSimpleConfig(keys.map(key => [key, map.get(key)]));
+        return this.compactConfigContent(filename, this.buildSimpleConfig(keys.map(key => [key, map.get(key)])));
     }
     mergeConfigFile(filename, updates, order = []) {
         const normalized = this.normalizeConfigFilename(filename);
@@ -481,8 +520,7 @@ class CoronaAddon {
             });
             const keys = [...new Set([...order, ...map.keys()])].filter(key => map.has(key));
             const content = this.buildSimpleConfig(keys.map(key => [key, map.get(key)]));
-            await this.writeConfigUnlocked(normalized, content);
-            return content;
+            return this.writeConfigUnlocked(normalized, content);
         });
     }
     removeConfigKeys(filename, keys, order = []) {

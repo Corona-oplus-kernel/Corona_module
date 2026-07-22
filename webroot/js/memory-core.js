@@ -1749,7 +1749,7 @@
         });
         const conf = await this.readConfig('io_scheduler.conf');
         const saved = this.parseIoConfig(conf);
-        this.state.ioEnabled = this.parseEnabledFlag(conf, !!conf);
+        this.state.ioEnabled = this.parseEnabledFlag(conf, false);
         const ioSwitch = document.getElementById('io-switch');
         if (ioSwitch) ioSwitch.checked = this.state.ioEnabled;
         const availableSchedulers = [];
@@ -1813,7 +1813,7 @@
             this.exec('[ -w /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor ] && echo 1 || echo 0')
         ]);
         const conf = await this.readConfig('cpu_governor.conf');
-        this.state.cpuEnabled = this.parseEnabledFlag(conf, !!conf);
+        this.state.cpuEnabled = this.parseEnabledFlag(conf, false);
         const cpuSwitch = document.getElementById('cpu-switch');
         if (cpuSwitch) cpuSwitch.checked = this.state.cpuEnabled;
         const availableGovernors = governorRaw.split(/\s+/).filter(g => g);
@@ -1897,7 +1897,7 @@
             this.exec('[ -w /proc/sys/net/ipv4/tcp_congestion_control ] && echo 1 || echo 0')
         ]);
         const conf = await this.readConfig('tcp.conf');
-        this.state.tcpEnabled = this.parseEnabledFlag(conf, !!conf);
+        this.state.tcpEnabled = this.parseEnabledFlag(conf, false);
         const tcpSwitch = document.getElementById('tcp-switch');
         if (tcpSwitch) tcpSwitch.checked = this.state.tcpEnabled;
         const availableTcp = tcpRaw.split(/\s+/).filter(t => t);
@@ -2545,7 +2545,7 @@
                 await this.exec(`/system/bin/sh ${this.shellQuote(`${this.modDir}/service.sh`)} --sync-zram-policy`);
                 await this.sleep(500);
                 await this.loadZramPolicyConfig();
-                this.showToast(this.t(enabled ? 'zramPolicyEnabled' : 'zramPolicyDisabled'));
+                this.showToast(this.t(toggle.checked ? 'zramPolicyEnabled' : 'zramPolicyDisabled'));
             } catch (error) {
                 toggle.checked = !enabled;
                 await this.waitForUiPaint();
@@ -3091,7 +3091,7 @@
         });
         const vmSupported = Object.values(this.vmFeatureSupport).some(Boolean);
         this.setFeatureSupport(document.getElementById('vm-switch')?.closest('.switch-container'), vmSupported);
-        this.state.vmEnabled = this.parseEnabledFlag(config, !!config);
+        this.state.vmEnabled = this.parseEnabledFlag(config, false);
         const vmSwitch = document.getElementById('vm-switch');
         if (vmSwitch) vmSwitch.checked = this.state.vmEnabled;
         const vmStatus = document.getElementById('vm-status');

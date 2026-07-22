@@ -4,7 +4,7 @@
   if (window.CoronaFeatureScripts["app-policy"]) return;
 CoronaAddon.prototype.ensureAppPolicyState = function() {
     if (!this.appPolicy) {
-        this.appPolicy = { monitorEnabled: true, notifyEnabled: true, whitelist: [], blacklist: [], protect: [], profiles: [], affinityExclude: [] };
+        this.appPolicy = { monitorEnabled: false, notifyEnabled: false, whitelist: [], blacklist: [], protect: [], profiles: [], affinityExclude: [] };
     }
     if (!Array.isArray(this.appPolicy.affinityExclude)) this.appPolicy.affinityExclude = [];
     if (!Array.isArray(this.installedApps)) this.installedApps = [];
@@ -20,13 +20,14 @@ CoronaAddon.prototype.getBackgroundAppPolicyScript = function(...args) {
 };
 CoronaAddon.prototype.parseAppRulesConfig = function(content) {
     this.ensureAppPolicyState();
-    const next = { monitorEnabled: true, notifyEnabled: true, whitelist: [], protect: [], profiles: [], affinityExclude: [...(this.appPolicy.affinityExclude || [])] };
+    const next = { monitorEnabled: false, notifyEnabled: false, whitelist: [], protect: [], profiles: [], affinityExclude: [...(this.appPolicy.affinityExclude || [])] };
     String(content || '').split('\n').forEach(line => {
         const idx = line.indexOf('=');
         if (idx <= 0) return;
         const key = line.slice(0, idx).trim();
         const value = line.slice(idx + 1).trim();
-        if (key === 'notify_enabled') next.notifyEnabled = value !== '0';
+        if (key === 'monitor_enabled') next.monitorEnabled = value === '1';
+        if (key === 'notify_enabled') next.notifyEnabled = value === '1';
         if (key === 'whitelist') next.whitelist = value ? value.split(',').filter(Boolean) : [];
         if (key === 'protect') next.protect = value ? value.split(',').filter(Boolean) : [];
         if (key === 'profiles') next.profiles = value ? value.split(',').filter(Boolean) : [];
@@ -39,7 +40,7 @@ CoronaAddon.prototype.parseAppRulesConfig = function(content) {
 CoronaAddon.prototype.buildAppRulesConfig = function() {
     this.ensureAppPolicyState();
     const lines = [
-        'monitor_enabled=1',
+        `monitor_enabled=${this.appPolicy.monitorEnabled ? '1' : '0'}`,
         `notify_enabled=${this.appPolicy.notifyEnabled ? '1' : '0'}`
     ];
     return lines.join('\n');
@@ -137,7 +138,11 @@ CoronaAddon.prototype.saveAppRulesConfig = async function(showToastText = '', op
     if (options.changedKey === 'monitor_enabled') updates.monitor_enabled = this.appPolicy.monitorEnabled ? '1' : '0';
     if (options.changedKey === 'notify_enabled') updates.notify_enabled = this.appPolicy.notifyEnabled ? '1' : '0';
     if (Object.keys(updates).length > 0) {
-        await this.mergeConfigFile('app_rules.conf', updates, ['monitor_enabled', 'notify_enabled']);
+        const content = await this.mergeConfigFile('app_rules.conf', updates, ['monitor_enabled', 'notify_enabled']);
+        if (!content) {
+            this.appPolicy.monitorEnabled = false;
+            this.appPolicy.notifyEnabled = false;
+        }
     }
     if (options.syncNow) {
         await this.syncAppPolicyDaemon();
