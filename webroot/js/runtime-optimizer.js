@@ -18,6 +18,39 @@
         'performance_cpus', 'exclude_packages', 'scan_interval_ms', 'load_learning',
         'thermal_control', 'thermal_warm_c', 'thermal_severe_c'
     ];
+    const CAPABILITY_REASON_KEYS = Object.freeze({
+        available: 'runtimeCapabilityAvailable',
+        missing_node: 'runtimeCapabilityMissingNode',
+        read_only: 'runtimeCapabilityReadOnly',
+        kernel_disabled: 'runtimeCapabilityKernelDisabled'
+    });
+    const POLICY_KEYS = Object.freeze({
+        irq: Object.freeze({
+            active: 'runtimeIrqActive', efficient: 'runtimeIrqEfficient', idle: 'runtimeIrqIdle',
+            disabled: 'runtimePolicyDisabled', unsupported: 'unsupported'
+        }),
+        ufs: Object.freeze({
+            boost: 'runtimeUfsBoost', flush: 'runtimeUfsFlush', 'small-write': 'runtimeUfsSmallWrite',
+            learning: 'runtimePolicyLearning', idle: 'runtimeUfsIdle', disabled: 'runtimePolicyDisabled',
+            unsupported: 'unsupported'
+        }),
+        gpu: Object.freeze({
+            burst: 'runtimeGpuBurst', limited: 'runtimeGpuLimited', idle: 'runtimeGpuIdle',
+            disabled: 'runtimePolicyDisabled', unsupported: 'unsupported'
+        }),
+        io: Object.freeze({
+            sequential: 'runtimeIoSequential', random: 'runtimeIoRandom', write: 'runtimeIoWrite',
+            mixed: 'runtimeIoMixed', pressure: 'runtimeIoPressureLimited', congested: 'runtimeIoCongested',
+            limited: 'runtimeIoLimited', learning: 'runtimePolicyLearning', idle: 'runtimeIoIdle',
+            disabled: 'runtimePolicyDisabled', unsupported: 'unsupported'
+        })
+    });
+    const POLICY_FALLBACKS = Object.freeze({ irq: 'runtimeIrqIdle', ufs: 'runtimeUfsIdle', gpu: 'runtimeGpuIdle', io: 'runtimeIoIdle' });
+    const PRESSURE_KEYS = Object.freeze(['runtimePressureNormal', 'runtimePressureModerate', 'runtimePressureHigh']);
+    const DECISION_AREA_KEYS = Object.freeze({
+        foreground: 'runtimeDecisionForeground', irq: 'runtimeIrqPolicy', ufs: 'runtimeUfsPolicy',
+        gpu: 'runtimeGpuPolicy', io: 'runtimeIoPolicy', storage: 'runtimeStorageLearning'
+    });
 
     Object.assign(CoronaAddon.prototype, {
         initRuntimeOptimizer() {
@@ -119,7 +152,16 @@
         },
         setRuntimeText(id, value) {
             const element = document.getElementById(id);
-            if (element) element.textContent = value || '--';
+            if (!element) return;
+            const next = value || '--';
+            if (element.textContent !== next) element.textContent = next;
+        },
+        runtimePolicyText(area, state) {
+            return this.t(POLICY_KEYS[area]?.[state] || POLICY_FALLBACKS[area] || 'runtimeUnknown');
+        },
+        runtimePressureText(level) {
+            const index = Math.max(0, Math.min(2, Number.parseInt(level || '0', 10)));
+            return this.t(PRESSURE_KEYS[index]);
         },
         setRuntimeSaveState(state) {
             const element = document.getElementById('runtime-save-state');
@@ -163,19 +205,14 @@
             });
         },
         updateRuntimeCapabilities(status) {
-            const reasonKeys = {
-                available: 'runtimeCapabilityAvailable',
-                missing_node: 'runtimeCapabilityMissingNode',
-                read_only: 'runtimeCapabilityReadOnly',
-                kernel_disabled: 'runtimeCapabilityKernelDisabled'
-            };
             document.querySelectorAll('.runtime-capability-item').forEach(item => {
                 const name = item.dataset.capability;
                 const supported = status[`capability_${name}`] === '1';
                 const reason = status[`capability_${name}_reason`] || 'missing_node';
                 item.dataset.state = supported ? 'available' : 'unavailable';
                 const value = item.querySelector('strong');
-                if (value) value.textContent = this.t(reasonKeys[reason] || 'unsupported');
+                const text = this.t(CAPABILITY_REASON_KEYS[reason] || 'unsupported');
+                if (value && value.textContent !== text) value.textContent = text;
             });
             HARDWARE_POLICIES.forEach(policy => {
                 const capability = policy.key.replace('_enabled', '');
@@ -189,18 +226,13 @@
         updateRuntimeDecisions(status) {
             const list = document.getElementById('runtime-decision-list');
             if (!list) return;
-            const areaKeys = {
-                foreground: 'runtimeDecisionForeground',
-                irq: 'runtimeIrqPolicy',
-                ufs: 'runtimeUfsPolicy',
-                gpu: 'runtimeGpuPolicy',
-                io: 'runtimeIoPolicy',
-                storage: 'runtimeStorageLearning'
-            };
             const entries = Object.entries(status)
                 .filter(([key]) => /^decision_\d+$/.test(key))
                 .sort(([left], [right]) => Number.parseInt(left.slice(9), 10) - Number.parseInt(right.slice(9), 10))
                 .map(([, value]) => value.split('|'));
+            const signature = entries.map(parts => parts.join('|')).join('\n');
+            if (this.runtimeDecisionSignature === signature) return;
+            this.runtimeDecisionSignature = signature;
             list.replaceChildren();
             if (!entries.length) {
                 const empty = document.createElement('div');
@@ -213,7 +245,7 @@
                 const item = document.createElement('div');
                 item.className = 'runtime-decision-item';
                 const title = document.createElement('strong');
-                title.textContent = `${this.t(areaKeys[area] || 'runtimeUnknown')} · ${action || '--'}`;
+                title.textContent = `${this.t(DECISION_AREA_KEYS[area] || 'runtimeUnknown')} · ${action || '--'}`;
                 const detail = document.createElement('span');
                 detail.textContent = reason || '--';
                 const sequence = document.createElement('small');
@@ -431,56 +463,16 @@
             const active = status.ebpf_active === '1';
             this.setRuntimeText('runtime-ebpf-state', this.t(active ? 'runtimeEbpfActive' : requested ? 'runtimeEbpfFallback' : 'runtimeEbpfIdle'));
             this.setRuntimeText('runtime-known-threads', status.known_threads);
-            const irqState = {
-                active: 'runtimeIrqActive',
-                efficient: 'runtimeIrqEfficient',
-                idle: 'runtimeIrqIdle',
-                disabled: 'runtimePolicyDisabled',
-                unsupported: 'unsupported'
-            }[status.irq_policy] || 'runtimeIrqIdle';
             const irqCpus = status.irq_target_cpus ? ` ${status.irq_target_cpus}` : '';
-            this.setRuntimeText('runtime-irq-policy', `${this.t(irqState)}${irqCpus} · ${status.irq_busy || 0}/${status.irq_managed || 0}`);
-            const ufsState = {
-                boost: 'runtimeUfsBoost',
-                flush: 'runtimeUfsFlush',
-                'small-write': 'runtimeUfsSmallWrite',
-                learning: 'runtimePolicyLearning',
-                idle: 'runtimeUfsIdle',
-                disabled: 'runtimePolicyDisabled',
-                unsupported: 'unsupported'
-            }[status.ufs_policy] || 'runtimeUfsIdle';
-            this.setRuntimeText('runtime-ufs-policy', `${this.t(ufsState)} · ${status.ufs_wb_available || 0}`);
-            const gpuState = {
-                burst: 'runtimeGpuBurst',
-                limited: 'runtimeGpuLimited',
-                idle: 'runtimeGpuIdle',
-                disabled: 'runtimePolicyDisabled',
-                unsupported: 'unsupported'
-            }[status.gpu_policy] || 'runtimeGpuIdle';
-            this.setRuntimeText('runtime-gpu-policy', `${this.t(gpuState)} · ${status.gpu_busy_percent || 0}%`);
-            const ioState = {
-                sequential: 'runtimeIoSequential',
-                random: 'runtimeIoRandom',
-                write: 'runtimeIoWrite',
-                mixed: 'runtimeIoMixed',
-                pressure: 'runtimeIoPressureLimited',
-                congested: 'runtimeIoCongested',
-                limited: 'runtimeIoLimited',
-                learning: 'runtimePolicyLearning',
-                idle: 'runtimeIoIdle',
-                disabled: 'runtimePolicyDisabled'
-            }[status.io_policy] || 'runtimeIoIdle';
+            this.setRuntimeText('runtime-irq-policy', `${this.runtimePolicyText('irq', status.irq_policy)}${irqCpus} · ${status.irq_busy || 0}/${status.irq_managed || 0}`);
+            this.setRuntimeText('runtime-ufs-policy', `${this.runtimePolicyText('ufs', status.ufs_policy)} · ${status.ufs_wb_available || 0}`);
+            this.setRuntimeText('runtime-gpu-policy', `${this.runtimePolicyText('gpu', status.gpu_policy)} · ${status.gpu_busy_percent || 0}%`);
             const ioValues = status.io_read_ahead_kb && status.io_read_ahead_kb !== '0'
                 ? ` · ${status.io_read_ahead_kb}/${status.io_nr_requests || 0}`
                 : '';
-            this.setRuntimeText('runtime-io-policy', `${this.t(ioState)}${ioValues}`);
-            const pressureLabel = level => this.t([
-                'runtimePressureNormal',
-                'runtimePressureModerate',
-                'runtimePressureHigh'
-            ][Math.max(0, Math.min(2, Number.parseInt(level || '0', 10)))]);
-            this.setRuntimeText('runtime-cpu-pressure', `${status.cpu_pressure_avg10 || '0'}% · ${pressureLabel(status.cpu_pressure_level)}`);
-            this.setRuntimeText('runtime-io-pressure', `${status.io_pressure_avg10 || '0'}% · ${pressureLabel(status.io_pressure_level)}`);
+            this.setRuntimeText('runtime-io-policy', `${this.runtimePolicyText('io', status.io_policy)}${ioValues}`);
+            this.setRuntimeText('runtime-cpu-pressure', `${status.cpu_pressure_avg10 || '0'}% · ${this.runtimePressureText(status.cpu_pressure_level)}`);
+            this.setRuntimeText('runtime-io-pressure', `${status.io_pressure_avg10 || '0'}% · ${this.runtimePressureText(status.io_pressure_level)}`);
             const cpuGroups = [
                 `E ${status.efficiency_cpus || '--'}`,
                 `B ${status.balanced_cpus || '--'}`,
