@@ -1,7 +1,9 @@
 mod config_migration;
+mod process_name;
 mod runtime_state;
 
 use config_migration::{migrate_legacy_runtime_path, migrate_v5_configs};
+use process_name::package_from_process_name;
 use runtime_state::{DecisionLog, NodeManager};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::env;
@@ -936,45 +938,6 @@ fn package_from_dumpsys(text: &str) -> Option<String> {
 
 fn package_from_pid(pid: u32) -> Option<String> {
     process_base_from_pid(pid)
-}
-
-fn valid_package_name(value: &str) -> bool {
-    value.contains('.')
-        && value.split('.').all(|part| {
-            !part.is_empty()
-                && part
-                    .bytes()
-                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
-        })
-        && value != "android"
-        && value != "com.android.shell"
-        && value != "me.weishu.kernelsu"
-}
-
-fn package_from_process_name(process_name: &str) -> Option<String> {
-    let base = process_name.split(':').next().unwrap_or_default().trim();
-    if base.is_empty() {
-        return None;
-    }
-    if !base.starts_with('/') {
-        return valid_package_name(base).then(|| base.to_string());
-    }
-
-    let parts = base.split('/').filter(|part| !part.is_empty()).collect::<Vec<_>>();
-    for (index, part) in parts.iter().enumerate() {
-        let candidate = match *part {
-            "user" | "user_de"
-                if parts.get(index + 1).is_some_and(|value| {
-                    value.bytes().all(|byte| byte.is_ascii_digit())
-                }) => parts.get(index + 2).copied(),
-            "data" if parts.get(index + 1) == Some(&"data") => parts.get(index + 2).copied(),
-            _ => None,
-        };
-        if let Some(candidate) = candidate.filter(|value| valid_package_name(value)) {
-            return Some(candidate.to_string());
-        }
-    }
-    None
 }
 
 fn process_base_from_pid(pid: u32) -> Option<String> {
