@@ -37,12 +37,12 @@ pid_is_daemon() {
 }
 
 find_daemon_pids() {
-    for process in /proc/[0-9]*; do
-        [ -d "$process" ] || continue
-        pid=${process##*/}
+    candidates=$(pidof sh 2>/dev/null)
+    [ -n "$candidates" ] || candidates=$(ps -A -o PID,NAME 2>/dev/null | awk '$2 == "sh" { print $1 }')
+    for pid in $candidates; do
         case "$pid" in *[!0-9]*) continue ;; esac
         [ "$pid" = "$$" ] && continue
-        command_line=$(cat "$process/cmdline" 2>/dev/null | tr '\0' ' ')
+        command_line=$(cat "/proc/$pid/cmdline" 2>/dev/null | tr '\0' ' ')
         case "$command_line" in
             "/system/bin/sh $0 daemon "|"$0 daemon ") echo "$pid" ;;
         esac
@@ -349,6 +349,7 @@ capture_baseline() {
 
 restore_baseline() {
     [ -r "$BASELINE_FILE" ] || return 0
+    [ -s "$BASELINE_FILE" ] || { rm -f "$BASELINE_FILE"; return 0; }
     block=$(find_zram_block)
     value=$(get_value "$BASELINE_FILE" sys_vm_swappiness)
     [ -n "$value" ] && write_if_supported /proc/sys/vm/swappiness "$value"
