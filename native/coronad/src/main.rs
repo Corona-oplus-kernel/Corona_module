@@ -2678,6 +2678,11 @@ impl Daemon {
         if bpf_requested && bpf.is_none() {
             stats.bpf_attach_failures = 1;
         }
+        let last_profile = if paths.config.join(".app_policy_effective").is_dir() {
+            String::new()
+        } else {
+            "base".to_string()
+        };
         let mut daemon = Self {
             rules: load_rules(&paths),
             pressure: load_pressure(&paths),
@@ -2708,7 +2713,7 @@ impl Daemon {
             gpu_runtime: GpuRuntime::default(),
             io_runtime: IoRuntime::default(),
             last_foreground: String::new(),
-            last_profile: String::new(),
+            last_profile,
             tick: 0,
             pressure_elapsed_ms: 0,
             protect_elapsed_ms: 0,
@@ -2744,6 +2749,9 @@ impl Daemon {
     }
 
     fn stop_legacy_zram_policy(&self) {
+        if !self.paths.config.join(".zram_policy.pid").is_file() {
+            return;
+        }
         let script = self.zram_policy_script();
         if script.is_file() {
             let _ = Command::new("/system/bin/sh")
