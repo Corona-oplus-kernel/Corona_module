@@ -1148,15 +1148,23 @@ fn classify_thread<'a>(package: &str, thread_name: &str, default_class: &'a str)
     }
 }
 
+fn is_binder_thread(thread_name: &str) -> bool {
+    let lower = thread_name.to_ascii_lowercase();
+    lower.starts_with("binder:")
+        || lower.starts_with("hwbinder:")
+        || lower.starts_with("binder_")
+        || lower.contains("binder thread")
+}
+
 fn adapt_class(class: &str, mode: RuntimeMode) -> &str {
     match mode {
         RuntimeMode::Normal => class,
         RuntimeMode::Warm => match class {
-            "performance" => "balanced",
+            "performance" | "latency" => "balanced",
             _ => class,
         },
         RuntimeMode::Severe | RuntimeMode::Saver | RuntimeMode::ScreenOff => match class {
-            "performance" | "balanced" => "efficiency",
+            "performance" | "latency" | "balanced" => "efficiency",
             _ => class,
         },
     }
@@ -2135,8 +2143,8 @@ fn pressure_adjusted_class(class: &str, level: u8, main_thread: bool) -> &str {
         return class;
     }
     match level {
-        1 if class == "performance" => "balanced",
-        2 if matches!(class, "performance" | "balanced") => "efficiency",
+        1 if matches!(class, "performance" | "latency") => "balanced",
+        2 if matches!(class, "performance" | "latency" | "balanced") => "efficiency",
         _ => class,
     }
 }
@@ -2471,8 +2479,18 @@ impl Daemon {
         self.io_pressure_level = io_pressure_level(self.io_pressure_avg10);
     }
 
-    fn thread_class(&self, package: &str, thread_name: &str, tid: i32, pid: u32, score: i8) -> &str {
-        let base = if tid == pid as i32 || (self.affinity.load_learning && score >= 2) {
+    fn thread_class(
+        &self,
+        package: &str,
+        thread_name: &str,
+        tid: i32,
+        pid: u32,
+        score: i8,
+        foreground: bool,
+    ) -> &str {
+        let base = if is_binder_thread(thread_name) {
+            if foreground { "latency" } else { "efficiency" }
+        } else if tid == pid as i32 || (self.affinity.load_learning && score >= 2) {
             "performance"
         } else if self.affinity.load_learning && score <= -3 {
             "efficiency"
@@ -2534,10 +2552,18 @@ impl Daemon {
                 let auto_plan = if auto_enabled
                     && manual.as_ref().and_then(|rule| rule.affinity.as_ref()).is_none()
                 {
-                    let class = self.thread_class(package, &thread_name, tid, pid, load_score);
+                    let class = self.thread_class(
+                        package,
+                        &thread_name,
+                        tid,
+                        pid,
+                        load_score,
+                        automatic,
+                    );
                     let cpus = match class {
                         "efficiency" => &self.topology.efficiency,
                         "performance" => &self.topology.performance,
+                        "latency" => &self.topology.latency,
                         _ => &self.topology.balanced,
                     };
                     Some((
@@ -2729,7 +2755,7 @@ impl Daemon {
         );
         let _ = write_text(&self.paths.state, state);
         let affinity_state = format!(
-            "status=active\npackage={}\napplied={}\nfailed={}\nmanual={}\nefficiency={}\nbalanced={}\nperformance={}\nmode={}\n",
+            "status=active\npackage={}\napplied={}\nfailed={}\nmanual={}\nefficiency={}\nbalanced={}\nperformance={}\nlatency={}\nmode={}\n",
             foreground,
             self.stats.affinity_applied,
             self.stats.affinity_failed,
@@ -2737,6 +2763,7 @@ impl Daemon {
             cpu_list_string(&self.topology.efficiency),
             cpu_list_string(&self.topology.balanced),
             cpu_list_string(&self.topology.performance),
+            cpu_list_string(&self.topology.latency),
             self.runtime_mode.name(),
         );
         let _ = write_text(&self.paths.affinity_state, affinity_state);
@@ -2957,6 +2984,14 @@ mod tests {
         assert!(glob_matches("Render*", "RenderThread"));
         assert!(glob_matches("GLThread?", "GLThread1"));
         assert!(!glob_matches("Render*", "UnityMain"));
+    }
+
+    #[test]
+    fn recognizes_binder_thread_names() {
+        assert!(is_binder_thread("Binder:123_1"));
+        assert!(is_binder_thread("HwBinder:456_2"));
+        assert!(is_binder_thread("binder_worker"));
+        assert!(!is_binder_thread("RenderThread"));
     }
 
     #[test]

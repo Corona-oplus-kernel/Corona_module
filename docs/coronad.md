@@ -55,6 +55,13 @@
 
 ## 线程分类
 
+名称以 `Binder:`、`HwBinder:`、`binder_` 开头，或包含 `binder thread` 的线程单独处理：
+
+- 前台应用 Binder 线程使用 `latency` CPU 集合。
+- 非前台 Binder 线程使用 `efficiency` CPU 集合。
+- `warm` 模式把 `latency` 降为 `balanced`。
+- `severe`、`saver` 和 `screen_off` 模式把 `latency` 降为 `efficiency`。
+
 主线程、包名同名线程，以及名称包含下列关键字的线程归入 `performance`：
 
 - `RenderThread`
