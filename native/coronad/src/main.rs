@@ -3614,6 +3614,14 @@ fn print_status(paths: &Paths) -> i32 {
         0
     } else {
         println!("running=0");
+        let decisions = DecisionLog::load(&paths.decision_history);
+        println!("decision_count={}", decisions.entries.len());
+        for (index, decision) in decisions.entries.iter().rev().enumerate() {
+            println!(
+                "decision_{index}={}|{}|{}|{}",
+                decision.tick, decision.area, decision.action, decision.reason,
+            );
+        }
         1
     }
 }
