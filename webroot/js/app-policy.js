@@ -8,6 +8,7 @@ CoronaAddon.prototype.ensureAppPolicyState = function() {
     }
     if (!Array.isArray(this.appPolicy.affinityExclude)) this.appPolicy.affinityExclude = [];
     if (!Array.isArray(this.installedApps)) this.installedApps = [];
+    if (!this.appPolicyCollator) this.appPolicyCollator = new Intl.Collator(['zh-CN', 'en'], { numeric: true, sensitivity: 'base' });
     if (!this.currentAppPolicyMode) this.currentAppPolicyMode = 'whitelist';
 };
 CoronaAddon.prototype.getAppPolicyScript = function(...args) {
@@ -550,7 +551,7 @@ CoronaAddon.prototype.renderAppPolicyList = function() {
             const bActive = configured.has(b.packageName);
             if (aActive !== bActive) return aActive ? -1 : 1;
             // plain compare first (much cheaper than pinyin collator on full list)
-            return a.label.localeCompare(b.label, 'zh') || a.packageName.localeCompare(b.packageName);
+            return this.appPolicyCollator.compare(a.label, b.label) || this.appPolicyCollator.compare(a.packageName, b.packageName);
         });
 
     if (apps.length === 0) {
