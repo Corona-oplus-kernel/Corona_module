@@ -316,21 +316,11 @@ CoronaAddon.prototype.scheduleSaveAppMetaCache = function() {
 };
 CoronaAddon.prototype.prewarmAppPolicyData = async function(force = false) {
     this.ensureAppPolicyState();
+    if (!force && this.appPolicyPrewarmDone) return this.installedApps;
     if (this.appPolicyPrewarmPromise) return this.appPolicyPrewarmPromise;
     this.appPolicyPrewarmPromise = (async () => {
-        let apps = [];
-        let lastError = null;
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-            try {
-                apps = await this.loadInstalledApps(force || attempt > 0);
-                if (apps.length > 0) break;
-            } catch (error) {
-                lastError = error;
-            }
-            await this.sleep(220);
-        }
-        if (lastError && apps.length === 0) throw lastError;
-        this.appPolicyPrewarmDone = apps.length > 0;
+        const apps = force ? await this.loadInstalledApps(true) : this.hydrateInstalledAppsFromCache();
+        this.appPolicyPrewarmDone = true;
         return apps;
     })();
     try {
