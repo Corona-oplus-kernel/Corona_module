@@ -491,6 +491,12 @@ struct StorageActivity {
     write_sectors: u64,
 }
 
+#[derive(Default)]
+struct StorageSample {
+    activity: StorageActivity,
+    devices: HashMap<String, DiskCounters>,
+}
+
 struct StorageLearning {
     samples: Vec<StorageActivity>,
     ready: bool,
@@ -554,7 +560,6 @@ enum UfsWritePattern {
 struct IoRuntime {
     last: HashMap<String, DiskCounters>,
     idle_rounds: HashMap<String, u8>,
-    elapsed_ms: u64,
     applied: u64,
     active_devices: usize,
     read_ahead_kb: u64,
@@ -2303,6 +2308,9 @@ impl UfsRuntime {
         learning: &StorageLearning,
         nodes: &mut NodeManager,
     ) {
+        if !activity.sampled {
+            return;
+        }
         if self.root.is_none() {
             self.root = find_ufs_root();
         }
@@ -2491,23 +2499,21 @@ impl IoRuntime {
     fn step(
         &mut self,
         mode: RuntimeMode,
-        elapsed_ms: u64,
         pressure_level: u8,
         active_sector_threshold: u64,
+        sample: &StorageSample,
         nodes: &mut NodeManager,
     ) {
-        self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
-        if self.elapsed_ms < 2_000 {
+        if !sample.activity.sampled {
             return;
         }
-        self.elapsed_ms = 0;
-        let counters = parse_disk_counters(&read_text(proc_root().join("diskstats")));
         self.active_devices = 0;
         self.state = "idle";
         self.read_ahead_kb = 0;
         self.nr_requests = 0;
         let mut dominant_sectors = 0u64;
-        for (device, current) in counters {
+        for (device, current) in &sample.devices {
+            let current = *current;
             let previous = self.last.insert(device.clone(), current).unwrap_or(current);
             let read_ops = current.read_ops.saturating_sub(previous.read_ops);
             let read_sectors = current.read_sectors.saturating_sub(previous.read_sectors);
@@ -2917,13 +2923,14 @@ impl Daemon {
         daemon
     }
 
-    fn sample_storage_activity(&mut self, elapsed_ms: u64) -> StorageActivity {
+    fn sample_storage_activity(&mut self, elapsed_ms: u64) -> StorageSample {
         self.storage_elapsed_ms = self.storage_elapsed_ms.saturating_add(elapsed_ms);
         if self.storage_elapsed_ms < 2_000 {
-            return StorageActivity::default();
+            return StorageSample::default();
         }
         self.storage_elapsed_ms = 0;
-        let current = parse_disk_counters(&read_text(proc_root().join("diskstats")))
+        let devices = parse_disk_counters(&read_text(proc_root().join("diskstats")));
+        let current = devices
             .values()
             .fold(DiskCounters::default(), |mut total, counters| {
                 total.read_ops = total.read_ops.saturating_add(counters.read_ops);
@@ -2939,18 +2946,24 @@ impl Daemon {
             && previous.write_ops == 0
             && previous.write_sectors == 0
         {
-            return StorageActivity {
-                sampled: true,
-                ..StorageActivity::default()
+            return StorageSample {
+                activity: StorageActivity {
+                    sampled: true,
+                    ..StorageActivity::default()
+                },
+                devices,
             };
         }
         let read_sectors = current.read_sectors.saturating_sub(previous.read_sectors);
         let write_sectors = current.write_sectors.saturating_sub(previous.write_sectors);
-        StorageActivity {
-            sampled: true,
-            total_sectors: read_sectors.saturating_add(write_sectors),
-            write_ops: current.write_ops.saturating_sub(previous.write_ops),
-            write_sectors,
+        StorageSample {
+            activity: StorageActivity {
+                sampled: true,
+                total_sectors: read_sectors.saturating_add(write_sectors),
+                write_ops: current.write_ops.saturating_sub(previous.write_ops),
+                write_sectors,
+            },
+            devices,
         }
     }
 
@@ -3515,13 +3528,13 @@ impl Daemon {
         self.process_bpf_events(&foreground);
         self.scan_threads(&foreground);
         let storage = self.sample_storage_activity(interval_ms);
-        self.storage_learning.observe(storage);
+        self.storage_learning.observe(storage.activity);
         if self.hardware.irq_enabled && self.capabilities.irq.supported {
             self.irq_runtime.step(
                 &self.topology,
                 self.runtime_mode,
                 interval_ms,
-                storage.total_sectors,
+                storage.activity.total_sectors,
                 &foreground,
                 &mut self.nodes,
             );
@@ -3536,7 +3549,12 @@ impl Daemon {
             && self.storage_learning.ready
         {
             self.ufs_runtime
-                .step(self.runtime_mode, storage, &self.storage_learning, &mut self.nodes);
+                .step(
+                    self.runtime_mode,
+                    storage.activity,
+                    &self.storage_learning,
+                    &mut self.nodes,
+                );
         } else {
             self.ufs_runtime.disable(&mut self.nodes);
             if self.hardware.ufs_enabled && !self.capabilities.ufs.supported {
@@ -3560,9 +3578,9 @@ impl Daemon {
         {
             self.io_runtime.step(
                 self.runtime_mode,
-                interval_ms,
                 self.io_pressure_level,
                 self.storage_learning.active_sectors,
+                &storage,
                 &mut self.nodes,
             );
         } else {
