@@ -252,9 +252,61 @@ struct DiskCounters {
 
 #[derive(Clone, Copy, Default)]
 struct StorageActivity {
+    sampled: bool,
     total_sectors: u64,
     write_ops: u64,
     write_sectors: u64,
+}
+
+struct StorageLearning {
+    samples: Vec<StorageActivity>,
+    ready: bool,
+    active_sectors: u64,
+    sequential_write_sectors: u64,
+    random_write_ops: u64,
+}
+
+impl Default for StorageLearning {
+    fn default() -> Self {
+        Self {
+            samples: Vec::new(),
+            ready: false,
+            active_sectors: 16_384,
+            sequential_write_sectors: 32_768,
+            random_write_ops: 64,
+        }
+    }
+}
+
+impl StorageLearning {
+    fn observe(&mut self, activity: StorageActivity) {
+        if !activity.sampled || self.ready {
+            return;
+        }
+        self.samples.push(activity);
+        if self.samples.len() < 12 {
+            return;
+        }
+        let percentile = |mut values: Vec<u64>| {
+            values.sort_unstable();
+            values[values.len().saturating_mul(3) / 4]
+        };
+        let active = percentile(self.samples.iter().map(|sample| sample.total_sectors).collect());
+        let write = percentile(self.samples.iter().map(|sample| sample.write_sectors).collect());
+        let operations = percentile(self.samples.iter().map(|sample| sample.write_ops).collect());
+        self.active_sectors = active.saturating_mul(2).clamp(8_192, 65_536);
+        self.sequential_write_sectors = write.saturating_mul(4).clamp(32_768, 131_072);
+        self.random_write_ops = operations.saturating_mul(2).clamp(64, 256);
+        self.ready = true;
+    }
+
+    fn progress(&self) -> u8 {
+        if self.ready {
+            100
+        } else {
+            ((self.samples.len() * 100) / 12) as u8
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -710,6 +762,7 @@ struct Daemon {
     fallback_reload_elapsed_ms: u64,
     storage_elapsed_ms: u64,
     last_storage_counters: DiskCounters,
+    storage_learning: StorageLearning,
 }
 
 fn read_text(path: impl AsRef<Path>) -> String {
@@ -1615,14 +1668,19 @@ fn parse_disk_counters(text: &str) -> HashMap<String, DiskCounters> {
         .collect()
 }
 
-fn ufs_write_pattern(write_ops: u64, write_sectors: u64) -> UfsWritePattern {
+fn ufs_write_pattern(
+    write_ops: u64,
+    write_sectors: u64,
+    random_write_ops: u64,
+    sequential_write_sectors: u64,
+) -> UfsWritePattern {
     if write_sectors < 8_192 || write_ops == 0 {
         return UfsWritePattern::Idle;
     }
     let average = write_sectors / write_ops;
-    if write_ops >= 64 && average <= 8 {
+    if write_ops >= random_write_ops && average <= 8 {
         UfsWritePattern::SmallRandom
-    } else if write_sectors >= 32_768 && average >= 32 {
+    } else if write_sectors >= sequential_write_sectors && average >= 32 {
         UfsWritePattern::LargeSequential
     } else {
         UfsWritePattern::Mixed
@@ -2010,7 +2068,7 @@ impl UfsRuntime {
         }
     }
 
-    fn step(&mut self, mode: RuntimeMode, activity: StorageActivity) {
+    fn step(&mut self, mode: RuntimeMode, activity: StorageActivity, learning: &StorageLearning) {
         if self.root.is_none() {
             self.root = find_ufs_root();
         }
@@ -2032,7 +2090,12 @@ impl UfsRuntime {
         } else {
             0
         };
-        let pattern = ufs_write_pattern(activity.write_ops, activity.write_sectors);
+        let pattern = ufs_write_pattern(
+            activity.write_ops,
+            activity.write_sectors,
+            learning.random_write_ops,
+            learning.sequential_write_sectors,
+        );
         if pattern == UfsWritePattern::LargeSequential
             && matches!(mode, RuntimeMode::Normal | RuntimeMode::Warm)
         {
@@ -2209,7 +2272,13 @@ impl IoRuntime {
         }
     }
 
-    fn step(&mut self, mode: RuntimeMode, elapsed_ms: u64, pressure_level: u8) {
+    fn step(
+        &mut self,
+        mode: RuntimeMode,
+        elapsed_ms: u64,
+        pressure_level: u8,
+        active_sector_threshold: u64,
+    ) {
         self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
         if self.elapsed_ms < 2_000 {
             return;
@@ -2241,7 +2310,7 @@ impl IoRuntime {
             self.baselines
                 .entry(requests_path.clone())
                 .or_insert_with(|| read_text(&requests_path).trim().to_string());
-            let active = total_ops >= 64 || total_sectors >= 16_384;
+            let active = total_ops >= 64 || total_sectors >= active_sector_threshold;
             if !active || !matches!(mode, RuntimeMode::Normal | RuntimeMode::Warm) {
                 let rounds = self.idle_rounds.entry(device.clone()).or_default();
                 *rounds = rounds.saturating_add(1);
@@ -2621,6 +2690,7 @@ impl Daemon {
             fallback_reload_elapsed_ms: 0,
             storage_elapsed_ms: 0,
             last_storage_counters: DiskCounters::default(),
+            storage_learning: StorageLearning::default(),
             paths,
         };
         daemon.update_environment();
@@ -2631,11 +2701,6 @@ impl Daemon {
     }
 
     fn sample_storage_activity(&mut self, elapsed_ms: u64) -> StorageActivity {
-        if !self.hardware.irq_enabled && !self.hardware.ufs_enabled {
-            self.storage_elapsed_ms = 0;
-            self.last_storage_counters = DiskCounters::default();
-            return StorageActivity::default();
-        }
         self.storage_elapsed_ms = self.storage_elapsed_ms.saturating_add(elapsed_ms);
         if self.storage_elapsed_ms < 2_000 {
             return StorageActivity::default();
@@ -2657,11 +2722,15 @@ impl Daemon {
             && previous.write_ops == 0
             && previous.write_sectors == 0
         {
-            return StorageActivity::default();
+            return StorageActivity {
+                sampled: true,
+                ..StorageActivity::default()
+            };
         }
         let read_sectors = current.read_sectors.saturating_sub(previous.read_sectors);
         let write_sectors = current.write_sectors.saturating_sub(previous.write_sectors);
         StorageActivity {
+            sampled: true,
             total_sectors: read_sectors.saturating_add(write_sectors),
             write_ops: current.write_ops.saturating_sub(previous.write_ops),
             write_sectors,
@@ -3081,6 +3150,13 @@ impl Daemon {
         ] {
             append_capability_state(&mut state, name, capability);
         }
+        state.push_str(&format!(
+            "storage_learning_progress={}\nstorage_active_sectors={}\nstorage_sequential_write_sectors={}\nstorage_random_write_ops={}\n",
+            self.storage_learning.progress(),
+            self.storage_learning.active_sectors,
+            self.storage_learning.sequential_write_sectors,
+            self.storage_learning.random_write_ops,
+        ));
         let _ = write_text(&self.paths.state, state);
         let affinity_state = format!(
             "status=active\npackage={}\napplied={}\nfailed={}\nmanual={}\nefficiency={}\nbalanced={}\nperformance={}\nlatency={}\nmode={}\n",
@@ -3139,6 +3215,7 @@ impl Daemon {
         self.process_bpf_events(&foreground);
         self.scan_threads(&foreground);
         let storage = self.sample_storage_activity(interval_ms);
+        self.storage_learning.observe(storage);
         if self.hardware.irq_enabled && self.capabilities.irq.supported {
             self.irq_runtime.step(
                 &self.topology,
@@ -3153,12 +3230,18 @@ impl Daemon {
                 self.irq_runtime.state = "unsupported";
             }
         }
-        if self.hardware.ufs_enabled && self.capabilities.ufs.supported {
-            self.ufs_runtime.step(self.runtime_mode, storage);
+        if self.hardware.ufs_enabled
+            && self.capabilities.ufs.supported
+            && self.storage_learning.ready
+        {
+            self.ufs_runtime
+                .step(self.runtime_mode, storage, &self.storage_learning);
         } else {
             self.ufs_runtime.disable();
-            if self.hardware.ufs_enabled {
+            if self.hardware.ufs_enabled && !self.capabilities.ufs.supported {
                 self.ufs_runtime.state = "unsupported";
+            } else if self.hardware.ufs_enabled {
+                self.ufs_runtime.state = "learning";
             }
         }
         if self.hardware.gpu_enabled && self.capabilities.gpu.supported {
@@ -3169,13 +3252,22 @@ impl Daemon {
                 self.gpu_runtime.state = "unsupported";
             }
         }
-        if self.hardware.io_enabled && self.capabilities.io.supported {
-            self.io_runtime
-                .step(self.runtime_mode, interval_ms, self.io_pressure_level);
+        if self.hardware.io_enabled
+            && self.capabilities.io.supported
+            && self.storage_learning.ready
+        {
+            self.io_runtime.step(
+                self.runtime_mode,
+                interval_ms,
+                self.io_pressure_level,
+                self.storage_learning.active_sectors,
+            );
         } else {
             self.io_runtime.disable();
-            if self.hardware.io_enabled {
+            if self.hardware.io_enabled && !self.capabilities.io.supported {
                 self.io_runtime.state = "unsupported";
+            } else if self.hardware.io_enabled {
+                self.io_runtime.state = "learning";
             }
         }
         if self.protect_elapsed_ms >= 30_000 {
@@ -3405,10 +3497,37 @@ mod tests {
 
     #[test]
     fn classifies_ufs_write_patterns() {
-        assert_eq!(ufs_write_pattern(0, 0), UfsWritePattern::Idle);
-        assert_eq!(ufs_write_pattern(1_024, 8_192), UfsWritePattern::SmallRandom);
-        assert_eq!(ufs_write_pattern(64, 65_536), UfsWritePattern::LargeSequential);
-        assert_eq!(ufs_write_pattern(16, 16_384), UfsWritePattern::Mixed);
+        assert_eq!(ufs_write_pattern(0, 0, 64, 32_768), UfsWritePattern::Idle);
+        assert_eq!(
+            ufs_write_pattern(1_024, 8_192, 64, 32_768),
+            UfsWritePattern::SmallRandom
+        );
+        assert_eq!(
+            ufs_write_pattern(64, 65_536, 64, 32_768),
+            UfsWritePattern::LargeSequential
+        );
+        assert_eq!(
+            ufs_write_pattern(16, 16_384, 64, 32_768),
+            UfsWritePattern::Mixed
+        );
+    }
+
+    #[test]
+    fn learns_storage_thresholds_from_samples() {
+        let mut learning = StorageLearning::default();
+        for _ in 0..12 {
+            learning.observe(StorageActivity {
+                sampled: true,
+                total_sectors: 4_096,
+                write_ops: 16,
+                write_sectors: 2_048,
+            });
+        }
+        assert!(learning.ready);
+        assert_eq!(learning.progress(), 100);
+        assert_eq!(learning.active_sectors, 8_192);
+        assert_eq!(learning.sequential_write_sectors, 32_768);
+        assert_eq!(learning.random_write_ops, 64);
     }
 
     #[test]

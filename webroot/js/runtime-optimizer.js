@@ -407,6 +407,7 @@
                 boost: 'runtimeUfsBoost',
                 flush: 'runtimeUfsFlush',
                 'small-write': 'runtimeUfsSmallWrite',
+                learning: 'runtimePolicyLearning',
                 idle: 'runtimeUfsIdle',
                 disabled: 'runtimePolicyDisabled',
                 unsupported: 'unsupported'
@@ -428,6 +429,7 @@
                 pressure: 'runtimeIoPressureLimited',
                 congested: 'runtimeIoCongested',
                 limited: 'runtimeIoLimited',
+                learning: 'runtimePolicyLearning',
                 idle: 'runtimeIoIdle',
                 disabled: 'runtimePolicyDisabled'
             }[status.io_policy] || 'runtimeIoIdle';
@@ -453,6 +455,10 @@
             this.setRuntimeText('runtime-ufs-write-shape', `${status.ufs_write_ops || 0} ops · ${status.ufs_average_write_sectors || 0} ${this.t('runtimeSectorsPerOp')}`);
             this.setRuntimeText('runtime-gpu-floor', `${status.gpu_min_freq || 0} · ${status.gpu_busy_percent || 0}%`);
             this.setRuntimeText('runtime-io-queue', `${status.io_read_ahead_kb || 0} KB · ${status.io_nr_requests || 0}`);
+            this.setRuntimeText(
+                'runtime-storage-learning',
+                `${status.storage_learning_progress || 0}% · ${status.storage_active_sectors || 0}/${status.storage_sequential_write_sectors || 0} sectors`
+            );
             this.setRuntimeText('runtime-affinity-stats', `${status.affinity_applied || 0}/${status.affinity_failed || 0} · ${status.manual_applied || 0}`);
             this.setRuntimeText('runtime-applied-failed', `${status.affinity_applied || status.applied || 0} / ${status.affinity_failed || status.failed || 0}`);
             this.setRuntimeText('runtime-ebpf-events', status.bpf_events || '0');
