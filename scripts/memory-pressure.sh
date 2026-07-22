@@ -65,6 +65,43 @@ pressure_avg10() {
     awk '/^some / { for (i = 1; i <= NF; i++) if ($i ~ /^avg10=/) { sub(/^avg10=/, "", $i); print $i; exit } }' /proc/pressure/memory 2>/dev/null
 }
 
+pressure_enabled() {
+    config="$SOURCE_CONF"
+    [ -f "$RUNTIME_CONF" ] && config="$RUNTIME_CONF"
+    [ "$(get_value "$config" enabled)" = "1" ]
+}
+
+print_status() {
+    enabled=0
+    pressure_enabled && enabled=1
+    running=0
+    manager=none
+
+    if [ "$enabled" = "1" ] && [ -x "$CORONAD" ] && coronad_enabled; then
+        corona_status=$(CORONA_MODDIR="$MODDIR" "$CORONAD" status 2>/dev/null)
+        corona_running=$(printf '%s\n' "$corona_status" | awk -F= '$1 == "running" { print $2; exit }')
+        corona_pressure=$(printf '%s\n' "$corona_status" | awk -F= '$1 == "memory_pressure" { print $2; exit }')
+        if [ "$corona_running" = "1" ] && [ "$corona_pressure" = "1" ]; then
+            running=1
+            manager=coronad
+        fi
+    fi
+
+    if [ "$running" = "0" ] && [ "$enabled" = "1" ]; then
+        pid=$(cat "$PID_FILE" 2>/dev/null)
+        if pid_is_daemon "$pid"; then
+            running=1
+            manager=legacy
+        fi
+    fi
+
+    echo "enabled=$enabled"
+    echo "running=$running"
+    echo "manager=$manager"
+    echo "avg10=$(pressure_avg10)"
+    echo "swappiness=$(cat /proc/sys/vm/swappiness 2>/dev/null | tr -d ' \n')"
+}
+
 run_daemon() {
     [ -r /proc/pressure/memory ] || exit 2
     echo $$ > "$PID_FILE"
@@ -131,17 +168,6 @@ apply_config() {
 case "$1" in
     daemon) run_daemon ;;
     stop) stop_daemon ;;
-    status)
-        if [ -x "$CORONAD" ] && coronad_enabled; then
-            CORONA_MODDIR="$MODDIR" "$CORONAD" status 2>/dev/null | sed -n '1p'
-            echo "avg10=$(pressure_avg10)"
-            echo "swappiness=$(cat /proc/sys/vm/swappiness 2>/dev/null | tr -d ' \n')"
-            exit 0
-        fi
-        pid=$(cat "$PID_FILE" 2>/dev/null)
-        pid_is_daemon "$pid" && echo running=1 || echo running=0
-        echo "avg10=$(pressure_avg10)"
-        echo "swappiness=$(cat /proc/sys/vm/swappiness 2>/dev/null | tr -d ' \n')"
-        ;;
+    status) print_status ;;
     *) apply_config ;;
 esac
