@@ -320,9 +320,11 @@ average_write_sectors = write_sectors / write_ops
 运行状态包含：
 
 - 前台包名和识别来源
-- CPU 分类与运行模式
-- PSI 和 swappiness 状态
+- efficiency、balanced、performance 和 latency CPU 集合
+- CPU/IO PSI 数值、压力等级与运行模式
 - eBPF attach 状态及错误阶段
-- IRQ、UFS、GPU、IO 当前策略和应用次数
+- IRQ 实际目标 CPU、管理数量和繁忙数量
+- UFS 写操作数、写扇区和平均请求大小
+- GPU 忙碌率、最低频率和 IO 队列参数
 - 已扫描线程数、亲和性成功/失败次数
 - 前台变化次数、重载次数和循环次数

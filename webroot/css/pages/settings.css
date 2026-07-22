@@ -875,6 +875,45 @@ body.theme-dark .option-item {
     font-size: 12px;
 }
 
+.runtime-live-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.runtime-live-item {
+    min-width: 0;
+    padding: 10px 11px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-ctl);
+    background: var(--glass-control-bg);
+}
+
+.runtime-live-item.runtime-live-wide {
+    grid-column: 1 / -1;
+}
+
+.runtime-live-item span,
+.runtime-live-item strong {
+    display: block;
+}
+
+.runtime-live-item span {
+    color: var(--text-sub);
+    font-size: 10px;
+}
+
+.runtime-live-item strong {
+    overflow: hidden;
+    margin-top: 4px;
+    color: var(--text-main);
+    font-size: 11px;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .runtime-status-note {
     margin-bottom: 12px;
     padding: 10px 12px;

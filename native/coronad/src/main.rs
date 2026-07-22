@@ -2810,7 +2810,7 @@ impl Daemon {
 
     fn write_state(&self, foreground: &str, foreground_source: &str) {
         let state = format!(
-            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\ncpu_pressure_avg10={:.2}\nio_pressure_avg10={:.2}\ncpu_pressure_level={}\nio_pressure_level={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_target_cpus={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_write_ops={}\nufs_write_sectors={}\nufs_average_write_sectors={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
+            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\ncpu_pressure_avg10={:.2}\nio_pressure_avg10={:.2}\ncpu_pressure_level={}\nio_pressure_level={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_target_cpus={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_write_ops={}\nufs_write_sectors={}\nufs_average_write_sectors={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nefficiency_cpus={}\nbalanced_cpus={}\nperformance_cpus={}\nlatency_cpus={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
             process::id(),
             foreground,
             foreground_source,
@@ -2861,6 +2861,10 @@ impl Daemon {
             self.io_runtime.read_ahead_kb,
             self.io_runtime.nr_requests,
             self.io_runtime.applied,
+            cpu_list_string(&self.topology.efficiency),
+            cpu_list_string(&self.topology.balanced),
+            cpu_list_string(&self.topology.performance),
+            cpu_list_string(&self.topology.latency),
             self.thread_states.len(),
             self.stats.loops,
             self.stats.foreground_changes,

@@ -73,6 +73,10 @@
             });
             this.loadRuntimeOptimizerConfig();
             this.refreshRuntimeOptimizer();
+            this.runtimeStatusTimer = window.setInterval(() => {
+                if (document.hidden || !document.getElementById('page-settings')?.classList.contains('active')) return;
+                this.refreshRuntimeOptimizer();
+            }, 2000);
         },
         mountRuntimeOptimizerPanel() {
             const target = document.getElementById('app-policy-content');
@@ -346,6 +350,9 @@
             }
         },
         async refreshRuntimeOptimizer(notify = false) {
+            if (this.runtimeRefreshPending) return;
+            this.runtimeRefreshPending = true;
+            try {
             const binary = this.shellQuote(`${this.modDir}/bin/coronad`);
             const status = this.parseRuntimeKeyValues(await this.exec(`${binary} status 2>/dev/null`));
             const running = status.running === '1';
@@ -374,6 +381,7 @@
             const ufsState = {
                 boost: 'runtimeUfsBoost',
                 flush: 'runtimeUfsFlush',
+                'small-write': 'runtimeUfsSmallWrite',
                 idle: 'runtimeUfsIdle',
                 disabled: 'runtimePolicyDisabled',
                 unsupported: 'unsupported'
@@ -392,6 +400,8 @@
                 random: 'runtimeIoRandom',
                 write: 'runtimeIoWrite',
                 mixed: 'runtimeIoMixed',
+                pressure: 'runtimeIoPressureLimited',
+                congested: 'runtimeIoCongested',
                 limited: 'runtimeIoLimited',
                 idle: 'runtimeIoIdle',
                 disabled: 'runtimePolicyDisabled'
@@ -400,6 +410,25 @@
                 ? ` · ${status.io_read_ahead_kb}/${status.io_nr_requests || 0}`
                 : '';
             this.setRuntimeText('runtime-io-policy', `${this.t(ioState)}${ioValues}`);
+            const pressureLabel = level => this.t([
+                'runtimePressureNormal',
+                'runtimePressureModerate',
+                'runtimePressureHigh'
+            ][Math.max(0, Math.min(2, Number.parseInt(level || '0', 10)))]);
+            this.setRuntimeText('runtime-cpu-pressure', `${status.cpu_pressure_avg10 || '0'}% · ${pressureLabel(status.cpu_pressure_level)}`);
+            this.setRuntimeText('runtime-io-pressure', `${status.io_pressure_avg10 || '0'}% · ${pressureLabel(status.io_pressure_level)}`);
+            const cpuGroups = [
+                `E ${status.efficiency_cpus || '--'}`,
+                `B ${status.balanced_cpus || '--'}`,
+                `P ${status.performance_cpus || '--'}`,
+                `L ${status.latency_cpus || '--'}`
+            ].join(' · ');
+            this.setRuntimeText('runtime-cpu-groups', cpuGroups);
+            this.setRuntimeText('runtime-irq-target', `${status.irq_target_cpus || '--'} · ${status.irq_busy || 0}/${status.irq_managed || 0}`);
+            this.setRuntimeText('runtime-ufs-write-shape', `${status.ufs_write_ops || 0} ops · ${status.ufs_average_write_sectors || 0} ${this.t('runtimeSectorsPerOp')}`);
+            this.setRuntimeText('runtime-gpu-floor', `${status.gpu_min_freq || 0} · ${status.gpu_busy_percent || 0}%`);
+            this.setRuntimeText('runtime-io-queue', `${status.io_read_ahead_kb || 0} KB · ${status.io_nr_requests || 0}`);
+            this.setRuntimeText('runtime-affinity-stats', `${status.affinity_applied || 0}/${status.affinity_failed || 0} · ${status.manual_applied || 0}`);
             this.setRuntimeText('runtime-applied-failed', `${status.affinity_applied || status.applied || 0} / ${status.affinity_failed || status.failed || 0}`);
             this.setRuntimeText('runtime-ebpf-events', status.bpf_events || '0');
             const error = document.getElementById('runtime-ebpf-error');
@@ -411,6 +440,9 @@
                     : '';
             }
             if (notify) this.showToast(this.t('runtimeRefreshed'));
+            } finally {
+                this.runtimeRefreshPending = false;
+            }
         }
     });
 
