@@ -2738,6 +2738,7 @@
         const status = await this.exec(`/system/bin/sh ${this.shellQuote(`${this.modDir}/scripts/memory-pressure.sh`)} status 2>/dev/null`);
         const values = this.parseIoConfig(status);
         const supported = (await this.exec('[ -r /proc/pressure/memory ] && echo 1 || echo 0')).trim() === '1';
+        const enabled = values.enabled === '1';
         const running = values.running === '1';
         const badge = document.getElementById('memory-pressure-status');
         if (badge) badge.textContent = this.t(!supported ? 'unsupported' : (running ? 'running' : 'inactive'));
@@ -2747,7 +2748,7 @@
         if (swappiness) swappiness.textContent = values.swappiness || '--';
         const applyButton = document.getElementById('memory-pressure-apply');
         if (applyButton) applyButton.disabled = !supported;
-        return { supported, running };
+        return { supported, enabled, running, manager: values.manager || 'none' };
     },
     async applyMemoryPressureConfig() {
         const button = document.getElementById('memory-pressure-apply');
@@ -2755,8 +2756,12 @@
         try {
             await this.persistMemoryPressureConfig('enabled');
             const result = await this.execResult(`/system/bin/sh ${this.shellQuote(`${this.modDir}/scripts/memory-pressure.sh`)} apply`);
-            await this.sleep(250);
-            const status = await this.loadMemoryPressureStatus();
+            let status = { supported: true, enabled: false, running: false, manager: 'none' };
+            for (let attempt = 0; attempt < 7; attempt += 1) {
+                await this.sleep(attempt === 0 ? 200 : 400);
+                status = await this.loadMemoryPressureStatus();
+                if (this.state.pressureEnabled ? status.running : !status.running) break;
+            }
             const succeeded = result.code === 0 && (this.state.pressureEnabled ? status.running : !status.running);
             const message = succeeded ? 'pressureApplied' : (status.supported ? 'pressureApplyFailed' : 'pressureUnsupported');
             this.showToast(this.t(message), succeeded ? 'success' : 'error');
