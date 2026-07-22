@@ -13,6 +13,7 @@ use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
 use std::process::{self, Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
 use std::thread;
 use std::time::Duration;
 
@@ -987,14 +988,17 @@ struct ForegroundInfo {
 }
 
 fn top_app_info() -> Option<ForegroundInfo> {
-    let configured = env::var_os("CORONA_TOP_APP_FILES")
-        .map(|value| value.to_string_lossy().split(':').map(PathBuf::from).collect::<Vec<_>>());
-    let files = configured.unwrap_or_else(|| {
+    static TOP_APP_FILES: OnceLock<Vec<PathBuf>> = OnceLock::new();
+    let files = TOP_APP_FILES.get_or_init(|| {
+        env::var_os("CORONA_TOP_APP_FILES").map_or_else(|| {
         vec![
             PathBuf::from("/dev/cpuset/top-app/cgroup.procs"),
             PathBuf::from("/dev/cpuset/top-app/tasks"),
             PathBuf::from("/sys/fs/cgroup/top-app/cgroup.procs"),
         ]
+        }, |value| {
+            value.to_string_lossy().split(':').map(PathBuf::from).collect()
+        })
     });
     for file in files {
         let pids = read_text(file)
@@ -1590,10 +1594,11 @@ fn scan_requested_processes(packages: &HashSet<String>) -> HashMap<String, Vec<u
     found
 }
 
-fn proc_root() -> PathBuf {
-    env::var_os("CORONA_PROC_ROOT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/proc"))
+fn proc_root() -> &'static Path {
+    static PROC_ROOT: OnceLock<PathBuf> = OnceLock::new();
+    PROC_ROOT
+        .get_or_init(|| env::var_os("CORONA_PROC_ROOT").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/proc")))
+        .as_path()
 }
 
 fn cpu_list_string(cpus: &[usize]) -> String {
