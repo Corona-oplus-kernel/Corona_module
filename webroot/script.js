@@ -254,7 +254,6 @@ class CoronaAddon {
             this.startTranslationObserver();
             this.updateInitOverlayMessage(this.t('initSettings'));
             await Promise.all([
-                this.ensureSettingsPageReady(),
                 this.loadDeviceInfo(),
                 this.loadModuleVersion()
             ]);
