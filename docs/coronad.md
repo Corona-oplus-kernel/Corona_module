@@ -241,12 +241,25 @@ delta = current_bytes - previous_bytes
 - `enable_wb_buf_flush`
 - `auto_hibern8`
 
-两秒内写入扇区差达到 `32768` 且运行模式为 `normal` 或 `warm` 时：
+写入类型按两秒采样计算：
+
+```text
+average_write_sectors = write_sectors / write_ops
+```
+
+- `write_sectors < 8192` 或没有写操作：空闲。
+- `write_ops >= 64` 且平均请求不超过 `8` 扇区：小块随机写。
+- `write_sectors >= 32768` 且平均请求不少于 `32` 扇区：连续大写。
+- 其它情况：混合写入。
+
+只有连续大写且运行模式为 `normal` 或 `warm` 时：
 
 - `wb_on=1`
 - `enable_wb_buf_flush=0`
 - `auto_hibern8=0`
 - 保持三轮后恢复
+
+小块随机写会立即取消尚未结束的 boost，并恢复 Write Booster、flush 和 hibern8 的原始值。
 
 `wb_avail_buf <= 2` 时执行 `enable_wb_buf_flush=1`。息屏时恢复 Write Booster 和 hibern8 的原始值。
 

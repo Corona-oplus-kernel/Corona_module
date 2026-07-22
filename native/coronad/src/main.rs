@@ -189,6 +189,9 @@ struct UfsRuntime {
     applied: u64,
     available_buffer: u64,
     current_buffer: u64,
+    write_ops: u64,
+    write_sectors: u64,
+    average_write_sectors: u64,
     state: &'static str,
 }
 
@@ -210,6 +213,21 @@ struct DiskCounters {
     read_sectors: u64,
     write_ops: u64,
     write_sectors: u64,
+}
+
+#[derive(Clone, Copy, Default)]
+struct StorageActivity {
+    total_sectors: u64,
+    write_ops: u64,
+    write_sectors: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum UfsWritePattern {
+    Idle,
+    SmallRandom,
+    LargeSequential,
+    Mixed,
 }
 
 #[derive(Default)]
@@ -655,7 +673,7 @@ struct Daemon {
     battery_saver_elapsed_ms: u64,
     fallback_reload_elapsed_ms: u64,
     storage_elapsed_ms: u64,
-    last_storage_sectors: u64,
+    last_storage_counters: DiskCounters,
 }
 
 fn read_text(path: impl AsRef<Path>) -> String {
@@ -1487,21 +1505,6 @@ fn parse_network_samples(text: &str) -> Vec<(String, u64)> {
         .collect()
 }
 
-fn storage_io_sectors(text: &str) -> u64 {
-    text.lines()
-        .filter_map(|line| {
-            let fields = line.split_ascii_whitespace().collect::<Vec<_>>();
-            let name = *fields.get(2)?;
-            if !name.starts_with("sd") || name.len() != 3 {
-                return None;
-            }
-            let read = fields.get(5)?.parse::<u64>().ok()?;
-            let written = fields.get(9)?.parse::<u64>().ok()?;
-            Some(read.saturating_add(written))
-        })
-        .sum()
-}
-
 fn parse_disk_counters(text: &str) -> HashMap<String, DiskCounters> {
     text.lines()
         .filter_map(|line| {
@@ -1521,6 +1524,20 @@ fn parse_disk_counters(text: &str) -> HashMap<String, DiskCounters> {
             ))
         })
         .collect()
+}
+
+fn ufs_write_pattern(write_ops: u64, write_sectors: u64) -> UfsWritePattern {
+    if write_sectors < 8_192 || write_ops == 0 {
+        return UfsWritePattern::Idle;
+    }
+    let average = write_sectors / write_ops;
+    if write_ops >= 64 && average <= 8 {
+        UfsWritePattern::SmallRandom
+    } else if write_sectors >= 32_768 && average >= 32 {
+        UfsWritePattern::LargeSequential
+    } else {
+        UfsWritePattern::Mixed
+    }
 }
 
 fn parse_numeric(value: &str) -> Option<u64> {
@@ -1806,7 +1823,7 @@ impl UfsRuntime {
         }
     }
 
-    fn step(&mut self, mode: RuntimeMode, storage_delta_sectors: u64) {
+    fn step(&mut self, mode: RuntimeMode, activity: StorageActivity) {
         if self.root.is_none() {
             self.root = find_ufs_root();
         }
@@ -1821,9 +1838,20 @@ impl UfsRuntime {
             parse_numeric(&read_text(root.join("attributes/wb_avail_buf"))).unwrap_or(0);
         self.current_buffer =
             parse_numeric(&read_text(root.join("attributes/wb_cur_buf"))).unwrap_or(0);
-        let heavy_write = storage_delta_sectors >= 32_768;
-        if heavy_write && matches!(mode, RuntimeMode::Normal | RuntimeMode::Warm) {
+        self.write_ops = activity.write_ops;
+        self.write_sectors = activity.write_sectors;
+        self.average_write_sectors = if activity.write_ops > 0 {
+            activity.write_sectors / activity.write_ops
+        } else {
+            0
+        };
+        let pattern = ufs_write_pattern(activity.write_ops, activity.write_sectors);
+        if pattern == UfsWritePattern::LargeSequential
+            && matches!(mode, RuntimeMode::Normal | RuntimeMode::Warm)
+        {
             self.hold_rounds = 3;
+        } else if pattern == UfsWritePattern::SmallRandom {
+            self.hold_rounds = 0;
         } else if self.hold_rounds > 0 {
             self.hold_rounds -= 1;
         }
@@ -1846,6 +1874,11 @@ impl UfsRuntime {
             self.restore(&hibern8);
             self.restore(&wb_on);
             self.state = if buffer_low { "flush" } else { "idle" };
+        } else if pattern == UfsWritePattern::SmallRandom {
+            self.restore(&flush);
+            self.restore(&hibern8);
+            self.restore(&wb_on);
+            self.state = "small-write";
         } else {
             self.restore(&flush);
             self.restore(&hibern8);
@@ -1867,6 +1900,9 @@ impl UfsRuntime {
         self.cleanup();
         self.targets.clear();
         self.hold_rounds = 0;
+        self.write_ops = 0;
+        self.write_sectors = 0;
+        self.average_write_sectors = 0;
         self.state = "disabled";
     }
 }
@@ -2396,7 +2432,7 @@ impl Daemon {
             battery_saver_elapsed_ms: 30_000,
             fallback_reload_elapsed_ms: 0,
             storage_elapsed_ms: 0,
-            last_storage_sectors: 0,
+            last_storage_counters: DiskCounters::default(),
             paths,
         };
         daemon.update_environment();
@@ -2406,25 +2442,42 @@ impl Daemon {
         daemon
     }
 
-    fn sample_storage_delta(&mut self, elapsed_ms: u64) -> u64 {
+    fn sample_storage_activity(&mut self, elapsed_ms: u64) -> StorageActivity {
         if !self.hardware.irq_enabled && !self.hardware.ufs_enabled {
             self.storage_elapsed_ms = 0;
-            self.last_storage_sectors = 0;
-            return 0;
+            self.last_storage_counters = DiskCounters::default();
+            return StorageActivity::default();
         }
         self.storage_elapsed_ms = self.storage_elapsed_ms.saturating_add(elapsed_ms);
         if self.storage_elapsed_ms < 2_000 {
-            return 0;
+            return StorageActivity::default();
         }
         self.storage_elapsed_ms = 0;
-        let current = storage_io_sectors(&read_text(proc_root().join("diskstats")));
-        let delta = if self.last_storage_sectors == 0 {
-            0
-        } else {
-            current.saturating_sub(self.last_storage_sectors)
-        };
-        self.last_storage_sectors = current;
-        delta
+        let current = parse_disk_counters(&read_text(proc_root().join("diskstats")))
+            .values()
+            .fold(DiskCounters::default(), |mut total, counters| {
+                total.read_ops = total.read_ops.saturating_add(counters.read_ops);
+                total.read_sectors = total.read_sectors.saturating_add(counters.read_sectors);
+                total.write_ops = total.write_ops.saturating_add(counters.write_ops);
+                total.write_sectors = total.write_sectors.saturating_add(counters.write_sectors);
+                total
+            });
+        let previous = self.last_storage_counters;
+        self.last_storage_counters = current;
+        if previous.read_ops == 0
+            && previous.read_sectors == 0
+            && previous.write_ops == 0
+            && previous.write_sectors == 0
+        {
+            return StorageActivity::default();
+        }
+        let read_sectors = current.read_sectors.saturating_sub(previous.read_sectors);
+        let write_sectors = current.write_sectors.saturating_sub(previous.write_sectors);
+        StorageActivity {
+            total_sectors: read_sectors.saturating_add(write_sectors),
+            write_ops: current.write_ops.saturating_sub(previous.write_ops),
+            write_sectors,
+        }
     }
 
     fn reload(&mut self) {
@@ -2757,7 +2810,7 @@ impl Daemon {
 
     fn write_state(&self, foreground: &str, foreground_source: &str) {
         let state = format!(
-            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\ncpu_pressure_avg10={:.2}\nio_pressure_avg10={:.2}\ncpu_pressure_level={}\nio_pressure_level={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_target_cpus={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
+            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\ncpu_pressure_avg10={:.2}\nio_pressure_avg10={:.2}\ncpu_pressure_level={}\nio_pressure_level={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_target_cpus={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_write_ops={}\nufs_write_sectors={}\nufs_average_write_sectors={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
             process::id(),
             foreground,
             foreground_source,
@@ -2795,6 +2848,9 @@ impl Daemon {
             self.ufs_runtime.state,
             self.ufs_runtime.available_buffer,
             self.ufs_runtime.current_buffer,
+            self.ufs_runtime.write_ops,
+            self.ufs_runtime.write_sectors,
+            self.ufs_runtime.average_write_sectors,
             self.ufs_runtime.applied,
             self.gpu_runtime.state,
             self.gpu_runtime.busy_percent,
@@ -2876,20 +2932,20 @@ impl Daemon {
         }
         self.process_bpf_events(&foreground);
         self.scan_threads(&foreground);
-        let storage_delta = self.sample_storage_delta(interval_ms);
+        let storage = self.sample_storage_activity(interval_ms);
         if self.hardware.irq_enabled {
             self.irq_runtime.step(
                 &self.topology,
                 self.runtime_mode,
                 interval_ms,
-                storage_delta,
+                storage.total_sectors,
                 &foreground,
             );
         } else {
             self.irq_runtime.disable();
         }
         if self.hardware.ufs_enabled {
-            self.ufs_runtime.step(self.runtime_mode, storage_delta);
+            self.ufs_runtime.step(self.runtime_mode, storage);
         } else {
             self.ufs_runtime.disable();
         }
@@ -3110,6 +3166,14 @@ mod tests {
             irq_target_cpus(&topology, Some(7), &[4, 5, 6, 7]),
             vec![4, 5, 6]
         );
+    }
+
+    #[test]
+    fn classifies_ufs_write_patterns() {
+        assert_eq!(ufs_write_pattern(0, 0), UfsWritePattern::Idle);
+        assert_eq!(ufs_write_pattern(1_024, 8_192), UfsWritePattern::SmallRandom);
+        assert_eq!(ufs_write_pattern(64, 65_536), UfsWritePattern::LargeSequential);
+        assert_eq!(ufs_write_pattern(16, 16_384), UfsWritePattern::Mixed);
     }
 
     #[test]
