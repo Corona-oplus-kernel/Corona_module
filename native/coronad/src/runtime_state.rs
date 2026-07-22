@@ -139,12 +139,14 @@ impl NodeManager {
                 .get(&path)
                 .map(|node| node.baseline.clone())
                 .unwrap_or(current);
+            let observed = read_text(&path).trim().to_string();
+            let target = if observed.is_empty() { value } else { observed };
             self.nodes.insert(
                 path,
                 ManagedNode {
                     owner,
                     baseline,
-                    target: value,
+                    target,
                     conflicts: 0,
                     suspended: false,
                 },
