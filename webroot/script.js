@@ -914,7 +914,7 @@ class CoronaAddon {
             if (floatingHeader) floatingHeader.classList.remove('visible', 'overlay-hidden');
         });
         if (pageName === 'settings' && this.settingsReadyState !== 'ready') {
-            this.ensureSettingsPageReady().catch(e => console.error('ensureSettingsPageReady failed', e));
+            this.ensureAllSettingsSectionsReady().catch(e => console.error('ensureAllSettingsSectionsReady failed', e));
         }
         if (pageName === 'home' && this.pendingChartDraw) {
             requestAnimationFrame(() => this.drawChart());

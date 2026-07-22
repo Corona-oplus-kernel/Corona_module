@@ -621,6 +621,18 @@
         this.settingsSectionPromises[section] = promise;
         return promise;
     },
+    ensureAllSettingsSectionsReady() {
+        if (this.allSettingsSectionsPromise) return this.allSettingsSectionsPromise;
+        const sections = ['memory-compression', 'le9ec', 'app-policy', 'custom-scripts', 'system-opt', 'corona-kernel', 'app-settings'];
+        this.allSettingsSectionsPromise = (async () => {
+            await this.ensureSettingsPageReady();
+            await Promise.all(sections.map(section => this.ensureSettingsSectionReady(section)));
+        })().catch(error => {
+            this.allSettingsSectionsPromise = null;
+            throw error;
+        });
+        return this.allSettingsSectionsPromise;
+    },
     initConfigValidation() {
         const button = document.getElementById('config-validation-btn');
         if (!button || button.dataset.bound) return;
