@@ -2163,7 +2163,8 @@ impl IrqRuntime {
         mode: RuntimeMode,
         elapsed_ms: u64,
         storage_delta: u64,
-        foreground: &str,
+        foreground_cpu: Option<usize>,
+        foreground_affinity: &[usize],
         nodes: &mut NodeManager,
     ) {
         self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
@@ -2176,8 +2177,7 @@ impl IrqRuntime {
         self.managed = samples.len();
         self.busy = 0;
         let efficiency = cpu_list_string(&topology.efficiency);
-        let (foreground_cpu, foreground_affinity) = foreground_main_placement(foreground);
-        let upper = irq_target_cpus(topology, foreground_cpu, &foreground_affinity);
+        let upper = irq_target_cpus(topology, foreground_cpu, foreground_affinity);
         let upper_list = cpu_list_string(&upper);
         self.target_cpus = if matches!(mode, RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe) {
             efficiency.clone()
@@ -2634,13 +2634,8 @@ fn parse_allowed_cpu_list(status: &str) -> Vec<usize> {
         .unwrap_or_default()
 }
 
-fn foreground_main_placement(package: &str) -> (Option<usize>, Vec<usize>) {
-    if package.is_empty() {
-        return (None, Vec::new());
-    }
-    let packages = HashSet::from([package.to_string()]);
-    let processes = scan_requested_processes(&packages);
-    let Some(pid) = processes.get(package).and_then(|pids| pids.first()).copied() else {
+fn foreground_main_placement(pids: &[u32]) -> (Option<usize>, Vec<usize>) {
+    let Some(pid) = pids.first().copied() else {
         return (None, Vec::new());
     };
     let root = proc_root().join(pid.to_string());
@@ -3216,16 +3211,17 @@ impl Daemon {
         }
     }
 
-    fn scan_threads(&mut self, foreground: &str) {
+    fn scan_threads(&mut self, foreground: &str) -> Vec<u32> {
         let mut requested = self.manual_packages.clone();
         if !foreground.is_empty() {
             requested.insert(foreground.to_string());
         }
         let processes = scan_requested_processes(&requested);
+        let foreground_pids = processes.get(foreground).cloned().unwrap_or_default();
         self.scan_package(
             foreground,
             true,
-            processes.get(foreground).map(Vec::as_slice).unwrap_or(&[]),
+            &foreground_pids,
         );
         let packages = self.manual_packages.iter().cloned().collect::<Vec<_>>();
         for package in packages {
@@ -3240,6 +3236,7 @@ impl Daemon {
         let oldest = self.tick.saturating_sub(30);
         self.thread_states
             .retain(|_, state| state.last_seen_tick >= oldest);
+        foreground_pids
     }
 
     fn process_bpf_events(&mut self, foreground: &str) {
@@ -3526,7 +3523,12 @@ impl Daemon {
             self.last_foreground.clone_from(&foreground);
         }
         self.process_bpf_events(&foreground);
-        self.scan_threads(&foreground);
+        let foreground_pids = self.scan_threads(&foreground);
+        let (foreground_cpu, foreground_affinity) = if self.hardware.irq_enabled {
+            foreground_main_placement(&foreground_pids)
+        } else {
+            (None, Vec::new())
+        };
         let storage = self.sample_storage_activity(interval_ms);
         self.storage_learning.observe(storage.activity);
         if self.hardware.irq_enabled && self.capabilities.irq.supported {
@@ -3535,7 +3537,8 @@ impl Daemon {
                 self.runtime_mode,
                 interval_ms,
                 storage.activity.total_sectors,
-                &foreground,
+                foreground_cpu,
+                &foreground_affinity,
                 &mut self.nodes,
             );
         } else {
