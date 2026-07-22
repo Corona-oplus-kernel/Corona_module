@@ -1025,6 +1025,11 @@ apply_memory_pressure_config() {
 sync_zram_policy() {
     action="$1"
     [ -x "$ZRAM_POLICY_HELPER" ] || return 0
+    if use_coronad; then
+        /system/bin/sh "$ZRAM_POLICY_HELPER" stop >/dev/null 2>&1
+        [ "$action" = "stop" ] || CORONA_MODDIR="$MODDIR" "$CORONAD" reload >/dev/null 2>&1
+        return 0
+    fi
     if ! coronad_enabled; then
         action=stop
     fi

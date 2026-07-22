@@ -861,6 +861,7 @@
       "runtimeDecisions": "Recent decisions",
       "runtimeDecisionsDesc": "Memory only; cleared when the daemon stops",
       "runtimeDecisionForeground": "Foreground change",
+      "runtimeDecisionZram": "ZRAM and ERM",
       "runtimeDecisionEmpty": "No decisions yet",
       "runtimePressureNormal": "Normal",
       "runtimePressureModerate": "Moderate",

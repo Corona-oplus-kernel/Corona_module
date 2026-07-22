@@ -1027,10 +1027,10 @@ run_once() {
     COMPRESSED_MB=0
     MEMORY_USED_MB=0
     OVERHEAD_MB=0
-    PRESSURE_AVG10=$(pressure_avg10)
+    PRESSURE_AVG10=${CORONA_PRESSURE_AVG10:-$(pressure_avg10)}
     [ -n "$PRESSURE_AVG10" ] || PRESSURE_AVG10=0
-    TEMPERATURE_C=$(max_temperature_c)
-    SCREEN_ON=$(screen_on)
+    TEMPERATURE_C=${CORONA_TEMPERATURE_C:-$(max_temperature_c)}
+    SCREEN_ON=${CORONA_SCREEN_ON:-$(screen_on)}
     HYBRID_PAUSED=0
     HYBRID_DAILY_MB=0
     HYBRID_QUOTA_MB=0
@@ -1296,7 +1296,12 @@ print_status() {
         pid=
         rm -f "$PID_FILE"
     fi
-    if policy_enabled && pid_is_daemon "$pid"; then
+    corona_pid=$(cat "$MODDIR/config/.coronad.pid" 2>/dev/null)
+    corona_managed=0
+    if policy_enabled && [ -n "$corona_pid" ] && [ -d "/proc/$corona_pid" ]; then
+        tr '\0' ' ' < "/proc/$corona_pid/cmdline" 2>/dev/null | grep -q 'coronad' && corona_managed=1
+    fi
+    if policy_enabled && { pid_is_daemon "$pid" || [ "$corona_managed" = "1" ]; }; then
         actual_running=1
     fi
     if [ -r "$STATE_FILE" ]; then
@@ -1317,6 +1322,7 @@ case "$1" in
     start) start_daemon ;;
     stop) stop_daemon ;;
     once) policy_enabled && run_once >/dev/null ;;
+    tick) policy_enabled && run_once ;;
     status) print_status ;;
     apply)
         stop_daemon

@@ -861,6 +861,7 @@
       "runtimeDecisions": "最近动作",
       "runtimeDecisionsDesc": "仅保存在内存，守护进程停止后清空",
       "runtimeDecisionForeground": "前台切换",
+      "runtimeDecisionZram": "ZRAM 与 ERM",
       "runtimeDecisionEmpty": "暂无动作",
       "runtimePressureNormal": "正常",
       "runtimePressureModerate": "中等",

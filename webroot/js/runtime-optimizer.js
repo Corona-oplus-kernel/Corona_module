@@ -49,7 +49,8 @@
     const PRESSURE_KEYS = Object.freeze(['runtimePressureNormal', 'runtimePressureModerate', 'runtimePressureHigh']);
     const DECISION_AREA_KEYS = Object.freeze({
         foreground: 'runtimeDecisionForeground', irq: 'runtimeIrqPolicy', ufs: 'runtimeUfsPolicy',
-        gpu: 'runtimeGpuPolicy', io: 'runtimeIoPolicy', storage: 'runtimeStorageLearning'
+        gpu: 'runtimeGpuPolicy', io: 'runtimeIoPolicy', storage: 'runtimeStorageLearning',
+        zram: 'runtimeDecisionZram'
     });
 
     Object.assign(CoronaAddon.prototype, {

@@ -54,6 +54,7 @@ struct Paths {
     stop: PathBuf,
     pressure_baseline: PathBuf,
     affinity_state: PathBuf,
+    zram_policy_state: PathBuf,
 }
 
 impl Paths {
@@ -92,6 +93,7 @@ impl Paths {
             stop: config.join(".coronad.stop"),
             pressure_baseline: config.join(".memory_pressure.baseline"),
             affinity_state: config.join(".auto_affinity_state"),
+            zram_policy_state: config.join(".zram_policy_state"),
             module,
             config,
         }
@@ -753,6 +755,11 @@ struct Daemon {
     storage_learning: StorageLearning,
     nodes: NodeManager,
     decisions: DecisionLog,
+    zram_policy_enabled: bool,
+    zram_policy_elapsed_ms: u64,
+    zram_policy_interval_ms: u64,
+    zram_policy_action: String,
+    zram_policy_reason: String,
 }
 
 fn read_text(path: impl AsRef<Path>) -> String {
@@ -1100,6 +1107,14 @@ fn hardware_config(values: &HashMap<String, String>) -> HardwareConfig {
 
 fn load_hardware(paths: &Paths) -> HardwareConfig {
     hardware_config(&parse_key_values(paths.config.join("hardware_policy.conf")))
+}
+
+fn load_zram_policy_enabled(paths: &Paths) -> bool {
+    value_bool(
+        &parse_key_values(paths.config.join("zram_policy.conf")),
+        "enabled",
+        false,
+    )
 }
 
 fn parse_cpu_list(value: &str) -> Vec<usize> {
@@ -2586,6 +2601,7 @@ impl Daemon {
     fn new(paths: Paths) -> Self {
         let affinity = load_affinity(&paths);
         let hardware = load_hardware(&paths);
+        let zram_policy_enabled = load_zram_policy_enabled(&paths);
         let topology = detect_topology(&affinity);
         let selftest = run_selftest(&paths, &topology);
         let manual_rules = load_manual_rules(&paths);
@@ -2650,13 +2666,82 @@ impl Daemon {
             storage_learning: StorageLearning::default(),
             nodes: NodeManager::default(),
             decisions: DecisionLog::default(),
+            zram_policy_enabled,
+            zram_policy_elapsed_ms: 30_000,
+            zram_policy_interval_ms: 30_000,
+            zram_policy_action: String::new(),
+            zram_policy_reason: String::new(),
             paths,
         };
         daemon.update_environment();
         daemon.update_system_pressure();
         constrain_daemon(&daemon.topology);
         apply_walt_hints(&daemon.manual_rules);
+        daemon.stop_legacy_zram_policy();
         daemon
+    }
+
+    fn zram_policy_script(&self) -> PathBuf {
+        self.paths.module.join("scripts/zram-policy.sh")
+    }
+
+    fn stop_legacy_zram_policy(&self) {
+        let script = self.zram_policy_script();
+        if script.is_file() {
+            let _ = Command::new("/system/bin/sh")
+                .arg(script)
+                .arg("stop")
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+        }
+    }
+
+    fn update_zram_policy(&mut self) {
+        if !self.zram_policy_enabled {
+            self.zram_policy_action = "disabled".to_string();
+            self.zram_policy_reason.clear();
+            return;
+        }
+        self.zram_policy_elapsed_ms = self
+            .zram_policy_elapsed_ms
+            .saturating_add(self.affinity.scan_interval_ms);
+        if self.zram_policy_elapsed_ms < self.zram_policy_interval_ms {
+            return;
+        }
+        self.zram_policy_elapsed_ms = 0;
+        let script = self.zram_policy_script();
+        let output = Command::new("/system/bin/sh")
+            .arg(script)
+            .arg("tick")
+            .env("CORONA_SCREEN_ON", if self.screen_on { "1" } else { "0" })
+            .env("CORONA_TEMPERATURE_C", format!("{:.1}", self.max_temperature_c))
+            .env(
+                "CORONA_PRESSURE_AVG10",
+                pressure_avg10().unwrap_or(0.0).to_string(),
+            )
+            .env("CORONA_RUNTIME_MODE", self.runtime_mode.name())
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output();
+        let interval = output
+            .ok()
+            .and_then(|output| {
+                String::from_utf8_lossy(&output.stdout)
+                    .lines()
+                    .rev()
+                    .find_map(|line| line.trim().parse::<u64>().ok())
+            })
+            .unwrap_or(30)
+            .clamp(5, 3_600);
+        self.zram_policy_interval_ms = interval * 1_000;
+        let state = parse_key_values(&self.paths.zram_policy_state);
+        self.zram_policy_action = state
+            .get("last_action")
+            .cloned()
+            .unwrap_or_else(|| "waiting".to_string());
+        self.zram_policy_reason = state.get("last_reason").cloned().unwrap_or_default();
     }
 
     fn sample_storage_activity(&mut self, elapsed_ms: u64) -> StorageSample {
@@ -2716,6 +2801,9 @@ impl Daemon {
         }
         self.affinity = load_affinity(&self.paths);
         self.hardware = load_hardware(&self.paths);
+        self.zram_policy_enabled = load_zram_policy_enabled(&self.paths);
+        self.zram_policy_elapsed_ms = self.zram_policy_interval_ms;
+        self.stop_legacy_zram_policy();
         self.capabilities = detect_capabilities();
         self.topology = detect_topology(&self.affinity);
         self.manual_rules = load_manual_rules(&self.paths);
@@ -3098,6 +3186,16 @@ impl Daemon {
                     self.storage_learning.sequential_write_sectors,
                 ),
             ),
+            (
+                "zram",
+                self.zram_policy_action.clone(),
+                format!(
+                    "reason={} interval={}s mode={}",
+                    self.zram_policy_reason,
+                    self.zram_policy_interval_ms / 1_000,
+                    self.runtime_mode.name(),
+                ),
+            ),
         ];
         for (area, action, reason) in records {
             self.decisions.record(self.tick, area, action, reason);
@@ -3189,9 +3287,13 @@ impl Daemon {
             append_capability_state(&mut state, name, capability);
         }
         state.push_str(&format!(
-            "config_schema=5\nselftest={}\nselftest_failures={}\nstorage_learning_progress={}\nstorage_active_sectors={}\nstorage_sequential_write_sectors={}\nstorage_random_write_ops={}\nnode_managed={}\nnode_apply_failed={}\nnode_external_changes={}\nnode_suspended={}\n",
+            "config_schema=5\nselftest={}\nselftest_failures={}\nzram_policy_managed={}\nzram_policy_interval={}\nzram_policy_action={}\nzram_policy_reason={}\nstorage_learning_progress={}\nstorage_active_sectors={}\nstorage_sequential_write_sectors={}\nstorage_random_write_ops={}\nnode_managed={}\nnode_apply_failed={}\nnode_external_changes={}\nnode_suspended={}\n",
             if self.selftest.ok { "ok" } else { "failed" },
             self.selftest.failures.join(","),
+            u8::from(self.zram_policy_enabled),
+            self.zram_policy_interval_ms / 1_000,
+            self.zram_policy_action,
+            self.zram_policy_reason,
             self.storage_learning.progress(),
             self.storage_learning.active_sectors,
             self.storage_learning.sequential_write_sectors,
@@ -3251,6 +3353,7 @@ impl Daemon {
             self.update_system_pressure();
             self.system_pressure_elapsed_ms = 0;
         }
+        self.update_zram_policy();
         let (foreground, foreground_source) = foreground_package();
         if foreground_source == "top-app" {
             self.stats.top_app_hits += 1;
@@ -3354,6 +3457,7 @@ impl Daemon {
         self.ufs_runtime.cleanup(&mut self.nodes);
         self.gpu_runtime.cleanup(&mut self.nodes);
         self.io_runtime.cleanup(&mut self.nodes);
+        self.stop_legacy_zram_policy();
         if self.pressure.enabled {
             if let Some(baseline) = self.pressure_baseline {
                 write_swappiness(baseline);
