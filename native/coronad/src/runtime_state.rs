@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 
-use super::{read_text, write_text};
+use super::{read_text, write_text, write_text_atomic};
 
 #[derive(Clone)]
 struct ManagedNode {
@@ -88,7 +88,7 @@ impl DecisionLog {
             })
             .collect::<Vec<_>>()
             .join("\n");
-        let _ = write_text(path, content);
+        let _ = write_text_atomic(path, content);
     }
 
     pub(super) fn record(
