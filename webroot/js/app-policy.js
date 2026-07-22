@@ -531,6 +531,10 @@ CoronaAddon.prototype.renderAppPolicyList = function() {
 
     // cancel previous chunk render
     if (list._renderToken) list._renderToken.cancelled = true;
+    if (list._renderObserver) {
+        list._renderObserver.disconnect();
+        list._renderObserver = null;
+    }
     const token = { cancelled: false };
     list._renderToken = token;
 
@@ -560,9 +564,8 @@ CoronaAddon.prototype.renderAppPolicyList = function() {
         return `<div class="app-policy-row ${active ? 'active' : ''}" data-pkg="${this.escapeHtml(app.packageName)}" data-label="${this.escapeHtml(app.label)}">${this.renderAppPolicyIcon(app)}<div class="app-policy-info"><div class="app-policy-name">${this.escapeHtml(app.label)}</div><div class="app-policy-package">${this.escapeHtml(app.packageName)}</div><div class="app-policy-tags">${tags}</div></div><div class="app-policy-check">✓</div></div>`;
     };
 
-    // Paint the first rows immediately, then yield between larger chunks.
     list.innerHTML = '';
-    const chunk = 32;
+    const chunk = 40;
     let index = 0;
     const paint = () => {
         if (token.cancelled) return;
@@ -575,7 +578,23 @@ CoronaAddon.prototype.renderAppPolicyList = function() {
         list.appendChild(template.content);
         index = end;
         if (index < apps.length) {
-            requestAnimationFrame(paint);
+            const sentinel = document.createElement('div');
+            sentinel.className = 'app-policy-render-sentinel';
+            list.appendChild(sentinel);
+            if ('IntersectionObserver' in window) {
+                const observer = new IntersectionObserver((entries) => {
+                    if (!entries.some(entry => entry.isIntersecting) || token.cancelled) return;
+                    observer.disconnect();
+                    list._renderObserver = null;
+                    sentinel.remove();
+                    requestAnimationFrame(paint);
+                }, { root: list, rootMargin: '320px 0px' });
+                list._renderObserver = observer;
+                observer.observe(sentinel);
+            } else {
+                sentinel.remove();
+                requestAnimationFrame(paint);
+            }
         }
     };
     paint();
