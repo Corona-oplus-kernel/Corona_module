@@ -18,6 +18,8 @@
 | cpufreq policy | `/sys/devices/system/cpu/cpufreq/policy*/` | 按频率簇识别能效核和性能核 |
 | CPU capacity | `/sys/devices/system/cpu/cpuX/cpu_capacity` | 识别延迟敏感核心集合 |
 | 内存 PSI | `/proc/pressure/memory` | 计算动态 swappiness |
+| CPU PSI | `/proc/pressure/cpu` | 降低非主线程的 CPU 分类 |
+| IO PSI | `/proc/pressure/io` | 限制块设备预读和请求队列 |
 | 中断统计 | `/proc/interrupts` | 计算 UFS、Wi-Fi 和移动网络 IRQ 活跃度 |
 | 网络流量 | `/proc/net/dev` | 计算网络队列活跃度 |
 | 网络状态 | `/sys/class/net/IFACE/operstate` | 判断接口是否在线 |
@@ -175,6 +177,28 @@ avg10 >= moderate  -> moderate_target
 - `/dev/memcg/apps/memory.swappiness`
 
 停止压力控制时恢复首次读取的 swappiness。
+
+## CPU 与 IO PSI 联动
+
+CPU 和 IO PSI 每 `2` 秒读取一次 `some avg10`。
+
+CPU 压力等级：
+
+| `cpu avg10` | 等级 | 非主线程变化 |
+| --- | --- | --- |
+| `< 35` | `0` | 不调整 |
+| `35..70` | `1` | `performance -> balanced` |
+| `>= 70` | `2` | `performance/balanced -> efficiency` |
+
+应用主线程不受 CPU PSI 降级影响。
+
+IO 压力等级：
+
+| `io avg10` | 等级 | `read_ahead_kb` 上限 | `nr_requests` 上限 |
+| --- | --- | --- | --- |
+| `< 2` | `0` | 使用负载分类结果 | 使用负载分类结果 |
+| `2..10` | `1` | `256` | `128` |
+| `>= 10` | `2` | `128` | `64` |
 
 ## IRQ 与网络队列
 

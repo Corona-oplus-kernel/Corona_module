@@ -633,6 +633,10 @@ struct Daemon {
     max_temperature_c: f64,
     battery_saver: bool,
     screen_on: bool,
+    cpu_pressure_avg10: f64,
+    io_pressure_avg10: f64,
+    cpu_pressure_level: u8,
+    io_pressure_level: u8,
     stats: Stats,
     pressure_baseline: Option<u32>,
     pressure_last_target: Option<u32>,
@@ -646,6 +650,7 @@ struct Daemon {
     pressure_elapsed_ms: u64,
     protect_elapsed_ms: u64,
     environment_elapsed_ms: u64,
+    system_pressure_elapsed_ms: u64,
     battery_saver_elapsed_ms: u64,
     fallback_reload_elapsed_ms: u64,
     storage_elapsed_ms: u64,
@@ -1964,7 +1969,7 @@ impl IoRuntime {
         }
     }
 
-    fn step(&mut self, mode: RuntimeMode, elapsed_ms: u64) {
+    fn step(&mut self, mode: RuntimeMode, elapsed_ms: u64, pressure_level: u8) {
         self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
         if self.elapsed_ms < 2_000 {
             return;
@@ -2020,7 +2025,7 @@ impl IoRuntime {
                 .or_else(|| read_text(&requests_path).trim().parse().ok())
                 .unwrap_or(128);
             let average_read_sectors = if read_ops > 0 { read_sectors / read_ops } else { 0 };
-            let (state, read_ahead, requests) = if read_sectors > write_sectors.saturating_mul(2)
+            let (mut state, mut read_ahead, mut requests) = if read_sectors > write_sectors.saturating_mul(2)
                 && read_sectors >= 32_768
             {
                 ("sequential", baseline_read_ahead.clamp(1_024, 2_048), baseline_requests.clamp(192, 256))
@@ -2031,6 +2036,15 @@ impl IoRuntime {
             } else {
                 ("mixed", baseline_read_ahead.min(256), baseline_requests)
             };
+            if pressure_level >= 2 {
+                state = "congested";
+                read_ahead = read_ahead.min(128);
+                requests = requests.min(64);
+            } else if pressure_level == 1 {
+                state = "pressure";
+                read_ahead = read_ahead.min(256);
+                requests = requests.min(128);
+            }
             self.apply(&read_ahead_path, read_ahead);
             self.apply(&requests_path, requests);
             if total_sectors >= dominant_sectors {
@@ -2078,8 +2092,8 @@ fn parse_task_stat_text(stat: &str) -> Option<(u64, u64)> {
     Some((user_ticks + system_ticks, start_time))
 }
 
-fn pressure_avg10() -> Option<f64> {
-    for line in read_text("/proc/pressure/memory").lines() {
+fn psi_avg10(path: &str) -> Option<f64> {
+    for line in read_text(path).lines() {
         if !line.starts_with("some ") {
             continue;
         }
@@ -2090,6 +2104,41 @@ fn pressure_avg10() -> Option<f64> {
         }
     }
     None
+}
+
+fn pressure_avg10() -> Option<f64> {
+    psi_avg10("/proc/pressure/memory")
+}
+
+fn cpu_pressure_level(avg10: f64) -> u8 {
+    if avg10 >= 70.0 {
+        2
+    } else if avg10 >= 35.0 {
+        1
+    } else {
+        0
+    }
+}
+
+fn io_pressure_level(avg10: f64) -> u8 {
+    if avg10 >= 10.0 {
+        2
+    } else if avg10 >= 2.0 {
+        1
+    } else {
+        0
+    }
+}
+
+fn pressure_adjusted_class(class: &str, level: u8, main_thread: bool) -> &str {
+    if main_thread {
+        return class;
+    }
+    match level {
+        1 if class == "performance" => "balanced",
+        2 if matches!(class, "performance" | "balanced") => "efficiency",
+        _ => class,
+    }
 }
 
 fn read_u32(path: impl AsRef<Path>) -> Option<u32> {
@@ -2254,6 +2303,10 @@ impl Daemon {
             max_temperature_c: 0.0,
             battery_saver: false,
             screen_on: true,
+            cpu_pressure_avg10: 0.0,
+            io_pressure_avg10: 0.0,
+            cpu_pressure_level: 0,
+            io_pressure_level: 0,
             stats,
             affinity,
             hardware,
@@ -2269,6 +2322,7 @@ impl Daemon {
             pressure_elapsed_ms: 0,
             protect_elapsed_ms: 0,
             environment_elapsed_ms: 10_000,
+            system_pressure_elapsed_ms: 2_000,
             battery_saver_elapsed_ms: 30_000,
             fallback_reload_elapsed_ms: 0,
             storage_elapsed_ms: 0,
@@ -2276,6 +2330,7 @@ impl Daemon {
             paths,
         };
         daemon.update_environment();
+        daemon.update_system_pressure();
         constrain_daemon(&daemon.topology);
         apply_walt_hints(&daemon.manual_rules);
         daemon
@@ -2409,6 +2464,13 @@ impl Daemon {
         }
     }
 
+    fn update_system_pressure(&mut self) {
+        self.cpu_pressure_avg10 = psi_avg10("/proc/pressure/cpu").unwrap_or(0.0);
+        self.io_pressure_avg10 = psi_avg10("/proc/pressure/io").unwrap_or(0.0);
+        self.cpu_pressure_level = cpu_pressure_level(self.cpu_pressure_avg10);
+        self.io_pressure_level = io_pressure_level(self.io_pressure_avg10);
+    }
+
     fn thread_class(&self, package: &str, thread_name: &str, tid: i32, pid: u32, score: i8) -> &str {
         let base = if tid == pid as i32 || (self.affinity.load_learning && score >= 2) {
             "performance"
@@ -2417,7 +2479,9 @@ impl Daemon {
         } else {
             classify_thread(package, thread_name, &self.affinity.default_class)
         };
-        adapt_class(base, self.runtime_mode)
+        let pressure_class =
+            pressure_adjusted_class(base, self.cpu_pressure_level, tid == pid as i32);
+        adapt_class(pressure_class, self.runtime_mode)
     }
 
     fn scan_package(&mut self, package: &str, automatic: bool, pids: &[u32]) {
@@ -2605,7 +2669,7 @@ impl Daemon {
 
     fn write_state(&self, foreground: &str, foreground_source: &str) {
         let state = format!(
-            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_target_cpus={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
+            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\ncpu_pressure_avg10={:.2}\nio_pressure_avg10={:.2}\ncpu_pressure_level={}\nio_pressure_level={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_target_cpus={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
             process::id(),
             foreground,
             foreground_source,
@@ -2623,6 +2687,10 @@ impl Daemon {
             pressure_avg10()
                 .map(|value| value.to_string())
                 .unwrap_or_default(),
+            self.cpu_pressure_avg10,
+            self.io_pressure_avg10,
+            self.cpu_pressure_level,
+            self.io_pressure_level,
             self.runtime_mode.name(),
             self.max_temperature_c,
             u8::from(self.battery_saver),
@@ -2681,6 +2749,7 @@ impl Daemon {
         self.pressure_elapsed_ms += interval_ms;
         self.protect_elapsed_ms += interval_ms;
         self.environment_elapsed_ms += interval_ms;
+        self.system_pressure_elapsed_ms += interval_ms;
         self.fallback_reload_elapsed_ms += interval_ms;
         let watched_change = self.watcher.as_ref().map(ConfigWatcher::changed).unwrap_or(false);
         if self.paths.reload.exists()
@@ -2695,6 +2764,10 @@ impl Daemon {
         if self.environment_elapsed_ms >= 10_000 {
             self.update_environment();
             self.environment_elapsed_ms = 0;
+        }
+        if self.system_pressure_elapsed_ms >= 2_000 {
+            self.update_system_pressure();
+            self.system_pressure_elapsed_ms = 0;
         }
         let (foreground, foreground_source) = foreground_package();
         if foreground_source == "top-app" {
@@ -2728,7 +2801,8 @@ impl Daemon {
             self.gpu_runtime.disable();
         }
         if self.hardware.io_enabled {
-            self.io_runtime.step(self.runtime_mode, interval_ms);
+            self.io_runtime
+                .step(self.runtime_mode, interval_ms, self.io_pressure_level);
         } else {
             self.io_runtime.disable();
         }
@@ -2932,6 +3006,23 @@ mod tests {
         assert_eq!(pressure_target(&config, 100, 0.5), 100);
         assert_eq!(pressure_target(&config, 100, 2.0), 160);
         assert_eq!(pressure_target(&config, 100, 8.0), 200);
+    }
+
+    #[test]
+    fn grades_cpu_and_io_pressure() {
+        assert_eq!(cpu_pressure_level(34.9), 0);
+        assert_eq!(cpu_pressure_level(35.0), 1);
+        assert_eq!(cpu_pressure_level(70.0), 2);
+        assert_eq!(io_pressure_level(1.9), 0);
+        assert_eq!(io_pressure_level(2.0), 1);
+        assert_eq!(io_pressure_level(10.0), 2);
+    }
+
+    #[test]
+    fn preserves_main_thread_under_cpu_pressure() {
+        assert_eq!(pressure_adjusted_class("performance", 2, true), "performance");
+        assert_eq!(pressure_adjusted_class("performance", 1, false), "balanced");
+        assert_eq!(pressure_adjusted_class("balanced", 2, false), "efficiency");
     }
 
     #[test]
