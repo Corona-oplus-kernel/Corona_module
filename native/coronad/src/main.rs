@@ -1,4 +1,7 @@
-use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
+mod runtime_state;
+
+use runtime_state::{DecisionLog, NodeManager};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
 use std::fs::{self, OpenOptions};
@@ -254,179 +257,6 @@ struct Capabilities {
 struct SelfTest {
     ok: bool,
     failures: Vec<&'static str>,
-}
-
-#[derive(Clone)]
-struct ManagedNode {
-    owner: &'static str,
-    baseline: String,
-    target: String,
-    conflicts: u8,
-    suspended: bool,
-}
-
-#[derive(Default)]
-struct NodeManager {
-    nodes: HashMap<PathBuf, ManagedNode>,
-    applied: u64,
-    failed: u64,
-    external_changes: u64,
-    suspended: usize,
-}
-
-struct Decision {
-    tick: u64,
-    area: &'static str,
-    action: String,
-    reason: String,
-}
-
-#[derive(Default)]
-struct DecisionLog {
-    entries: VecDeque<Decision>,
-    last_actions: HashMap<&'static str, String>,
-}
-
-impl DecisionLog {
-    fn record(&mut self, tick: u64, area: &'static str, action: String, reason: String) {
-        if self.last_actions.get(area) == Some(&action) {
-            return;
-        }
-        self.last_actions.insert(area, action.clone());
-        if self.entries.len() >= 32 {
-            self.entries.pop_front();
-        }
-        self.entries.push_back(Decision {
-            tick,
-            area,
-            action: sanitize_state_value(&action),
-            reason: sanitize_state_value(&reason),
-        });
-    }
-}
-
-impl NodeManager {
-    fn apply(&mut self, owner: &'static str, path: &Path, value: impl Into<String>) -> bool {
-        self.apply_batch(owner, vec![(path.to_path_buf(), value.into())])
-    }
-
-    fn apply_batch(&mut self, owner: &'static str, writes: Vec<(PathBuf, String)>) -> bool {
-        if writes.is_empty() {
-            return true;
-        }
-        let mut prepared = Vec::with_capacity(writes.len());
-        for (path, value) in writes {
-            let current = read_text(&path).trim().to_string();
-            if current.is_empty() {
-                self.failed += 1;
-                return false;
-            }
-            if let Some(node) = self.nodes.get_mut(&path) {
-                if node.owner != owner || node.suspended {
-                    self.failed += 1;
-                    return false;
-                }
-                if current != node.target && current != value {
-                    node.conflicts = node.conflicts.saturating_add(1);
-                    self.external_changes += 1;
-                    if node.conflicts >= 3 {
-                        node.suspended = true;
-                        self.suspended += 1;
-                        self.failed += 1;
-                        return false;
-                    }
-                } else if current == node.target {
-                    node.conflicts = 0;
-                }
-            }
-            prepared.push((path, value, current));
-        }
-
-        let mut changed = Vec::new();
-        for (path, value, current) in &prepared {
-            if current == value {
-                continue;
-            }
-            if write_text(path, value.as_bytes()).is_err() {
-                for (changed_path, previous) in changed.into_iter().rev() {
-                    let _ = write_text(changed_path, previous);
-                }
-                self.failed += 1;
-                return false;
-            }
-            changed.push((path.clone(), current.clone()));
-        }
-
-        for (path, value, current) in prepared {
-            let baseline = self
-                .nodes
-                .get(&path)
-                .map(|node| node.baseline.clone())
-                .unwrap_or(current);
-            self.nodes.insert(
-                path,
-                ManagedNode {
-                    owner,
-                    baseline,
-                    target: value,
-                    conflicts: 0,
-                    suspended: false,
-                },
-            );
-        }
-        self.applied += changed.len() as u64;
-        true
-    }
-
-    fn restore(&mut self, owner: &'static str, path: &Path) -> bool {
-        let Some(node) = self.nodes.get(path).cloned() else {
-            return true;
-        };
-        if node.owner != owner {
-            self.failed += 1;
-            return false;
-        }
-        let current = read_text(path).trim().to_string();
-        if current != node.baseline && write_text(path, node.baseline.as_bytes()).is_err() {
-            self.failed += 1;
-            return false;
-        }
-        if current != node.baseline {
-            self.applied += 1;
-        }
-        if node.suspended {
-            self.suspended = self.suspended.saturating_sub(1);
-        }
-        self.nodes.remove(path);
-        true
-    }
-
-    fn restore_owner(&mut self, owner: &'static str) {
-        let paths = self
-            .nodes
-            .iter()
-            .filter_map(|(path, node)| (node.owner == owner).then(|| path.clone()))
-            .collect::<Vec<_>>();
-        for path in paths {
-            self.restore(owner, &path);
-        }
-    }
-
-    fn owner_paths(&self, owner: &'static str, prefix: &Path) -> Vec<PathBuf> {
-        self.nodes
-            .iter()
-            .filter_map(|(path, node)| {
-                (node.owner == owner && path.starts_with(prefix)).then(|| path.clone())
-            })
-            .collect()
-    }
-
-    fn baseline(&self, owner: &'static str, path: &Path) -> Option<&str> {
-        self.nodes
-            .get(path)
-            .filter(|node| node.owner == owner)
-            .map(|node| node.baseline.as_str())
-    }
 }
 
 #[derive(Clone)]
@@ -1006,16 +836,6 @@ struct Daemon {
 
 fn read_text(path: impl AsRef<Path>) -> String {
     fs::read_to_string(path).unwrap_or_default()
-}
-
-fn sanitize_state_value(value: &str) -> String {
-    value
-        .chars()
-        .map(|character| match character {
-            '\n' | '\r' | '|' | '=' => ' ',
-            _ => character,
-        })
-        .collect()
 }
 
 fn write_text(path: impl AsRef<Path>, value: impl AsRef<[u8]>) -> io::Result<()> {
@@ -3455,7 +3275,7 @@ impl Daemon {
             self.storage_learning.active_sectors,
             self.storage_learning.sequential_write_sectors,
             self.storage_learning.random_write_ops,
-            self.nodes.nodes.len(),
+            self.nodes.managed_len(),
             self.nodes.failed,
             self.nodes.external_changes,
             self.nodes.suspended,
