@@ -204,6 +204,15 @@ struct IrqRuntime {
     target_cpus: String,
 }
 
+struct IrqStepContext<'a> {
+    topology: &'a CpuTopology,
+    mode: RuntimeMode,
+    elapsed_ms: u64,
+    storage_delta: u64,
+    foreground_cpu: Option<usize>,
+    foreground_affinity: &'a [usize],
+}
+
 #[derive(Default)]
 struct UfsRuntime {
     root: Option<PathBuf>,
@@ -1953,15 +1962,10 @@ impl IrqRuntime {
 
     fn step(
         &mut self,
-        topology: &CpuTopology,
-        mode: RuntimeMode,
-        elapsed_ms: u64,
-        storage_delta: u64,
-        foreground_cpu: Option<usize>,
-        foreground_affinity: &[usize],
+        context: IrqStepContext<'_>,
         nodes: &mut NodeManager,
     ) {
-        self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
+        self.elapsed_ms = self.elapsed_ms.saturating_add(context.elapsed_ms);
         if self.elapsed_ms < 2_000 {
             return;
         }
@@ -1970,10 +1974,17 @@ impl IrqRuntime {
         self.supported = !samples.is_empty();
         self.managed = samples.len();
         self.busy = 0;
-        let efficiency = cpu_list_string(&topology.efficiency);
-        let upper = irq_target_cpus(topology, foreground_cpu, foreground_affinity);
+        let efficiency = cpu_list_string(&context.topology.efficiency);
+        let upper = irq_target_cpus(
+            context.topology,
+            context.foreground_cpu,
+            context.foreground_affinity,
+        );
         let upper_list = cpu_list_string(&upper);
-        self.target_cpus = if matches!(mode, RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe) {
+        self.target_cpus = if matches!(
+            context.mode,
+            RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe
+        ) {
             efficiency.clone()
         } else {
             upper_list.clone()
@@ -1982,7 +1993,7 @@ impl IrqRuntime {
             let previous = self.last_counts.insert(irq, count).unwrap_or(count);
             let delta = count.saturating_sub(previous);
             let busy = if name.contains("ufshcd") {
-                storage_delta >= 8_192
+                context.storage_delta >= 8_192
             } else {
                 delta >= 128
             };
@@ -1993,7 +2004,10 @@ impl IrqRuntime {
             if !path.is_file() {
                 continue;
             }
-            if matches!(mode, RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe) {
+            if matches!(
+                context.mode,
+                RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe
+            ) {
                 self.apply(nodes, &path, &efficiency);
                 self.idle_rounds.insert(irq, 0);
             } else if busy {
@@ -2025,7 +2039,7 @@ impl IrqRuntime {
             if delta >= 65_536
                 || (online
                     && matches!(
-                        mode,
+                        context.mode,
                         RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe
                     ))
             {
@@ -2033,10 +2047,10 @@ impl IrqRuntime {
             }
         }
         let queue_target = if matches!(
-            mode,
+            context.mode,
             RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe
         ) {
-            Some(cpu_mask_string(&topology.efficiency))
+            Some(cpu_mask_string(&context.topology.efficiency))
         } else if !active_interfaces.is_empty() {
             Some(cpu_mask_string(&upper))
         } else {
@@ -2055,7 +2069,10 @@ impl IrqRuntime {
         }
         self.state = if !self.supported {
             "unsupported"
-        } else if matches!(mode, RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe) {
+        } else if matches!(
+            context.mode,
+            RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe
+        ) {
             "efficient"
         } else if self.busy > 0 {
             "active"
@@ -2315,7 +2332,7 @@ impl IoRuntime {
             let write_sectors = current.write_sectors.saturating_sub(previous.write_sectors);
             let total_ops = read_ops.saturating_add(write_ops);
             let total_sectors = read_sectors.saturating_add(write_sectors);
-            let queue = Path::new("/sys/block").join(&device).join("queue");
+            let queue = Path::new("/sys/block").join(device).join("queue");
             let read_ahead_path = queue.join("read_ahead_kb");
             let requests_path = queue.join("nr_requests");
             if !read_ahead_path.is_file() || !requests_path.is_file() {
@@ -2326,7 +2343,7 @@ impl IoRuntime {
                 let rounds = self.idle_rounds.entry(device.clone()).or_default();
                 *rounds = rounds.saturating_add(1);
                 if *rounds >= 1 {
-                    self.restore_device(nodes, &device);
+                    self.restore_device(nodes, device);
                 }
                 continue;
             }
@@ -3467,12 +3484,14 @@ impl Daemon {
         self.storage_learning.observe(storage.activity);
         if self.hardware.irq_enabled && self.capabilities.irq.supported {
             self.irq_runtime.step(
-                &self.topology,
-                self.runtime_mode,
-                interval_ms,
-                storage.activity.total_sectors,
-                foreground_cpu,
-                &foreground_affinity,
+                IrqStepContext {
+                    topology: &self.topology,
+                    mode: self.runtime_mode,
+                    elapsed_ms: interval_ms,
+                    storage_delta: storage.activity.total_sectors,
+                    foreground_cpu,
+                    foreground_affinity: &foreground_affinity,
+                },
                 &mut self.nodes,
             );
         } else {
@@ -3925,7 +3944,7 @@ mod tests {
             bytes[4..8].copy_from_slice(&mask.to_ne_bytes());
             let mut name_bytes = name.as_bytes().to_vec();
             name_bytes.push(0);
-            while name_bytes.len() % 4 != 0 {
+            while !name_bytes.len().is_multiple_of(4) {
                 name_bytes.push(0);
             }
             bytes[12..16].copy_from_slice(&(name_bytes.len() as u32).to_ne_bytes());

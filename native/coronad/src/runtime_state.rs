@@ -181,7 +181,8 @@ impl NodeManager {
         let paths = self
             .nodes
             .iter()
-            .filter_map(|(path, node)| (node.owner == owner).then(|| path.clone()))
+            .filter(|(_, node)| node.owner == owner)
+            .map(|(path, _)| path.clone())
             .collect::<Vec<_>>();
         for path in paths {
             self.restore(owner, &path);
@@ -191,9 +192,8 @@ impl NodeManager {
     pub(super) fn owner_paths(&self, owner: &'static str, prefix: &Path) -> Vec<PathBuf> {
         self.nodes
             .iter()
-            .filter_map(|(path, node)| {
-                (node.owner == owner && path.starts_with(prefix)).then(|| path.clone())
-            })
+            .filter(|(path, node)| node.owner == owner && path.starts_with(prefix))
+            .map(|(path, _)| path.clone())
             .collect()
     }
 
