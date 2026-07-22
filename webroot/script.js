@@ -913,7 +913,7 @@ class CoronaAddon {
             const floatingHeader = document.getElementById('floating-header');
             if (floatingHeader) floatingHeader.classList.remove('visible', 'overlay-hidden');
         });
-        if (pageName === 'settings' && this.settingsReadyState !== 'ready') {
+        if (pageName === 'settings') {
             this.ensureAllSettingsSectionsReady().catch(e => console.error('ensureAllSettingsSectionsReady failed', e));
         }
         if (pageName === 'home' && this.pendingChartDraw) {
