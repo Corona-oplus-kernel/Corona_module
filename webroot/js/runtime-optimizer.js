@@ -162,6 +162,30 @@
                 input.setAttribute('aria-disabled', enabled ? 'false' : 'true');
             });
         },
+        updateRuntimeCapabilities(status) {
+            const reasonKeys = {
+                available: 'runtimeCapabilityAvailable',
+                missing_node: 'runtimeCapabilityMissingNode',
+                read_only: 'runtimeCapabilityReadOnly',
+                kernel_disabled: 'runtimeCapabilityKernelDisabled'
+            };
+            document.querySelectorAll('.runtime-capability-item').forEach(item => {
+                const name = item.dataset.capability;
+                const supported = status[`capability_${name}`] === '1';
+                const reason = status[`capability_${name}_reason`] || 'missing_node';
+                item.dataset.state = supported ? 'available' : 'unavailable';
+                const value = item.querySelector('strong');
+                if (value) value.textContent = this.t(reasonKeys[reason] || 'unsupported');
+            });
+            HARDWARE_POLICIES.forEach(policy => {
+                const capability = policy.key.replace('_enabled', '');
+                const toggle = document.getElementById(policy.id);
+                if (!toggle) return;
+                const supported = status[`capability_${capability}`] === '1';
+                toggle.disabled = !supported;
+                toggle.closest('.runtime-switch-card')?.classList.toggle('runtime-capability-unavailable', !supported);
+            });
+        },
         scheduleRuntimeOptimizerApply() {
             if (!this.isRuntimeDaemonEnabled()) return;
             const revision = (this.runtimeOptimizerRevision || 0) + 1;
@@ -356,6 +380,7 @@
             const binary = this.shellQuote(`${this.modDir}/bin/coronad`);
             const status = this.parseRuntimeKeyValues(await this.exec(`${binary} status 2>/dev/null`));
             const running = status.running === '1';
+            this.updateRuntimeCapabilities(status);
             const badge = document.getElementById('runtime-status-badge');
             if (badge) {
                 badge.dataset.state = running ? 'running' : 'stopped';

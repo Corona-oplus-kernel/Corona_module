@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::io;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::RawFd;
@@ -154,6 +154,41 @@ struct HardwareConfig {
     ufs_enabled: bool,
     gpu_enabled: bool,
     io_enabled: bool,
+}
+
+#[derive(Clone, Copy)]
+struct Capability {
+    supported: bool,
+    reason: &'static str,
+}
+
+impl Capability {
+    fn available() -> Self {
+        Self {
+            supported: true,
+            reason: "available",
+        }
+    }
+
+    fn unavailable(reason: &'static str) -> Self {
+        Self {
+            supported: false,
+            reason,
+        }
+    }
+}
+
+#[derive(Clone)]
+struct Capabilities {
+    cpu_psi: Capability,
+    io_psi: Capability,
+    memory_psi: Capability,
+    irq: Capability,
+    ufs: Capability,
+    gpu: Capability,
+    io: Capability,
+    zram: Capability,
+    erm: Capability,
 }
 
 #[derive(Clone)]
@@ -641,6 +676,7 @@ struct Daemon {
     pressure: PressureConfig,
     affinity: AffinityConfig,
     hardware: HardwareConfig,
+    capabilities: Capabilities,
     topology: CpuTopology,
     manual_rules: Vec<ManualRule>,
     manual_packages: HashSet<String>,
@@ -1631,6 +1667,104 @@ fn find_gpu_root() -> Option<PathBuf> {
     .then_some(path)
 }
 
+fn writable_node(path: &Path) -> bool {
+    OpenOptions::new().write(true).open(path).is_ok()
+}
+
+fn node_capability(nodes: &[PathBuf]) -> Capability {
+    if nodes.iter().any(|path| writable_node(path)) {
+        Capability::available()
+    } else if nodes.iter().any(|path| path.exists()) {
+        Capability::unavailable("read_only")
+    } else {
+        Capability::unavailable("missing_node")
+    }
+}
+
+fn irq_capability() -> Capability {
+    if !Path::new("/proc/interrupts").is_file() {
+        return Capability::unavailable("missing_node");
+    }
+    let mut nodes = Vec::new();
+    if let Ok(entries) = fs::read_dir("/proc/irq") {
+        for entry in entries.flatten() {
+            for name in ["smp_affinity_list", "smp_affinity"] {
+                let path = entry.path().join(name);
+                if path.is_file() {
+                    nodes.push(path);
+                }
+            }
+        }
+    }
+    node_capability(&nodes)
+}
+
+fn io_capability() -> Capability {
+    let mut nodes = Vec::new();
+    for device in parse_disk_counters(&read_text(proc_root().join("diskstats"))).into_keys() {
+        let queue = Path::new("/sys/block").join(device).join("queue");
+        nodes.push(queue.join("read_ahead_kb"));
+        nodes.push(queue.join("nr_requests"));
+    }
+    node_capability(&nodes)
+}
+
+fn detect_capabilities() -> Capabilities {
+    let ufs = find_ufs_root().map_or_else(
+        || Capability::unavailable("missing_node"),
+        |root| {
+            node_capability(&[
+                root.join("auto_hibern8"),
+                root.join("wb_on"),
+                root.join("enable_wb_buf_flush"),
+            ])
+        },
+    );
+    let gpu = find_gpu_root().map_or_else(
+        || Capability::unavailable("missing_node"),
+        |root| node_capability(&[root.join("devfreq/min_freq")]),
+    );
+    Capabilities {
+        cpu_psi: if Path::new("/proc/pressure/cpu").is_file() {
+            Capability::available()
+        } else {
+            Capability::unavailable("kernel_disabled")
+        },
+        io_psi: if Path::new("/proc/pressure/io").is_file() {
+            Capability::available()
+        } else {
+            Capability::unavailable("kernel_disabled")
+        },
+        memory_psi: if Path::new("/proc/pressure/memory").is_file() {
+            Capability::available()
+        } else {
+            Capability::unavailable("kernel_disabled")
+        },
+        irq: irq_capability(),
+        ufs,
+        gpu,
+        io: io_capability(),
+        zram: if Path::new("/sys/block/zram0/disksize").is_file() {
+            Capability::available()
+        } else {
+            Capability::unavailable("missing_node")
+        },
+        erm: if Path::new("/sys/kernel/oplus_mm/erm/stats").is_file() {
+            node_capability(&[PathBuf::from("/dev/memcg/memory.erm_avail_buffer")])
+        } else {
+            Capability::unavailable("missing_node")
+        },
+    }
+}
+
+fn append_capability_state(output: &mut String, name: &str, capability: Capability) {
+    output.push_str(&format!(
+        "capability_{name}={}\ncapability_{name}_reason={}\n",
+        u8::from(capability.supported),
+        capability.reason,
+    ));
+}
+
 fn first_numeric(value: &str) -> Option<u64> {
     value
         .split_ascii_whitespace()
@@ -2469,6 +2603,7 @@ impl Daemon {
             stats,
             affinity,
             hardware,
+            capabilities: detect_capabilities(),
             pressure_baseline,
             pressure_last_target: None,
             irq_runtime: IrqRuntime::default(),
@@ -2546,6 +2681,7 @@ impl Daemon {
         }
         self.affinity = load_affinity(&self.paths);
         self.hardware = load_hardware(&self.paths);
+        self.capabilities = detect_capabilities();
         self.topology = detect_topology(&self.affinity);
         self.manual_rules = load_manual_rules(&self.paths);
         self.manual_packages = self
@@ -2862,7 +2998,7 @@ impl Daemon {
     }
 
     fn write_state(&self, foreground: &str, foreground_source: &str) {
-        let state = format!(
+        let mut state = format!(
             "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\ncpu_pressure_avg10={:.2}\nio_pressure_avg10={:.2}\ncpu_pressure_level={}\nio_pressure_level={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_target_cpus={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_write_ops={}\nufs_write_sectors={}\nufs_average_write_sectors={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nefficiency_cpus={}\nbalanced_cpus={}\nperformance_cpus={}\nlatency_cpus={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
             process::id(),
             foreground,
@@ -2932,6 +3068,19 @@ impl Daemon {
             self.stats.bpf_events,
             self.stats.bpf_attach_failures,
         );
+        for (name, capability) in [
+            ("cpu_psi", self.capabilities.cpu_psi),
+            ("io_psi", self.capabilities.io_psi),
+            ("memory_psi", self.capabilities.memory_psi),
+            ("irq", self.capabilities.irq),
+            ("ufs", self.capabilities.ufs),
+            ("gpu", self.capabilities.gpu),
+            ("io", self.capabilities.io),
+            ("zram", self.capabilities.zram),
+            ("erm", self.capabilities.erm),
+        ] {
+            append_capability_state(&mut state, name, capability);
+        }
         let _ = write_text(&self.paths.state, state);
         let affinity_state = format!(
             "status=active\npackage={}\napplied={}\nfailed={}\nmanual={}\nefficiency={}\nbalanced={}\nperformance={}\nlatency={}\nmode={}\n",
@@ -2990,7 +3139,7 @@ impl Daemon {
         self.process_bpf_events(&foreground);
         self.scan_threads(&foreground);
         let storage = self.sample_storage_activity(interval_ms);
-        if self.hardware.irq_enabled {
+        if self.hardware.irq_enabled && self.capabilities.irq.supported {
             self.irq_runtime.step(
                 &self.topology,
                 self.runtime_mode,
@@ -3000,22 +3149,34 @@ impl Daemon {
             );
         } else {
             self.irq_runtime.disable();
+            if self.hardware.irq_enabled {
+                self.irq_runtime.state = "unsupported";
+            }
         }
-        if self.hardware.ufs_enabled {
+        if self.hardware.ufs_enabled && self.capabilities.ufs.supported {
             self.ufs_runtime.step(self.runtime_mode, storage);
         } else {
             self.ufs_runtime.disable();
+            if self.hardware.ufs_enabled {
+                self.ufs_runtime.state = "unsupported";
+            }
         }
-        if self.hardware.gpu_enabled {
+        if self.hardware.gpu_enabled && self.capabilities.gpu.supported {
             self.gpu_runtime.step(self.runtime_mode, interval_ms);
         } else {
             self.gpu_runtime.disable();
+            if self.hardware.gpu_enabled {
+                self.gpu_runtime.state = "unsupported";
+            }
         }
-        if self.hardware.io_enabled {
+        if self.hardware.io_enabled && self.capabilities.io.supported {
             self.io_runtime
                 .step(self.runtime_mode, interval_ms, self.io_pressure_level);
         } else {
             self.io_runtime.disable();
+            if self.hardware.io_enabled {
+                self.io_runtime.state = "unsupported";
+            }
         }
         if self.protect_elapsed_ms >= 30_000 {
             self.protect_apps();
