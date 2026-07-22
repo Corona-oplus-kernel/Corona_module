@@ -971,7 +971,9 @@ coronad_enabled() {
 }
 
 use_coronad() {
-    [ -x "$CORONAD" ] && coronad_enabled
+    [ -x "$CORONAD" ] || return 1
+    coronad_enabled || return 1
+    CORONA_MODDIR="$MODDIR" "$CORONAD" selftest 2>/dev/null | grep -q '^selftest=ok$'
 }
 
 start_app_policy_daemon() {

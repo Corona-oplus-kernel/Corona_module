@@ -54,6 +54,64 @@ fn migrate_legacy_runtime_path(module: &Path, config: &Path, name: &str) {
     }
 }
 
+fn migrate_config_keys(path: &Path, mappings: &[(&str, &str)]) {
+    let content = read_text(path);
+    if content.is_empty() {
+        return;
+    }
+    let mut changed = false;
+    let migrated = content
+        .lines()
+        .map(|line| {
+            let Some((key, value)) = line.split_once('=') else {
+                return line.to_string();
+            };
+            let key = key.trim();
+            if let Some((_, replacement)) = mappings.iter().find(|(legacy, _)| *legacy == key) {
+                changed = true;
+                format!("{replacement}={}", value.trim())
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    if changed {
+        let _ = write_text(path, format!("{migrated}\n"));
+    }
+}
+
+fn migrate_v5_configs(module: &Path, config: &Path) {
+    for (legacy, current) in [
+        ("runtime_optimizer.conf", "auto_affinity.conf"),
+        ("daemon.conf", "coronad.conf"),
+    ] {
+        let legacy = config.join(legacy);
+        let current = config.join(current);
+        if legacy.is_file() && !current.exists() {
+            let _ = fs::rename(legacy, current);
+        }
+    }
+    migrate_config_keys(
+        &config.join("auto_affinity.conf"),
+        &[
+            ("temperature_control", "thermal_control"),
+            ("warm_temperature", "thermal_warm_c"),
+            ("severe_temperature", "thermal_severe_c"),
+        ],
+    );
+    migrate_config_keys(
+        &config.join("hardware_policy.conf"),
+        &[
+            ("irq", "irq_enabled"),
+            ("ufs", "ufs_enabled"),
+            ("gpu", "gpu_enabled"),
+            ("io", "io_enabled"),
+        ],
+    );
+    migrate_legacy_runtime_path(module, config, ".coronad_state");
+}
+
 extern "C" fn handle_signal(signal_number: i32) {
     match signal_number {
         1 => RELOAD_REQUESTED.store(true, Ordering::Release),
@@ -102,6 +160,7 @@ impl Paths {
         ] {
             migrate_legacy_runtime_path(&module, &config, name);
         }
+        migrate_v5_configs(&module, &config);
         Self {
             pid: config.join(".coronad.pid"),
             state: config.join(".coronad_state"),
@@ -189,6 +248,12 @@ struct Capabilities {
     io: Capability,
     zram: Capability,
     erm: Capability,
+}
+
+#[derive(Clone)]
+struct SelfTest {
+    ok: bool,
+    failures: Vec<&'static str>,
 }
 
 #[derive(Clone)]
@@ -895,6 +960,7 @@ struct Daemon {
     affinity: AffinityConfig,
     hardware: HardwareConfig,
     capabilities: Capabilities,
+    selftest: SelfTest,
     topology: CpuTopology,
     manual_rules: Vec<ManualRule>,
     manual_packages: HashSet<String>,
@@ -1993,6 +2059,29 @@ fn detect_capabilities() -> Capabilities {
     }
 }
 
+fn run_selftest(paths: &Paths, topology: &CpuTopology) -> SelfTest {
+    let mut failures = Vec::new();
+    if topology.balanced.is_empty() {
+        failures.push("cpu_topology");
+    }
+    if read_text(proc_root().join("stat")).is_empty() {
+        failures.push("procfs");
+    }
+    if fs::create_dir_all(&paths.config).is_err() {
+        failures.push("config_directory");
+    } else {
+        let probe = paths.config.join(".coronad.selftest");
+        if write_text(&probe, "1").is_err() {
+            failures.push("config_write");
+        }
+        let _ = fs::remove_file(probe);
+    }
+    SelfTest {
+        ok: failures.is_empty(),
+        failures,
+    }
+}
+
 fn append_capability_state(output: &mut String, name: &str, capability: Capability) {
     output.push_str(&format!(
         "capability_{name}={}\ncapability_{name}_reason={}\n",
@@ -2756,6 +2845,7 @@ impl Daemon {
         let affinity = load_affinity(&paths);
         let hardware = load_hardware(&paths);
         let topology = detect_topology(&affinity);
+        let selftest = run_selftest(&paths, &topology);
         let manual_rules = load_manual_rules(&paths);
         let manual_packages = manual_rules
             .iter()
@@ -2797,6 +2887,7 @@ impl Daemon {
             affinity,
             hardware,
             capabilities: detect_capabilities(),
+            selftest,
             pressure_baseline,
             pressure_last_target: None,
             irq_runtime: IrqRuntime::default(),
@@ -3347,7 +3438,9 @@ impl Daemon {
             append_capability_state(&mut state, name, capability);
         }
         state.push_str(&format!(
-            "storage_learning_progress={}\nstorage_active_sectors={}\nstorage_sequential_write_sectors={}\nstorage_random_write_ops={}\nnode_managed={}\nnode_apply_failed={}\nnode_external_changes={}\nnode_suspended={}\n",
+            "config_schema=5\nselftest={}\nselftest_failures={}\nstorage_learning_progress={}\nstorage_active_sectors={}\nstorage_sequential_write_sectors={}\nstorage_random_write_ops={}\nnode_managed={}\nnode_apply_failed={}\nnode_external_changes={}\nnode_suspended={}\n",
+            if self.selftest.ok { "ok" } else { "failed" },
+            self.selftest.failures.join(","),
             self.storage_learning.progress(),
             self.storage_learning.active_sectors,
             self.storage_learning.sequential_write_sectors,
@@ -3565,6 +3658,15 @@ fn print_status(paths: &Paths) -> i32 {
     }
 }
 
+fn print_selftest(paths: &Paths) -> i32 {
+    let topology = detect_topology(&load_affinity(paths));
+    let result = run_selftest(paths, &topology);
+    println!("selftest={}", if result.ok { "ok" } else { "failed" });
+    println!("failures={}", result.failures.join(","));
+    println!("cpu_count={}", topology.balanced.len());
+    if result.ok { 0 } else { 1 }
+}
+
 fn main() {
     let paths = Paths::detect();
     let command = env::args().nth(1).unwrap_or_else(|| "status".to_string());
@@ -3580,13 +3682,14 @@ fn main() {
         }
         "stop" => stop_daemon(&paths).map(|_| 0).unwrap_or(1),
         "status" => print_status(&paths),
+        "selftest" => print_selftest(&paths),
         "once" => {
             let mut daemon = Daemon::new(paths);
             daemon.step();
             0
         }
         _ => {
-            eprintln!("usage: coronad [start|daemon|reload|stop|status|once]");
+            eprintln!("usage: coronad [start|daemon|reload|stop|status|selftest|once]");
             2
         }
     };
@@ -3761,6 +3864,31 @@ mod tests {
         assert_eq!(read_text(&first), "2");
         assert!(nodes.restore("ufs", &first));
         assert_eq!(read_text(&first), "1");
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn migrates_legacy_v5_config_keys() {
+        let root = PathBuf::from(format!("/root/tmp/coronad-migration-test-{}", process::id()));
+        let config = root.join("config");
+        fs::create_dir_all(&config).unwrap();
+        write_text(
+            config.join("runtime_optimizer.conf"),
+            "temperature_control=1\nwarm_temperature=70\n",
+        )
+        .unwrap();
+        write_text(config.join("hardware_policy.conf"), "irq=1\nufs=0\n").unwrap();
+
+        migrate_v5_configs(&root, &config);
+
+        let affinity = read_text(config.join("auto_affinity.conf"));
+        let hardware = read_text(config.join("hardware_policy.conf"));
+        assert!(affinity.contains("thermal_control=1"));
+        assert!(affinity.contains("thermal_warm_c=70"));
+        assert!(hardware.contains("irq_enabled=1"));
+        assert!(hardware.contains("ufs_enabled=0"));
+        assert!(!config.join("runtime_optimizer.conf").exists());
 
         fs::remove_dir_all(root).unwrap();
     }

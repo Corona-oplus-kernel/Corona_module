@@ -2532,9 +2532,15 @@
                 const daemonEnabled = this.parseEnabledFlag(await this.readConfig('coronad.conf'));
                 this.state.runtimeDaemonEnabled = daemonEnabled;
                 if (!daemonEnabled) {
-                    this.showToast(this.t('runtimeDaemonRequired'), 'warning');
+                    if (typeof this.rejectDaemonDependentToggle === 'function') {
+                        this.rejectDaemonDependentToggle(toggle);
+                    } else {
+                        this.showToast(this.t('runtimeDaemonRequired'), 'warning');
+                        setTimeout(() => {
+                            toggle.checked = false;
+                        }, 180);
+                    }
                     setTimeout(() => {
-                        toggle.checked = false;
                         toggle.disabled = false;
                     }, 180);
                     return;
