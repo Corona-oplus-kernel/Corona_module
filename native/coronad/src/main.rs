@@ -177,6 +177,7 @@ struct IrqRuntime {
     applied: u64,
     supported: bool,
     state: &'static str,
+    target_cpus: String,
 }
 
 #[derive(Default)]
@@ -1645,6 +1646,7 @@ impl IrqRuntime {
         mode: RuntimeMode,
         elapsed_ms: u64,
         storage_delta: u64,
+        foreground: &str,
     ) {
         self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
         if self.elapsed_ms < 2_000 {
@@ -1656,8 +1658,14 @@ impl IrqRuntime {
         self.managed = samples.len();
         self.busy = 0;
         let efficiency = cpu_list_string(&topology.efficiency);
-        let upper = upper_cpu_list(topology);
+        let (foreground_cpu, foreground_affinity) = foreground_main_placement(foreground);
+        let upper = irq_target_cpus(topology, foreground_cpu, &foreground_affinity);
         let upper_list = cpu_list_string(&upper);
+        self.target_cpus = if matches!(mode, RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe) {
+            efficiency.clone()
+        } else {
+            upper_list.clone()
+        };
         for (irq, count, name) in samples {
             let previous = self.last_counts.insert(irq, count).unwrap_or(count);
             let delta = count.saturating_sub(previous);
@@ -1763,6 +1771,7 @@ impl IrqRuntime {
         self.targets.clear();
         self.idle_rounds.clear();
         self.busy = 0;
+        self.target_cpus.clear();
         self.state = "disabled";
     }
 }
@@ -2098,6 +2107,59 @@ fn parse_task_stat_text(stat: &str) -> Option<(u64, u64)> {
     let system_ticks = fields.get(12)?.parse::<u64>().ok()?;
     let start_time = fields.get(19)?.parse::<u64>().ok()?;
     Some((user_ticks + system_ticks, start_time))
+}
+
+fn parse_task_processor(stat: &str) -> Option<usize> {
+    let close = stat.rfind(") ")?;
+    let fields = stat[close + 2..].split_ascii_whitespace().collect::<Vec<_>>();
+    fields.get(36)?.parse().ok()
+}
+
+fn parse_allowed_cpu_list(status: &str) -> Vec<usize> {
+    status
+        .lines()
+        .find_map(|line| line.strip_prefix("Cpus_allowed_list:"))
+        .map(parse_cpu_list)
+        .unwrap_or_default()
+}
+
+fn foreground_main_placement(package: &str) -> (Option<usize>, Vec<usize>) {
+    if package.is_empty() {
+        return (None, Vec::new());
+    }
+    let packages = HashSet::from([package.to_string()]);
+    let processes = scan_requested_processes(&packages);
+    let Some(pid) = processes.get(package).and_then(|pids| pids.first()).copied() else {
+        return (None, Vec::new());
+    };
+    let root = proc_root().join(pid.to_string());
+    (
+        parse_task_processor(&read_text(root.join("stat"))),
+        parse_allowed_cpu_list(&read_text(root.join("status"))),
+    )
+}
+
+fn irq_target_cpus(
+    topology: &CpuTopology,
+    current_cpu: Option<usize>,
+    allowed_cpus: &[usize],
+) -> Vec<usize> {
+    let upper = upper_cpu_list(topology);
+    let mut target = upper.clone();
+    if target.len() > 1 {
+        if let Some(cpu) = current_cpu {
+            target.retain(|candidate| *candidate != cpu);
+        }
+    }
+    let outside_affinity = target
+        .iter()
+        .copied()
+        .filter(|cpu| !allowed_cpus.contains(cpu))
+        .collect::<Vec<_>>();
+    if !outside_affinity.is_empty() {
+        target = outside_affinity;
+    }
+    if target.is_empty() { upper } else { target }
 }
 
 fn psi_avg10(path: &str) -> Option<f64> {
@@ -2722,7 +2784,11 @@ impl Daemon {
             u8::from(self.battery_saver),
             u8::from(self.screen_on),
             self.irq_runtime.state,
-            cpu_list_string(&self.topology.latency),
+            if self.irq_runtime.target_cpus.is_empty() {
+                cpu_list_string(&self.topology.latency)
+            } else {
+                self.irq_runtime.target_cpus.clone()
+            },
             self.irq_runtime.managed,
             self.irq_runtime.busy,
             self.irq_runtime.applied,
@@ -2812,8 +2878,13 @@ impl Daemon {
         self.scan_threads(&foreground);
         let storage_delta = self.sample_storage_delta(interval_ms);
         if self.hardware.irq_enabled {
-            self.irq_runtime
-                .step(&self.topology, self.runtime_mode, interval_ms, storage_delta);
+            self.irq_runtime.step(
+                &self.topology,
+                self.runtime_mode,
+                interval_ms,
+                storage_delta,
+                &foreground,
+            );
         } else {
             self.irq_runtime.disable();
         }
@@ -3011,6 +3082,34 @@ mod tests {
     fn parses_task_cpu_and_start_time() {
         let stat = "123 (Render Thread) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21";
         assert_eq!(parse_task_stat_text(stat), Some((23, 19)));
+    }
+
+    #[test]
+    fn parses_task_processor_and_allowed_cpus() {
+        let mut fields = vec!["0"; 37];
+        fields[0] = "S";
+        fields[36] = "6";
+        let stat = format!("123 (main) {}", fields.join(" "));
+        assert_eq!(parse_task_processor(&stat), Some(6));
+        assert_eq!(
+            parse_allowed_cpu_list("Cpus_allowed_list:\t4-7\n"),
+            vec![4, 5, 6, 7]
+        );
+    }
+
+    #[test]
+    fn avoids_foreground_cpu_for_irq_target() {
+        let topology = CpuTopology {
+            efficiency: vec![0, 1, 2, 3],
+            balanced: (0..8).collect(),
+            performance: vec![6, 7],
+            latency: vec![4, 5, 6, 7],
+        };
+        assert_eq!(irq_target_cpus(&topology, Some(6), &[6, 7]), vec![4, 5]);
+        assert_eq!(
+            irq_target_cpus(&topology, Some(7), &[4, 5, 6, 7]),
+            vec![4, 5, 6]
+        );
     }
 
     #[test]

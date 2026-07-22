@@ -213,7 +213,10 @@ IO 压力等级：
 
 - UFS IRQ：两次 `/proc/diskstats` 采样的扇区差达到 `8192` 时判定繁忙。
 - 网络 IRQ：两次 IRQ 计数差达到 `128` 时判定繁忙。
-- 繁忙 IRQ 写入 `/proc/irq/IRQ/smp_affinity_list`，目标为 `latency` CPU 集合。
+- 从前台主线程 `/proc/PID/stat` 读取当前 CPU，从 `/proc/PID/status` 读取 `Cpus_allowed_list`。
+- 繁忙 IRQ 优先使用 `latency` 集合中不属于主线程 affinity 的 CPU，并排除主线程当前 CPU。
+- 如果排除后没有可用 CPU，则回退到原始 `latency` 集合。
+- 目标写入 `/proc/irq/IRQ/smp_affinity_list`。
 - `screen_off`、`saver` 或 `severe` 模式写入 `efficiency` CPU 集合。
 - 连续三轮空闲后恢复原始 affinity。
 
