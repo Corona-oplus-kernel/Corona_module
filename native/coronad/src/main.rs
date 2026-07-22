@@ -7,11 +7,11 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
 use std::fs::{self, OpenOptions};
-use std::io;
+use std::io::{self, Read};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
-use std::process::{self, Command, Stdio};
+use std::process::{self, Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
@@ -760,6 +760,7 @@ struct Daemon {
     zram_policy_interval_ms: u64,
     zram_policy_action: String,
     zram_policy_reason: String,
+    zram_policy_child: Option<Child>,
 }
 
 fn read_text(path: impl AsRef<Path>) -> String {
@@ -2691,6 +2692,7 @@ impl Daemon {
             zram_policy_interval_ms: 30_000,
             zram_policy_action: String::new(),
             zram_policy_reason: String::new(),
+            zram_policy_child: None,
             paths,
         };
         daemon.update_environment();
@@ -2719,9 +2721,16 @@ impl Daemon {
     }
 
     fn update_zram_policy(&mut self) {
+        if self.poll_zram_policy() {
+            self.refresh_zram_policy_state();
+        }
         if !self.zram_policy_enabled {
+            self.stop_zram_policy_tick();
             self.zram_policy_action = "disabled".to_string();
             self.zram_policy_reason.clear();
+            return;
+        }
+        if self.zram_policy_child.is_some() {
             return;
         }
         self.zram_policy_elapsed_ms = self
@@ -2732,7 +2741,7 @@ impl Daemon {
         }
         self.zram_policy_elapsed_ms = 0;
         let script = self.zram_policy_script();
-        let output = Command::new("/system/bin/sh")
+        self.zram_policy_child = Command::new("/system/bin/sh")
             .arg(script)
             .arg("tick")
             .env("CORONA_SCREEN_ON", if self.screen_on { "1" } else { "0" })
@@ -2743,25 +2752,53 @@ impl Daemon {
             )
             .env("CORONA_RUNTIME_MODE", self.runtime_mode.name())
             .stdin(Stdio::null())
+            .stdout(Stdio::piped())
             .stderr(Stdio::null())
-            .output();
-        let interval = output
-            .ok()
-            .and_then(|output| {
-                String::from_utf8_lossy(&output.stdout)
-                    .lines()
-                    .rev()
-                    .find_map(|line| line.trim().parse::<u64>().ok())
-            })
+            .spawn()
+            .ok();
+        if self.zram_policy_child.is_none() {
+            self.zram_policy_interval_ms = 30_000;
+            self.zram_policy_action = "error".to_string();
+            self.zram_policy_reason = "spawn_failed".to_string();
+        }
+    }
+
+    fn poll_zram_policy(&mut self) -> bool {
+        let Some(child) = self.zram_policy_child.as_mut() else {
+            return false;
+        };
+        let Ok(Some(_)) = child.try_wait() else {
+            return false;
+        };
+        let mut output = String::new();
+        if let Some(mut stdout) = child.stdout.take() {
+            let _ = stdout.read_to_string(&mut output);
+        }
+        self.zram_policy_interval_ms = output
+            .lines()
+            .rev()
+            .find_map(|line| line.trim().parse::<u64>().ok())
             .unwrap_or(30)
-            .clamp(5, 3_600);
-        self.zram_policy_interval_ms = interval * 1_000;
+            .clamp(5, 3_600)
+            * 1_000;
+        self.zram_policy_child = None;
+        true
+    }
+
+    fn refresh_zram_policy_state(&mut self) {
         let state = parse_key_values(&self.paths.zram_policy_state);
         self.zram_policy_action = state
             .get("last_action")
             .cloned()
             .unwrap_or_else(|| "waiting".to_string());
         self.zram_policy_reason = state.get("last_reason").cloned().unwrap_or_default();
+    }
+
+    fn stop_zram_policy_tick(&mut self) {
+        if let Some(mut child) = self.zram_policy_child.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
     }
 
     fn sample_storage_activity(&mut self, elapsed_ms: u64) -> StorageSample {
@@ -3482,6 +3519,7 @@ impl Daemon {
     }
 
     fn cleanup(&mut self) {
+        self.stop_zram_policy_tick();
         self.irq_runtime.cleanup(&mut self.nodes);
         self.ufs_runtime.cleanup(&mut self.nodes);
         self.gpu_runtime.cleanup(&mut self.nodes);
