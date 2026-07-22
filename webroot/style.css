@@ -5294,6 +5294,26 @@ body.theme-dark #app-policy-overlay .app-policy-detail-card {
 body.theme-dark .color-live-swatch {
     border-color: rgba(255,255,255,0.12);
 }
+
+.runtime-capability-item[data-state="waiting"] strong {
+    color: var(--text-sub);
+}
+
+.runtime-decision-item.runtime-decision-new {
+    animation: runtime-decision-arrive 420ms var(--motion-spring) both;
+}
+
+@keyframes runtime-decision-arrive {
+    0% { opacity: 0; transform: translateY(-8px) scale(0.97); background: color-mix(in srgb, var(--primary) 18%, transparent); }
+    65% { opacity: 1; transform: translateY(1px) scale(1.01); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .runtime-decision-item.runtime-decision-new {
+        animation: none;
+    }
+}
 .color-live-meta {
     flex: 1;
     min-width: 0;

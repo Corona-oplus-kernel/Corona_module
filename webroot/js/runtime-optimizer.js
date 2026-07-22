@@ -205,9 +205,16 @@
                 input.setAttribute('aria-disabled', enabled ? 'false' : 'true');
             });
         },
-        updateRuntimeCapabilities(status) {
+        updateRuntimeCapabilities(status, running) {
             document.querySelectorAll('.runtime-capability-item').forEach(item => {
                 const name = item.dataset.capability;
+                if (!running) {
+                    item.dataset.state = 'waiting';
+                    const value = item.querySelector('strong');
+                    const text = this.t('runtimeCapabilityWaiting');
+                    if (value && value.textContent !== text) value.textContent = text;
+                    return;
+                }
                 const supported = status[`capability_${name}`] === '1';
                 const reason = status[`capability_${name}_reason`] || 'missing_node';
                 item.dataset.state = supported ? 'available' : 'unavailable';
@@ -219,6 +226,11 @@
                 const capability = policy.key.replace('_enabled', '');
                 const toggle = document.getElementById(policy.id);
                 if (!toggle) return;
+                if (!running) {
+                    toggle.disabled = false;
+                    toggle.closest('.runtime-switch-card')?.classList.remove('runtime-capability-unavailable');
+                    return;
+                }
                 const supported = status[`capability_${capability}`] === '1';
                 toggle.disabled = !supported;
                 toggle.closest('.runtime-switch-card')?.classList.toggle('runtime-capability-unavailable', !supported);
@@ -242,6 +254,7 @@
                     list.replaceChildren(empty);
                 }
                 empty.textContent = this.t('runtimeDecisionEmpty');
+                this.runtimeDecisionsInitialized = true;
                 return;
             }
             list.querySelector('.runtime-decision-empty')?.remove();
@@ -262,12 +275,17 @@
                     const sequence = document.createElement('small');
                     sequence.textContent = `#${tick || 0}`;
                     item.append(title, detail, sequence);
+                    if (this.runtimeDecisionsInitialized) {
+                        item.classList.add('runtime-decision-new');
+                        item.addEventListener('animationend', () => item.classList.remove('runtime-decision-new'), { once: true });
+                    }
                 }
                 list.appendChild(item);
             });
             existing.forEach((item, key) => {
                 if (!active.has(key)) item.remove();
             });
+            this.runtimeDecisionsInitialized = true;
         },
         scheduleRuntimeOptimizerApply() {
             if (!this.isRuntimeDaemonEnabled()) return;
@@ -463,12 +481,20 @@
             const binary = this.shellQuote(`${this.modDir}/bin/coronad`);
             const status = this.parseRuntimeKeyValues(await this.exec(`${binary} status 2>/dev/null`));
             const running = status.running === '1';
-            this.updateRuntimeCapabilities(status);
+            this.updateRuntimeCapabilities(status, running);
             this.updateRuntimeDecisions(status);
             const badge = document.getElementById('runtime-status-badge');
             if (badge) {
                 badge.dataset.state = running ? 'running' : 'stopped';
                 badge.textContent = this.t(running ? 'runtimeRunning' : 'runtimeStopped');
+            }
+            if (!running) {
+                const waiting = this.t('runtimePolicyWaiting');
+                ['runtime-foreground', 'runtime-detection', 'runtime-mode', 'runtime-temperature', 'runtime-ebpf-state', 'runtime-known-threads', 'runtime-cpu-pressure', 'runtime-io-pressure', 'runtime-cpu-groups', 'runtime-irq-target', 'runtime-ufs-write-shape', 'runtime-gpu-floor', 'runtime-io-queue', 'runtime-storage-learning', 'runtime-affinity-stats', 'runtime-applied-failed', 'runtime-ebpf-events'].forEach(id => this.setRuntimeText(id, '--'));
+                ['runtime-irq-policy', 'runtime-ufs-policy', 'runtime-gpu-policy', 'runtime-io-policy'].forEach(id => this.setRuntimeText(id, waiting));
+                const error = document.getElementById('runtime-ebpf-error');
+                if (error) error.hidden = true;
+                return;
             }
             this.setRuntimeText('runtime-foreground', status.foreground || status.package);
             this.setRuntimeText('runtime-detection', status.foreground_source);
