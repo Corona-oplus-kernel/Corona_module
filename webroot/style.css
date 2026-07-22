@@ -5157,6 +5157,120 @@ body.theme-dark #zram-settings .option-item {
     overscroll-behavior: contain;
 }
 
+#app-policy-overlay {
+    padding: max(18px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom));
+    background: rgba(15, 18, 26, 0.32);
+    backdrop-filter: blur(18px) saturate(1.08);
+    -webkit-backdrop-filter: blur(18px) saturate(1.08);
+}
+
+#app-policy-overlay .app-policy-detail-card {
+    width: min(100%, 560px);
+    height: min(82dvh, 720px);
+    max-height: none;
+    padding: 0;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: color-mix(in srgb, var(--card-bg) 94%, transparent);
+    box-shadow: 0 24px 70px rgba(17, 24, 39, 0.22), 0 2px 12px rgba(17, 24, 39, 0.08);
+}
+
+#app-policy-overlay .detail-header {
+    min-height: 66px;
+    padding: 20px 22px 12px;
+}
+
+#app-policy-overlay .detail-title {
+    font-size: 20px;
+    font-weight: 760;
+    letter-spacing: -0.02em;
+}
+
+#app-policy-overlay .priority-search-container {
+    position: relative;
+    z-index: 2;
+    padding: 4px 16px 12px;
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--card-bg) 98%, transparent) 74%, transparent);
+}
+
+#app-policy-overlay .priority-search {
+    height: 46px;
+    padding: 0 16px;
+    border-radius: 15px;
+    border-color: color-mix(in srgb, var(--text-sub) 14%, transparent);
+    background: color-mix(in srgb, var(--text-main) 5%, transparent);
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+#app-policy-overlay .priority-search:focus {
+    border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+    background: color-mix(in srgb, var(--card-bg) 96%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 13%, transparent);
+}
+
+#app-policy-list {
+    padding: 2px 12px 18px;
+    scroll-padding-block: 12px;
+}
+
+#app-policy-list .app-policy-row {
+    min-height: 70px;
+    margin-bottom: 8px;
+    padding: 11px 12px;
+    border-radius: 18px;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 70px;
+    transition: transform 160ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    animation: app-policy-row-in 240ms var(--motion-ease) both;
+}
+
+#app-policy-list .app-policy-row:active {
+    transform: scale(0.985);
+}
+
+#app-policy-list .app-policy-row.active {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+#app-policy-list .app-policy-check {
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: white;
+    background: var(--primary);
+    transform: scale(0.72);
+    transition: opacity 180ms ease, transform 220ms var(--motion-spring);
+}
+
+#app-policy-list .app-policy-row.active .app-policy-check {
+    transform: scale(1);
+}
+
+.app-policy-render-sentinel {
+    height: 1px;
+    pointer-events: none;
+}
+
+@keyframes app-policy-row-in {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+body.theme-dark #app-policy-overlay .app-policy-detail-card {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(20, 23, 31, 0.94);
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #app-policy-list .app-policy-row {
+        animation: none;
+        transition: none;
+    }
+}
+
 /* Color picker live preview */
 .color-live-preview {
     display: flex;
