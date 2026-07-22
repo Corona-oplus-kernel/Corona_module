@@ -314,21 +314,6 @@ CoronaAddon.prototype.scheduleSaveAppMetaCache = function() {
         this._appMetaSaveTimer = null;
     }, 600);
 };
-CoronaAddon.prototype.prewarmAppPolicyData = async function(force = false) {
-    this.ensureAppPolicyState();
-    if (!force && this.appPolicyPrewarmDone) return this.installedApps;
-    if (this.appPolicyPrewarmPromise) return this.appPolicyPrewarmPromise;
-    this.appPolicyPrewarmPromise = (async () => {
-        const apps = force ? await this.loadInstalledApps(true) : this.hydrateInstalledAppsFromCache();
-        this.appPolicyPrewarmDone = true;
-        return apps;
-    })();
-    try {
-        return await this.appPolicyPrewarmPromise;
-    } finally {
-        this.appPolicyPrewarmPromise = null;
-    }
-};
 CoronaAddon.prototype.humanizePackageName = function(pkg) {
     const parts = String(pkg || '').split('.').filter(Boolean);
     if (parts.length === 0) return pkg || '--';

@@ -592,7 +592,7 @@
                 this.initPerformanceMode();
                 this.initAppPolicy();
                 await Promise.all([this.loadAppMetaCache(), this.loadPerformanceModeConfig(), this.loadAppRulesConfig()]);
-                await this.prewarmAppPolicyData();
+                this.hydrateInstalledAppsFromCache();
                 return;
             }
             if (section === 'custom-scripts') {
