@@ -591,7 +591,7 @@
                 await Promise.all([this.ensureFeatureScript('app-policy'), this.ensureFeatureScript('priority-thread')]);
                 this.initPerformanceMode();
                 this.initAppPolicy();
-                await Promise.all([this.loadPerformanceModeConfig(), this.loadAppRulesConfig()]);
+                await Promise.all([this.loadAppMetaCache(), this.loadPerformanceModeConfig(), this.loadAppRulesConfig()]);
                 await this.prewarmAppPolicyData();
                 return;
             }
@@ -620,20 +620,6 @@
         });
         this.settingsSectionPromises[section] = promise;
         return promise;
-    },
-    ensureAllSettingsSectionsReady() {
-        if (this.allSettingsSectionsPromise) return this.allSettingsSectionsPromise;
-        const sections = [
-            'memory-compression',
-            'le9ec',
-            'app-policy',
-            'custom-scripts',
-            'system-opt',
-            'corona-kernel',
-            'app-settings'
-        ];
-        this.allSettingsSectionsPromise = Promise.all(sections.map(section => this.ensureSettingsSectionReady(section)));
-        return this.allSettingsSectionsPromise;
     },
     initConfigValidation() {
         const button = document.getElementById('config-validation-btn');
