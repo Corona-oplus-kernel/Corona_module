@@ -970,6 +970,57 @@ body.theme-dark .option-item {
     opacity: .58;
 }
 
+.runtime-decision-section {
+    margin-bottom: 12px;
+}
+
+.runtime-decision-list {
+    display: grid;
+    gap: 7px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.runtime-decision-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 10px;
+    padding: 9px 10px;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-ctl);
+    background: var(--glass-control-bg);
+}
+
+.runtime-decision-item strong,
+.runtime-decision-item span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.runtime-decision-item strong {
+    color: var(--text-main);
+    font-size: 11px;
+}
+
+.runtime-decision-item span {
+    grid-column: 1 / -1;
+    color: var(--text-sub);
+    font-size: 10px;
+}
+
+.runtime-decision-item small {
+    color: var(--text-dim);
+    font-size: 9px;
+}
+
+.runtime-decision-empty {
+    padding: 12px;
+    color: var(--text-dim);
+    font-size: 11px;
+    text-align: center;
+}
+
 @media (max-width: 520px) {
     .runtime-capability-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));

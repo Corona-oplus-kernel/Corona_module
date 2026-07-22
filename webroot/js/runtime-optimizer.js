@@ -186,6 +186,42 @@
                 toggle.closest('.runtime-switch-card')?.classList.toggle('runtime-capability-unavailable', !supported);
             });
         },
+        updateRuntimeDecisions(status) {
+            const list = document.getElementById('runtime-decision-list');
+            if (!list) return;
+            const areaKeys = {
+                foreground: 'runtimeDecisionForeground',
+                irq: 'runtimeIrqPolicy',
+                ufs: 'runtimeUfsPolicy',
+                gpu: 'runtimeGpuPolicy',
+                io: 'runtimeIoPolicy',
+                storage: 'runtimeStorageLearning'
+            };
+            const entries = Object.entries(status)
+                .filter(([key]) => /^decision_\d+$/.test(key))
+                .sort(([left], [right]) => Number.parseInt(left.slice(9), 10) - Number.parseInt(right.slice(9), 10))
+                .map(([, value]) => value.split('|'));
+            list.replaceChildren();
+            if (!entries.length) {
+                const empty = document.createElement('div');
+                empty.className = 'runtime-decision-empty';
+                empty.textContent = this.t('runtimeDecisionEmpty');
+                list.appendChild(empty);
+                return;
+            }
+            entries.forEach(([tick, area, action, reason]) => {
+                const item = document.createElement('div');
+                item.className = 'runtime-decision-item';
+                const title = document.createElement('strong');
+                title.textContent = `${this.t(areaKeys[area] || 'runtimeUnknown')} · ${action || '--'}`;
+                const detail = document.createElement('span');
+                detail.textContent = reason || '--';
+                const sequence = document.createElement('small');
+                sequence.textContent = `#${tick || 0}`;
+                item.append(title, detail, sequence);
+                list.appendChild(item);
+            });
+        },
         scheduleRuntimeOptimizerApply() {
             if (!this.isRuntimeDaemonEnabled()) return;
             const revision = (this.runtimeOptimizerRevision || 0) + 1;
@@ -381,6 +417,7 @@
             const status = this.parseRuntimeKeyValues(await this.exec(`${binary} status 2>/dev/null`));
             const running = status.running === '1';
             this.updateRuntimeCapabilities(status);
+            this.updateRuntimeDecisions(status);
             const badge = document.getElementById('runtime-status-badge');
             if (badge) {
                 badge.dataset.state = running ? 'running' : 'stopped';

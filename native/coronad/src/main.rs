@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::env;
 use std::ffi::OsStr;
 use std::fs::{self, OpenOptions};
@@ -207,6 +207,37 @@ struct NodeManager {
     failed: u64,
     external_changes: u64,
     suspended: usize,
+}
+
+struct Decision {
+    tick: u64,
+    area: &'static str,
+    action: String,
+    reason: String,
+}
+
+#[derive(Default)]
+struct DecisionLog {
+    entries: VecDeque<Decision>,
+    last_actions: HashMap<&'static str, String>,
+}
+
+impl DecisionLog {
+    fn record(&mut self, tick: u64, area: &'static str, action: String, reason: String) {
+        if self.last_actions.get(area) == Some(&action) {
+            return;
+        }
+        self.last_actions.insert(area, action.clone());
+        if self.entries.len() >= 32 {
+            self.entries.pop_front();
+        }
+        self.entries.push_back(Decision {
+            tick,
+            area,
+            action: sanitize_state_value(&action),
+            reason: sanitize_state_value(&reason),
+        });
+    }
 }
 
 impl NodeManager {
@@ -899,10 +930,21 @@ struct Daemon {
     last_storage_counters: DiskCounters,
     storage_learning: StorageLearning,
     nodes: NodeManager,
+    decisions: DecisionLog,
 }
 
 fn read_text(path: impl AsRef<Path>) -> String {
     fs::read_to_string(path).unwrap_or_default()
+}
+
+fn sanitize_state_value(value: &str) -> String {
+    value
+        .chars()
+        .map(|character| match character {
+            '\n' | '\r' | '|' | '=' => ' ',
+            _ => character,
+        })
+        .collect()
 }
 
 fn write_text(path: impl AsRef<Path>, value: impl AsRef<[u8]>) -> io::Result<()> {
@@ -2774,6 +2816,7 @@ impl Daemon {
             last_storage_counters: DiskCounters::default(),
             storage_learning: StorageLearning::default(),
             nodes: NodeManager::default(),
+            decisions: DecisionLog::default(),
             paths,
         };
         daemon.update_environment();
@@ -3149,6 +3192,76 @@ impl Daemon {
         }
     }
 
+    fn record_decisions(&mut self, foreground: &str, foreground_changed: bool) {
+        if foreground_changed {
+            self.decisions.record(
+                self.tick,
+                "foreground",
+                foreground.to_string(),
+                "top-app/cgroup".to_string(),
+            );
+        }
+        let records = [
+            (
+                "irq",
+                self.irq_runtime.state.to_string(),
+                format!(
+                    "mode={} busy={}/{} target={}",
+                    self.runtime_mode.name(),
+                    self.irq_runtime.busy,
+                    self.irq_runtime.managed,
+                    self.irq_runtime.target_cpus,
+                ),
+            ),
+            (
+                "ufs",
+                self.ufs_runtime.state.to_string(),
+                format!(
+                    "writes={} sectors={} average={}",
+                    self.ufs_runtime.write_ops,
+                    self.ufs_runtime.write_sectors,
+                    self.ufs_runtime.average_write_sectors,
+                ),
+            ),
+            (
+                "gpu",
+                self.gpu_runtime.state.to_string(),
+                format!(
+                    "busy={}% floor={}",
+                    self.gpu_runtime.busy_percent, self.gpu_runtime.target_min_freq,
+                ),
+            ),
+            (
+                "io",
+                self.io_runtime.state.to_string(),
+                format!(
+                    "pressure={} devices={} queue={}/{}",
+                    self.io_pressure_level,
+                    self.io_runtime.active_devices,
+                    self.io_runtime.read_ahead_kb,
+                    self.io_runtime.nr_requests,
+                ),
+            ),
+            (
+                "storage",
+                if self.storage_learning.ready {
+                    "ready".to_string()
+                } else {
+                    "learning".to_string()
+                },
+                format!(
+                    "progress={} active={} sequential={}",
+                    self.storage_learning.progress(),
+                    self.storage_learning.active_sectors,
+                    self.storage_learning.sequential_write_sectors,
+                ),
+            ),
+        ];
+        for (area, action, reason) in records {
+            self.decisions.record(self.tick, area, action, reason);
+        }
+    }
+
     fn write_state(&self, foreground: &str, foreground_source: &str) {
         let mut state = format!(
             "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\ncpu_pressure_avg10={:.2}\nio_pressure_avg10={:.2}\ncpu_pressure_level={}\nio_pressure_level={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_target_cpus={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_write_ops={}\nufs_write_sectors={}\nufs_average_write_sectors={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nefficiency_cpus={}\nbalanced_cpus={}\nperformance_cpus={}\nlatency_cpus={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
@@ -3244,6 +3357,13 @@ impl Daemon {
             self.nodes.external_changes,
             self.nodes.suspended,
         ));
+        state.push_str(&format!("decision_count={}\n", self.decisions.entries.len()));
+        for (index, decision) in self.decisions.entries.iter().rev().enumerate() {
+            state.push_str(&format!(
+                "decision_{index}={}|{}|{}|{}\n",
+                decision.tick, decision.area, decision.action, decision.reason,
+            ));
+        }
         let _ = write_text(&self.paths.state, state);
         let affinity_state = format!(
             "status=active\npackage={}\napplied={}\nfailed={}\nmanual={}\nefficiency={}\nbalanced={}\nperformance={}\nlatency={}\nmode={}\n",
@@ -3368,6 +3488,7 @@ impl Daemon {
             self.pressure_elapsed_ms = 0;
             self.update_pressure();
         }
+        self.record_decisions(&foreground, foreground_changed);
         self.write_state(&foreground, foreground_source);
         let _ = profile_changed;
         interval_ms
