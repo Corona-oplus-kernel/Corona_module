@@ -3911,6 +3911,22 @@ mod tests {
     }
 
     #[test]
+    fn limits_and_restores_decision_history() {
+        let path = PathBuf::from(format!("/root/tmp/coronad-decisions-test-{}", process::id()));
+        let mut decisions = DecisionLog::default();
+        for index in 0..40 {
+            decisions.record(index, "test", format!("action-{index}"), "reason".to_string());
+        }
+        assert_eq!(decisions.entries.len(), 24);
+        decisions.save(&path);
+        let restored = DecisionLog::load(&path);
+        assert_eq!(restored.entries.len(), 24);
+        assert_eq!(restored.entries.front().map(|entry| entry.tick), Some(16));
+        assert_eq!(restored.entries.back().map(|entry| entry.tick), Some(39));
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn matches_kernel_bpf_uapi_layouts() {
         assert_eq!(std::mem::size_of::<BpfInsn>(), 8);
         assert_eq!(std::mem::size_of::<BpfRawTracepointAttr>(), 16);
