@@ -859,7 +859,7 @@
       "runtimeCapabilityReadOnly": "Read only",
       "runtimeCapabilityKernelDisabled": "Kernel disabled",
       "runtimeDecisions": "Recent decisions",
-      "runtimeDecisionsDesc": "Memory only; cleared when the daemon stops",
+      "runtimeDecisionsDesc": "Keeps up to 24 entries across daemon restarts and clears them on device boot",
       "runtimeDecisionForeground": "Foreground change",
       "runtimeDecisionZram": "ZRAM and ERM",
       "runtimeDecisionEmpty": "No decisions yet",

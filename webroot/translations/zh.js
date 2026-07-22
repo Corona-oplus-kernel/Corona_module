@@ -859,7 +859,7 @@
       "runtimeCapabilityReadOnly": "节点只读",
       "runtimeCapabilityKernelDisabled": "内核未启用",
       "runtimeDecisions": "最近动作",
-      "runtimeDecisionsDesc": "仅保存在内存，守护进程停止后清空",
+      "runtimeDecisionsDesc": "最多保留 24 条，守护重启后继续保留，设备开机时清空",
       "runtimeDecisionForeground": "前台切换",
       "runtimeDecisionZram": "ZRAM 与 ERM",
       "runtimeDecisionEmpty": "暂无动作",

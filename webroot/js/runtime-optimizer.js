@@ -234,25 +234,39 @@
             const signature = entries.map(parts => parts.join('|')).join('\n');
             if (this.runtimeDecisionSignature === signature) return;
             this.runtimeDecisionSignature = signature;
-            list.replaceChildren();
             if (!entries.length) {
-                const empty = document.createElement('div');
-                empty.className = 'runtime-decision-empty';
+                let empty = list.querySelector('.runtime-decision-empty');
+                if (!empty) {
+                    empty = document.createElement('div');
+                    empty.className = 'runtime-decision-empty';
+                    list.replaceChildren(empty);
+                }
                 empty.textContent = this.t('runtimeDecisionEmpty');
-                list.appendChild(empty);
                 return;
             }
+            list.querySelector('.runtime-decision-empty')?.remove();
+            const existing = new Map([...list.querySelectorAll('.runtime-decision-item')].map(item => [item.dataset.key, item]));
+            const active = new Set();
             entries.forEach(([tick, area, action, reason]) => {
-                const item = document.createElement('div');
-                item.className = 'runtime-decision-item';
-                const title = document.createElement('strong');
-                title.textContent = `${this.t(DECISION_AREA_KEYS[area] || 'runtimeUnknown')} · ${action || '--'}`;
-                const detail = document.createElement('span');
-                detail.textContent = reason || '--';
-                const sequence = document.createElement('small');
-                sequence.textContent = `#${tick || 0}`;
-                item.append(title, detail, sequence);
+                const key = `${tick}|${area}|${action}|${reason}`;
+                active.add(key);
+                let item = existing.get(key);
+                if (!item) {
+                    item = document.createElement('div');
+                    item.className = 'runtime-decision-item';
+                    item.dataset.key = key;
+                    const title = document.createElement('strong');
+                    title.textContent = `${this.t(DECISION_AREA_KEYS[area] || 'runtimeUnknown')} · ${action || '--'}`;
+                    const detail = document.createElement('span');
+                    detail.textContent = reason || '--';
+                    const sequence = document.createElement('small');
+                    sequence.textContent = `#${tick || 0}`;
+                    item.append(title, detail, sequence);
+                }
                 list.appendChild(item);
+            });
+            existing.forEach((item, key) => {
+                if (!active.has(key)) item.remove();
             });
         },
         scheduleRuntimeOptimizerApply() {
