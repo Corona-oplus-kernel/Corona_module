@@ -192,6 +192,148 @@ struct Capabilities {
 }
 
 #[derive(Clone)]
+struct ManagedNode {
+    owner: &'static str,
+    baseline: String,
+    target: String,
+    conflicts: u8,
+    suspended: bool,
+}
+
+#[derive(Default)]
+struct NodeManager {
+    nodes: HashMap<PathBuf, ManagedNode>,
+    applied: u64,
+    failed: u64,
+    external_changes: u64,
+    suspended: usize,
+}
+
+impl NodeManager {
+    fn apply(&mut self, owner: &'static str, path: &Path, value: impl Into<String>) -> bool {
+        self.apply_batch(owner, vec![(path.to_path_buf(), value.into())])
+    }
+
+    fn apply_batch(&mut self, owner: &'static str, writes: Vec<(PathBuf, String)>) -> bool {
+        if writes.is_empty() {
+            return true;
+        }
+        let mut prepared = Vec::with_capacity(writes.len());
+        for (path, value) in writes {
+            let current = read_text(&path).trim().to_string();
+            if current.is_empty() {
+                self.failed += 1;
+                return false;
+            }
+            if let Some(node) = self.nodes.get_mut(&path) {
+                if node.owner != owner || node.suspended {
+                    self.failed += 1;
+                    return false;
+                }
+                if current != node.target && current != value {
+                    node.conflicts = node.conflicts.saturating_add(1);
+                    self.external_changes += 1;
+                    if node.conflicts >= 3 {
+                        node.suspended = true;
+                        self.suspended += 1;
+                        self.failed += 1;
+                        return false;
+                    }
+                } else if current == node.target {
+                    node.conflicts = 0;
+                }
+            }
+            prepared.push((path, value, current));
+        }
+
+        let mut changed = Vec::new();
+        for (path, value, current) in &prepared {
+            if current == value {
+                continue;
+            }
+            if write_text(path, value.as_bytes()).is_err() {
+                for (changed_path, previous) in changed.into_iter().rev() {
+                    let _ = write_text(changed_path, previous);
+                }
+                self.failed += 1;
+                return false;
+            }
+            changed.push((path.clone(), current.clone()));
+        }
+
+        for (path, value, current) in prepared {
+            let baseline = self
+                .nodes
+                .get(&path)
+                .map(|node| node.baseline.clone())
+                .unwrap_or(current);
+            self.nodes.insert(
+                path,
+                ManagedNode {
+                    owner,
+                    baseline,
+                    target: value,
+                    conflicts: 0,
+                    suspended: false,
+                },
+            );
+        }
+        self.applied += changed.len() as u64;
+        true
+    }
+
+    fn restore(&mut self, owner: &'static str, path: &Path) -> bool {
+        let Some(node) = self.nodes.get(path).cloned() else {
+            return true;
+        };
+        if node.owner != owner {
+            self.failed += 1;
+            return false;
+        }
+        let current = read_text(path).trim().to_string();
+        if current != node.baseline && write_text(path, node.baseline.as_bytes()).is_err() {
+            self.failed += 1;
+            return false;
+        }
+        if current != node.baseline {
+            self.applied += 1;
+        }
+        if node.suspended {
+            self.suspended = self.suspended.saturating_sub(1);
+        }
+        self.nodes.remove(path);
+        true
+    }
+
+    fn restore_owner(&mut self, owner: &'static str) {
+        let paths = self
+            .nodes
+            .iter()
+            .filter_map(|(path, node)| (node.owner == owner).then(|| path.clone()))
+            .collect::<Vec<_>>();
+        for path in paths {
+            self.restore(owner, &path);
+        }
+    }
+
+    fn owner_paths(&self, owner: &'static str, prefix: &Path) -> Vec<PathBuf> {
+        self.nodes
+            .iter()
+            .filter_map(|(path, node)| {
+                (node.owner == owner && path.starts_with(prefix)).then(|| path.clone())
+            })
+            .collect()
+    }
+
+    fn baseline(&self, owner: &'static str, path: &Path) -> Option<&str> {
+        self.nodes
+            .get(path)
+            .filter(|node| node.owner == owner)
+            .map(|node| node.baseline.as_str())
+    }
+}
+
+#[derive(Clone)]
 struct CpuTopology {
     efficiency: Vec<usize>,
     balanced: Vec<usize>,
@@ -201,8 +343,6 @@ struct CpuTopology {
 
 #[derive(Default)]
 struct IrqRuntime {
-    baselines: HashMap<PathBuf, String>,
-    targets: HashMap<PathBuf, String>,
     last_counts: HashMap<u32, u64>,
     net_counts: HashMap<String, u64>,
     idle_rounds: HashMap<u32, u8>,
@@ -218,8 +358,6 @@ struct IrqRuntime {
 #[derive(Default)]
 struct UfsRuntime {
     root: Option<PathBuf>,
-    baselines: HashMap<PathBuf, String>,
-    targets: HashMap<PathBuf, String>,
     hold_rounds: u8,
     applied: u64,
     available_buffer: u64,
@@ -233,7 +371,6 @@ struct UfsRuntime {
 #[derive(Default)]
 struct GpuRuntime {
     root: Option<PathBuf>,
-    baseline_min_freq: Option<String>,
     target_min_freq: u64,
     hold_rounds: u8,
     elapsed_ms: u64,
@@ -320,8 +457,6 @@ enum UfsWritePattern {
 #[derive(Default)]
 struct IoRuntime {
     last: HashMap<String, DiskCounters>,
-    baselines: HashMap<PathBuf, String>,
-    targets: HashMap<PathBuf, String>,
     idle_rounds: HashMap<String, u8>,
     elapsed_ms: u64,
     applied: u64,
@@ -763,6 +898,7 @@ struct Daemon {
     storage_elapsed_ms: u64,
     last_storage_counters: DiskCounters,
     storage_learning: StorageLearning,
+    nodes: NodeManager,
 }
 
 fn read_text(path: impl AsRef<Path>) -> String {
@@ -1873,33 +2009,16 @@ fn network_queue_paths(interfaces: &HashSet<String>) -> Vec<PathBuf> {
 }
 
 impl IrqRuntime {
-    fn apply(&mut self, path: &Path, value: &str) {
-        if self.targets.get(path).map(String::as_str) == Some(value) {
-            return;
-        }
-        let current = read_text(path).trim().to_string();
-        if current.is_empty() {
-            return;
-        }
-        self.baselines.entry(path.to_path_buf()).or_insert(current.clone());
-        if current == value || write_text(path, value.as_bytes()).is_ok() {
-            if current != value {
-                self.applied += 1;
-            }
-            self.targets.insert(path.to_path_buf(), value.to_string());
-        }
+    fn apply(&mut self, nodes: &mut NodeManager, path: &Path, value: &str) {
+        let before = nodes.applied;
+        nodes.apply("irq", path, value);
+        self.applied += nodes.applied.saturating_sub(before);
     }
 
-    fn restore(&mut self, path: &Path) {
-        if self.targets.remove(path).is_none() {
-            return;
-        }
-        let Some(value) = self.baselines.get(path) else {
-            return;
-        };
-        if read_text(path).trim() != value && write_text(path, value.as_bytes()).is_ok() {
-            self.applied += 1;
-        }
+    fn restore(&mut self, nodes: &mut NodeManager, path: &Path) {
+        let before = nodes.applied;
+        nodes.restore("irq", path);
+        self.applied += nodes.applied.saturating_sub(before);
     }
 
     fn step(
@@ -1909,6 +2028,7 @@ impl IrqRuntime {
         elapsed_ms: u64,
         storage_delta: u64,
         foreground: &str,
+        nodes: &mut NodeManager,
     ) {
         self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
         if self.elapsed_ms < 2_000 {
@@ -1944,16 +2064,16 @@ impl IrqRuntime {
                 continue;
             }
             if matches!(mode, RuntimeMode::ScreenOff | RuntimeMode::Saver | RuntimeMode::Severe) {
-                self.apply(&path, &efficiency);
+                self.apply(nodes, &path, &efficiency);
                 self.idle_rounds.insert(irq, 0);
             } else if busy {
-                self.apply(&path, &upper_list);
+                self.apply(nodes, &path, &upper_list);
                 self.idle_rounds.insert(irq, 0);
             } else {
                 let rounds = self.idle_rounds.entry(irq).or_default();
                 *rounds = rounds.saturating_add(1);
                 if *rounds >= 3 {
-                    self.restore(&path);
+                    self.restore(nodes, &path);
                 }
             }
         }
@@ -1994,18 +2114,13 @@ impl IrqRuntime {
         };
         for path in network_queue_paths(&active_interfaces) {
             if let Some(target) = queue_target.as_deref() {
-                self.apply(&path, target);
+                self.apply(nodes, &path, target);
             }
         }
         if queue_target.is_none() {
-            let queue_paths = self
-                .targets
-                .keys()
-                .filter(|path| path.starts_with("/sys/class/net"))
-                .cloned()
-                .collect::<Vec<_>>();
+            let queue_paths = nodes.owner_paths("irq", Path::new("/sys/class/net"));
             for path in queue_paths {
-                self.restore(&path);
+                self.restore(nodes, &path);
             }
         }
         self.state = if !self.supported {
@@ -2019,18 +2134,17 @@ impl IrqRuntime {
         };
     }
 
-    fn cleanup(&self) {
-        for (path, value) in &self.baselines {
-            let _ = write_text(path, value.as_bytes());
-        }
+    fn cleanup(&mut self, nodes: &mut NodeManager) {
+        let before = nodes.applied;
+        nodes.restore_owner("irq");
+        self.applied += nodes.applied.saturating_sub(before);
     }
 
-    fn disable(&mut self) {
+    fn disable(&mut self, nodes: &mut NodeManager) {
         if self.state == "disabled" {
             return;
         }
-        self.cleanup();
-        self.targets.clear();
+        self.cleanup(nodes);
         self.idle_rounds.clear();
         self.busy = 0;
         self.target_cpus.clear();
@@ -2039,36 +2153,25 @@ impl IrqRuntime {
 }
 
 impl UfsRuntime {
-    fn apply(&mut self, path: &Path, value: &str) {
-        if self.targets.get(path).map(String::as_str) == Some(value) {
-            return;
-        }
-        let current = read_text(path).trim().to_string();
-        if current.is_empty() {
-            return;
-        }
-        self.baselines.entry(path.to_path_buf()).or_insert(current.clone());
-        if current == value || write_text(path, value.as_bytes()).is_ok() {
-            if current != value {
-                self.applied += 1;
-            }
-            self.targets.insert(path.to_path_buf(), value.to_string());
-        }
+    fn apply_batch(&mut self, nodes: &mut NodeManager, writes: Vec<(PathBuf, String)>) {
+        let before = nodes.applied;
+        nodes.apply_batch("ufs", writes);
+        self.applied += nodes.applied.saturating_sub(before);
     }
 
-    fn restore(&mut self, path: &Path) {
-        if self.targets.remove(path).is_none() {
-            return;
-        }
-        let Some(value) = self.baselines.get(path) else {
-            return;
-        };
-        if read_text(path).trim() != value && write_text(path, value.as_bytes()).is_ok() {
-            self.applied += 1;
-        }
+    fn restore(&mut self, nodes: &mut NodeManager, path: &Path) {
+        let before = nodes.applied;
+        nodes.restore("ufs", path);
+        self.applied += nodes.applied.saturating_sub(before);
     }
 
-    fn step(&mut self, mode: RuntimeMode, activity: StorageActivity, learning: &StorageLearning) {
+    fn step(
+        &mut self,
+        mode: RuntimeMode,
+        activity: StorageActivity,
+        learning: &StorageLearning,
+        nodes: &mut NodeManager,
+    ) {
         if self.root.is_none() {
             self.root = find_ufs_root();
         }
@@ -2107,48 +2210,49 @@ impl UfsRuntime {
         }
         let buffer_low = self.available_buffer > 0 && self.available_buffer <= 2;
         if self.hold_rounds > 0 && !buffer_low {
+            let mut writes = Vec::new();
             if wb_on.is_file() {
-                self.apply(&wb_on, "1");
+                writes.push((wb_on.clone(), "1".to_string()));
             }
             if flush.is_file() {
-                self.apply(&flush, "0");
+                writes.push((flush.clone(), "0".to_string()));
             }
             if hibern8.is_file() {
-                self.apply(&hibern8, "0");
+                writes.push((hibern8.clone(), "0".to_string()));
             }
+            self.apply_batch(nodes, writes);
             self.state = "boost";
         } else if buffer_low || matches!(mode, RuntimeMode::ScreenOff) {
             if flush.is_file() {
-                self.apply(&flush, "1");
+                self.apply_batch(nodes, vec![(flush.clone(), "1".to_string())]);
             }
-            self.restore(&hibern8);
-            self.restore(&wb_on);
+            self.restore(nodes, &hibern8);
+            self.restore(nodes, &wb_on);
             self.state = if buffer_low { "flush" } else { "idle" };
         } else if pattern == UfsWritePattern::SmallRandom {
-            self.restore(&flush);
-            self.restore(&hibern8);
-            self.restore(&wb_on);
+            self.restore(nodes, &flush);
+            self.restore(nodes, &hibern8);
+            self.restore(nodes, &wb_on);
             self.state = "small-write";
         } else {
-            self.restore(&flush);
-            self.restore(&hibern8);
-            self.restore(&wb_on);
+            self.restore(nodes, &flush);
+            self.restore(nodes, &hibern8);
+            self.restore(nodes, &wb_on);
             self.state = "idle";
         }
     }
 
-    fn cleanup(&self) {
-        for (path, value) in &self.baselines {
-            let _ = write_text(path, value.as_bytes());
-        }
+    fn cleanup(&mut self, nodes: &mut NodeManager) {
+        let before = nodes.applied;
+        nodes.restore_owner("ufs");
+        self.applied += nodes.applied.saturating_sub(before);
     }
 
-    fn disable(&mut self) {
+    fn disable(&mut self, nodes: &mut NodeManager) {
         if self.state == "disabled" {
             return;
         }
-        self.cleanup();
-        self.targets.clear();
+        self.cleanup(nodes);
         self.hold_rounds = 0;
         self.write_ops = 0;
         self.write_sectors = 0;
@@ -2158,7 +2262,7 @@ impl UfsRuntime {
 }
 
 impl GpuRuntime {
-    fn step(&mut self, mode: RuntimeMode, elapsed_ms: u64) {
+    fn step(&mut self, mode: RuntimeMode, elapsed_ms: u64, nodes: &mut NodeManager) {
         self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
         if self.elapsed_ms < 1_000 {
             return;
@@ -2184,11 +2288,7 @@ impl GpuRuntime {
             })
             .unwrap_or(0)
             .min(100);
-        if self.baseline_min_freq.is_none() {
-            let baseline = read_text(&min_freq).trim().to_string();
-            if !baseline.is_empty() {
-                self.baseline_min_freq = Some(baseline);
-            }
+        if self.target_min_freq == 0 {
             self.target_min_freq = select_gpu_floor(&root);
         }
         let allowed = matches!(mode, RuntimeMode::Normal | RuntimeMode::Warm);
@@ -2199,77 +2299,62 @@ impl GpuRuntime {
         }
         if allowed && self.hold_rounds > 0 && self.target_min_freq > 0 {
             let target = self.target_min_freq.to_string();
-            if read_text(&min_freq).trim() != target
-                && write_text(&min_freq, target.as_bytes()).is_ok()
-            {
-                self.applied += 1;
-            }
+            let before = nodes.applied;
+            nodes.apply("gpu", &min_freq, target);
+            self.applied += nodes.applied.saturating_sub(before);
             self.state = "burst";
         } else {
-            if let Some(baseline) = self.baseline_min_freq.as_deref() {
-                if read_text(&min_freq).trim() != baseline
-                    && write_text(&min_freq, baseline.as_bytes()).is_ok()
-                {
-                    self.applied += 1;
-                }
-            }
+            let before = nodes.applied;
+            nodes.restore("gpu", &min_freq);
+            self.applied += nodes.applied.saturating_sub(before);
             self.hold_rounds = 0;
             self.state = if allowed { "idle" } else { "limited" };
         }
     }
 
-    fn cleanup(&self) {
-        if let (Some(root), Some(baseline)) = (&self.root, &self.baseline_min_freq) {
-            let _ = write_text(root.join("devfreq/min_freq"), baseline.as_bytes());
-        }
+    fn cleanup(&mut self, nodes: &mut NodeManager) {
+        let before = nodes.applied;
+        nodes.restore_owner("gpu");
+        self.applied += nodes.applied.saturating_sub(before);
     }
 
-    fn disable(&mut self) {
+    fn disable(&mut self, nodes: &mut NodeManager) {
         if self.state == "disabled" {
             return;
         }
-        self.cleanup();
+        self.cleanup(nodes);
         self.hold_rounds = 0;
         self.state = "disabled";
     }
 }
 
 impl IoRuntime {
-    fn apply(&mut self, path: &Path, value: u64) {
-        let value = value.to_string();
-        if self.targets.get(path) == Some(&value) {
-            return;
-        }
-        let current = read_text(path).trim().to_string();
-        if current.is_empty() {
-            return;
-        }
-        self.baselines.entry(path.to_path_buf()).or_insert(current.clone());
-        if current == value || write_text(path, value.as_bytes()).is_ok() {
-            if current != value {
-                self.applied += 1;
-            }
-            self.targets.insert(path.to_path_buf(), value);
-        }
+    fn apply_device(
+        &mut self,
+        nodes: &mut NodeManager,
+        read_ahead_path: &Path,
+        requests_path: &Path,
+        read_ahead: u64,
+        requests: u64,
+    ) {
+        let before = nodes.applied;
+        nodes.apply_batch(
+            "io",
+            vec![
+                (read_ahead_path.to_path_buf(), read_ahead.to_string()),
+                (requests_path.to_path_buf(), requests.to_string()),
+            ],
+        );
+        self.applied += nodes.applied.saturating_sub(before);
     }
 
-    fn restore_device(&mut self, device: &str) {
+    fn restore_device(&mut self, nodes: &mut NodeManager, device: &str) {
+        let before = nodes.applied;
         for node in ["read_ahead_kb", "nr_requests"] {
             let path = Path::new("/sys/block").join(device).join("queue").join(node);
-            if !self.targets.contains_key(&path) {
-                continue;
-            }
-            let Some(value) = self.baselines.get(&path) else {
-                continue;
-            };
-            let current = read_text(&path);
-            if current.trim() == value || write_text(&path, value.as_bytes()).is_ok() {
-                if current.trim() != value {
-                    self.applied += 1;
-                }
-                self.targets.remove(&path);
-            }
+            nodes.restore("io", &path);
         }
+        self.applied += nodes.applied.saturating_sub(before);
     }
 
     fn step(
@@ -2278,6 +2363,7 @@ impl IoRuntime {
         elapsed_ms: u64,
         pressure_level: u8,
         active_sector_threshold: u64,
+        nodes: &mut NodeManager,
     ) {
         self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed_ms);
         if self.elapsed_ms < 2_000 {
@@ -2304,32 +2390,24 @@ impl IoRuntime {
             if !read_ahead_path.is_file() || !requests_path.is_file() {
                 continue;
             }
-            self.baselines
-                .entry(read_ahead_path.clone())
-                .or_insert_with(|| read_text(&read_ahead_path).trim().to_string());
-            self.baselines
-                .entry(requests_path.clone())
-                .or_insert_with(|| read_text(&requests_path).trim().to_string());
             let active = total_ops >= 64 || total_sectors >= active_sector_threshold;
             if !active || !matches!(mode, RuntimeMode::Normal | RuntimeMode::Warm) {
                 let rounds = self.idle_rounds.entry(device.clone()).or_default();
                 *rounds = rounds.saturating_add(1);
                 if *rounds >= 1 {
-                    self.restore_device(&device);
+                    self.restore_device(nodes, &device);
                 }
                 continue;
             }
             self.idle_rounds.insert(device.clone(), 0);
             self.active_devices += 1;
-            let baseline_read_ahead = self
-                .baselines
-                .get(&read_ahead_path)
+            let baseline_read_ahead = nodes
+                .baseline("io", &read_ahead_path)
                 .and_then(|value| value.parse::<u64>().ok())
                 .or_else(|| read_text(&read_ahead_path).trim().parse().ok())
                 .unwrap_or(512);
-            let baseline_requests = self
-                .baselines
-                .get(&requests_path)
+            let baseline_requests = nodes
+                .baseline("io", &requests_path)
                 .and_then(|value| value.parse::<u64>().ok())
                 .or_else(|| read_text(&requests_path).trim().parse().ok())
                 .unwrap_or(128);
@@ -2354,8 +2432,13 @@ impl IoRuntime {
                 read_ahead = read_ahead.min(256);
                 requests = requests.min(128);
             }
-            self.apply(&read_ahead_path, read_ahead);
-            self.apply(&requests_path, requests);
+            self.apply_device(
+                nodes,
+                &read_ahead_path,
+                &requests_path,
+                read_ahead,
+                requests,
+            );
             if total_sectors >= dominant_sectors {
                 dominant_sectors = total_sectors;
                 self.state = state;
@@ -2368,18 +2451,17 @@ impl IoRuntime {
         }
     }
 
-    fn cleanup(&self) {
-        for (path, value) in &self.baselines {
-            let _ = write_text(path, value.as_bytes());
-        }
+    fn cleanup(&mut self, nodes: &mut NodeManager) {
+        let before = nodes.applied;
+        nodes.restore_owner("io");
+        self.applied += nodes.applied.saturating_sub(before);
     }
 
-    fn disable(&mut self) {
+    fn disable(&mut self, nodes: &mut NodeManager) {
         if self.state == "disabled" {
             return;
         }
-        self.cleanup();
-        self.targets.clear();
+        self.cleanup(nodes);
         self.idle_rounds.clear();
         self.active_devices = 0;
         self.read_ahead_kb = 0;
@@ -2691,6 +2773,7 @@ impl Daemon {
             storage_elapsed_ms: 0,
             last_storage_counters: DiskCounters::default(),
             storage_learning: StorageLearning::default(),
+            nodes: NodeManager::default(),
             paths,
         };
         daemon.update_environment();
@@ -3151,11 +3234,15 @@ impl Daemon {
             append_capability_state(&mut state, name, capability);
         }
         state.push_str(&format!(
-            "storage_learning_progress={}\nstorage_active_sectors={}\nstorage_sequential_write_sectors={}\nstorage_random_write_ops={}\n",
+            "storage_learning_progress={}\nstorage_active_sectors={}\nstorage_sequential_write_sectors={}\nstorage_random_write_ops={}\nnode_managed={}\nnode_apply_failed={}\nnode_external_changes={}\nnode_suspended={}\n",
             self.storage_learning.progress(),
             self.storage_learning.active_sectors,
             self.storage_learning.sequential_write_sectors,
             self.storage_learning.random_write_ops,
+            self.nodes.nodes.len(),
+            self.nodes.failed,
+            self.nodes.external_changes,
+            self.nodes.suspended,
         ));
         let _ = write_text(&self.paths.state, state);
         let affinity_state = format!(
@@ -3223,9 +3310,10 @@ impl Daemon {
                 interval_ms,
                 storage.total_sectors,
                 &foreground,
+                &mut self.nodes,
             );
         } else {
-            self.irq_runtime.disable();
+            self.irq_runtime.disable(&mut self.nodes);
             if self.hardware.irq_enabled {
                 self.irq_runtime.state = "unsupported";
             }
@@ -3235,9 +3323,9 @@ impl Daemon {
             && self.storage_learning.ready
         {
             self.ufs_runtime
-                .step(self.runtime_mode, storage, &self.storage_learning);
+                .step(self.runtime_mode, storage, &self.storage_learning, &mut self.nodes);
         } else {
-            self.ufs_runtime.disable();
+            self.ufs_runtime.disable(&mut self.nodes);
             if self.hardware.ufs_enabled && !self.capabilities.ufs.supported {
                 self.ufs_runtime.state = "unsupported";
             } else if self.hardware.ufs_enabled {
@@ -3245,9 +3333,10 @@ impl Daemon {
             }
         }
         if self.hardware.gpu_enabled && self.capabilities.gpu.supported {
-            self.gpu_runtime.step(self.runtime_mode, interval_ms);
+            self.gpu_runtime
+                .step(self.runtime_mode, interval_ms, &mut self.nodes);
         } else {
-            self.gpu_runtime.disable();
+            self.gpu_runtime.disable(&mut self.nodes);
             if self.hardware.gpu_enabled {
                 self.gpu_runtime.state = "unsupported";
             }
@@ -3261,9 +3350,10 @@ impl Daemon {
                 interval_ms,
                 self.io_pressure_level,
                 self.storage_learning.active_sectors,
+                &mut self.nodes,
             );
         } else {
-            self.io_runtime.disable();
+            self.io_runtime.disable(&mut self.nodes);
             if self.hardware.io_enabled && !self.capabilities.io.supported {
                 self.io_runtime.state = "unsupported";
             } else if self.hardware.io_enabled {
@@ -3283,11 +3373,11 @@ impl Daemon {
         interval_ms
     }
 
-    fn cleanup(&self) {
-        self.irq_runtime.cleanup();
-        self.ufs_runtime.cleanup();
-        self.gpu_runtime.cleanup();
-        self.io_runtime.cleanup();
+    fn cleanup(&mut self) {
+        self.irq_runtime.cleanup(&mut self.nodes);
+        self.ufs_runtime.cleanup(&mut self.nodes);
+        self.gpu_runtime.cleanup(&mut self.nodes);
+        self.io_runtime.cleanup(&mut self.nodes);
         if self.pressure.enabled {
             if let Some(baseline) = self.pressure_baseline {
                 write_swappiness(baseline);
@@ -3528,6 +3618,30 @@ mod tests {
         assert_eq!(learning.active_sectors, 8_192);
         assert_eq!(learning.sequential_write_sectors, 32_768);
         assert_eq!(learning.random_write_ops, 64);
+    }
+
+    #[test]
+    fn manages_node_ownership_and_restore() {
+        let root = PathBuf::from(format!("/root/tmp/coronad-node-test-{}", process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let first = root.join("first");
+        let missing = root.join("missing");
+        write_text(&first, "1").unwrap();
+
+        let mut nodes = NodeManager::default();
+        assert!(!nodes.apply_batch(
+            "ufs",
+            vec![(first.clone(), "2".to_string()), (missing, "3".to_string())],
+        ));
+        assert_eq!(read_text(&first), "1");
+        assert!(nodes.apply("ufs", &first, "2"));
+        assert_eq!(read_text(&first), "2");
+        assert!(!nodes.apply("io", &first, "3"));
+        assert_eq!(read_text(&first), "2");
+        assert!(nodes.restore("ufs", &first));
+        assert_eq!(read_text(&first), "1");
+
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
