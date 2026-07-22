@@ -23,7 +23,7 @@ pub(super) struct NodeManager {
 
 pub(super) struct Decision {
     pub(super) tick: u64,
-    pub(super) area: &'static str,
+    pub(super) area: String,
     pub(super) action: String,
     pub(super) reason: String,
 }
@@ -31,8 +31,10 @@ pub(super) struct Decision {
 #[derive(Default)]
 pub(super) struct DecisionLog {
     pub(super) entries: VecDeque<Decision>,
-    last_actions: HashMap<&'static str, String>,
+    last_actions: HashMap<String, String>,
 }
+
+const DECISION_LIMIT: usize = 24;
 
 fn sanitize(value: &str) -> String {
     value
@@ -45,26 +47,76 @@ fn sanitize(value: &str) -> String {
 }
 
 impl DecisionLog {
+    pub(super) fn load(path: &Path) -> Self {
+        let mut log = Self::default();
+        for line in read_text(path).lines() {
+            let mut parts = line.splitn(4, '|');
+            let Some(tick) = parts.next().and_then(|value| value.parse::<u64>().ok()) else {
+                continue;
+            };
+            let (Some(area), Some(action), Some(reason)) =
+                (parts.next(), parts.next(), parts.next())
+            else {
+                continue;
+            };
+            log.entries.push_back(Decision {
+                tick,
+                area: sanitize(area),
+                action: sanitize(action),
+                reason: sanitize(reason),
+            });
+            while log.entries.len() > DECISION_LIMIT {
+                log.entries.pop_front();
+            }
+        }
+        for decision in &log.entries {
+            log.last_actions
+                .insert(decision.area.clone(), decision.action.clone());
+        }
+        log
+    }
+
+    pub(super) fn save(&self, path: &Path) {
+        let content = self
+            .entries
+            .iter()
+            .map(|decision| {
+                format!(
+                    "{}|{}|{}|{}",
+                    decision.tick, decision.area, decision.action, decision.reason
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let _ = write_text(path, content);
+    }
+
     pub(super) fn record(
         &mut self,
         tick: u64,
-        area: &'static str,
+        area: &str,
         action: String,
         reason: String,
-    ) {
+    ) -> bool {
         if self.last_actions.get(area) == Some(&action) {
-            return;
+            return false;
         }
-        self.last_actions.insert(area, action.clone());
-        if self.entries.len() >= 32 {
+        self.last_actions.insert(area.to_string(), action.clone());
+        if self.entries.len() >= DECISION_LIMIT {
             self.entries.pop_front();
         }
+        let tick = self
+            .entries
+            .back()
+            .map(|decision| decision.tick.saturating_add(1).max(tick))
+            .unwrap_or(tick);
         self.entries.push_back(Decision {
             tick,
-            area,
+            area: area.to_string(),
             action: sanitize(&action),
             reason: sanitize(&reason),
         });
+        true
     }
 }
 

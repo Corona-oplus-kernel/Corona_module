@@ -1179,6 +1179,7 @@ apply_writeback_block_config
 apply_runtime_configs
 apply_zram_policy_config
 rm -rf "$MODDIR/config/.app_policy_effective" "$MODDIR/config"/.app_policy_effective.next.*
+rm -f "$CONFIG_DIR/.coronad_decisions"
 apply_fstrim_config
 run_user_scripts
 start_app_policy_daemon

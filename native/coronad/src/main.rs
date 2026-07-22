@@ -56,6 +56,7 @@ struct Paths {
     pressure_baseline: PathBuf,
     affinity_state: PathBuf,
     zram_policy_state: PathBuf,
+    decision_history: PathBuf,
 }
 
 impl Paths {
@@ -95,6 +96,7 @@ impl Paths {
             pressure_baseline: config.join(".memory_pressure.baseline"),
             affinity_state: config.join(".auto_affinity_state"),
             zram_policy_state: config.join(".zram_policy_state"),
+            decision_history: config.join(".coronad_decisions"),
             module,
             config,
         }
@@ -2731,7 +2733,7 @@ impl Daemon {
             last_storage_counters: DiskCounters::default(),
             storage_learning: StorageLearning::default(),
             nodes: NodeManager::default(),
-            decisions: DecisionLog::default(),
+            decisions: DecisionLog::load(&paths.decision_history),
             zram_policy_enabled,
             zram_policy_elapsed_ms: 30_000,
             zram_policy_interval_ms: 30_000,
@@ -3238,8 +3240,9 @@ impl Daemon {
     }
 
     fn record_decisions(&mut self, foreground: &str, foreground_changed: bool) {
+        let mut changed = false;
         if foreground_changed {
-            self.decisions.record(
+            changed |= self.decisions.record(
                 self.tick,
                 "foreground",
                 foreground.to_string(),
@@ -3313,7 +3316,10 @@ impl Daemon {
             ),
         ];
         for (area, action, reason) in records {
-            self.decisions.record(self.tick, area, action, reason);
+            changed |= self.decisions.record(self.tick, area, action, reason);
+        }
+        if changed {
+            self.decisions.save(&self.paths.decision_history);
         }
     }
 
