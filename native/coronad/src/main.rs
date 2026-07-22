@@ -953,7 +953,13 @@ fn process_base_from_pid(pid: u32) -> Option<String> {
     package_from_process_name(&process_name)
 }
 
-fn top_app_package() -> Option<String> {
+struct ForegroundInfo {
+    package: String,
+    source: &'static str,
+    pids: Vec<u32>,
+}
+
+fn top_app_info() -> Option<ForegroundInfo> {
     let configured = env::var_os("CORONA_TOP_APP_FILES")
         .map(|value| value.to_string_lossy().split(':').map(PathBuf::from).collect::<Vec<_>>());
     let files = configured.unwrap_or_else(|| {
@@ -964,23 +970,33 @@ fn top_app_package() -> Option<String> {
         ]
     });
     for file in files {
-        let mut pids = read_text(file)
+        let pids = read_text(file)
             .split_ascii_whitespace()
             .filter_map(|value| value.parse::<u32>().ok())
             .collect::<Vec<_>>();
-        pids.reverse();
-        for pid in pids {
-            if let Some(package) = package_from_pid(pid) {
-                return Some(package);
-            }
-        }
+        let package = pids
+            .iter()
+            .rev()
+            .find_map(|pid| package_from_pid(*pid));
+        let Some(package) = package else {
+            continue;
+        };
+        let matching_pids = pids
+            .into_iter()
+            .filter(|pid| package_from_pid(*pid).as_deref() == Some(package.as_str()))
+            .collect();
+        return Some(ForegroundInfo {
+            package,
+            source: "top-app",
+            pids: matching_pids,
+        });
     }
     None
 }
 
-fn foreground_package() -> (String, &'static str) {
-    if let Some(package) = top_app_package() {
-        return (package, "top-app");
+fn foreground_info() -> ForegroundInfo {
+    if let Some(info) = top_app_info() {
+        return info;
     }
     let package = package_from_dumpsys(&command_output(
         "/system/bin/dumpsys",
@@ -993,7 +1009,11 @@ fn foreground_package() -> (String, &'static str) {
         ))
     })
     .unwrap_or_default();
-    (package, "dumpsys")
+    ForegroundInfo {
+        package,
+        source: "dumpsys",
+        pids: Vec::new(),
+    }
 }
 
 fn csv_contains(csv: &str, item: &str) -> bool {
@@ -3040,13 +3060,22 @@ impl Daemon {
         }
     }
 
-    fn scan_threads(&mut self, foreground: &str) -> Vec<u32> {
+    fn scan_threads(&mut self, foreground: &str, known_foreground_pids: &[u32]) -> Vec<u32> {
         let mut requested = self.manual_packages.clone();
-        if !foreground.is_empty() {
+        requested.remove(foreground);
+        if known_foreground_pids.is_empty() && !foreground.is_empty() {
             requested.insert(foreground.to_string());
         }
-        let processes = scan_requested_processes(&requested);
-        let foreground_pids = processes.get(foreground).cloned().unwrap_or_default();
+        let processes = if requested.is_empty() {
+            HashMap::new()
+        } else {
+            scan_requested_processes(&requested)
+        };
+        let foreground_pids = if known_foreground_pids.is_empty() {
+            processes.get(foreground).cloned().unwrap_or_default()
+        } else {
+            known_foreground_pids.to_vec()
+        };
         self.scan_package(
             foreground,
             true,
@@ -3354,20 +3383,20 @@ impl Daemon {
             self.system_pressure_elapsed_ms = 0;
         }
         self.update_zram_policy();
-        let (foreground, foreground_source) = foreground_package();
-        if foreground_source == "top-app" {
+        let foreground = foreground_info();
+        if foreground.source == "top-app" {
             self.stats.top_app_hits += 1;
         } else {
             self.stats.dumpsys_fallbacks += 1;
         }
-        let profile_changed = self.apply_profile(&foreground);
-        let foreground_changed = foreground != self.last_foreground;
+        let profile_changed = self.apply_profile(&foreground.package);
+        let foreground_changed = foreground.package != self.last_foreground;
         if foreground_changed {
             self.stats.foreground_changes += 1;
-            self.last_foreground.clone_from(&foreground);
+            self.last_foreground.clone_from(&foreground.package);
         }
-        self.process_bpf_events(&foreground);
-        let foreground_pids = self.scan_threads(&foreground);
+        self.process_bpf_events(&foreground.package);
+        let foreground_pids = self.scan_threads(&foreground.package, &foreground.pids);
         let (foreground_cpu, foreground_affinity) = if self.hardware.irq_enabled {
             foreground_main_placement(&foreground_pids)
         } else {
@@ -3446,8 +3475,8 @@ impl Daemon {
             self.pressure_elapsed_ms = 0;
             self.update_pressure();
         }
-        self.record_decisions(&foreground, foreground_changed);
-        self.write_state(&foreground, foreground_source);
+        self.record_decisions(&foreground.package, foreground_changed);
+        self.write_state(&foreground.package, foreground.source);
         let _ = profile_changed;
         interval_ms
     }
