@@ -259,8 +259,6 @@ class CoronaAddon {
                 this.loadDeviceInfo(),
                 this.loadModuleVersion()
             ]);
-            this.updateInitOverlayMessage(this.t('initApps'));
-            await this.ensureAllSettingsSectionsReady();
             this.initDetailOverlays();
             this.initHomeCardClicks();
             this.initChart();
