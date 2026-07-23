@@ -16,6 +16,9 @@
     --glass-selection-border: rgba(255, 255, 255, 0.35);
     --glass-selection-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.45);
     --glass-control-bg: rgba(0, 0, 0, 0.05);
+    --dialog-solid-bg: #fff;
+    --control-solid-bg: #fff;
+    --solid-border: rgba(17, 24, 39, 0.08);
     --glass-blur-floating: 10px;
     --glass-blur-card: 14px;
     --glass-blur-dialog: 16px;
@@ -85,6 +88,9 @@ body.theme-dark {
     --glass-selection-border: rgba(255, 255, 255, 0.14);
     --glass-selection-shadow: 0 2px 10px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
     --glass-control-bg: rgba(255, 255, 255, 0.07);
+    --dialog-solid-bg: rgba(20, 23, 31, 0.94);
+    --control-solid-bg: rgba(255, 255, 255, 0.05);
+    --solid-border: rgba(255, 255, 255, 0.1);
     --primary: hsl(var(--hue), 78%, 62%);
     --primary-dim: hsla(var(--hue), 78%, 62%, 0.18);
     --primary-light: hsla(var(--hue), 78%, 62%, 0.12);
@@ -245,10 +251,8 @@ body.theme-dark .color-pref-swatch {
 .color-picker-dialog {
     width: min(92vw, 400px);
     border-radius: 18px;
-    background: var(--glass-dialog-bg);
-    backdrop-filter: blur(var(--glass-blur-dialog));
-    -webkit-backdrop-filter: blur(var(--glass-blur-dialog));
-    border: 1px solid var(--glass-border);
+    background: var(--dialog-solid-bg);
+    border: 1px solid var(--solid-border);
     color: var(--text-main);
     box-shadow: var(--glass-shadow-lg);
     transition: var(--glass-motion);
@@ -5176,16 +5180,9 @@ body.theme-dark #zram-settings .option-item {
     max-height: none;
     padding: 0;
     border-radius: 28px;
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    background: color-mix(in srgb, var(--card-bg) 94%, transparent);
+    border: 1px solid var(--solid-border);
+    background: var(--dialog-solid-bg);
     box-shadow: 0 24px 70px rgba(17, 24, 39, 0.22), 0 2px 12px rgba(17, 24, 39, 0.08);
-}
-
-body:not(.theme-dark) #app-policy-overlay .app-policy-detail-card {
-    border-color: rgba(17, 24, 39, 0.08);
-    background: #fff;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
 }
 
 #app-policy-overlay .detail-header {
@@ -5203,11 +5200,7 @@ body:not(.theme-dark) #app-policy-overlay .app-policy-detail-card {
     position: relative;
     z-index: 2;
     padding: 4px 16px 12px;
-    background: linear-gradient(to bottom, color-mix(in srgb, var(--card-bg) 98%, transparent) 74%, transparent);
-}
-
-body:not(.theme-dark) #app-policy-overlay .priority-search-container {
-    background: linear-gradient(to bottom, #fff 76%, rgba(255, 255, 255, 0));
+    background: linear-gradient(to bottom, var(--dialog-solid-bg) 76%, transparent);
 }
 
 #app-policy-overlay .priority-search {
@@ -5237,14 +5230,11 @@ body:not(.theme-dark) #app-policy-overlay .priority-search-container {
     border-radius: 18px;
     content-visibility: auto;
     contain-intrinsic-size: auto 70px;
+    border-color: var(--solid-border);
+    background: var(--control-solid-bg);
+    box-shadow: 0 1px 4px rgba(17, 24, 39, 0.035);
     transition: transform 160ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
     animation: app-policy-row-in 240ms var(--motion-ease) both;
-}
-
-body:not(.theme-dark) #app-policy-list .app-policy-row {
-    border-color: rgba(17, 24, 39, 0.07);
-    background: #fff;
-    box-shadow: 0 1px 4px rgba(17, 24, 39, 0.035);
 }
 
 #app-policy-list .app-policy-row:active {
@@ -5252,10 +5242,6 @@ body:not(.theme-dark) #app-policy-list .app-policy-row {
 }
 
 #app-policy-list .app-policy-row.active {
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 18%, transparent);
-}
-
-body:not(.theme-dark) #app-policy-list .app-policy-row.active {
     border-color: var(--primary);
     background: var(--primary-dim);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 18%, transparent);
@@ -5288,8 +5274,6 @@ body:not(.theme-dark) #app-policy-list .app-policy-row.active {
 }
 
 body.theme-dark #app-policy-overlay .app-policy-detail-card {
-    border-color: rgba(255, 255, 255, 0.1);
-    background: rgba(20, 23, 31, 0.94);
     box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
 }
 
@@ -5464,13 +5448,6 @@ body.theme-dark .color-live-bar { background: rgba(255,255,255,0.08); }
     max-height: min(88vh, 720px);
 }
 
-body:not(.theme-dark) .color-picker-dialog {
-    border-color: rgba(17, 24, 39, 0.08);
-    background: #fff;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-}
-
 .color-picker-header {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -5478,11 +5455,7 @@ body:not(.theme-dark) .color-picker-dialog {
     gap: 12px;
     padding: 18px;
     border-bottom: 1px solid var(--glass-border);
-    background: linear-gradient(135deg, var(--primary-soft), transparent 70%);
-}
-
-body:not(.theme-dark) .color-picker-header {
-    background: #fff;
+    background: var(--dialog-solid-bg);
 }
 
 .color-picker-header-swatch {
@@ -5530,15 +5503,8 @@ body:not(.theme-dark) .color-picker-header {
     margin-bottom: 16px;
     border: 1px solid var(--glass-border);
     border-radius: 16px;
-    background: var(--glass-surface);
+    background: var(--control-solid-bg);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
-}
-
-body:not(.theme-dark) .color-global-preview,
-body:not(.theme-dark) .color-preview-card,
-body:not(.theme-dark) .color-picker-dialog .preset-color,
-body:not(.theme-dark) .color-picker-dialog .dialog-buttons {
-    background: #fff;
 }
 
 .color-preview-topbar,
@@ -5606,7 +5572,7 @@ body:not(.theme-dark) .color-picker-dialog .dialog-buttons {
     padding: 10px;
     border: 1px solid var(--glass-border);
     border-radius: 12px;
-    background: var(--glass-surface-strong);
+    background: var(--control-solid-bg);
 }
 
 .color-preview-card small {
@@ -5647,7 +5613,7 @@ body:not(.theme-dark) .color-picker-dialog .dialog-buttons {
     padding: 5px 8px;
     border: 1px solid var(--glass-border);
     border-radius: 11px;
-    background: var(--glass-surface);
+    background: var(--control-solid-bg);
     box-shadow: none;
     color: var(--text-sub);
 }
@@ -5690,7 +5656,7 @@ body:not(.theme-dark) .color-picker-dialog .dialog-buttons {
 
 .color-picker-dialog .dialog-buttons {
     padding: 12px 18px max(16px, env(safe-area-inset-bottom));
-    background: var(--glass-surface-strong);
+    background: var(--dialog-solid-bg);
 }
 
 .color-picker-dialog .dialog-button.filled {
@@ -5806,19 +5772,6 @@ body.language-switch-in .detail-overlay.show .detail-card {
 .link-transition-label {
     font-size: 13px;
     font-weight: 650;
-}
-
-body.color-refreshing .module-card,
-body.color-refreshing .card,
-body.color-refreshing .action-btn,
-body.color-refreshing .option-item,
-body.color-refreshing .tab-slider,
-body.color-refreshing .range-slider,
-body.color-refreshing .color-global-preview,
-body.color-refreshing .color-picker-header,
-body.color-refreshing .color-preview-card,
-body.color-refreshing .current-badge {
-    transition: background-color 150ms linear, border-color 150ms linear, color 150ms linear, box-shadow 150ms linear;
 }
 
 .module-card-info,

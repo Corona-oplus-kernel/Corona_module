@@ -12,7 +12,6 @@
             localStorage.setItem('corona_theme', normalizedTheme);
         }
         this.applyTheme(normalizedTheme, false);
-        this.applyHue(this.state.hue, false);
     },
     initChangePreviewPreference() {
         const saved = localStorage.getItem('corona_change_preview');
@@ -280,11 +279,8 @@
         const value = this.normalizeHue(hue);
         const persist = options.persist !== false;
         const updateState = options.updateState !== false;
-        if (options.smooth === true && document.body) {
-            document.body.classList.add('color-refreshing');
-            if (this._colorRefreshTimer) clearTimeout(this._colorRefreshTimer);
-            this._colorRefreshTimer = setTimeout(() => document.body.classList.remove('color-refreshing'), 180);
-        }
+        const refreshControls = options.refreshControls !== false;
+        const emit = options.emit !== false;
         if (animate && document.body) {
             document.body.classList.add('theme-animate');
             if (this._themeAnimTimer) clearTimeout(this._themeAnimTimer);
@@ -328,10 +324,10 @@
         if (typeof this.updateColorPrefUI === 'function') this.updateColorPrefUI(value);
 
         // refresh slider fills that use primary color
-        document.querySelectorAll('.range-slider').forEach(el => {
-            if (typeof this.updateSliderProgress === 'function') this.updateSliderProgress(el);
-        });
-        try {
+        if (refreshControls && typeof this.updateSliderProgress === 'function') {
+            document.querySelectorAll('.range-slider').forEach(el => this.updateSliderProgress(el));
+        }
+        if (emit) try {
             document.dispatchEvent(new CustomEvent('colorChanged', {
                 detail: { hue: value, primary, accent, source: 'corona' }
             }));
@@ -368,7 +364,6 @@
     initAccentSelector() {
         const current = this.normalizeHue(this.state.hue ?? localStorage.getItem('corona_color_hue') ?? 214);
         this.applyHue(current, false);
-        this.updateColorPrefUI(current);
 
         const openBtn = document.getElementById('color-picker-btn');
         if (openBtn && !openBtn.dataset.bound) {
@@ -387,7 +382,6 @@
                 });
                 await this.applyTheme('light', true);
                 this.applyHue(214, false);
-                this.updateColorPrefUI(214);
                 if (typeof this.resetUiLayout === 'function') this.resetUiLayout();
                 if (typeof this.switchPage === 'function') await this.switchPage('home');
                 if (typeof this.showToast === 'function') this.showToast('已返回默认界面');
@@ -501,43 +495,52 @@
             if (liveDot) liveDot.style.background = primary;
             if (liveValue) liveValue.style.color = primary;
             if (liveBar) liveBar.style.background = primary;
-            if (typeof this.updateSliderProgress === 'function') {
-                document.querySelectorAll('.range-slider').forEach(el => this.updateSliderProgress(el));
-            }
-            if (typeof this.drawChart === 'function') {
-                try { this.drawChart(); } catch (e) {}
-            }
         };
 
-        const previewHue = (hue, { toast = false } = {}) => {
+        let previewFrame = 0;
+        let committedHue = originalHue;
+        const renderHue = (persist = false, toast = false) => {
+            const painted = this.applyHue(draftHue, false, { persist, updateState: true, refreshControls: persist, emit: persist });
+            if (persist) committedHue = draftHue;
+            paintLocalPreview(painted.value, painted.primary, painted.dim);
+            if (slider && typeof this.updateSliderProgress === 'function') this.updateSliderProgress(slider);
+            if (toast && typeof this.showToast === 'function') this.showToast(`${this.t('colorChanged')}: ${draftHue}°`);
+        };
+        const previewHue = (hue, { toast = false, persist = false, immediate = false } = {}) => {
             draftHue = this.normalizeHue(hue);
-            const painted = this.applyHue(draftHue, false, { persist: true, updateState: true, smooth: true });
             if (output) output.textContent = `${draftHue}°`;
             if (slider && String(slider.value) !== String(draftHue)) slider.value = String(draftHue);
             presets.forEach(p => {
                 const ph = parseInt(p.dataset.hue, 10);
                 p.classList.toggle('active', Math.abs(ph - draftHue) <= 2);
             });
-            paintLocalPreview(painted.value, painted.primary, painted.dim);
-            if (typeof this.updateColorPrefUI === 'function') this.updateColorPrefUI(draftHue);
-            if (toast && typeof this.showToast === 'function') {
-                this.showToast(`${this.t('colorChanged')}: ${draftHue}°`);
+            if (immediate) {
+                if (previewFrame) cancelAnimationFrame(previewFrame);
+                previewFrame = 0;
+                renderHue(persist, toast);
+                return;
             }
+            if (previewFrame) return;
+            previewFrame = requestAnimationFrame(() => {
+                previewFrame = 0;
+                renderHue(false, false);
+            });
         };
 
-        previewHue(originalHue);
+        previewHue(originalHue, { immediate: true });
 
         presets.forEach(p => {
-            p.addEventListener('click', () => previewHue(p.dataset.hue, { toast: true }));
+            p.addEventListener('click', () => previewHue(p.dataset.hue, { toast: true, persist: true, immediate: true }));
         });
         slider.addEventListener('input', () => previewHue(slider.value));
-        slider.addEventListener('change', () => previewHue(slider.value, { toast: true }));
+        slider.addEventListener('change', () => previewHue(slider.value, { toast: true, persist: true, immediate: true }));
 
         const closeDialog = () => {
-            this.applyHue(draftHue, false, { persist: true, updateState: true });
+            if (previewFrame) cancelAnimationFrame(previewFrame);
+            if (committedHue !== draftHue) renderHue(true, false);
             overlay.classList.add('closing');
             dialog.classList.add('closing');
-            setTimeout(() => overlay.remove(), 180);
+            setTimeout(() => overlay.remove(), 220);
         };
 
         dialog.querySelector('#close-color').addEventListener('click', () => closeDialog());
