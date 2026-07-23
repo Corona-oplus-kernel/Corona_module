@@ -1988,20 +1988,8 @@
                     writes: [{ path: `/sys/devices/system/cpu/cpu${cpuId}/online`, value: newState }]
                 });
                 if (!confirmed) return;
-                if (!this.state.cpuEnabled) {
-                    core.online = !core.online;
-                    item.className = `cpu-core ${core.online ? 'online' : 'offline'}`;
-                    const load = document.getElementById(`cpu-load-${cpuId}`);
-                    if (load) {
-                        load.textContent = core.online ? '--' : 'OFF';
-                        load.classList.remove('has-usage');
-                    }
-                    await this.saveCpuHotplugConfig(cpuId);
-                    await this.updateModuleDescription();
-                    this.showToast(`CPU${cpuId} 配置已保存（禁用状态）`);
-                    return;
-                }
-                await this.exec(`echo ${newState} > /sys/devices/system/cpu/cpu${cpuId}/online`);
+                const savedOnly = !this.state.cpuEnabled;
+                if (!savedOnly) await this.exec(`echo ${newState} > /sys/devices/system/cpu/cpu${cpuId}/online`);
                 core.online = !core.online;
                 item.className = `cpu-core ${core.online ? 'online' : 'offline'}`;
                 const load = document.getElementById(`cpu-load-${cpuId}`);
@@ -2011,7 +1999,7 @@
                 }
                 await this.saveCpuHotplugConfig(cpuId);
                 await this.updateModuleDescription();
-                this.showToast(`CPU${cpuId} 已${core.online ? '启用' : '禁用'}`);
+                this.showToast(savedOnly ? `CPU${cpuId} 配置已保存（禁用状态）` : `CPU${cpuId} 已${core.online ? '启用' : '禁用'}`);
             });
         });
     },
@@ -2366,6 +2354,15 @@
                 }
             });
         }
+        const persistLoopSize = async () => {
+            try {
+                await this.persistLoopConfig('size_mb');
+                this.markWritebackBlockDirty();
+                this.showToast(this.t('writebackBlockConfigSaved'));
+            } catch (error) {
+                this.showToast(this.t('loopConfigSaveFailed'), 'error');
+            }
+        };
         const sizeOptions = document.getElementById('zram-writeback-size-options');
         if (sizeOptions && !sizeOptions.dataset.bound) {
             sizeOptions.dataset.bound = '1';
@@ -2378,13 +2375,7 @@
                 this.state.loopSizeGb = sizeGb;
                 this.renderLoopSizeOptions();
                 if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
-                try {
-                    await this.persistLoopConfig('size_mb');
-                    this.markWritebackBlockDirty();
-                    this.showToast(this.t('writebackBlockConfigSaved'));
-                } catch (error) {
-                    this.showToast(this.t('loopConfigSaveFailed'), 'error');
-                }
+                await persistLoopSize();
             });
         }
         const sizeSlider = document.getElementById('zram-writeback-size-slider');
@@ -2400,13 +2391,7 @@
             });
             sizeSlider.addEventListener('change', async () => {
                 if (this.loopSizeFixed) return;
-                try {
-                    await this.persistLoopConfig('size_mb');
-                    this.markWritebackBlockDirty();
-                    this.showToast(this.t('writebackBlockConfigSaved'));
-                } catch (error) {
-                    this.showToast(this.t('loopConfigSaveFailed'), 'error');
-                }
+                await persistLoopSize();
             });
         }
         const loopRefresh = document.getElementById('zram-loop-device-refresh');
