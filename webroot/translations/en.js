@@ -47,6 +47,7 @@
       "initPrepare": "Preparing configuration...",
       "initDevice": "Loading device information...",
       "initSettings": "Loading settings...",
+      "initFailed": "Initialization did not finish. Reopen the module.",
       "settingsInitFailed": "Failed to initialize settings. Please try again.",
       "initRealtime": "Loading live status...",
       "initApps": "Loading application list...",

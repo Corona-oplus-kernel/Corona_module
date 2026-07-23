@@ -47,6 +47,7 @@
       "initPrepare": "正在准备配置...",
       "initDevice": "正在加载设备信息...",
       "initSettings": "正在预加载配置页面...",
+      "initFailed": "初始化未完成，请重新打开模块",
       "settingsInitFailed": "配置初始化失败，请重试",
       "initRealtime": "正在获取实时状态...",
       "initApps": "正在预加载应用列表...",

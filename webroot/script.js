@@ -117,7 +117,7 @@ class CoronaAddon {
         this.parameterSnapshots = [];
         this.dom = {};
         this.initDOMCache();
-        this.init();
+        this.init().catch(error => console.error('initialization failed', error));
     }
     initDOMCache() {
         const ids = [
@@ -153,7 +153,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072301` : '';
+        return map[name] ? `${map[name]}?v=2026072302` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -217,6 +217,7 @@ class CoronaAddon {
         return true;
     }
     async init() {
+        let initialized = false;
         await this.resolvePaths();
         await Promise.all([
             this.ensureFeatureScript('i18n-zh'),
@@ -255,7 +256,8 @@ class CoronaAddon {
             this.updateInitOverlayMessage(this.t('initSettings'));
             await Promise.all([
                 this.loadDeviceInfo(),
-                this.loadModuleVersion()
+                this.loadModuleVersion(),
+                this.ensureAllSettingsSectionsReady()
             ]);
             this.initDetailOverlays();
             this.initHomeCardClicks();
@@ -266,9 +268,11 @@ class CoronaAddon {
             this.updateInitOverlayMessage(this.t('initRealtime'));
             await this.awaitInitialRealtimeReady();
             this.startRealtimeMonitor();
+            initialized = true;
         } finally {
             this.isInitializing = false;
-            this.showInitOverlay(false);
+            if (initialized) this.showInitOverlay(false);
+            else this.showInitOverlay(true, this.t('initFailed'));
         }
     }
     updateSliderProgress(slider) {
