@@ -49,6 +49,7 @@
     const PRESSURE_KEYS = Object.freeze(['runtimePressureNormal', 'runtimePressureModerate', 'runtimePressureHigh']);
     const DETECTION_KEYS = Object.freeze({
         activity: 'runtimeDetectionActivity',
+        window: 'runtimeDetectionActivity',
         'top-app': 'runtimeDetectionTopApp',
         dumpsys: 'runtimeDetectionActivity'
     });
@@ -384,7 +385,7 @@
                     actionLabel.textContent = action || '--';
                     const detail = document.createElement('span');
                     detail.className = 'runtime-decision-reason';
-                    detail.textContent = reason === 'activity' ? this.t('runtimeDetectionActivity') : reason || '--';
+                    detail.textContent = DETECTION_KEYS[reason] ? this.t(DETECTION_KEYS[reason]) : reason || '--';
                     item.append(header, actionLabel, detail);
                     if (addedKeys.has(key) && this.runtimeDecisionsInitialized) {
                         item.classList.add('runtime-decision-new');

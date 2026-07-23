@@ -995,14 +995,8 @@ fn package_from_activity_line(line: &str) -> Option<String> {
     None
 }
 
-fn package_from_dumpsys(text: &str) -> Option<String> {
-    for marker in [
-        "mResumedActivity:",
-        "ResumedActivity:",
-        "topResumedActivity=",
-        "mCurrentFocus=",
-        "mFocusedApp=",
-    ] {
+fn package_from_markers(text: &str, markers: &[&str]) -> Option<String> {
+    for marker in markers {
         if let Some(package) = text
             .lines()
             .find(|line| line.contains(marker))
@@ -1012,6 +1006,20 @@ fn package_from_dumpsys(text: &str) -> Option<String> {
         }
     }
     None
+}
+
+fn package_from_activity_dumpsys(text: &str) -> Option<String> {
+    package_from_markers(text, &[
+        "mResumedActivity:",
+        "ResumedActivity:",
+        "mTopResumedActivity=",
+        "topResumedActivity=",
+        "mFocusedApp=",
+    ])
+}
+
+fn package_from_window_dumpsys(text: &str) -> Option<String> {
+    package_from_markers(text, &["mCurrentFocus=", "mFocusedWindow=", "mFocusedApp="])
 }
 
 fn process_base_from_pid(pid: u32) -> Option<String> {
@@ -1038,35 +1046,61 @@ struct ForegroundInfo {
 }
 
 fn web_foreground_info() -> ForegroundInfo {
-    let package = package_from_dumpsys(&command_output(
+    let activity = command_output(
         "/system/bin/sh",
         &[
             "-c",
-            "dumpsys activity activities 2>/dev/null | grep -m 1 -E '^[[:space:]]+(mResumedActivity:|ResumedActivity:)'",
+            "dumpsys activity activities 2>/dev/null | grep -E 'mResumedActivity:|ResumedActivity:|mTopResumedActivity=|topResumedActivity=|mFocusedApp='",
         ],
-    ));
-    if let Some(package) = package {
+    );
+    if let Some(package) = package_from_activity_dumpsys(&activity) {
         return ForegroundInfo {
             pids: package_pids(&package),
             package,
             source: "activity",
         };
     }
+
+    let window = command_output(
+        "/system/bin/sh",
+        &[
+            "-c",
+            "dumpsys window windows 2>/dev/null | grep -E 'mCurrentFocus=|mFocusedWindow=|mFocusedApp='",
+        ],
+    );
+    if let Some(package) = package_from_window_dumpsys(&window) {
+        return ForegroundInfo {
+            pids: package_pids(&package),
+            package,
+            source: "window",
+        };
+    }
     ForegroundInfo::default()
 }
 
 fn take_foreground_event(paths: &Paths) -> Option<ForegroundInfo> {
-    let package = read_text(&paths.foreground_event).trim().to_string();
+    let event = read_text(&paths.foreground_event);
     let _ = fs::remove_file(&paths.foreground_event);
+    let event = event.trim();
+    let (source, package) = event
+        .split_once('|')
+        .map(|(source, package)| {
+            ((source == "window").then_some("window").unwrap_or("activity"), package)
+        })
+        .unwrap_or(("activity", event));
+    let package = package.trim().to_string();
     (!package.is_empty()).then_some(ForegroundInfo {
         pids: package_pids(&package),
         package,
-        source: "activity",
+        source,
     })
 }
 
-fn write_foreground_event(paths: &Paths, package: &str) {
-    let _ = write_text_atomic(&paths.foreground_event, package);
+fn write_foreground_event(paths: &Paths, foreground: &ForegroundInfo) {
+    let _ = write_text_atomic(
+        &paths.foreground_event,
+        &format!("{}|{}", foreground.source, foreground.package),
+    );
 }
 
 fn csv_contains(csv: &str, item: &str) -> bool {
@@ -3704,7 +3738,7 @@ fn print_status(paths: &Paths, web: bool) -> i32 {
             }
             let foreground = web_foreground_info();
             if !foreground.package.is_empty() {
-                write_foreground_event(paths, &foreground.package);
+                write_foreground_event(paths, &foreground);
                 println!("foreground={}", foreground.package);
                 println!("foreground_source={}", foreground.source);
             }
@@ -3766,9 +3800,20 @@ mod tests {
     #[test]
     fn parses_foreground_package() {
         let input = "topResumedActivity=ActivityRecord{123 u0 com.example.game/.MainActivity t1}";
-        assert_eq!(package_from_dumpsys(input).as_deref(), Some("com.example.game"));
+        assert_eq!(package_from_activity_dumpsys(input).as_deref(), Some("com.example.game"));
         let multi_window = "topResumedActivity=ActivityRecord{1 u0 bin.mt.plus/.Main t1}\nResumedActivity: ActivityRecord{2 u0 me.weishu.kernelsu/.ui.webui.WebUIActivity t2}";
-        assert_eq!(package_from_dumpsys(multi_window).as_deref(), Some("me.weishu.kernelsu"));
+        assert_eq!(package_from_activity_dumpsys(multi_window).as_deref(), Some("me.weishu.kernelsu"));
+        let oem_variant = "mTopResumedActivity=ActivityRecord{abc u10 com.coloros.example/com.coloros.example.MainActivity}";
+        assert_eq!(package_from_activity_dumpsys(oem_variant).as_deref(), Some("com.coloros.example"));
+        let window = "mCurrentFocus=Window{abc u0 com.android.settings/.Settings}";
+        assert_eq!(package_from_window_dumpsys(window).as_deref(), Some("com.android.settings"));
+    }
+
+    #[test]
+    fn prioritizes_authoritative_foreground_markers() {
+        let input = "topResumedActivity=ActivityRecord{1 u0 bin.mt.plus/.Main t1}\nResumedActivity: ActivityRecord{2 u0 com.termux/.app.TermuxActivity t2}\nmFocusedApp=ActivityRecord{3 u0 com.android.settings/.Settings t3}";
+        assert_eq!(package_from_activity_dumpsys(input).as_deref(), Some("com.termux"));
+        assert_eq!(package_from_activity_dumpsys("mFocusedApp=null"), None);
     }
 
     #[test]
