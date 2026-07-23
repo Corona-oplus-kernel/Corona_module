@@ -334,6 +334,19 @@
             });
         });
     },
+    drawChartGrid(ctx, width, height, maxVal, unit, textColor) {
+        const padding = { top: 10, right: 10, bottom: 25, left: 35 };
+        const chartWidth = width - padding.left - padding.right;
+        const chartHeight = height - padding.top - padding.bottom;
+        ctx.strokeStyle = 'rgba(128,128,128,0.1)'; ctx.lineWidth = 1;
+        ctx.fillStyle = textColor; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+        for (let i = 0; i <= 4; i++) {
+            const y = padding.top + (chartHeight / 4) * i;
+            ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(width - padding.right, y); ctx.stroke();
+            ctx.fillText(`${Math.round(maxVal - (maxVal / 4) * i)}${unit}`, padding.left - 5, y + 3);
+        }
+        return { padding, chartWidth, chartHeight };
+    },
     updateHistoryData(cpuUsage, memUsage, cpuTemp, batteryTemp) {
         const now = Date.now();
         this.historyData.cpu.push({ time: now, value: cpuUsage });
@@ -383,13 +396,7 @@
             return;
         }
         if (data.length < 2) { ctx.fillStyle = textSub; ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(this.localizeMessage('收集数据中...'), width / 2, height / 2); return; }
-        const padding = { top: 10, right: 10, bottom: 25, left: 35 };
-        const chartWidth = width - padding.left - padding.right;
-        const chartHeight = height - padding.top - padding.bottom;
-        ctx.strokeStyle = 'rgba(128,128,128,0.1)'; ctx.lineWidth = 1;
-        for (let i = 0; i <= 4; i++) { const y = padding.top + (chartHeight / 4) * i; ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(width - padding.right, y); ctx.stroke(); }
-        ctx.fillStyle = textSub; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
-        for (let i = 0; i <= 4; i++) { const val = Math.round(maxVal - (maxVal / 4) * i); const y = padding.top + (chartHeight / 4) * i; ctx.fillText(`${val}${unit}`, padding.left - 5, y + 3); }
+        const { padding, chartWidth, chartHeight } = this.drawChartGrid(ctx, width, height, maxVal, unit, textSub);
         const gradient = ctx.createLinearGradient(0, padding.top, 0, height - padding.bottom);
         gradient.addColorStop(0, color2); gradient.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.beginPath();
@@ -412,13 +419,7 @@
         const styles = getComputedStyle(document.body);
         const textMain = styles.getPropertyValue('--text-main').trim() || '#1A1A1A';
         const textSub = styles.getPropertyValue('--text-sub').trim() || '#6E6E6E';
-        const padding = { top: 10, right: 10, bottom: 25, left: 35 };
-        const chartWidth = width - padding.left - padding.right;
-        const chartHeight = height - padding.top - padding.bottom;
-        ctx.strokeStyle = 'rgba(128,128,128,0.1)'; ctx.lineWidth = 1;
-        for (let i = 0; i <= 4; i++) { const y = padding.top + (chartHeight / 4) * i; ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(width - padding.right, y); ctx.stroke(); }
-        ctx.fillStyle = textSub; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
-        for (let i = 0; i <= 4; i++) { const val = Math.round(maxVal - (maxVal / 4) * i); const y = padding.top + (chartHeight / 4) * i; ctx.fillText(`${val}${unit}`, padding.left - 5, y + 3); }
+        const { padding, chartWidth, chartHeight } = this.drawChartGrid(ctx, width, height, maxVal, unit, textSub);
         series.forEach(s => {
             if (s.data.length < 2) return;
             const stepX = chartWidth / (s.data.length - 1);
@@ -443,6 +444,15 @@
                 legendX += ctx.measureText(`${s.label}: ${lastVal.toFixed(1)}${unit}`).width + 25;
             }
         });
+    },
+    togglePanelContent(content, toggle, options = {}) {
+        const state = content._panelState || (content.classList.contains('expanded') && !content.classList.contains('hidden') ? 'open' : 'closed');
+        const cardEl = toggle.closest('.module-card');
+        if (cardEl) cardEl.classList.add('expanding');
+        if (typeof beginExpand === 'function') beginExpand();
+        const params = { ...options, cardEl };
+        if (state === 'open' || state === 'opening') this.collapsePanelContent(content, toggle, params);
+        else this.expandPanelContent(content, toggle, params);
     },
     initExpandableCards() {
         const loadSection = section => () => {
@@ -478,25 +488,10 @@
             headerEl.style.cursor = 'pointer';
             headerEl.addEventListener('click', (ev) => {
                 if (ev.target.closest('input, button, a, .switch, label.switch')) return;
-                // opening/open -> collapse; closing/closed -> expand (supports reverse mid-anim)
-                const state = content._panelState || (content.classList.contains('expanded') && !content.classList.contains('hidden') ? 'open' : 'closed');
-                const shouldClose = state === 'open' || state === 'opening';
-                const cardEl = toggle.closest('.module-card');
-                if (cardEl) cardEl.classList.add('expanding');
-                if (typeof beginExpand === 'function') beginExpand();
-                if (shouldClose) {
-                    this.collapsePanelContent(content, toggle, {
-                        cardEl,
-                        beforeCollapse: content.id === 'memory-compression-content'
-                            ? () => this.collapseMemoryCompressionChildren(content)
-                            : null
-                    });
-                } else {
-                    this.expandPanelContent(content, toggle, {
-                        cardEl,
-                        onExpand: card.onExpand || null
-                    });
-                }
+                this.togglePanelContent(content, toggle, {
+                    onExpand: card.onExpand || null,
+                    beforeCollapse: content.id === 'memory-compression-content' ? () => this.collapseMemoryCompressionChildren(content) : null
+                });
             });
         });
         this.initSubCards();
@@ -659,21 +654,7 @@
             toggle.classList.remove('expanded');
             if (icon) icon.classList.remove('expanded');
             toggle.addEventListener('click', () => {
-                // opening/open -> collapse; closing/closed -> expand (supports reverse mid-anim)
-                const state = content._panelState || (content.classList.contains('expanded') && !content.classList.contains('hidden') ? 'open' : 'closed');
-                const shouldClose = state === 'open' || state === 'opening';
-                const cardEl = toggle.closest('.module-card');
-                if (cardEl) cardEl.classList.add('expanding');
-                if (typeof beginExpand === 'function') beginExpand();
-                if (shouldClose) {
-                    this.collapsePanelContent(content, toggle, {
-                        icon, cardEl, onCollapse: card.onCollapse || null
-                    });
-                } else {
-                    this.expandPanelContent(content, toggle, {
-                        icon, cardEl, onExpand: card.onExpand || null
-                    });
-                }
+                this.togglePanelContent(content, toggle, { icon, onExpand: card.onExpand || null, onCollapse: card.onCollapse || null });
             });
         });
     },

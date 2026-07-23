@@ -208,6 +208,12 @@ CoronaAddon.prototype.initAppPolicy = function() {
         }
     });
 };
+CoronaAddon.prototype.createInstalledApp = function(packageName, componentName = '', cached = {}) {
+    const meta = cached && typeof cached === 'object' ? cached : {};
+    const cachedLabel = meta.label && meta.label !== packageName ? meta.label : '';
+    const label = cachedLabel || this.humanizePackageName(packageName);
+    return { packageName, componentName: meta.componentName || componentName, label, labelLoaded: !!cachedLabel, searchText: `${label}\n${packageName}`.toLowerCase() };
+};
 CoronaAddon.prototype.loadInstalledApps = async function(force = false) {
     this.ensureAppPolicyState();
     if (!force && this.installedAppsScanned && this.installedApps.length > 0) return this.installedApps;
@@ -222,16 +228,7 @@ CoronaAddon.prototype.loadInstalledApps = async function(force = false) {
             const packageName = (parts[0] || '').trim();
             const componentName = (parts[1] || '').trim();
             if (!packageName) return;
-            const cached = (this.appMetaCache && this.appMetaCache[packageName]) || {};
-            const cachedLabel = cached.label && cached.label !== packageName ? cached.label : '';
-            const label = cachedLabel || this.humanizePackageName(packageName);
-            apps.push({
-                packageName,
-                componentName: cached.componentName || componentName,
-                label,
-                labelLoaded: !!cachedLabel,
-                searchText: `${label}\n${packageName}`.toLowerCase()
-            });
+            apps.push(this.createInstalledApp(packageName, componentName, this.appMetaCache?.[packageName]));
         });
         this.installedApps = apps;
         this.installedAppsScanned = apps.length > 0;
@@ -248,18 +245,7 @@ CoronaAddon.prototype.hydrateInstalledAppsFromCache = function() {
     if (this.installedApps.length > 0 || !this.appMetaCache || typeof this.appMetaCache !== 'object') {
         return this.installedApps;
     }
-    this.installedApps = Object.entries(this.appMetaCache).map(([packageName, cached]) => {
-        const meta = cached && typeof cached === 'object' ? cached : {};
-        const cachedLabel = meta.label && meta.label !== packageName ? meta.label : '';
-        const label = cachedLabel || this.humanizePackageName(packageName);
-        return {
-            packageName,
-            componentName: meta.componentName || '',
-            label,
-            labelLoaded: !!cachedLabel,
-            searchText: `${label}\n${packageName}`.toLowerCase()
-        };
-    });
+    this.installedApps = Object.entries(this.appMetaCache).map(([packageName, cached]) => this.createInstalledApp(packageName, '', cached));
     return this.installedApps;
 };
 CoronaAddon.prototype.refreshInstalledAppLabels = async function(force = false) {
@@ -625,9 +611,8 @@ CoronaAddon.prototype.estimateCurrentProfileConfigCount = async function() {
     const output = await this.exec(`/system/bin/sh -c ${this.shellQuote(checks)}`);
     return String(output || '').split('\n').filter(Boolean).length;
 };
-CoronaAddon.prototype.openAppProfilePicker = async function(pkg, label) {
-    this.ensureAppPolicyState();
-    this.appProfileStateSnapshot = {
+CoronaAddon.prototype.copyAppPolicyState = function() {
+    return {
         monitorEnabled: !!this.appPolicy.monitorEnabled,
         notifyEnabled: !!this.appPolicy.notifyEnabled,
         whitelist: [...(this.appPolicy.whitelist || [])],
@@ -635,6 +620,10 @@ CoronaAddon.prototype.openAppProfilePicker = async function(pkg, label) {
         profiles: [...(this.appPolicy.profiles || [])],
         affinityExclude: [...(this.appPolicy.affinityExclude || [])]
     };
+};
+CoronaAddon.prototype.openAppProfilePicker = async function(pkg, label) {
+    this.ensureAppPolicyState();
+    this.appProfileStateSnapshot = this.copyAppPolicyState();
     this.selectedAppProfilePackage = pkg;
     this.selectedAppProfileLabel = label || pkg;
     this.currentProfileConfigCount = 0;
@@ -690,14 +679,7 @@ CoronaAddon.prototype.renderAppProfileChoices = function() {
             if (mode === 'toggle-whitelist' || mode === 'toggle-protect') {
                 if (mode === 'toggle-whitelist') await this.toggleAppPolicyPackage('whitelist', pkg);
                 if (mode === 'toggle-protect') await this.toggleAppPolicyPackage('protect', pkg);
-                this.appProfileStateSnapshot = {
-                    monitorEnabled: !!this.appPolicy.monitorEnabled,
-                    notifyEnabled: !!this.appPolicy.notifyEnabled,
-                    whitelist: [...(this.appPolicy.whitelist || [])],
-                    protect: [...(this.appPolicy.protect || [])],
-                    profiles: [...(this.appPolicy.profiles || [])],
-                    affinityExclude: [...(this.appPolicy.affinityExclude || [])]
-                };
+                this.appProfileStateSnapshot = this.copyAppPolicyState();
                 this.refreshAppPolicyPackage(pkg, { reorder: true });
                 this.renderAppProfileChoices();
                 return;
