@@ -1064,11 +1064,12 @@
             { key: 'resetConfigPressure', files: ['memory_pressure.conf'] },
             { key: 'resetConfigSwap', files: ['swap.conf'] },
             { key: 'resetConfigVm', files: ['vm.conf', 'kernel.conf'] },
-            { key: 'resetConfigReclaim', files: ['le9ec.conf', 'lmk.conf', 'reclaim.conf', 'kswapd.conf'] },
+            { key: 'resetConfigReclaim', files: ['le9ec.conf'] },
+            { key: 'resetConfigSystemOpt', files: ['system_opt.conf'] },
             { key: 'resetConfigIo', files: ['io_scheduler.conf'] },
             { key: 'resetConfigCpu', files: ['cpu_governor.conf', 'cpu_hotplug.conf'] },
             { key: 'resetConfigNetwork', files: ['tcp.conf'] },
-            { key: 'resetConfigKernel', files: ['corona_kernel.conf', 'device.conf', 'protect.conf', 'fstrim.conf'] },
+            { key: 'resetConfigKernel', files: ['corona_kernel.conf'] },
             { key: 'resetConfigScripts', files: ['custom_scripts.b64'] },
             { key: 'resetConfigAppPolicy', files: ['app_rules.conf', 'app_whitelist.list', 'app_protect.list', 'process_priority.conf', 'thread_priority.conf'] }
         ];
@@ -1134,8 +1135,8 @@
     },
     getResetScopeFiles(scope) {
         const groups = {
-            memory: ['zram.conf', 'zram_policy.conf', 'loop.conf', 'memory_pressure.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'le9ec.conf', 'lmk.conf', 'reclaim.conf', 'kswapd.conf'],
-            system: ['io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'corona_kernel.conf', 'device.conf', 'protect.conf', 'fstrim.conf'],
+            memory: ['zram.conf', 'zram_policy.conf', 'loop.conf', 'memory_pressure.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'le9ec.conf'],
+            system: ['io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'corona_kernel.conf', 'system_opt.conf'],
             scripts: ['custom_scripts.b64'],
             snapshots: ['parameter_snapshots.b64'],
             'app-policy': ['app_rules.conf', 'app_whitelist.list', 'app_protect.list', 'process_priority.conf', 'thread_priority.conf'],

@@ -4,12 +4,7 @@ const SWITCH_ONLY_CONFIG_FILES = new Set([
     'hardware_policy.conf',
     'zram_policy.conf',
     'corona_kernel.conf',
-    'lmk.conf',
-    'device.conf',
-    'reclaim.conf',
-    'kswapd.conf',
-    'protect.conf',
-    'fstrim.conf'
+    'system_opt.conf'
 ]);
 
 class CoronaAddon {
@@ -23,7 +18,7 @@ class CoronaAddon {
         this.ioNrRequestsOptions = [];
         this.ioRqAffinityOptions = [];
         this.ioNomergesOptions = [];
-        this.snapshotConfigFiles = ['zram.conf', 'zram_policy.conf', 'loop.conf', 'memory_pressure.conf', 'le9ec.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'process_priority.conf', 'thread_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf', 'auto_affinity.conf', 'hardware_policy.conf', 'coronad.conf'];
+        this.snapshotConfigFiles = ['zram.conf', 'zram_policy.conf', 'loop.conf', 'memory_pressure.conf', 'le9ec.conf', 'system_opt.conf', 'io_scheduler.conf', 'cpu_governor.conf', 'cpu_hotplug.conf', 'tcp.conf', 'process_priority.conf', 'thread_priority.conf', 'swap.conf', 'vm.conf', 'kernel.conf', 'corona_kernel.conf', 'auto_affinity.conf', 'hardware_policy.conf', 'coronad.conf'];
         this.state = {
             algorithm: 'lz4',
             recompAlgorithm1: 'none',
@@ -153,7 +148,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072306` : '';
+        return map[name] ? `${map[name]}?v=2026072307` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};

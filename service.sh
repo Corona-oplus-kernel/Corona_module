@@ -1181,6 +1181,24 @@ if [ "$1" = "--apply-thread-priority" ]; then
     exit 0
 fi
 
+if [ "$1" = "--apply-system-opt" ]; then
+    get_system_info
+    case "$2" in
+        background)
+            apply_lmk_config
+            apply_device_config
+            ;;
+        reclaim)
+            apply_reclaim_config
+            apply_kswapd_config
+            ;;
+        protect) apply_protect_config ;;
+        fstrim) apply_fstrim_config ;;
+        *) exit 2 ;;
+    esac
+    exit 0
+fi
+
 if [ "$1" = "--apply-writeback-block" ]; then
     apply_writeback_block_config
     exit $?
