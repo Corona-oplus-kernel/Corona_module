@@ -27,13 +27,13 @@
         const height = Math.max(0, Number(heightPx) || 0);
         const largePanel = content?.id === 'app-settings-content' || content?.id === 'memory-compression-content';
         const visual = Math.min(height, largePanel ? 1400 : 1000);
-        const maximum = largePanel ? 560 : 480;
-        return Math.round(Math.min(maximum, Math.max(280, visual * 0.2 + 240)));
+        const maximum = largePanel ? 500 : 430;
+        return Math.round(Math.min(maximum, Math.max(230, visual * 0.16 + 220)));
     },
     getPanelMotion(direction = 'expand') {
         return direction === 'collapse'
-            ? { height: 'cubic-bezier(0.4, 0, 0.2, 1)', content: 'cubic-bezier(0.32, 0, 0.2, 1)' }
-            : { height: 'cubic-bezier(0.16, 1, 0.3, 1)', content: 'cubic-bezier(0.22, 1.32, 0.36, 1)' };
+            ? { height: 'cubic-bezier(0.4, 0, 0.8, 0.2)', content: 'cubic-bezier(0.4, 0, 1, 1)', opacity: 'cubic-bezier(0.4, 0, 1, 1)' }
+            : { height: 'cubic-bezier(0.2, 0.9, 0.25, 1)', content: 'cubic-bezier(0.2, 0.95, 0.3, 1.06)', opacity: 'cubic-bezier(0.16, 1, 0.3, 1)' };
     },
     setPanelTransition(content, durationMs, mode = 'both', direction = 'expand') {
         if (!content) return;
@@ -65,7 +65,7 @@
         content.style.transition = 'none';
         content.style.maxHeight = '0px';
         content.style.opacity = '0';
-        content.style.transform = 'translateY(-8px) scale(0.992)';
+        content.style.transform = 'translateY(-6px) scale(0.995)';
         content.style.overflow = 'hidden';
         content.style.pointerEvents = 'none';
         content.style.willChange = 'auto';
@@ -116,7 +116,7 @@
         const currentOpacity = currentStyle ? Math.max(0, Math.min(1, parseFloat(currentStyle.opacity) || 0)) : 0;
         const currentTransform = currentStyle?.transform && currentStyle.transform !== 'none'
             ? currentStyle.transform
-            : (currentH > 1 ? 'translateY(0) scale(1)' : 'translateY(-8px) scale(0.992)');
+            : (currentH > 1 ? 'translateY(0) scale(1)' : 'translateY(-6px) scale(0.995)');
 
         content.classList.remove('hidden');
         content.classList.add('expanded');
@@ -193,7 +193,7 @@
         content.addEventListener('transitionend', onEnd);
 
         // CSS transition only (more stable than WAAPI max-height on huge panels)
-        content.style.transition = `max-height ${duration}ms ${motion.height}, opacity ${Math.round(duration * 0.72)}ms ease, transform ${Math.round(duration * 0.92)}ms ${motion.content}`;
+        content.style.transition = `max-height ${duration}ms ${motion.height}, opacity ${Math.round(duration * 0.72)}ms ${motion.opacity}, transform ${Math.round(duration * 0.92)}ms ${motion.content}`;
         void content.offsetHeight;
         content.style.maxHeight = target + 'px';
         content.style.opacity = '1';
@@ -289,7 +289,7 @@
             content.style.transition = 'none';
             content.style.maxHeight = '0px';
             content.style.opacity = '0';
-            content.style.transform = 'translateY(-8px) scale(0.992)';
+            content.style.transform = 'translateY(-6px) scale(0.995)';
             content.style.willChange = 'auto';
             content.classList.remove('panel-animating');
             content.classList.remove('expanded');
@@ -314,11 +314,11 @@
         content._anim = onEnd;
         content.addEventListener('transitionend', onEnd);
 
-        content.style.transition = `max-height ${duration}ms ${motion.height}, opacity ${Math.round(duration * 0.62)}ms ease, transform ${Math.round(duration * 0.82)}ms ${motion.content}`;
+        content.style.transition = `max-height ${duration}ms ${motion.height}, opacity ${Math.round(duration * 0.62)}ms ${motion.opacity}, transform ${Math.round(duration * 0.82)}ms ${motion.content}`;
         void content.offsetHeight;
         content.style.maxHeight = '0px';
         content.style.opacity = '0';
-        content.style.transform = 'translateY(-8px) scale(0.992)';
+        content.style.transform = 'translateY(-6px) scale(0.995)';
         content._animTimer = setTimeout(finish, duration + 50);
     },
 
@@ -523,7 +523,7 @@
                     void list.offsetHeight;
                     const duration = this.getPanelAnimMs(targetHeight, list);
                     const motion = this.getPanelMotion('expand');
-                    list.style.transition = `max-height ${duration}ms ${motion.height}, opacity ${Math.round(duration * 0.72)}ms ease, transform ${Math.round(duration * 0.92)}ms ${motion.content}, margin-top ${duration}ms ${motion.height}`;
+                    list.style.transition = `max-height ${duration}ms ${motion.height}, opacity ${Math.round(duration * 0.72)}ms ${motion.opacity}, transform ${Math.round(duration * 0.92)}ms ${motion.content}, margin-top ${duration}ms ${motion.height}`;
                     list.style.maxHeight = `${targetHeight}px`;
                     list.style.opacity = '1';
                     list.style.transform = 'translateY(0)';
@@ -543,7 +543,7 @@
                     void list.offsetHeight;
                     const duration = this.getPanelAnimMs(fromHeight, list);
                     const motion = this.getPanelMotion('collapse');
-                    list.style.transition = `max-height ${duration}ms ${motion.height}, opacity ${Math.round(duration * 0.62)}ms ease, transform ${Math.round(duration * 0.82)}ms ${motion.content}, margin-top ${duration}ms ${motion.height}`;
+                    list.style.transition = `max-height ${duration}ms ${motion.height}, opacity ${Math.round(duration * 0.62)}ms ${motion.opacity}, transform ${Math.round(duration * 0.82)}ms ${motion.content}, margin-top ${duration}ms ${motion.height}`;
                     list.style.maxHeight = '0px';
                     list.style.opacity = '0';
                     list.style.transform = 'translateY(-6px)';
