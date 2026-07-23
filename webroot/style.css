@@ -242,10 +242,10 @@ body.theme-dark .color-pref-swatch {
     align-items: center;
     z-index: 20000;
     padding: 20px;
-    animation: coronaOverlayIn 0.2s ease-out;
+    animation: coronaOverlayIn 160ms ease-out;
 }
 .color-picker-overlay.closing {
-    animation: coronaOverlayOut 0.18s ease-out forwards;
+    animation: coronaOverlayOut 130ms ease-in forwards;
 }
 .color-picker-dialog {
     width: min(92vw, 400px);
@@ -258,7 +258,7 @@ body.theme-dark .color-pref-swatch {
     box-shadow: var(--glass-shadow-lg);
     transition: var(--glass-motion);
     overflow: hidden;
-    animation: coronaDialogIn 0.3s var(--motion-ease);
+    animation: coronaDialogIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 body.theme-dark .color-picker-dialog {
     color: #f2f2f2;
@@ -267,7 +267,7 @@ body.theme-dark .color-picker-overlay {
     background: rgba(0, 0, 0, 0.2);
 }
 .color-picker-dialog.closing {
-    animation: coronaDialogOut 0.2s var(--motion-collapse) forwards;
+    animation: coronaDialogOut 150ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 .color-picker-dialog h2 {
     margin: 0;
@@ -385,12 +385,12 @@ body.theme-dark .preset-color.active {
     to { opacity: 0; }
 }
 @keyframes coronaDialogIn {
-    from { opacity: 0; transform: translateY(10px) scale(0.96); }
+    from { opacity: 0; transform: translateY(6px) scale(0.985); }
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes coronaDialogOut {
     from { opacity: 1; transform: translateY(0) scale(1); }
-    to { opacity: 0; transform: translateY(8px) scale(0.96); }
+    to { opacity: 0; transform: translateY(4px) scale(0.99); }
 }
 
 body.theme-dark #zram-settings .option-item {
@@ -5189,6 +5189,15 @@ body.theme-dark #zram-settings .option-item {
     backdrop-filter: blur(var(--glass-blur-card));
     -webkit-backdrop-filter: blur(var(--glass-blur-card));
     box-shadow: 0 24px 70px rgba(17, 24, 39, 0.22), 0 2px 12px rgba(17, 24, 39, 0.08);
+    transform: translate3d(0, 22px, 0) scale(0.985);
+    transform-origin: center bottom;
+    opacity: 0;
+    transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease-out;
+}
+
+#app-policy-overlay.show .app-policy-detail-card {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
 }
 
 #app-policy-overlay .detail-header {
@@ -5240,7 +5249,7 @@ body.theme-dark #zram-settings .option-item {
     background: var(--control-solid-bg);
     box-shadow: 0 1px 4px rgba(17, 24, 39, 0.035);
     transition: transform 160ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
-    animation: app-policy-row-in 240ms var(--motion-ease) both;
+    animation: app-policy-row-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 #app-policy-list .app-policy-row:active {
@@ -5275,7 +5284,7 @@ body.theme-dark #zram-settings .option-item {
 }
 
 @keyframes app-policy-row-in {
-    from { opacity: 0; transform: translateY(5px); }
+    from { opacity: 0; transform: translateY(3px); }
     to { opacity: 1; transform: translateY(0); }
 }
 

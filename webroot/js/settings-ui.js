@@ -540,7 +540,7 @@
             if (committedHue !== draftHue) renderHue(true, false);
             overlay.classList.add('closing');
             dialog.classList.add('closing');
-            setTimeout(() => overlay.remove(), 220);
+            setTimeout(() => overlay.remove(), 170);
         };
 
         dialog.querySelector('#close-color').addEventListener('click', () => closeDialog());
