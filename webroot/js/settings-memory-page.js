@@ -34,8 +34,10 @@
         const container = document.getElementById('algorithm-list');
         if (!container) return;
         container.innerHTML = this.algorithms.map(alg => `<div class="option-item ${alg === this.state.algorithm ? 'selected' : ''}" data-value="${alg}">${alg}</div>`).join('');
-        container.querySelectorAll('.option-item').forEach(item => {
-            item.addEventListener('click', (e) => { container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.algorithm = e.currentTarget.dataset.value; if (typeof this.updateZstdLevelVisibility === 'function') this.updateZstdLevelVisibility(); if (typeof this.markZramDirty === 'function') this.markZramDirty('algorithm'); });
+        this.bindOptionItems(container, value => {
+            this.state.algorithm = value;
+            if (typeof this.updateZstdLevelVisibility === 'function') this.updateZstdLevelVisibility();
+            if (typeof this.markZramDirty === 'function') this.markZramDirty('algorithm');
         });
         this.renderRecompAlgorithmOptions();
         if (typeof this.updateZstdLevelVisibility === 'function') this.updateZstdLevelVisibility();
@@ -144,11 +146,8 @@
             if (!container) continue;
             const current = this.state[key] || 'none';
             container.innerHTML = algos.map(alg => `<div class="option-item ${alg === current ? 'selected' : ''}" data-value="${alg}">${labels[alg] || alg}</div>`).join('');
-            container.querySelectorAll('.option-item').forEach(item => {
-                item.addEventListener('click', async (e) => {
-                    container.querySelectorAll('.option-item').forEach(el => el.classList.remove('selected'));
-                    e.currentTarget.classList.add('selected');
-                    this.state[key] = e.currentTarget.dataset.value;
+            this.bindOptionItems(container, value => {
+                    this.state[key] = value;
                     // cascading: later levels require previous non-none
                     if (this.state[key] === 'none') {
                         for (let j = i + 1; j <= 3; j++) this.state[`recompAlgorithm${j}`] = 'none';
@@ -166,7 +165,6 @@
                             for (let j = i + 1; j <= 3; j++) this.markZramDirty(`recomp_algorithm${j}`);
                         }
                     }
-                });
             });
         }
     },
@@ -174,22 +172,13 @@
         const container = document.getElementById('readahead-list');
         const supported = this.ioFeatureSupport?.read_ahead_kb !== false;
         container.innerHTML = this.readaheadOptions.map(size => `<div class="option-item ${size === this.state.readahead ? 'selected' : ''} ${supported ? '' : 'feature-disabled'}" data-value="${size}" aria-disabled="${supported ? 'false' : 'true'}">${size}</div>`).join('');
-        container.querySelectorAll('.option-item').forEach(item => {
-            item.addEventListener('click', async (e) => { if (!supported) return; container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected')); e.currentTarget.classList.add('selected'); this.state.readahead = parseInt(e.currentTarget.dataset.value); await this.applyReadaheadImmediate(); });
-        });
+        this.bindOptionItems(container, async value => { this.state.readahead = parseInt(value); await this.applyReadaheadImmediate(); }, { enabled: () => supported });
     },
     renderDiscreteOptions(containerId, values, currentValue, formatter, onSelect, supported = true) {
         const container = document.getElementById(containerId);
         if (!container) return;
         container.innerHTML = values.map(value => `<div class="option-item ${value === currentValue ? 'selected' : ''} ${supported ? '' : 'feature-disabled'}" data-value="${value}" aria-disabled="${supported ? 'false' : 'true'}">${formatter ? formatter(value) : value}</div>`).join('');
-        container.querySelectorAll('.option-item').forEach(item => {
-            item.addEventListener('click', async (e) => {
-                if (!supported) return;
-                container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
-                e.currentTarget.classList.add('selected');
-                await onSelect(e.currentTarget.dataset.value);
-            });
-        });
+        this.bindOptionItems(container, onSelect, { enabled: () => supported });
     },
     renderIOAdvancedOptions() {
         const ensureValues = (values, fallback) => Array.isArray(values) && values.length > 0 ? values : fallback;

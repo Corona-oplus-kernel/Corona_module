@@ -1770,15 +1770,10 @@
         const container = document.getElementById('io-scheduler-list');
         if (container) {
             container.innerHTML = availableSchedulers.map(s => `<div class="option-item ${s === currentScheduler ? 'selected' : ''}" data-value="${s}">${s}</div>`).join('');
-            container.querySelectorAll('.option-item').forEach(item => {
-                item.addEventListener('click', async (e) => {
-                    if (!this.ioFeatureSupport?.scheduler) return;
-                    container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
-                    e.currentTarget.classList.add('selected');
-                    this.state.ioScheduler = e.currentTarget.dataset.value;
-                    await this.applyIOSchedulerImmediate();
-                });
-            });
+            this.bindOptionItems(container, async value => {
+                this.state.ioScheduler = value;
+                await this.applyIOSchedulerImmediate();
+            }, { enabled: () => this.ioFeatureSupport?.scheduler });
         }
         const currentEl = document.getElementById('io-current');
         if (currentEl) currentEl.textContent = !this.ioFeatureSupport.scheduler ? this.t('unsupported') : (this.state.ioEnabled ? (currentScheduler || '--') : '已禁用');
@@ -1821,15 +1816,10 @@
         const container = document.getElementById('cpu-governor-list');
         if (container) {
             container.innerHTML = availableGovernors.map(g => `<div class="option-item ${g === this.state.cpuGovernor ? 'selected' : ''}" data-value="${g}">${g}</div>`).join('');
-            container.querySelectorAll('.option-item').forEach(item => {
-                item.addEventListener('click', async (e) => {
-                    if (!this.cpuGovernorSupported) return;
-                    container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
-                    e.currentTarget.classList.add('selected');
-                    this.state.cpuGovernor = e.currentTarget.dataset.value;
-                    await this.applyCpuGovernorImmediate('governor');
-                });
-            });
+            this.bindOptionItems(container, async value => {
+                this.state.cpuGovernor = value;
+                await this.applyCpuGovernorImmediate('governor');
+            }, { enabled: () => this.cpuGovernorSupported });
         }
         const currentEl = document.getElementById('cpu-gov-current');
         if (currentEl) currentEl.textContent = !this.cpuGovernorSupported ? this.t('unsupported') : (this.state.cpuEnabled ? (this.state.cpuGovernor || '--') : '已禁用');
@@ -1904,15 +1894,10 @@
         this.state.tcp = resolved;
         const container = document.getElementById('tcp-list');
         container.innerHTML = availableTcp.map(t => `<div class="option-item ${t === this.state.tcp ? 'selected' : ''}" data-value="${t}">${t}</div>`).join('');
-        container.querySelectorAll('.option-item').forEach(item => {
-            item.addEventListener('click', async (e) => {
-                if (!this.tcpSupported) return;
-                container.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
-                e.currentTarget.classList.add('selected');
-                this.state.tcp = e.currentTarget.dataset.value;
-                await this.applyTcpImmediate('congestion');
-            });
-        });
+        this.bindOptionItems(container, async value => {
+            this.state.tcp = value;
+            await this.applyTcpImmediate('congestion');
+        }, { enabled: () => this.tcpSupported });
         document.getElementById('tcp-current').textContent = !this.tcpSupported ? this.t('unsupported') : (this.state.tcpEnabled ? (this.state.tcp || '--') : '已禁用');
         this.setFeatureSupport(document.getElementById('tcp-switch')?.closest('.switch-container'), this.tcpSupported);
         this.setFeatureSupport(container, this.tcpSupported);
@@ -2681,18 +2666,13 @@
             });
         }
         const profiles = document.getElementById('memory-pressure-profile-list');
-        if (profiles && !profiles.dataset.bound) {
-            profiles.dataset.bound = '1';
-            profiles.querySelectorAll('.option-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    this.state.pressureProfile = item.dataset.value || 'balanced';
-                    this.renderMemoryPressureProfile();
-                    this.persistMemoryPressureConfig('profile')
-                        .then(() => this.showToast(this.t('pressureConfigSaved')))
-                        .catch(() => this.showToast(this.t('pressureConfigSaveFailed'), 'error'));
-                });
-            });
-        }
+        this.bindOptionItems(profiles, value => {
+            this.state.pressureProfile = value || 'balanced';
+            this.renderMemoryPressureProfile();
+            return this.persistMemoryPressureConfig('profile')
+                .then(() => this.showToast(this.t('pressureConfigSaved')))
+                .catch(() => this.showToast(this.t('pressureConfigSaveFailed'), 'error'));
+        });
         const applyButton = document.getElementById('memory-pressure-apply');
         if (applyButton && !applyButton.dataset.bound) {
             applyButton.dataset.bound = '1';
@@ -2786,15 +2766,10 @@
             });
         }
         if (priorityList) {
-            priorityList.querySelectorAll('.option-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    priorityList.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
-                    item.classList.add('selected');
-                    this.syncAnimatedOptionIndicator(priorityList);
-                    this.state.swapPriority = parseInt(item.dataset.value);
-                    this.markSwapDirty('priority');
-                });
-            });
+            this.bindOptionItems(priorityList, value => {
+                this.state.swapPriority = parseInt(value);
+                this.markSwapDirty('priority');
+            }, { animate: true });
             this.syncAnimatedOptionIndicator(priorityList);
         }
         this.loadSwapConfig();
@@ -3186,16 +3161,10 @@
             const el = document.getElementById('thp-container');
             if (el) el.style.display = '';
             const list = document.getElementById('thp-list');
-            if (list) {
-                list.querySelectorAll('.option-item').forEach(item => {
-                    item.addEventListener('click', () => {
-                        list.querySelectorAll('.option-item').forEach(i => i.classList.remove('selected'));
-                        item.classList.add('selected');
-                        this.state.thp = item.dataset.value;
-                        this.applyKernelFeatures(['thp']);
-                    });
-                });
-            }
+            this.bindOptionItems(list, value => {
+                this.state.thp = value;
+                this.applyKernelFeatures(['thp']);
+            });
         }
         if (this.kernelFeatures.ksm) {
             featureCount++;

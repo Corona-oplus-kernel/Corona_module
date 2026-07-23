@@ -148,7 +148,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072312` : '';
+        return map[name] ? `${map[name]}?v=2026072313` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -408,6 +408,17 @@ class CoronaAddon {
     }
     shellQuote(value) {
         return `'${String(value).replace(/'/g, `'\\''`)}'`;
+    }
+    bindOptionItems(container, onSelect, options = {}) {
+        if (!container || container.dataset.optionBound) return;
+        container.dataset.optionBound = '1';
+        container.addEventListener('click', async event => {
+            const item = event.target.closest('.option-item');
+            if (!item || !container.contains(item) || (options.enabled && !options.enabled())) return;
+            container.querySelectorAll('.option-item').forEach(option => option.classList.toggle('selected', option === item));
+            if (options.animate) this.syncAnimatedOptionIndicator(container);
+            await onSelect(item.dataset.value, item, event);
+        });
     }
     normalizeConfigFilename(filename) {
         const normalized = String(filename || '').replace(/\\/g, '/').replace(/^\.\//, '');
