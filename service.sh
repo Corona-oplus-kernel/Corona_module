@@ -8,10 +8,19 @@ CORONAD="$MODDIR/bin/coronad"
 THREAD_PRIORITY_FILE="$CONFIG_DIR/thread_priority.conf"
 WRITEBACK_HELPER="$MODDIR/scripts/zram-writeback.sh"
 ZRAM_POLICY_HELPER="$MODDIR/scripts/zram-policy.sh"
+SYSTEM_OPT_CONFIG="$CONFIG_DIR/system_opt.conf"
 
 set_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/dev/null; }
 lock_value() { [ -f "$2" ] && chmod 644 "$2" 2>/dev/null && echo "$1" > "$2" 2>/dev/null && chmod 444 "$2" 2>/dev/null; }
 get_conf_value() { [ -f "$1" ] && grep -m1 "^$2=" "$1" | cut -d'=' -f2-; }
+
+system_opt_enabled() {
+    key="$1"
+    legacy_file="$2"
+    value=$(get_conf_value "$SYSTEM_OPT_CONFIG" "$key")
+    [ -n "$value" ] && { [ "$value" = "1" ]; return; }
+    [ "$(get_conf_value "$CONFIG_DIR/$legacy_file" enabled)" = "1" ]
+}
 
 migrate_runtime_state_files() {
     mkdir -p "$CONFIG_DIR"
@@ -44,6 +53,34 @@ migrate_runtime_state_files() {
 }
 
 migrate_runtime_state_files
+
+migrate_system_opt_config() {
+    mkdir -p "$CONFIG_DIR"
+    tmp="$SYSTEM_OPT_CONFIG.tmp.$$"
+    [ -f "$SYSTEM_OPT_CONFIG" ] && cat "$SYSTEM_OPT_CONFIG" > "$tmp" || : > "$tmp"
+    while IFS='|' read -r legacy key; do
+        [ -n "$legacy" ] || continue
+        legacy_path="$CONFIG_DIR/$legacy"
+        if [ "$(get_conf_value "$legacy_path" enabled)" = "1" ] && ! grep -q "^${key}=" "$tmp" 2>/dev/null; then
+            echo "${key}=1" >> "$tmp"
+        fi
+        rm -f "$legacy_path"
+    done <<'EOF'
+lmk.conf|background_enabled
+device.conf|background_enabled
+reclaim.conf|reclaim_enabled
+kswapd.conf|reclaim_enabled
+protect.conf|protect_enabled
+fstrim.conf|fstrim_enabled
+EOF
+    if [ -s "$tmp" ]; then
+        mv -f "$tmp" "$SYSTEM_OPT_CONFIG"
+    else
+        rm -f "$tmp" "$SYSTEM_OPT_CONFIG"
+    fi
+}
+
+migrate_system_opt_config
 
 config_has_user_settings() {
     awk '
@@ -84,7 +121,7 @@ compact_enable_only_configs() {
         [ -f "$file" ] || continue
         config_has_user_settings "$file" && continue
         case "${file##*/}" in
-            app_rules.conf|coronad.conf|hardware_policy.conf|zram_policy.conf|corona_kernel.conf|lmk.conf|device.conf|reclaim.conf|kswapd.conf|protect.conf|fstrim.conf)
+            app_rules.conf|coronad.conf|hardware_policy.conf|zram_policy.conf|corona_kernel.conf|system_opt.conf)
                 config_has_enabled_switch "$file" && continue
                 ;;
         esac
@@ -547,9 +584,7 @@ EOF
 }
 
 apply_device_config() {
-    [ ! -f "$CONFIG_DIR/device.conf" ] && return
-    enabled=$(grep "^enabled=" "$CONFIG_DIR/device.conf" | cut -d'=' -f2)
-    [ "$enabled" != "1" ] && return
+    system_opt_enabled background_enabled device.conf || return
     device_config set_sync_disabled_for_tests until_reboot 2>/dev/null
     device_config put activity_manager max_cached_processes 32768 2>/dev/null
     device_config put activity_manager max_phantom_processes 32768 2>/dev/null
@@ -558,9 +593,7 @@ apply_device_config() {
 }
 
 apply_protect_config() {
-    [ ! -f "$CONFIG_DIR/protect.conf" ] && return
-    enabled=$(grep "^enabled=" "$CONFIG_DIR/protect.conf" | cut -d'=' -f2)
-    [ "$enabled" != "1" ] && return
+    system_opt_enabled protect_enabled protect.conf || return
     [ -d /dev/memcg/system ] && [ "$mem_total_kb" -gt 8388608 ] && {
         mkdir -p /dev/memcg/system/active_fg
         echo 0 > /dev/memcg/system/active_fg/memory.swappiness 2>/dev/null
@@ -574,9 +607,7 @@ apply_protect_config() {
 }
 
 apply_fstrim_config() {
-    [ ! -f "$CONFIG_DIR/fstrim.conf" ] && return
-    enabled=$(grep "^enabled=" "$CONFIG_DIR/fstrim.conf" | cut -d'=' -f2)
-    [ "$enabled" != "1" ] && return
+    system_opt_enabled fstrim_enabled fstrim.conf || return
     busybox=/data/adb/magisk/busybox
     [ -f /data/adb/ksu/bin/busybox ] && busybox=/data/adb/ksu/bin/busybox
     [ -f /data/adb/ap/bin/busybox ] && busybox=/data/adb/ap/bin/busybox
@@ -810,9 +841,7 @@ apply_le9ec_config() {
 }
 
 apply_lmk_config() {
-    [ ! -f "$CONFIG_DIR/lmk.conf" ] && return
-    enabled=$(get_conf_value "$CONFIG_DIR/lmk.conf" enabled)
-    [ "$enabled" != "1" ] && return
+    system_opt_enabled background_enabled lmk.conf || return
     if [ "$sdk_version" -gt 28 ] 2>/dev/null; then
         levels='4096:0,5120:100,8192:200,32768:250,65536:900,96000:950'
         [ "$mem_total_kb" -gt 8388608 ] && levels='4096:0,5120:100,32768:200,96000:250,131072:900,204800:950'
@@ -822,21 +851,16 @@ apply_lmk_config() {
 }
 
 apply_reclaim_config() {
-    [ ! -f "$CONFIG_DIR/reclaim.conf" ] && return
-    enabled=$(get_conf_value "$CONFIG_DIR/reclaim.conf" enabled)
-    [ "$enabled" != "1" ] && return
+    system_opt_enabled reclaim_enabled reclaim.conf || return
     echo off > /sys/kernel/mm/damon/admin/kdamonds/0/state 2>/dev/null
     echo 0 > /sys/module/process_reclaim/parameters/enable_process_reclaim 2>/dev/null
     if [ "$is_oplus" = "1" ]; then
-        echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
         dumpsys osensemanager proc debug feature 0 2>/dev/null
     fi
 }
 
 apply_kswapd_config() {
-    [ ! -f "$CONFIG_DIR/kswapd.conf" ] && return
-    enabled=$(get_conf_value "$CONFIG_DIR/kswapd.conf" enabled)
-    [ "$enabled" != "1" ] && return
+    system_opt_enabled reclaim_enabled kswapd.conf || return
     kswapd_pid=$(pgrep kswapd 2>/dev/null | head -1)
     [ -z "$kswapd_pid" ] && return
     echo "$kswapd_pid" > /dev/cpuset/foreground/cgroup.procs 2>/dev/null
@@ -1068,7 +1092,7 @@ apply_runtime_configs() {
     apply_protect_config
 }
 
-runtime_config_files='swap.conf memory_pressure.conf vm.conf kernel.conf lmk.conf reclaim.conf kswapd.conf le9ec.conf corona_kernel.conf io_scheduler.conf cpu_governor.conf cpu_hotplug.conf tcp.conf process_priority.conf thread_priority.conf device.conf protect.conf'
+runtime_config_files='swap.conf memory_pressure.conf vm.conf kernel.conf system_opt.conf le9ec.conf corona_kernel.conf io_scheduler.conf cpu_governor.conf cpu_hotplug.conf tcp.conf process_priority.conf thread_priority.conf'
 
 build_effective_runtime_config() {
     target_dir="$1"
@@ -1091,9 +1115,15 @@ apply_runtime_config_name() {
         memory_pressure.conf) apply_memory_pressure_config ;;
         vm.conf) has_mm_sys_entry || apply_vm_config ;;
         kernel.conf) has_mm_sys_entry || apply_kernel_features_config ;;
-        lmk.conf) has_mm_sys_entry || apply_lmk_config ;;
-        reclaim.conf) has_mm_sys_entry || apply_reclaim_config ;;
-        kswapd.conf) has_mm_sys_entry || apply_kswapd_config ;;
+        system_opt.conf)
+            if ! has_mm_sys_entry; then
+                apply_lmk_config
+                apply_reclaim_config
+                apply_kswapd_config
+            fi
+            apply_device_config
+            apply_protect_config
+            ;;
         le9ec.conf) apply_le9ec_config ;;
         corona_kernel.conf) apply_corona_kernel_config ;;
         io_scheduler.conf) apply_io_config ;;
@@ -1109,8 +1139,6 @@ apply_runtime_config_name() {
                 apply_thread_priority_config
             fi
             ;;
-        device.conf) apply_device_config ;;
-        protect.conf) apply_protect_config ;;
     esac
 }
 

@@ -17,6 +17,14 @@ corona_get() {
   [ -f "$file" ] && grep -m1 "^${key}=" "$file" | cut -d'=' -f2-
 }
 
+corona_system_opt_enabled() {
+  local key="$1"
+  local legacy="$2"
+  local value=$(corona_get system_opt.conf "$key")
+  [ -n "$value" ] && { [ "$value" = "1" ]; return; }
+  [ "$(corona_get "$legacy" enabled)" = "1" ]
+}
+
 normalize_zram_path() {
   local requested_path="$1"
   if [ -n "$requested_path" ] && [ -e "$requested_path" ]; then
@@ -398,9 +406,7 @@ apply_corona_le9ec() {
 }
 
 apply_corona_lmk() {
-  [ ! -f "$CORONA_CONFIG/lmk.conf" ] && return
-  local enabled=$(corona_get lmk.conf enabled)
-  [ "$enabled" != "1" ] && return
+  corona_system_opt_enabled background_enabled lmk.conf || return
   local mem_total_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
   local sdk_version=$(getprop ro.build.version.sdk)
   local lowmemorykiller='/sys/module/lowmemorykiller/parameters'
@@ -425,9 +431,7 @@ apply_corona_lmk() {
 }
 
 apply_corona_reclaim() {
-  [ ! -f "$CORONA_CONFIG/reclaim.conf" ] && return
-  local enabled=$(corona_get reclaim.conf enabled)
-  [ "$enabled" != "1" ] && return
+  corona_system_opt_enabled reclaim_enabled reclaim.conf || return
   echo off > /sys/kernel/mm/damon/admin/kdamonds/0/state 2>/dev/null
   echo off > /sys/kernel/mm/damon/admin/kdamonds/1/state 2>/dev/null
   echo 0 > /sys/kernel/mm/damon/admin/kdamonds/nr_kdamonds 2>/dev/null
@@ -435,17 +439,13 @@ apply_corona_reclaim() {
   [ -d /sys/module/process_reclaim/parameters ] && echo 0 > /sys/module/process_reclaim/parameters/enable_process_reclaim 2>/dev/null
   local is_oplus=0; [ -d /proc/oplus_mem ] && is_oplus=1
   [ "$is_oplus" = "1" ] && {
-    echo never > /sys/kernel/mm/transparent_hugepage/enabled 2>/dev/null
-    echo never > /sys/kernel/mm/transparent_hugepage/defrag 2>/dev/null
     echo 32768 > /dev/memcg/memory.zram_used_limit_mb 2>/dev/null
     echo 99 > /dev/memcg/memory.cpuload_threshold 2>/dev/null
   }
 }
 
 apply_corona_kswapd() {
-  [ ! -f "$CORONA_CONFIG/kswapd.conf" ] && return
-  local enabled=$(corona_get kswapd.conf enabled)
-  [ "$enabled" != "1" ] && return
+  corona_system_opt_enabled reclaim_enabled kswapd.conf || return
   local kswapd_pid=$(pgrep kswapd)
   local hybridswapd_pid=$(pgrep hybridswapd)
   [ -n "$kswapd_pid" ] && echo "$kswapd_pid" > /dev/cpuset/foreground/cgroup.procs 2>/dev/null
