@@ -59,29 +59,25 @@
             this.runtimeOptimizerInitialized = true;
             this.mountRuntimeOptimizerPanel();
             document.getElementById('runtime-refresh-btn')?.addEventListener('click', () => this.refreshRuntimeOptimizer(true));
-            document.querySelector('.runtime-details')?.addEventListener('toggle', event => {
-                if (event.currentTarget.open) this.refreshRuntimeOptimizer();
-            });
-            document.querySelector('.runtime-capabilities')?.addEventListener('toggle', event => {
-                if (event.currentTarget.open) this.refreshRuntimeOptimizer();
-            });
-            document.querySelector('.runtime-history')?.addEventListener('toggle', event => {
-                if (event.currentTarget.open) this.refreshRuntimeOptimizer();
-            });
+            this.bindRuntimeDetails();
             const settingsToggle = document.getElementById('runtime-settings-toggle');
+            const toggleSettings = () => this.toggleRuntimePanel('runtime-settings', {
+                cardEl: document.getElementById('runtime-optimizer-panel'),
+                onExpand: () => this.refreshRuntimeOptimizer()
+            });
             settingsToggle?.addEventListener('click', event => {
                 if (event.target.closest('#runtime-refresh-btn')) return;
-                this.toggleRuntimeSettings();
+                toggleSettings();
             });
             settingsToggle?.addEventListener('keydown', event => {
                 if (event.target.closest('#runtime-refresh-btn')) return;
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();
-                this.toggleRuntimeSettings();
+                toggleSettings();
             });
             document.getElementById('runtime-advanced-toggle')?.addEventListener('click', () => {
                 if (this.rejectDaemonDependentAction()) return;
-                this.toggleRuntimeAdvanced();
+                this.toggleRuntimePanel('runtime-advanced');
             });
             document.querySelectorAll('#runtime-class-options button').forEach(button => {
                 button.addEventListener('click', () => {
@@ -130,31 +126,30 @@
             target.insertBefore(overview, anchor);
             target.insertBefore(settings, anchor);
         },
-        toggleRuntimeSettings() {
-            const toggle = document.getElementById('runtime-settings-toggle');
-            const content = document.getElementById('runtime-settings-content');
-            if (!toggle || !content) return;
-            const opening = content._panelState !== 'opening' && content._panelState !== 'open';
-            if (opening) {
-                this.expandPanelContent(content, toggle, {
-                    cardEl: document.getElementById('runtime-optimizer-panel'),
-                    onExpand: () => this.refreshRuntimeOptimizer()
+        bindRuntimeDetails() {
+            document.querySelectorAll('.runtime-details, .runtime-capabilities, .runtime-history').forEach(details => {
+                details.addEventListener('toggle', () => {
+                    if (!details.open) return;
+                    this.refreshRuntimeOptimizer();
+                    const content = [...details.children].find(child => child.tagName !== 'SUMMARY');
+                    if (!content?.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                    content._runtimeExpandAnimation?.cancel();
+                    content._runtimeExpandAnimation = content.animate([
+                        { opacity: 0, transform: 'translateY(-7px)', clipPath: 'inset(0 0 100% 0)' },
+                        { opacity: 1, transform: 'translateY(0)', clipPath: 'inset(0)' }
+                    ], { duration: 190, easing: 'cubic-bezier(.22, 1, .36, 1)' });
                 });
-            } else {
-                this.collapsePanelContent(content, toggle, {
-                    cardEl: document.getElementById('runtime-optimizer-panel')
-                });
-            }
+            });
         },
-        toggleRuntimeAdvanced() {
-            const toggle = document.getElementById('runtime-advanced-toggle');
-            const content = document.getElementById('runtime-advanced-content');
+        toggleRuntimePanel(prefix, options = {}) {
+            const toggle = document.getElementById(`${prefix}-toggle`);
+            const content = document.getElementById(`${prefix}-content`);
             if (!toggle || !content) return;
             const opening = content._panelState !== 'opening' && content._panelState !== 'open';
             if (opening) {
-                this.expandPanelContent(content, toggle);
+                this.expandPanelContent(content, toggle, options);
             } else {
-                this.collapsePanelContent(content, toggle);
+                this.collapsePanelContent(content, toggle, options);
             }
         },
         parseRuntimeKeyValues(content) {
