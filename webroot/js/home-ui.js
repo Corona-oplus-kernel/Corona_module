@@ -828,20 +828,19 @@
         this.showOverlay('battery-detail-overlay');
         const content = document.getElementById('battery-detail-content');
         content.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-sub)">加载中...</div>';
-        const [status, health, voltage, temp, capacity, chargeType, technology, cycleCount, chargeFull, chargeFullDesign] = await Promise.all([
-            this.exec('cat /sys/class/power_supply/battery/status 2>/dev/null'),
-            this.exec('cat /sys/class/power_supply/battery/health 2>/dev/null'),
-            this.exec('cat /sys/class/power_supply/battery/voltage_now 2>/dev/null'),
-            this.exec('cat /sys/class/power_supply/battery/temp 2>/dev/null'),
-            this.exec('cat /sys/class/power_supply/battery/capacity 2>/dev/null'),
-            this.exec('cat /sys/class/power_supply/battery/charge_type 2>/dev/null'),
-            this.exec('cat /sys/class/power_supply/battery/technology 2>/dev/null'),
-            this.exec('cat /sys/class/power_supply/battery/cycle_count 2>/dev/null'),
-            this.exec('cat /sys/class/power_supply/battery/charge_full 2>/dev/null'),
-            this.exec('cat /sys/class/power_supply/battery/charge_full_design 2>/dev/null')
-        ]);
-        let finalCapacity = capacity;
-        if (!finalCapacity || finalCapacity === '') finalCapacity = await this.exec('cat /sys/class/power_supply/battery/uevent 2>/dev/null | grep POWER_SUPPLY_CAPACITY= | cut -d= -f2');
+        const battery = await this.execSnapshot({
+            STATUS: 'cat /sys/class/power_supply/battery/status 2>/dev/null',
+            HEALTH: 'cat /sys/class/power_supply/battery/health 2>/dev/null',
+            VOLTAGE: 'cat /sys/class/power_supply/battery/voltage_now 2>/dev/null',
+            TEMP: 'cat /sys/class/power_supply/battery/temp 2>/dev/null',
+            CAPACITY: 'value=$(cat /sys/class/power_supply/battery/capacity 2>/dev/null); [ -n "$value" ] || value=$(awk -F= \'/^POWER_SUPPLY_CAPACITY=/ { print $2; exit }\' /sys/class/power_supply/battery/uevent 2>/dev/null); printf "%s" "$value"',
+            CHARGE_TYPE: 'cat /sys/class/power_supply/battery/charge_type 2>/dev/null',
+            TECHNOLOGY: 'cat /sys/class/power_supply/battery/technology 2>/dev/null',
+            CYCLE_COUNT: 'cat /sys/class/power_supply/battery/cycle_count 2>/dev/null',
+            CHARGE_FULL: 'cat /sys/class/power_supply/battery/charge_full 2>/dev/null',
+            CHARGE_DESIGN: 'cat /sys/class/power_supply/battery/charge_full_design 2>/dev/null'
+        });
+        const { STATUS: status, HEALTH: health, VOLTAGE: voltage, TEMP: temp, CAPACITY: finalCapacity, CHARGE_TYPE: chargeType, TECHNOLOGY: technology, CYCLE_COUNT: cycleCount, CHARGE_FULL: chargeFull, CHARGE_DESIGN: chargeFullDesign } = battery;
         const statusMap = { 'Charging': '充电中', 'Discharging': '放电中', 'Full': '已充满', 'Not charging': '未充电', 'Unknown': '未知' };
         const healthMap = { 'Good': '良好', 'Overheat': '过热', 'Dead': '损坏', 'Over voltage': '过压', 'Unknown': '未知', 'Cold': '过冷' };
         const voltageV = voltage ? (parseInt(voltage) / 1000000).toFixed(3) : '--';

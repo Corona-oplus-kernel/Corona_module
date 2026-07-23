@@ -147,7 +147,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072325` : '';
+        return map[name] ? `${map[name]}?v=2026072326` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -404,6 +404,23 @@ class CoronaAddon {
     async exec(cmd) {
         const result = await this.execResult(cmd);
         return result.stdout;
+    }
+    decodeShellValue(value) {
+        if (!value) return '';
+        try { return atob(value); } catch (error) { return ''; }
+    }
+    async execSnapshot(fields) {
+        const entries = Object.entries(fields || {}).filter(([key, command]) => /^[A-Z0-9_]+$/.test(key) && command);
+        if (!entries.length) return {};
+        const emit = `emit_value() { key="$1"; value="$2"; printf '%s ' "$key"; printf '%s' "$value" | base64 2>/dev/null | tr -d '\\r\\n'; printf '\\n'; }`;
+        const output = await this.exec(`${emit}; ${entries.map(([key, command]) => `emit_value ${key} "$(${command})"`).join('; ')}`);
+        const values = {};
+        String(output || '').split('\n').forEach(line => {
+            const separator = line.indexOf(' ');
+            if (separator <= 0) return;
+            values[line.slice(0, separator)] = this.decodeShellValue(line.slice(separator + 1).trim());
+        });
+        return values;
     }
     shellQuote(value) {
         return `'${String(value).replace(/'/g, `'\\''`)}'`;

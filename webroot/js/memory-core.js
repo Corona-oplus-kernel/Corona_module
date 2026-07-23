@@ -321,18 +321,19 @@
         return this.applyIOConfigImmediate('scheduler', skipPreview);
     },
     async loadDeviceInfo() {
-        const [brand, marketName, model, socModel, hardware, chipname, androidVersion, sdk, kernelVersion, battDesign] = await Promise.all([
-            this.exec('getprop ro.product.brand'),
-            this.exec('getprop ro.vendor.oplus.market.name'),
-            this.exec('getprop ro.product.model'),
-            this.exec('getprop ro.board.platform'),
-            this.exec('getprop ro.hardware'),
-            this.exec('getprop ro.hardware.chipname'),
-            this.exec('getprop ro.build.version.release'),
-            this.exec('getprop ro.build.version.sdk'),
-            this.exec('uname -r'),
-            this.exec('cat /sys/class/power_supply/battery/charge_full_design 2>/dev/null')
-        ]);
+        const info = await this.execSnapshot({
+            BRAND: 'getprop ro.product.brand',
+            MARKET: 'getprop ro.vendor.oplus.market.name',
+            MODEL: 'getprop ro.product.model',
+            SOC: 'getprop ro.board.platform',
+            HARDWARE: 'getprop ro.hardware',
+            CHIP: 'getprop ro.hardware.chipname',
+            ANDROID: 'getprop ro.build.version.release',
+            SDK: 'getprop ro.build.version.sdk',
+            KERNEL: 'uname -r',
+            BATTERY_DESIGN: 'cat /sys/class/power_supply/battery/charge_full_design 2>/dev/null'
+        });
+        const { BRAND: brand, MARKET: marketName, MODEL: model, SOC: socModel, HARDWARE: hardware, CHIP: chipname, ANDROID: androidVersion, SDK: sdk, KERNEL: kernelVersion, BATTERY_DESIGN: battDesign } = info;
         this.kernelVersion = kernelVersion || '';
         await this.detectZramAlgorithms();
         if (typeof this.detectZramFeatures === "function") await this.detectZramFeatures();
@@ -396,11 +397,11 @@
     },
     async detectCpuClusters() {
         this.cpuClusterInfo = { little: 0, mid: 0, big: 0, prime: 0 };
-        const cpuCount = parseInt(await this.exec('ls -d /sys/devices/system/cpu/cpu[0-9]* 2>/dev/null | wc -l')) || 0;
-        const freqs = [];
-        const freqPromises = [];
-        for (let i = 0; i < cpuCount; i++) { freqPromises.push(this.exec(`cat /sys/devices/system/cpu/cpu${i}/cpufreq/cpuinfo_max_freq 2>/dev/null`).then(maxFreq => { if (maxFreq) freqs.push({ cpu: i, freq: parseInt(maxFreq) }); })); }
-        await Promise.all(freqPromises);
+        const raw = await this.exec('for cpu in /sys/devices/system/cpu/cpu[0-9]*; do id=${cpu##*cpu}; freq=$(cat "$cpu/cpufreq/cpuinfo_max_freq" 2>/dev/null); [ -n "$freq" ] && printf "%s %s\\n" "$id" "$freq"; done');
+        const freqs = String(raw || '').split('\n').map(line => {
+            const [cpu, freq] = line.trim().split(/\s+/).map(Number);
+            return Number.isFinite(cpu) && Number.isFinite(freq) ? { cpu, freq } : null;
+        }).filter(Boolean);
         if (freqs.length === 0) return;
         const uniqueFreqs = [...new Set(freqs.map(f => f.freq))].sort((a, b) => a - b);
         if (uniqueFreqs.length === 1) this.cpuClusterInfo.little = freqs.length;
@@ -1101,10 +1102,6 @@
         card.hidden = !visible;
         card.style.display = visible ? '' : 'none';
     },
-    decodeSnapshotValue(value) {
-        if (!value) return '';
-        try { return atob(value); } catch (error) { return ''; }
-    },
     async readZramStatusSnapshot(configuredPath) {
         const path = this.shellQuote(configuredPath || '/dev/block/zram0');
         const command = `emit_value() { tag="$1"; value="$2"; printf '%s ' "$tag"; printf '%s' "$value" | base64 2>/dev/null | tr -d '\\r\\n'; printf '\\n'; }; configured=${path}; active_entry=$(awk 'NR > 1 { dev=$1; sub(/^.*\\//, "", dev); if (dev ~ /^zram[0-9]+$/) { print $1; exit } }' /proc/swaps 2>/dev/null); active_block=\${active_entry##*/}; configured_block=\${configured##*/}; block=\${active_block:-$configured_block}; case "$block" in zram[0-9]*) ;; *) block= ;; esac; zram_path=$configured; if [ -n "$active_block" ]; then for candidate in /dev/block/$active_block /dev/$active_block; do [ -e "$candidate" ] && { zram_path=$candidate; break; }; done; fi; emit_value PATH "$zram_path"; if [ -n "$block" ]; then base=/sys/block/$block; emit_value ALG "$(cat "$base/comp_algorithm" 2>/dev/null)"; emit_value SIZE "$(cat "$base/disksize" 2>/dev/null)"; emit_value MM "$(cat "$base/mm_stat" 2>/dev/null)"; emit_value BLOCK "$(cat "$base/stat" 2>/dev/null)"; fi; emit_value SWAPPINESS "$(cat /proc/sys/vm/swappiness 2>/dev/null)"; emit_value SWAP "$(awk -v block="$block" 'NR > 1 { dev=$1; sub(/^.*\\//, "", dev); if (dev == block) { print $1, $2, $3, $4, $5; exit } }' /proc/swaps 2>/dev/null)"`;
@@ -1113,7 +1110,7 @@
         String(output || '').split('\n').forEach(line => {
             const separator = line.indexOf(' ');
             if (separator <= 0) return;
-            values[line.slice(0, separator)] = this.decodeSnapshotValue(line.slice(separator + 1).trim());
+            values[line.slice(0, separator)] = this.decodeShellValue(line.slice(separator + 1).trim());
         });
         const swapParts = String(values.SWAP || '').trim().split(/\s+/);
         return {
@@ -1237,11 +1234,12 @@
     async detectZramFeatures() {
         if (!this.zramFeatures) this.zramFeatures = { multiComp: false, zstdLevel: false, writebackControl: false, writebackMode: 'none' };
         const zramBlock = this.getZramBlockName(this.state.zramPath) || 'zram0';
-        const [recompNode, zstdNode, writebackNode] = await Promise.all([
-            this.exec(`[ -f /sys/block/${zramBlock}/recomp_algorithm ] && echo 1 || echo 0`),
-            this.exec('[ -f /sys/module/zstd/parameters/compression_level ] && echo 1 || echo 0'),
-            this.exec(`if [ ! -x /product/bin/nandswap_tool ]; then echo none; elif [ -f /sys/block/${zramBlock}/hybridswap_loop_device ]; then echo hybrid; elif [ -f /sys/block/${zramBlock}/backing_dev ] && [ -f /sys/block/${zramBlock}/writeback_limit_enable ]; then echo standard; else echo none; fi`)
-        ]);
+        const feature = await this.execSnapshot({
+            RECOMP: `[ -f /sys/block/${zramBlock}/recomp_algorithm ] && echo 1 || echo 0`,
+            ZSTD: '[ -f /sys/module/zstd/parameters/compression_level ] && echo 1 || echo 0',
+            WRITEBACK: `if [ ! -x /product/bin/nandswap_tool ]; then echo none; elif [ -f /sys/block/${zramBlock}/hybridswap_loop_device ]; then echo hybrid; elif [ -f /sys/block/${zramBlock}/backing_dev ] && [ -f /sys/block/${zramBlock}/writeback_limit_enable ]; then echo standard; else echo none; fi`
+        });
+        const { RECOMP: recompNode, ZSTD: zstdNode, WRITEBACK: writebackNode } = feature;
         this.zramFeatures.multiComp = (recompNode || '').trim() === '1';
         this.zramFeatures.zstdLevel = (zstdNode || '').trim() === '1';
         this.zramFeatures.writebackMode = (writebackNode || '').trim() || 'none';
@@ -1956,8 +1954,7 @@
             });
         });
     },
-    async getCpuStat(cpuId) {
-        const stat = await this.exec(`grep "^cpu${cpuId} " /proc/stat 2>/dev/null`);
+    parseCpuStat(stat) {
         if (!stat) return null;
         const parts = stat.split(/\s+/);
         if (parts.length < 5) return null;
@@ -1973,6 +1970,11 @@
         return { total, active };
     },
     async updateCpuLoads() {
+        const stats = {};
+        String(await this.exec("grep '^cpu[0-9][0-9]* ' /proc/stat 2>/dev/null") || '').split('\n').forEach(line => {
+            const cpuId = Number.parseInt(line.match(/^cpu(\d+)\s/)?.[1], 10);
+            if (Number.isFinite(cpuId)) stats[cpuId] = this.parseCpuStat(line);
+        });
         for (const core of this.cpuCores) {
             const el = document.querySelector(`.cpu-core[data-cpu="${core.id}"] .cpu-core-load`);
             if (!el) continue;
@@ -1981,7 +1983,7 @@
                 el.classList.remove('has-usage');
                 continue;
             }
-            const s1 = await this.getCpuStat(core.id);
+            const s1 = stats[core.id];
             if (!s1) continue;
             if (!this.cpuStats[core.id]) { this.cpuStats[core.id] = s1; continue; }
             const prev = this.cpuStats[core.id];
