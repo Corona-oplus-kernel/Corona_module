@@ -874,6 +874,7 @@
       "runtimeForeground": "Foreground app",
       "runtimeDetection": "Detection source",
       "runtimeMode": "Runtime mode",
+      "runtimeDaemonUsage": "Daemon usage",
       "runtimeTemperature": "Peak temperature",
       "runtimeEbpfState": "eBPF state",
       "runtimeKnownThreads": "Tracked threads",

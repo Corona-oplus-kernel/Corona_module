@@ -589,7 +589,7 @@
                 badge.textContent = this.t(running ? 'runtimeRunning' : 'runtimeStopped');
             }
             if (!running) {
-                ['runtime-foreground', 'runtime-detection', 'runtime-mode', 'runtime-temperature', 'runtime-cpu-pressure', 'runtime-io-pressure'].forEach(id => this.setRuntimeText(id, '--'));
+                ['runtime-foreground', 'runtime-detection', 'runtime-mode', 'runtime-daemon-usage', 'runtime-temperature', 'runtime-cpu-pressure', 'runtime-io-pressure'].forEach(id => this.setRuntimeText(id, '--'));
                 const error = document.getElementById('runtime-ebpf-error');
                 if (error) error.hidden = true;
                 return;
@@ -597,6 +597,11 @@
             this.setRuntimeText('runtime-foreground', status.foreground || status.package);
             this.setRuntimeText('runtime-detection', status.foreground_source);
             this.setRuntimeText('runtime-mode', status.runtime_mode || status.mode);
+            const daemonMemoryKb = Number(status.daemon_rss_kb || 0);
+            const daemonMemory = daemonMemoryKb >= 1024
+                ? `${(daemonMemoryKb / 1024).toFixed(1)} MB`
+                : `${daemonMemoryKb} KB`;
+            this.setRuntimeText('runtime-daemon-usage', `CPU ${Number(status.daemon_cpu_percent || 0).toFixed(2)}% · ${daemonMemory}`);
             this.setRuntimeText('runtime-temperature', status.max_temperature_c ? `${status.max_temperature_c} °C` : '--');
             this.setRuntimeText('runtime-cpu-pressure', `${status.cpu_pressure_avg10 || '0'}% · ${this.runtimePressureText(status.cpu_pressure_level)}`);
             this.setRuntimeText('runtime-io-pressure', `${status.io_pressure_avg10 || '0'}% · ${this.runtimePressureText(status.io_pressure_level)}`);

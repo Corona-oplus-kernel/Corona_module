@@ -874,6 +874,7 @@
       "runtimeForeground": "前台应用",
       "runtimeDetection": "检测来源",
       "runtimeMode": "运行模式",
+      "runtimeDaemonUsage": "守护占用",
       "runtimeTemperature": "最高温度",
       "runtimeEbpfState": "eBPF 状态",
       "runtimeKnownThreads": "已跟踪线程",

@@ -725,6 +725,43 @@ impl Drop for BpfMonitor {
     }
 }
 
+#[derive(Default)]
+struct ResourceUsage {
+    cpu_percent: f64,
+    rss_kb: u64,
+    cpu_count: usize,
+    process_ticks: Option<u64>,
+    system_ticks: Option<u64>,
+}
+
+impl ResourceUsage {
+    fn new() -> Self {
+        Self {
+            cpu_count: parse_cpu_list(&read_text("/sys/devices/system/cpu/online")).len().max(1),
+            ..Self::default()
+        }
+    }
+
+    fn sample(&mut self) {
+        let process_ticks = process_cpu_ticks();
+        let system_ticks = system_cpu_ticks();
+        if let (Some(current_process), Some(current_system), Some(previous_process), Some(previous_system)) =
+            (process_ticks, system_ticks, self.process_ticks, self.system_ticks)
+        {
+            let process_delta = current_process.saturating_sub(previous_process);
+            let system_delta = current_system.saturating_sub(previous_system);
+            if system_delta > 0 {
+                let capacity = self.cpu_count as f64;
+                self.cpu_percent = (process_delta as f64 * capacity * 100.0 / system_delta as f64)
+                    .min(capacity * 100.0);
+            }
+        }
+        self.process_ticks = process_ticks;
+        self.system_ticks = system_ticks;
+        self.rss_kb = process_rss_kb();
+    }
+}
+
 struct Daemon {
     paths: Paths,
     rules: Rules,
@@ -777,10 +814,42 @@ struct Daemon {
     zram_policy_reason: String,
     zram_policy_child: Option<Child>,
     last_affinity_state: String,
+    resource_usage: ResourceUsage,
 }
 
 fn read_text(path: impl AsRef<Path>) -> String {
     fs::read_to_string(path).unwrap_or_default()
+}
+
+fn parse_process_cpu_ticks(stat: &str) -> Option<u64> {
+    let mut fields = stat.get(stat.rfind(')')? + 1..)?.split_whitespace();
+    let user = fields.nth(11)?.parse::<u64>().ok()?;
+    Some(user + fields.next()?.parse::<u64>().ok()?)
+}
+
+fn process_cpu_ticks() -> Option<u64> {
+    parse_process_cpu_ticks(&read_text("/proc/self/stat"))
+}
+
+fn parse_system_cpu_ticks(stat: &str) -> Option<u64> {
+    let mut fields = stat.lines().next()?.split_whitespace();
+    (fields.next()? == "cpu").then_some(())?;
+    let total = fields.filter_map(|value| value.parse::<u64>().ok()).sum::<u64>();
+    (total > 0).then_some(total)
+}
+
+fn system_cpu_ticks() -> Option<u64> {
+    parse_system_cpu_ticks(&read_text("/proc/stat"))
+}
+
+fn parse_process_rss_kb(status: &str) -> u64 {
+    status.lines()
+        .find_map(|line| line.strip_prefix("VmRSS:")?.split_whitespace().next()?.parse().ok())
+        .unwrap_or(0)
+}
+
+fn process_rss_kb() -> u64 {
+    parse_process_rss_kb(&read_text("/proc/self/status"))
 }
 
 fn write_text(path: impl AsRef<Path>, value: impl AsRef<[u8]>) -> io::Result<()> {
@@ -2704,6 +2773,7 @@ impl Daemon {
             zram_policy_reason: String::new(),
             zram_policy_child: None,
             last_affinity_state: String::new(),
+            resource_usage: ResourceUsage::new(),
             paths,
         };
         daemon.update_environment();
@@ -2711,6 +2781,7 @@ impl Daemon {
         constrain_daemon(&daemon.topology);
         apply_walt_hints(&daemon.manual_rules);
         daemon.stop_legacy_zram_policy();
+        daemon.resource_usage.sample();
         daemon
     }
 
@@ -3287,9 +3358,12 @@ impl Daemon {
     }
 
     fn write_state(&mut self, foreground: &str, foreground_source: &str) {
+        self.resource_usage.sample();
         let mut state = format!(
-            "pid={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\ncpu_pressure_avg10={:.2}\nio_pressure_avg10={:.2}\ncpu_pressure_level={}\nio_pressure_level={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_target_cpus={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_write_ops={}\nufs_write_sectors={}\nufs_average_write_sectors={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nefficiency_cpus={}\nbalanced_cpus={}\nperformance_cpus={}\nlatency_cpus={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
+            "pid={}\ndaemon_cpu_percent={:.2}\ndaemon_rss_kb={}\nforeground={}\nforeground_source={}\nprofile={}\nauto_affinity={}\nebpf_requested={}\nebpf_active={}\nebpf_error_stage={}\nebpf_error_errno={}\nmemory_pressure={}\npressure_avg10={}\ncpu_pressure_avg10={:.2}\nio_pressure_avg10={:.2}\ncpu_pressure_level={}\nio_pressure_level={}\nruntime_mode={}\nmax_temperature_c={:.1}\nbattery_saver={}\nscreen_on={}\nirq_policy={}\nirq_target_cpus={}\nirq_managed={}\nirq_busy={}\nirq_applied={}\nufs_policy={}\nufs_wb_available={}\nufs_wb_current={}\nufs_write_ops={}\nufs_write_sectors={}\nufs_average_write_sectors={}\nufs_applied={}\ngpu_policy={}\ngpu_busy_percent={}\ngpu_min_freq={}\ngpu_applied={}\nio_policy={}\nio_active_devices={}\nio_read_ahead_kb={}\nio_nr_requests={}\nio_applied={}\nefficiency_cpus={}\nbalanced_cpus={}\nperformance_cpus={}\nlatency_cpus={}\nknown_threads={}\nloops={}\nforeground_changes={}\nthreads_seen={}\nthreads_new={}\naffinity_applied={}\naffinity_failed={}\nmanual_applied={}\nreloads={}\ntop_app_hits={}\ndumpsys_fallbacks={}\nbpf_events={}\nbpf_attach_failures={}\n",
             process::id(),
+            self.resource_usage.cpu_percent,
+            self.resource_usage.rss_kb,
             foreground,
             foreground_source,
             if self.last_profile.is_empty() {
@@ -3747,6 +3821,14 @@ mod tests {
     fn parses_task_cpu_and_start_time() {
         let stat = "123 (Render Thread) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21";
         assert_eq!(parse_task_stat_text(stat), Some((23, 19)));
+    }
+
+    #[test]
+    fn parses_process_resource_usage() {
+        let stat = "123 (Corona daemon) S 1 2 3 4 5 6 7 8 9 10 11 12 13 14";
+        assert_eq!(parse_process_cpu_ticks(stat), Some(23));
+        assert_eq!(parse_system_cpu_ticks("cpu  10 20 30 40 5\ncpu0 1 2 3 4\n"), Some(105));
+        assert_eq!(parse_process_rss_kb("Name:\tcoronad\nVmRSS:\t  3584 kB\n"), 3584);
     }
 
     #[test]
