@@ -743,8 +743,10 @@
         overlays.forEach(id => {
             const overlay = document.getElementById(id);
             const closeBtn = document.getElementById(id.replace('-overlay', '-close'));
-            if (closeBtn) closeBtn.addEventListener('click', () => this.hideOverlay(id));
-            if (overlay) overlay.addEventListener('click', (e) => { if (e.target === overlay) this.hideOverlay(id); });
+            if (closeBtn) closeBtn.addEventListener('click', () => this.closeHomeDetail(id));
+            if (overlay) overlay.addEventListener('click', event => {
+                if (event.target === overlay) this.closeHomeDetail(id);
+            });
         });
         this.initSurfaceSwipeNavigation();
         document.getElementById('xinran-overlay').addEventListener('click', (e) => { this.hideOverlay('xinran-overlay'); });
@@ -755,10 +757,16 @@
     initSurfaceSwipeNavigation() {
         document.querySelectorAll('.home-return-overlay').forEach(overlay => {
             const card = overlay.querySelector('.detail-card');
-            this.bindSurfaceSwipe(card, () => this.hideOverlay(overlay.id));
+            this.bindSurfaceSwipe(card, () => this.closeHomeDetail(overlay.id));
         });
         const settingsPage = document.getElementById('page-settings');
         this.bindSurfaceSwipe(settingsPage, () => this.switchPage('home'));
+    },
+    closeHomeDetail(id) {
+        this.hideOverlay(id);
+        Promise.resolve(this.switchPage('home')).catch(error => {
+            console.error('home detail navigation failed', error);
+        });
     },
     bindSurfaceSwipe(surface, onDismiss) {
         if (!surface || surface.dataset.swipeBound === '1') return;
