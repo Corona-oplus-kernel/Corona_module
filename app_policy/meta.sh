@@ -88,31 +88,36 @@ list_zip_entries() {
     [ -n "$BUSYBOX" ] && "$BUSYBOX" unzip -l "$archive" 2>/dev/null | awk 'NF && $NF !~ /^Archive:|files?$|Date|Length|----/ {print $NF}'
 }
 
+find_apk_icon() {
+    APK_PATH=$(pm path "$1" 2>/dev/null | sed -n 's/^package://p' | head -n1)
+    [ -f "$APK_PATH" ] || return 1
+    ICON_ENTRY=$(list_zip_entries "$APK_PATH" | grep -E '^res/(mipmap|drawable)[^/]*/((ic_launcher|app_icon|logo|icon)[^/]*)\.(png|webp|jpg|jpeg)$' | sort | tail -n1)
+    [ -n "$ICON_ENTRY" ] || ICON_ENTRY=$(unzip -l "$APK_PATH" 2>/dev/null | awk '/ res\// && $4 ~ /\.(png|webp|jpg|jpeg)$/ {print $1 " " $4}' | sort -n | tail -n1 | awk '{print $2}')
+    [ -n "$ICON_ENTRY" ]
+}
+
+extract_zip_entry() {
+    if command -v unzip >/dev/null 2>&1; then unzip -p "$1" "$2" > "$3" 2>/dev/null
+    elif command -v toybox >/dev/null 2>&1; then toybox unzip -p "$1" "$2" > "$3" 2>/dev/null
+    elif [ -n "$BUSYBOX" ]; then "$BUSYBOX" unzip -p "$1" "$2" > "$3" 2>/dev/null
+    fi
+}
+
 output_icon() {
     pkg="$1"
     component="${2:-$(resolve_launcher_component "$pkg") }"
     component=$(printf '%s' "$component" | sed 's/[[:space:]]*$//')
     launcher_icon=$(run_launcher_meta icon-data "$pkg" "$component")
     [ -n "$launcher_icon" ] && { printf '%s' "$launcher_icon"; return 0; }
-    apk=$(pm path "$pkg" 2>/dev/null | sed -n 's/^package://p' | head -n1)
-    [ -f "$apk" ] || exit 0
-    icon_entry=$(list_zip_entries "$apk" | grep -E '^res/(mipmap|drawable)[^/]*/((ic_launcher|app_icon|logo|icon)[^/]*)\.(png|webp|jpg|jpeg)$' | sort | tail -n1)
-    [ -n "$icon_entry" ] || icon_entry=$(unzip -l "$apk" 2>/dev/null | awk '/ res\// && $4 ~ /\.(png|webp|jpg|jpeg)$/ {print $1 " " $4}' | sort -n | tail -n1 | awk '{print $2}')
-    [ -n "$icon_entry" ] || exit 0
+    find_apk_icon "$pkg" || exit 0
     tmp=$(mktemp)
-    if command -v unzip >/dev/null 2>&1; then
-        unzip -p "$apk" "$icon_entry" > "$tmp" 2>/dev/null
-    elif command -v toybox >/dev/null 2>&1; then
-        toybox unzip -p "$apk" "$icon_entry" > "$tmp" 2>/dev/null
-    elif [ -n "$BUSYBOX" ]; then
-        "$BUSYBOX" unzip -p "$apk" "$icon_entry" > "$tmp" 2>/dev/null
-    fi
+    extract_zip_entry "$APK_PATH" "$ICON_ENTRY" "$tmp"
     [ -s "$tmp" ] || {
         rm -f "$tmp"
         exit 0
     }
     mime=image/png
-    case "$icon_entry" in
+    case "$ICON_ENTRY" in
         *.webp) mime=image/webp ;;
         *.jpg|*.jpeg) mime=image/jpeg ;;
     esac
@@ -139,24 +144,14 @@ output_icon_file() {
             exit 0
         fi
     fi
-    apk=$(pm path "$pkg" 2>/dev/null | sed -n 's/^package://p' | head -n1)
-    [ -f "$apk" ] || exit 0
-    icon_entry=$(list_zip_entries "$apk" | grep -E '^res/(mipmap|drawable)[^/]*/((ic_launcher|app_icon|logo|icon)[^/]*)\.(png|webp|jpg|jpeg)$' | sort | tail -n1)
-    [ -n "$icon_entry" ] || icon_entry=$(unzip -l "$apk" 2>/dev/null | awk '/ res\// && $4 ~ /\.(png|webp|jpg|jpeg)$/ {print $1 " " $4}' | sort -n | tail -n1 | awk '{print $2}')
-    [ -n "$icon_entry" ] || exit 0
-    ext=${icon_entry##*.}
+    find_apk_icon "$pkg" || exit 0
+    ext=${ICON_ENTRY##*.}
     out="$ICONS_DIR/$pkg.$ext"
     if [ -s "$out" ]; then
         printf '%s' "$out"
         exit 0
     fi
-    if command -v unzip >/dev/null 2>&1; then
-        unzip -p "$apk" "$icon_entry" > "$out" 2>/dev/null
-    elif command -v toybox >/dev/null 2>&1; then
-        toybox unzip -p "$apk" "$icon_entry" > "$out" 2>/dev/null
-    elif [ -n "$BUSYBOX" ]; then
-        "$BUSYBOX" unzip -p "$apk" "$icon_entry" > "$out" 2>/dev/null
-    fi
+    extract_zip_entry "$APK_PATH" "$ICON_ENTRY" "$out"
     [ -s "$out" ] && printf '%s' "$out" || rm -f "$out"
 }
 
