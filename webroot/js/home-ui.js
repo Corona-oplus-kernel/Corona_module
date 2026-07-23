@@ -802,21 +802,7 @@
     showOverlay(id) {
         const overlay = document.getElementById(id);
         if (!overlay) return;
-        if (overlay._hideTimer) {
-            clearTimeout(overlay._hideTimer);
-            overlay._hideTimer = null;
-        }
-        if (overlay._hideTransitionEnd) {
-            overlay.removeEventListener('transitionend', overlay._hideTransitionEnd);
-            overlay._hideTransitionEnd = null;
-        }
-        overlay.classList.remove('hidden', 'closing');
-        overlay.querySelectorAll('.detail-card, .priority-process-card, .script-edit-card').forEach(card => {
-            card.scrollTop = 0;
-            ['height', 'max-height', 'transform', 'opacity', 'transition', 'will-change'].forEach(name => card.style.removeProperty(name));
-        });
-        overlay.querySelectorAll('textarea').forEach(t => { t.scrollTop = 0; });
-        requestAnimationFrame(() => overlay.classList.add('show'));
+        this.openOverlayElement(overlay);
         if (overlay.classList.contains('home-return-overlay') && window.history.state?.coronaOverlay !== id) {
             window.history.pushState({ coronaPage: 'home', coronaOverlay: id }, '', `#home/${id}`);
         }
@@ -828,48 +814,15 @@
     hideOverlay(id) {
         const overlay = document.getElementById(id);
         if (!overlay) return;
-        if (overlay._hideTimer) {
-            clearTimeout(overlay._hideTimer);
-            overlay._hideTimer = null;
-        }
-        if (overlay._hideTransitionEnd) {
-            overlay.removeEventListener('transitionend', overlay._hideTransitionEnd);
-            overlay._hideTransitionEnd = null;
-        }
         if (id === 'module-intro-overlay') {
-            overlay.classList.add('closing');
-            overlay.classList.remove('show');
-            overlay._hideTimer = setTimeout(() => {
-                overlay.classList.add('hidden');
-                overlay.classList.remove('closing');
-                overlay._hideTimer = null;
-            }, 250);
+            this.closeOverlayElement(overlay, { duration: 250, closingClass: 'closing' });
             return;
         }
-        overlay.classList.remove('show');
         if (overlay.classList.contains('no-close-btn')) {
             const floatingHeader = document.getElementById('floating-header');
             if (floatingHeader) floatingHeader.classList.remove('overlay-hidden');
         }
-        const finalize = () => {
-            if (overlay._hideTimer) {
-                clearTimeout(overlay._hideTimer);
-                overlay._hideTimer = null;
-            }
-            if (overlay._hideTransitionEnd) {
-                overlay.removeEventListener('transitionend', overlay._hideTransitionEnd);
-                overlay._hideTransitionEnd = null;
-            }
-            overlay.classList.add('hidden');
-        };
-        const onTransitionEnd = (e) => {
-            if (e.propertyName === 'transform' && e.target.classList && e.target.classList.contains('detail-card')) {
-                finalize();
-            }
-        };
-        overlay._hideTransitionEnd = onTransitionEnd;
-        overlay.addEventListener('transitionend', onTransitionEnd);
-        overlay._hideTimer = setTimeout(finalize, 300);
+        this.closeOverlayElement(overlay, { duration: 300, endSelector: '.detail-card', endProperty: 'transform' });
     },
     async showBatteryDetail() {
         this.showOverlay('battery-detail-overlay');

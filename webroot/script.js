@@ -148,7 +148,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072322` : '';
+        return map[name] ? `${map[name]}?v=2026072324` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -618,6 +618,70 @@ class CoronaAddon {
         const payload = JSON.stringify({ __version: 10, apps: this.appMetaCache || {} });
         const base64Data = btoa(unescape(encodeURIComponent(payload)));
         await this.exec(`echo '${base64Data}' > ${this.shellQuote(path)}`);
+    }
+    clearOverlayLifecycle(overlay) {
+        if (!overlay) return;
+        if (overlay._hideTimer) clearTimeout(overlay._hideTimer);
+        if (overlay._hideEndTarget && overlay._hideEndHandler) {
+            overlay._hideEndTarget.removeEventListener(overlay._hideEndEvent || 'transitionend', overlay._hideEndHandler);
+        }
+        overlay._hideTimer = null;
+        overlay._hideEndTarget = null;
+        overlay._hideEndHandler = null;
+        overlay._hideEndEvent = null;
+    }
+    openOverlayElement(overlay, options = {}) {
+        if (!overlay) return null;
+        this.clearOverlayLifecycle(overlay);
+        overlay.classList.remove('hidden', 'closing', 'leaving');
+        if (options.reset !== false) {
+            overlay.querySelectorAll('.detail-card, .priority-process-card, .script-edit-card').forEach(card => {
+                card.scrollTop = 0;
+                ['height', 'max-height', 'transform', 'opacity', 'transition', 'will-change'].forEach(name => card.style.removeProperty(name));
+            });
+            overlay.querySelectorAll('textarea').forEach(textarea => { textarea.scrollTop = 0; });
+        }
+        const show = () => overlay.classList.add('show');
+        if (options.defer === false) show();
+        else requestAnimationFrame(show);
+        return overlay;
+    }
+    closeOverlayElement(overlay, options = {}) {
+        if (!overlay) return;
+        this.clearOverlayLifecycle(overlay);
+        const duration = Math.max(0, Number(options.duration) || 300);
+        const remove = options.remove === true;
+        const closingClass = options.closingClass || '';
+        if (closingClass) {
+            overlay.classList.add(closingClass);
+            options.closingTarget?.classList.add(closingClass);
+        }
+        overlay.classList.remove('show');
+        const finalize = () => {
+            this.clearOverlayLifecycle(overlay);
+            if (remove) overlay.remove();
+            else {
+                overlay.classList.add('hidden');
+                if (closingClass) {
+                    overlay.classList.remove(closingClass);
+                    options.closingTarget?.classList.remove(closingClass);
+                }
+            }
+            if (typeof options.onClose === 'function') options.onClose();
+        };
+        const endTarget = options.endTarget || (options.endSelector ? overlay.querySelector(options.endSelector) : null);
+        if (endTarget) {
+            const endEvent = options.endEvent || 'transitionend';
+            const endHandler = event => {
+                if (options.endProperty && event.propertyName !== options.endProperty) return;
+                finalize();
+            };
+            overlay._hideEndTarget = endTarget;
+            overlay._hideEndHandler = endHandler;
+            overlay._hideEndEvent = endEvent;
+            endTarget.addEventListener(endEvent, endHandler, { once: true });
+        }
+        overlay._hideTimer = setTimeout(finalize, duration);
     }
     showConfirm(message, title = '确认', options = {}) {
         return new Promise((resolve) => {

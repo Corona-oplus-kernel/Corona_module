@@ -471,6 +471,7 @@
         this.translateDom(dialog);
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
+        this.openOverlayElement(overlay, { defer: false, reset: false });
 
         const slider = dialog.querySelector('#picker-hue-slider');
         const output = dialog.querySelector('#picker-hue-value');
@@ -538,9 +539,14 @@
         const closeDialog = () => {
             if (previewFrame) cancelAnimationFrame(previewFrame);
             if (committedHue !== draftHue) renderHue(true, false);
-            overlay.classList.add('closing');
-            dialog.classList.add('closing');
-            setTimeout(() => overlay.remove(), 170);
+            this.closeOverlayElement(overlay, {
+                remove: true,
+                duration: 170,
+                closingClass: 'closing',
+                closingTarget: dialog,
+                endTarget: dialog,
+                endEvent: 'animationend'
+            });
         };
 
         dialog.querySelector('#close-color').addEventListener('click', () => closeDialog());

@@ -2449,7 +2449,7 @@
     },
     showZramDeviceSelector(devices, pathInput) {
         const overlay = document.createElement('div');
-        overlay.className = 'detail-overlay show';
+        overlay.className = 'detail-overlay hidden';
         overlay.innerHTML = `
             <div class="detail-container">
                 <div class="detail-header">
@@ -2462,9 +2462,10 @@
             </div>
         `;
         document.body.appendChild(overlay);
+        this.openOverlayElement(overlay, { reset: false });
+        const closeSelector = () => this.closeOverlayElement(overlay, { remove: true, duration: 300, endSelector: '.detail-container', endProperty: 'transform' });
         overlay.querySelector('#zram-selector-close').addEventListener('click', () => {
-            overlay.classList.remove('show');
-            setTimeout(() => overlay.remove(), 300);
+            closeSelector();
         });
         overlay.querySelectorAll('.zram-device-option').forEach(opt => {
             opt.addEventListener('click', () => {
@@ -2472,15 +2473,13 @@
                 this.state.zramPath = opt.dataset.path;
                 if (typeof this.updateLoopParameterDisplay === 'function') this.updateLoopParameterDisplay(this._loopActive ? document.getElementById('zram-loop-device-value')?.textContent : '');
                 if (typeof this.markZramDirty === 'function') this.markZramDirty('zram_path');
-                overlay.classList.remove('show');
-                setTimeout(() => overlay.remove(), 300);
+                closeSelector();
                 this.showToast(`已选择并保存: ${opt.dataset.path}（点应用生效）`);
             });
         });
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
-                overlay.classList.remove('show');
-                setTimeout(() => overlay.remove(), 300);
+                closeSelector();
             }
         });
     },
