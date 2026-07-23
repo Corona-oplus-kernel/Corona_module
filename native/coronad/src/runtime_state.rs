@@ -59,10 +59,15 @@ impl DecisionLog {
             else {
                 continue;
             };
+            let area = sanitize(area);
+            let action = sanitize(action);
+            if area.trim().is_empty() || action.trim().is_empty() {
+                continue;
+            }
             log.entries.push_back(Decision {
                 tick,
-                area: sanitize(area),
-                action: sanitize(action),
+                area,
+                action,
                 reason: sanitize(reason),
             });
             while log.entries.len() > DECISION_LIMIT {
@@ -98,10 +103,15 @@ impl DecisionLog {
         action: String,
         reason: String,
     ) -> bool {
-        if self.last_actions.get(area) == Some(&action) {
+        let area = sanitize(area);
+        let action = sanitize(&action);
+        if area.trim().is_empty() || action.trim().is_empty() {
             return false;
         }
-        self.last_actions.insert(area.to_string(), action.clone());
+        if self.last_actions.get(&area) == Some(&action) {
+            return false;
+        }
+        self.last_actions.insert(area.clone(), action.clone());
         if self.entries.len() >= DECISION_LIMIT {
             self.entries.pop_front();
         }
@@ -112,8 +122,8 @@ impl DecisionLog {
             .unwrap_or(tick);
         self.entries.push_back(Decision {
             tick,
-            area: area.to_string(),
-            action: sanitize(&action),
+            area,
+            action,
             reason: sanitize(&reason),
         });
         true

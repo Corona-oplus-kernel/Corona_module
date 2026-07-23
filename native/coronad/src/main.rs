@@ -3922,6 +3922,7 @@ mod tests {
     fn limits_and_restores_decision_history() {
         let path = PathBuf::from(format!("/root/tmp/coronad-decisions-test-{}", process::id()));
         let mut decisions = DecisionLog::default();
+        assert!(!decisions.record(0, "zram", String::new(), "waiting".to_string()));
         for index in 0..40 {
             decisions.record(index, "test", format!("action-{index}"), "reason".to_string());
         }
