@@ -62,6 +62,9 @@
             document.querySelector('.runtime-details')?.addEventListener('toggle', event => {
                 if (event.currentTarget.open) this.refreshRuntimeOptimizer();
             });
+            document.querySelector('.runtime-history')?.addEventListener('toggle', event => {
+                if (event.currentTarget.open) this.refreshRuntimeOptimizer();
+            });
             const settingsToggle = document.getElementById('runtime-settings-toggle');
             settingsToggle?.addEventListener('click', event => {
                 if (event.target.closest('#runtime-refresh-btn')) return;
@@ -251,14 +254,32 @@
         },
         updateRuntimeDecisions(status) {
             const list = document.getElementById('runtime-decision-list');
-            if (!list) return;
+            const latest = document.getElementById('runtime-latest-decision');
+            if (!list || !latest) return;
             const entries = Object.entries(status)
                 .filter(([key]) => /^decision_\d+$/.test(key))
                 .sort(([left], [right]) => Number.parseInt(left.slice(9), 10) - Number.parseInt(right.slice(9), 10))
                 .map(([, value]) => value.split('|'));
             const signature = entries.map(parts => parts.join('|')).join('\n');
-            if (this.runtimeDecisionSignature === signature) return;
+            const changed = this.runtimeDecisionSignature !== signature;
             this.runtimeDecisionSignature = signature;
+            const latestText = entries.length
+                ? `${this.t(DECISION_AREA_KEYS[entries[0][1]] || 'runtimeUnknown')} · ${entries[0][2] || '--'}`
+                : this.t('runtimeDecisionEmpty');
+            if (latest.textContent !== latestText) latest.textContent = latestText;
+            if (changed && this.runtimeDecisionsInitialized) {
+                const history = document.querySelector('.runtime-history');
+                history?.classList.remove('runtime-history-updated');
+                void history?.offsetWidth;
+                history?.classList.add('runtime-history-updated');
+            }
+            const renderList = document.querySelector('.runtime-history')?.open === true;
+            if (!renderList) {
+                this.runtimeDecisionsInitialized = true;
+                return;
+            }
+            if (this.runtimeDecisionListSignature === signature) return;
+            this.runtimeDecisionListSignature = signature;
             if (!entries.length) {
                 let empty = list.querySelector('.runtime-decision-empty');
                 if (!empty) {
@@ -288,7 +309,7 @@
                     const sequence = document.createElement('small');
                     sequence.textContent = `#${tick || 0}`;
                     item.append(title, detail, sequence);
-                    if (this.runtimeDecisionsInitialized) {
+                    if (changed && this.runtimeDecisionsInitialized) {
                         item.classList.add('runtime-decision-new');
                         item.addEventListener('animationend', () => item.classList.remove('runtime-decision-new'), { once: true });
                     }

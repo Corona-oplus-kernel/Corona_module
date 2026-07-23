@@ -989,35 +989,54 @@ body.theme-dark .runtime-advanced {
 
 .runtime-summary-list,
 .runtime-details,
-.runtime-decision-section {
+.runtime-history {
     border-top: 1px solid var(--glass-border);
 }
 
 .runtime-summary-row {
-    display: grid;
+    display: flex;
+    min-width: 0;
     align-items: center;
-    gap: 12px;
-    padding: 12px 0;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--glass-border);
 }
 
-.runtime-summary-primary {
-    grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.runtime-summary-metrics {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    border-top: 1px solid var(--glass-border);
+.runtime-summary-row:last-child {
+    border-bottom: 0;
 }
 
 .runtime-summary-row > span {
-    display: flex;
     min-width: 0;
-    flex-direction: column;
-    gap: 3px;
+    color: var(--text-sub);
+    font-size: 11px;
 }
 
-.runtime-summary-row small,
-.runtime-details summary small {
+.runtime-summary-row > strong {
+    min-width: 0;
+    max-width: 62%;
+    color: var(--text-main);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.runtime-summary-primary {
+    align-items: flex-start;
+    padding-block: 13px;
+}
+
+.runtime-summary-primary > span {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.runtime-summary-primary small,
+.runtime-details summary small,
+.runtime-history summary small {
     overflow: hidden;
     color: var(--text-sub);
     font-size: 10px;
@@ -1026,33 +1045,18 @@ body.theme-dark .runtime-advanced {
     white-space: nowrap;
 }
 
-.runtime-summary-row strong {
-    overflow: hidden;
-    color: var(--text-main);
-    font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.runtime-summary-primary > span:first-child > strong {
-    font-size: 14px;
-}
-
-.runtime-summary-primary > span:last-child {
-    max-width: 112px;
-    text-align: right;
-}
-
 .runtime-summary-primary b {
     color: var(--text-sub);
     font-weight: 500;
 }
 
-.runtime-details {
+.runtime-details,
+.runtime-history {
     margin: 0;
 }
 
-.runtime-details summary {
+.runtime-details summary,
+.runtime-history summary {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1062,34 +1066,40 @@ body.theme-dark .runtime-advanced {
     list-style: none;
 }
 
-.runtime-details summary::-webkit-details-marker {
+.runtime-details summary::-webkit-details-marker,
+.runtime-history summary::-webkit-details-marker {
     display: none;
 }
 
-.runtime-details summary > span:first-child {
+.runtime-details summary > span:first-child,
+.runtime-history summary > span:first-child {
     display: flex;
     min-width: 0;
     flex-direction: column;
     gap: 3px;
 }
 
-.runtime-details summary strong {
+.runtime-details summary strong,
+.runtime-history summary strong {
     color: var(--text-main);
     font-size: 12px;
 }
 
 .runtime-details-arrow {
+    flex: 0 0 auto;
     color: var(--text-sub);
     font-size: 20px;
     line-height: 1;
     transition: transform 160ms ease;
 }
 
-.runtime-details[open] .runtime-details-arrow {
+.runtime-details[open] .runtime-details-arrow,
+.runtime-history[open] .runtime-details-arrow {
     transform: rotate(90deg);
 }
 
-.runtime-detail-list {
+.runtime-detail-list,
+.runtime-decision-list {
     border-top: 1px solid var(--glass-border);
 }
 
@@ -1153,14 +1163,9 @@ body.theme-dark .runtime-advanced {
     border-bottom: 0;
 }
 
-.runtime-decision-section {
-    margin: 0;
-    padding-top: 12px;
-}
-
 .runtime-decision-list {
     display: block;
-    max-height: 168px;
+    max-height: 190px;
     overflow-y: auto;
 }
 
@@ -1183,6 +1188,15 @@ body.theme-dark .runtime-advanced {
     padding: 12px 0 2px;
 }
 
+.runtime-history.runtime-history-updated summary small {
+    animation: runtime-history-update 180ms ease-out;
+}
+
+@keyframes runtime-history-update {
+    from { opacity: 0.35; transform: translateY(-2px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 .runtime-daemon-waiting {
     padding: 12px 0;
     border: 0;
@@ -1202,20 +1216,6 @@ body.theme-dark .runtime-advanced {
 .thread-runtime-overview.runtime-stopped .runtime-details,
 .thread-runtime-overview.runtime-stopped .runtime-status-note {
     display: none;
-}
-
-.thread-runtime-overview.runtime-stopped .runtime-decision-section {
-    margin-top: 0;
-}
-
-@media (max-width: 520px) {
-    .runtime-summary-metrics {
-        gap: 8px;
-    }
-
-    .runtime-summary-primary > span:last-child {
-        max-width: 96px;
-    }
 }
 
 @media (hover: hover) {
