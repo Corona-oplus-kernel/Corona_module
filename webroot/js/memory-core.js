@@ -323,7 +323,7 @@
     async loadDeviceInfo() {
         const info = await this.execSnapshot({
             BRAND: 'getprop ro.product.brand',
-            MARKET: 'getprop ro.vendor.oplus.market.name',
+            MARKET: 'for key in ro.vendor.oplus.market.name ro.oplus.market.name ro.product.marketname ro.product.market.name ro.config.marketing_name; do value=$(getprop "$key"); [ -n "$value" ] && { printf "%s" "$value"; break; }; done',
             MODEL: 'getprop ro.product.model',
             SOC: 'getprop ro.board.platform',
             HARDWARE: 'getprop ro.hardware',

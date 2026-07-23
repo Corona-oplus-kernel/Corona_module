@@ -148,7 +148,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072331` : '';
+        return map[name] ? `${map[name]}?v=2026072333` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -408,7 +408,12 @@ class CoronaAddon {
     }
     decodeShellValue(value) {
         if (!value) return '';
-        try { return atob(value); } catch (error) { return ''; }
+        try {
+            const binary = atob(value);
+            return new TextDecoder().decode(Uint8Array.from(binary, character => character.charCodeAt(0)));
+        } catch (error) {
+            return '';
+        }
     }
     async execSnapshot(fields) {
         const entries = Object.entries(fields || {}).filter(([key, command]) => /^[A-Z0-9_]+$/.test(key) && command);

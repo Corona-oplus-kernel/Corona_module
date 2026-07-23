@@ -1,7 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use super::{read_text, write_text, write_text_atomic};
+use super::{read_text, write_text};
 
 #[derive(Clone)]
 struct ManagedNode {
@@ -30,8 +30,10 @@ pub(super) struct Decision {
 
 #[derive(Default)]
 pub(super) struct DecisionLog {
-    pub(super) entries: VecDeque<Decision>,
+    pub(super) pending: Vec<Decision>,
     last_actions: HashMap<String, String>,
+    sequence: u64,
+    published: bool,
 }
 
 const DECISION_LIMIT: usize = 24;
@@ -47,58 +49,16 @@ fn sanitize(value: &str) -> String {
 }
 
 impl DecisionLog {
-    pub(super) fn load(path: &Path) -> Self {
-        let mut log = Self::default();
-        for line in read_text(path).lines() {
-            let mut parts = line.splitn(4, '|');
-            let Some(tick) = parts.next().and_then(|value| value.parse::<u64>().ok()) else {
-                continue;
-            };
-            let (Some(area), Some(action), Some(reason)) =
-                (parts.next(), parts.next(), parts.next())
-            else {
-                continue;
-            };
-            let area = sanitize(area);
-            let action = sanitize(action);
-            if area.trim().is_empty() || action.trim().is_empty() {
-                continue;
-            }
-            log.entries.push_back(Decision {
-                tick,
-                area,
-                action,
-                reason: sanitize(reason),
-            });
-            while log.entries.len() > DECISION_LIMIT {
-                log.entries.pop_front();
-            }
-        }
-        for decision in &log.entries {
-            log.last_actions
-                .insert(decision.area.clone(), decision.action.clone());
-        }
-        log
+    pub(super) fn sequence(&self) -> u64 {
+        self.sequence
     }
 
-    pub(super) fn save(&self, path: &Path) {
-        let content = self
-            .entries
-            .iter()
-            .map(|decision| {
-                format!(
-                    "{}|{}|{}|{}",
-                    decision.tick, decision.area, decision.action, decision.reason
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-        let _ = write_text_atomic(path, content);
+    pub(super) fn mark_published(&mut self) {
+        self.published = true;
     }
 
     pub(super) fn record(
         &mut self,
-        tick: u64,
         area: &str,
         action: String,
         reason: String,
@@ -112,16 +72,16 @@ impl DecisionLog {
             return false;
         }
         self.last_actions.insert(area.clone(), action.clone());
-        if self.entries.len() >= DECISION_LIMIT {
-            self.entries.pop_front();
+        if self.published {
+            self.pending.clear();
+            self.published = false;
         }
-        let tick = self
-            .entries
-            .back()
-            .map(|decision| decision.tick.saturating_add(1).max(tick))
-            .unwrap_or(tick);
-        self.entries.push_back(Decision {
-            tick,
+        if self.pending.len() >= DECISION_LIMIT {
+            self.pending.remove(0);
+        }
+        self.sequence = self.sequence.saturating_add(1);
+        self.pending.push(Decision {
+            tick: self.sequence,
             area,
             action,
             reason: sanitize(&reason),

@@ -58,7 +58,6 @@ struct Paths {
     pressure_baseline: PathBuf,
     affinity_state: PathBuf,
     zram_policy_state: PathBuf,
-    decision_history: PathBuf,
 }
 
 impl Paths {
@@ -98,7 +97,6 @@ impl Paths {
             pressure_baseline: config.join(".memory_pressure.baseline"),
             affinity_state: config.join(".auto_affinity_state"),
             zram_policy_state: config.join(".zram_policy_state"),
-            decision_history: config.join(".coronad_decisions"),
             module,
             config,
         }
@@ -970,36 +968,43 @@ fn command_output(program: &str, args: &[&str]) -> String {
         .unwrap_or_default()
 }
 
-fn package_from_dumpsys(text: &str) -> Option<String> {
-    for line in text.lines() {
-        if !(line.contains("topResumedActivity=")
-            || line.contains("mResumedActivity:")
-            || line.contains("mCurrentFocus=")
-            || line.contains("mFocusedApp="))
-        {
+fn package_from_activity_line(line: &str) -> Option<String> {
+    for token in line.split_ascii_whitespace() {
+        let token = token.trim_matches(|character: char| {
+            matches!(character, '{' | '}' | '[' | ']' | '(' | ')' | ',' | ':')
+        });
+        let Some((package, _)) = token.split_once('/') else {
             continue;
+        };
+        let package = package
+            .trim_matches(|character: char| {
+                !character.is_ascii_alphanumeric()
+                    && character != '.'
+                    && character != '_'
+                    && character != '-'
+            })
+            .to_string();
+        if package.contains('.') && package != "com.android.shell" {
+            return Some(package);
         }
-        for token in line.split_ascii_whitespace() {
-            let token = token.trim_matches(|character: char| {
-                matches!(character, '{' | '}' | '[' | ']' | '(' | ')' | ',' | ':')
-            });
-            let Some((package, _)) = token.split_once('/') else {
-                continue;
-            };
-            let package = package
-                .trim_matches(|character: char| {
-                    !character.is_ascii_alphanumeric()
-                        && character != '.'
-                        && character != '_'
-                        && character != '-'
-                })
-                .to_string();
-            if package.contains('.')
-                && package != "me.weishu.kernelsu"
-                && package != "com.android.shell"
-            {
-                return Some(package);
-            }
+    }
+    None
+}
+
+fn package_from_dumpsys(text: &str) -> Option<String> {
+    for marker in [
+        "mResumedActivity:",
+        "ResumedActivity:",
+        "topResumedActivity=",
+        "mCurrentFocus=",
+        "mFocusedApp=",
+    ] {
+        if let Some(package) = text
+            .lines()
+            .find(|line| line.contains(marker))
+            .and_then(package_from_activity_line)
+        {
+            return Some(package);
         }
     }
     None
@@ -1015,6 +1020,7 @@ fn process_base_from_pid(pid: u32) -> Option<String> {
     package_from_process_name(&process_name)
 }
 
+#[derive(Clone, Default)]
 struct ForegroundInfo {
     package: String,
     source: &'static str,
@@ -1059,26 +1065,26 @@ fn top_app_info() -> Option<ForegroundInfo> {
     None
 }
 
-fn foreground_info() -> ForegroundInfo {
-    if let Some(info) = top_app_info() {
-        return info;
-    }
+fn web_foreground_info() -> ForegroundInfo {
     let package = package_from_dumpsys(&command_output(
-        "/system/bin/dumpsys",
-        &["activity", "activities"],
-    ))
-    .or_else(|| {
-        package_from_dumpsys(&command_output(
-            "/system/bin/dumpsys",
-            &["window", "windows"],
-        ))
-    })
-    .unwrap_or_default();
-    ForegroundInfo {
-        package,
-        source: "dumpsys",
-        pids: Vec::new(),
+        "/system/bin/sh",
+        &[
+            "-c",
+            "dumpsys activity activities 2>/dev/null | grep -m 1 -E '^[[:space:]]+(mResumedActivity:|ResumedActivity:)'",
+        ],
+    ));
+    if let Some(package) = package {
+        return ForegroundInfo {
+            package,
+            source: "activity",
+            pids: Vec::new(),
+        };
     }
+    top_app_info().unwrap_or_default()
+}
+
+fn foreground_info() -> ForegroundInfo {
+    top_app_info().unwrap_or_else(web_foreground_info)
 }
 
 fn csv_contains(csv: &str, item: &str) -> bool {
@@ -2722,6 +2728,7 @@ impl Daemon {
         } else {
             "base".to_string()
         };
+        let _ = fs::remove_file(paths.config.join(".coronad_decisions"));
         let mut daemon = Self {
             rules: load_rules(&paths),
             pressure: load_pressure(&paths),
@@ -2765,7 +2772,7 @@ impl Daemon {
             last_storage_counters: DiskCounters::default(),
             storage_learning: StorageLearning::default(),
             nodes: NodeManager::default(),
-            decisions: DecisionLog::load(&paths.decision_history),
+            decisions: DecisionLog::default(),
             zram_policy_enabled,
             zram_policy_elapsed_ms: 30_000,
             zram_policy_interval_ms: 30_000,
@@ -3273,14 +3280,12 @@ impl Daemon {
         }
     }
 
-    fn record_decisions(&mut self, foreground: &str, foreground_changed: bool) {
-        let mut changed = false;
+    fn record_decisions(&mut self, foreground: &str, foreground_source: &str, foreground_changed: bool) {
         if foreground_changed {
-            changed |= self.decisions.record(
-                self.tick,
+            self.decisions.record(
                 "foreground",
                 foreground.to_string(),
-                "top-app/cgroup".to_string(),
+                foreground_source.to_string(),
             );
         }
         let records = [
@@ -3350,10 +3355,7 @@ impl Daemon {
             ),
         ];
         for (area, action, reason) in records {
-            changed |= self.decisions.record(self.tick, area, action, reason);
-        }
-        if changed {
-            self.decisions.save(&self.paths.decision_history);
+            self.decisions.record(area, action, reason);
         }
     }
 
@@ -3461,14 +3463,20 @@ impl Daemon {
             self.nodes.external_changes,
             self.nodes.suspended,
         ));
-        state.push_str(&format!("decision_count={}\n", self.decisions.entries.len()));
-        for (index, decision) in self.decisions.entries.iter().rev().enumerate() {
+        state.push_str(&format!(
+            "decision_sequence={}\ndecision_count={}\n",
+            self.decisions.sequence(),
+            self.decisions.pending.len(),
+        ));
+        for (index, decision) in self.decisions.pending.iter().rev().enumerate() {
             state.push_str(&format!(
                 "decision_{index}={}|{}|{}|{}\n",
                 decision.tick, decision.area, decision.action, decision.reason,
             ));
         }
-        let _ = write_text_atomic(&self.paths.state, state);
+        if write_text_atomic(&self.paths.state, state).is_ok() {
+            self.decisions.mark_published();
+        }
         let affinity_state = format!(
             "status=active\npackage={}\napplied={}\nfailed={}\nmanual={}\nefficiency={}\nbalanced={}\nperformance={}\nlatency={}\nmode={}\n",
             foreground,
@@ -3611,7 +3619,7 @@ impl Daemon {
             self.pressure_elapsed_ms = 0;
             self.update_pressure();
         }
-        self.record_decisions(&foreground.package, foreground_changed);
+        self.record_decisions(&foreground.package, foreground.source, foreground_changed);
         if foreground_changed || profile_changed || self.state_elapsed_ms >= 2_000 {
             self.write_state(&foreground.package, foreground.source);
             self.state_elapsed_ms = 0;
@@ -3680,22 +3688,30 @@ fn run_daemon(paths: Paths) -> i32 {
     0
 }
 
-fn print_status(paths: &Paths) -> i32 {
+fn print_status(paths: &Paths, web: bool) -> i32 {
     if let Some(pid) = daemon_pid(paths) {
         println!("running=1");
         println!("pid={pid}");
-        print!("{}", read_text(&paths.state));
+        let state = read_text(&paths.state);
+        if web {
+            for line in state.lines().filter(|line| {
+                !line.starts_with("foreground=") && !line.starts_with("foreground_source=")
+            }) {
+                println!("{line}");
+            }
+            let foreground = web_foreground_info();
+            if !foreground.package.is_empty() {
+                println!("foreground={}", foreground.package);
+                println!("foreground_source={}", foreground.source);
+            }
+        } else {
+            print!("{state}");
+        }
         0
     } else {
         println!("running=0");
-        let decisions = DecisionLog::load(&paths.decision_history);
-        println!("decision_count={}", decisions.entries.len());
-        for (index, decision) in decisions.entries.iter().rev().enumerate() {
-            println!(
-                "decision_{index}={}|{}|{}|{}",
-                decision.tick, decision.area, decision.action, decision.reason,
-            );
-        }
+        println!("decision_sequence=0");
+        println!("decision_count=0");
         1
     }
 }
@@ -3723,7 +3739,8 @@ fn main() {
             }
         }
         "stop" => stop_daemon(&paths).map(|_| 0).unwrap_or(1),
-        "status" => print_status(&paths),
+        "status" => print_status(&paths, false),
+        "web-status" => print_status(&paths, true),
         "selftest" => print_selftest(&paths),
         "once" => {
             let mut daemon = Daemon::new(paths);
@@ -3731,7 +3748,7 @@ fn main() {
             0
         }
         _ => {
-            eprintln!("usage: coronad [start|daemon|reload|stop|status|selftest|once]");
+            eprintln!("usage: coronad [start|daemon|reload|stop|status|web-status|selftest|once]");
             2
         }
     };
@@ -3746,6 +3763,8 @@ mod tests {
     fn parses_foreground_package() {
         let input = "topResumedActivity=ActivityRecord{123 u0 com.example.game/.MainActivity t1}";
         assert_eq!(package_from_dumpsys(input).as_deref(), Some("com.example.game"));
+        let multi_window = "topResumedActivity=ActivityRecord{1 u0 bin.mt.plus/.Main t1}\nResumedActivity: ActivityRecord{2 u0 me.weishu.kernelsu/.ui.webui.WebUIActivity t2}";
+        assert_eq!(package_from_dumpsys(multi_window).as_deref(), Some("me.weishu.kernelsu"));
     }
 
     #[test]
@@ -4001,20 +4020,22 @@ mod tests {
     }
 
     #[test]
-    fn limits_and_restores_decision_history() {
-        let path = PathBuf::from(format!("/root/tmp/coronad-decisions-test-{}", process::id()));
+    fn emits_only_pending_decision_changes() {
         let mut decisions = DecisionLog::default();
-        assert!(!decisions.record(0, "zram", String::new(), "waiting".to_string()));
+        assert!(!decisions.record("zram", String::new(), "waiting".to_string()));
         for index in 0..40 {
-            decisions.record(index, "test", format!("action-{index}"), "reason".to_string());
+            decisions.record("test", format!("action-{index}"), "reason".to_string());
         }
-        assert_eq!(decisions.entries.len(), 24);
-        decisions.save(&path);
-        let restored = DecisionLog::load(&path);
-        assert_eq!(restored.entries.len(), 24);
-        assert_eq!(restored.entries.front().map(|entry| entry.tick), Some(16));
-        assert_eq!(restored.entries.back().map(|entry| entry.tick), Some(39));
-        fs::remove_file(path).unwrap();
+        assert_eq!(decisions.pending.len(), 24);
+        assert_eq!(decisions.pending.first().map(|entry| entry.tick), Some(17));
+        assert_eq!(decisions.pending.last().map(|entry| entry.tick), Some(40));
+        assert_eq!(decisions.sequence(), 40);
+        decisions.mark_published();
+        assert_eq!(decisions.pending.len(), 24);
+        assert!(!decisions.record("test", "action-39".to_string(), "same".to_string()));
+        assert!(decisions.record("test", "action-40".to_string(), "new".to_string()));
+        assert_eq!(decisions.pending.len(), 1);
+        assert_eq!(decisions.pending[0].tick, 41);
     }
 
     #[test]

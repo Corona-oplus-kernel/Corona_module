@@ -47,6 +47,11 @@
     });
     const POLICY_FALLBACKS = Object.freeze({ irq: 'runtimeIrqIdle', ufs: 'runtimeUfsIdle', gpu: 'runtimeGpuIdle', io: 'runtimeIoIdle' });
     const PRESSURE_KEYS = Object.freeze(['runtimePressureNormal', 'runtimePressureModerate', 'runtimePressureHigh']);
+    const DETECTION_KEYS = Object.freeze({
+        activity: 'runtimeDetectionActivity',
+        'top-app': 'runtimeDetectionTopApp',
+        dumpsys: 'runtimeDetectionActivity'
+    });
     const DECISION_AREA_KEYS = Object.freeze({
         foreground: 'runtimeDecisionForeground', irq: 'runtimeIrqPolicy', ufs: 'runtimeUfsPolicy',
         gpu: 'runtimeGpuPolicy', io: 'runtimeIoPolicy', storage: 'runtimeStorageLearning',
@@ -310,18 +315,26 @@
             const list = document.getElementById('runtime-decision-list');
             const summary = document.getElementById('runtime-decision-summary');
             if (!list || !summary) return;
-            const entries = Object.entries(status)
+            const daemonId = status.pid || 'stopped';
+            const incoming = Object.entries(status)
                 .filter(([key]) => /^decision_\d+$/.test(key))
                 .sort(([left], [right]) => Number.parseInt(left.slice(9), 10) - Number.parseInt(right.slice(9), 10))
-                .map(([, value]) => value.split('|'));
-            const signature = entries.map(parts => parts.join('|')).join('\n');
-            const changed = this.runtimeDecisionSignature !== signature;
-            this.runtimeDecisionSignature = signature;
+                .map(([, value]) => value.split('|'))
+                .filter(parts => parts.length >= 3)
+                .map(parts => ({ key: `${daemonId}:${parts[0]}`, parts }));
+            this.runtimeDecisionEntries ||= [];
+            this.runtimeDecisionKeys ||= new Set(this.runtimeDecisionEntries.map(entry => entry.key));
+            const additions = incoming.filter(entry => !this.runtimeDecisionKeys.has(entry.key));
+            if (additions.length) {
+                this.runtimeDecisionEntries = [...additions, ...this.runtimeDecisionEntries].slice(0, 24);
+                this.runtimeDecisionKeys = new Set(this.runtimeDecisionEntries.map(entry => entry.key));
+            }
+            const entries = this.runtimeDecisionEntries;
             const summaryText = entries.length
                 ? this.t('runtimeDecisionCount').replace('{count}', String(entries.length))
                 : this.t('runtimeDecisionEmpty');
             if (summary.textContent !== summaryText) summary.textContent = summaryText;
-            if (changed && this.runtimeDecisionsInitialized) {
+            if (additions.length && this.runtimeDecisionsInitialized) {
                 const history = document.querySelector('.runtime-history');
                 history?.classList.remove('runtime-history-updated');
                 void history?.offsetWidth;
@@ -332,6 +345,7 @@
                 this.runtimeDecisionsInitialized = true;
                 return;
             }
+            const signature = entries.map(entry => entry.key).join('\n');
             if (this.runtimeDecisionListSignature === signature) return;
             this.runtimeDecisionListSignature = signature;
             if (!entries.length) {
@@ -348,8 +362,8 @@
             list.querySelector('.runtime-decision-empty')?.remove();
             const existing = new Map([...list.querySelectorAll('.runtime-decision-item')].map(item => [item.dataset.key, item]));
             const active = new Set();
-            entries.forEach(([tick, area, action, reason]) => {
-                const key = `${tick}|${area}|${action}|${reason}`;
+            const addedKeys = new Set(additions.map(entry => entry.key));
+            entries.forEach(({ key, parts: [tick, area, action, reason] }) => {
                 active.add(key);
                 let item = existing.get(key);
                 if (!item) {
@@ -372,7 +386,7 @@
                     detail.className = 'runtime-decision-reason';
                     detail.textContent = reason || '--';
                     item.append(header, actionLabel, detail);
-                    if (changed && this.runtimeDecisionsInitialized) {
+                    if (addedKeys.has(key) && this.runtimeDecisionsInitialized) {
                         item.classList.add('runtime-decision-new');
                         item.addEventListener('animationend', () => item.classList.remove('runtime-decision-new'), { once: true });
                     }
@@ -576,7 +590,7 @@
             this.runtimeRefreshPending = true;
             try {
             const binary = this.shellQuote(`${this.modDir}/bin/coronad`);
-            const status = this.parseRuntimeKeyValues(await this.exec(`${binary} status 2>/dev/null`));
+            const status = this.parseRuntimeKeyValues(await this.exec(`${binary} web-status 2>/dev/null`));
             const running = status.running === '1';
             const renderDetails = document.querySelector('.runtime-details')?.open === true;
             const renderCapabilities = document.querySelector('.runtime-capabilities')?.open === true;
@@ -595,7 +609,7 @@
                 return;
             }
             this.setRuntimeText('runtime-foreground', status.foreground || status.package);
-            this.setRuntimeText('runtime-detection', status.foreground_source);
+            this.setRuntimeText('runtime-detection', this.t(DETECTION_KEYS[status.foreground_source] || 'runtimeUnknown'));
             this.setRuntimeText('runtime-mode', status.runtime_mode || status.mode);
             const daemonMemoryKb = Number(status.daemon_rss_kb || 0);
             const daemonMemory = daemonMemoryKb >= 1024
