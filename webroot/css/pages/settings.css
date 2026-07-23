@@ -1252,10 +1252,6 @@ body.theme-dark .runtime-advanced {
     animation: runtime-history-update 180ms ease-out;
 }
 
-.runtime-history summary {
-    align-items: center;
-}
-
 .runtime-history summary > span:first-child {
     flex: 1;
     max-width: calc(100% - 32px);
@@ -1263,10 +1259,7 @@ body.theme-dark .runtime-advanced {
 
 .runtime-history summary small {
     display: block;
-    overflow: hidden;
     line-height: 1.4;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 @keyframes runtime-history-update {

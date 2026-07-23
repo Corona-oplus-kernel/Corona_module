@@ -2751,12 +2751,6 @@ body.theme-dark .confirm-dialog {
 body.theme-dark .confirm-dialog-body #confirm-dialog-message.preview-message {
     background: rgba(255, 255, 255, 0.06);
 }
-.detail-overlay {
-    transition: background 0.22s ease, backdrop-filter 0.22s ease, -webkit-backdrop-filter 0.22s ease, visibility 0s linear 0.32s;
-}
-.detail-overlay.show {
-    animation: overlayFadeIn 0.24s ease;
-}
 .confirm-dialog {
     opacity: 0;
     transform: translateY(18px) scale(0.94);
@@ -2862,11 +2856,6 @@ body.theme-dark .confirm-dialog-body #confirm-dialog-message.preview-message {
     grid-template-columns: 1fr 1.25fr;
     gap: 10px;
     padding: 0 14px 14px;
-}
-
-@keyframes overlayFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
 }
 
 .module-intro-card {
