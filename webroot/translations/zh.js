@@ -845,6 +845,8 @@
       "runtimeTemperature": "最高温度",
       "runtimeEbpfState": "eBPF 状态",
       "runtimeKnownThreads": "已跟踪线程",
+      "runtimeDetails": "运行详情",
+      "runtimeDetailsDesc": "策略、队列与硬件能力",
       "runtimeCpuPressure": "CPU PSI",
       "runtimeIoPressure": "I/O PSI",
       "runtimeCpuGroups": "CPU 分组",

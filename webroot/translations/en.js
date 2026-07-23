@@ -845,6 +845,8 @@
       "runtimeTemperature": "Peak temperature",
       "runtimeEbpfState": "eBPF state",
       "runtimeKnownThreads": "Tracked threads",
+      "runtimeDetails": "Runtime details",
+      "runtimeDetailsDesc": "Policies, queues, and hardware capabilities",
       "runtimeCpuPressure": "CPU PSI",
       "runtimeIoPressure": "I/O PSI",
       "runtimeCpuGroups": "CPU groups",

@@ -659,66 +659,6 @@ body.theme-dark .option-item {
     margin-top: 4px;
 }
 
-.thread-runtime-overview .runtime-dashboard {
-    margin-bottom: 0;
-}
-
-.thread-runtime-overview .runtime-status-note {
-    margin: 10px 0 0;
-}
-
-.runtime-daemon-waiting {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    padding: 13px 14px;
-    border: 1px solid color-mix(in srgb, var(--text-sub) 13%, transparent);
-    border-radius: var(--radius-ctl);
-    background: color-mix(in srgb, var(--text-main) 4%, transparent);
-}
-
-.runtime-daemon-waiting[hidden] {
-    display: none;
-}
-
-.runtime-daemon-waiting-dot {
-    width: 9px;
-    height: 9px;
-    flex: 0 0 9px;
-    border-radius: 50%;
-    background: var(--text-dim);
-    box-shadow: 0 0 0 5px color-mix(in srgb, var(--text-dim) 10%, transparent);
-}
-
-.runtime-daemon-waiting > span:last-child {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.runtime-daemon-waiting strong {
-    color: var(--text-main);
-    font-size: 13px;
-}
-
-.runtime-daemon-waiting small {
-    color: var(--text-sub);
-    font-size: 11px;
-    line-height: 1.45;
-}
-
-.thread-runtime-overview.runtime-stopped .runtime-dashboard,
-.thread-runtime-overview.runtime-stopped .runtime-live-grid,
-.thread-runtime-overview.runtime-stopped .runtime-capability-section,
-.thread-runtime-overview.runtime-stopped .runtime-status-note {
-    display: none;
-}
-
-.thread-runtime-overview.runtime-stopped .runtime-decision-section {
-    margin-top: 12px;
-}
-
 .runtime-optimizer-section {
     margin-bottom: 14px;
     overflow: hidden;
@@ -810,273 +750,6 @@ body.theme-dark .option-item {
 .runtime-status-badge[data-state="stopped"] {
     background: color-mix(in srgb, #d94b55 14%, transparent);
     color: #c63c47;
-}
-
-.runtime-dashboard {
-    display: grid;
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-    gap: 10px;
-    margin-bottom: 12px;
-}
-
-.runtime-foreground-card,
-.runtime-quick-grid,
-.runtime-metrics-strip {
-    border: 1px solid var(--glass-border);
-    border-radius: calc(var(--radius-ctl) + 2px);
-    background: var(--glass-surface);
-}
-
-.runtime-foreground-card {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    justify-content: center;
-    padding: 16px;
-}
-
-.runtime-dashboard-label,
-.runtime-quick-item span,
-.runtime-metrics-strip > span > span,
-.runtime-field-grid label > span,
-.runtime-number-grid label > span {
-    color: var(--text-sub);
-    font-size: 11px;
-}
-
-.runtime-foreground-card > strong {
-    overflow: hidden;
-    margin: 6px 0 8px;
-    color: var(--text-main);
-    font-size: 16px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.runtime-dashboard-meta {
-    overflow: hidden;
-    color: var(--text-dim);
-    font-size: 11px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.runtime-dashboard-meta b {
-    color: var(--text-sub);
-    font-weight: 600;
-}
-
-.runtime-quick-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    overflow: hidden;
-}
-
-.runtime-quick-item {
-    min-width: 0;
-    padding: 11px 12px;
-    border-right: 1px solid var(--glass-border);
-    border-bottom: 1px solid var(--glass-border);
-}
-
-.runtime-quick-item:nth-child(2n) {
-    border-right: none;
-}
-
-.runtime-quick-item:nth-last-child(-n + 2) {
-    border-bottom: none;
-}
-
-.runtime-quick-item span,
-.runtime-quick-item strong {
-    display: block;
-}
-
-.runtime-quick-item strong {
-    overflow: hidden;
-    margin-top: 5px;
-    color: var(--text-main);
-    font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.runtime-metrics-strip {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding: 10px 12px;
-}
-
-.runtime-metrics-strip > span {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    min-width: 0;
-}
-
-.runtime-metrics-strip > span + span {
-    margin-left: 12px;
-    padding-left: 12px;
-    border-left: 1px solid var(--glass-border);
-}
-
-.runtime-metrics-strip strong {
-    color: var(--text-main);
-    font-size: 12px;
-}
-
-.runtime-live-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-.runtime-live-item {
-    min-width: 0;
-    padding: 10px 11px;
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-ctl);
-    background: var(--glass-control-bg);
-}
-
-.runtime-live-item.runtime-live-wide {
-    grid-column: 1 / -1;
-}
-
-.runtime-live-item span,
-.runtime-live-item strong {
-    display: block;
-}
-
-.runtime-live-item span {
-    color: var(--text-sub);
-    font-size: 10px;
-}
-
-.runtime-live-item strong {
-    overflow: hidden;
-    margin-top: 4px;
-    color: var(--text-main);
-    font-size: 11px;
-    line-height: 1.4;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.runtime-capability-section {
-    margin-bottom: 12px;
-}
-
-.runtime-capability-heading {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 8px;
-}
-
-.runtime-capability-heading span {
-    color: var(--text-sub);
-    font-size: 10px;
-    text-align: right;
-}
-
-.runtime-capability-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-}
-
-.runtime-capability-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    min-width: 0;
-    padding: 9px 10px;
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-ctl);
-    background: var(--glass-control-bg);
-}
-
-.runtime-capability-item span,
-.runtime-capability-item strong {
-    overflow: hidden;
-    font-size: 10px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.runtime-capability-item strong {
-    color: #2f9d68;
-}
-
-.runtime-capability-item[data-state="unavailable"] strong {
-    color: var(--text-dim);
-}
-
-.runtime-switch-card.runtime-capability-unavailable {
-    opacity: .58;
-}
-
-.runtime-decision-section {
-    margin-bottom: 12px;
-}
-
-.runtime-decision-list {
-    display: grid;
-    gap: 7px;
-    max-height: 220px;
-    overflow-y: auto;
-}
-
-.runtime-decision-item {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 3px 10px;
-    padding: 9px 10px;
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-ctl);
-    background: var(--glass-control-bg);
-}
-
-.runtime-decision-item strong,
-.runtime-decision-item span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.runtime-decision-item strong {
-    color: var(--text-main);
-    font-size: 11px;
-}
-
-.runtime-decision-item span {
-    grid-column: 1 / -1;
-    color: var(--text-sub);
-    font-size: 10px;
-}
-
-.runtime-decision-item small {
-    color: var(--text-dim);
-    font-size: 9px;
-}
-
-.runtime-decision-empty {
-    padding: 12px;
-    color: var(--text-dim);
-    font-size: 11px;
-    text-align: center;
-}
-
-@media (max-width: 520px) {
-    .runtime-capability-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
 }
 
 .runtime-status-note {
@@ -1305,12 +978,244 @@ body.theme-dark .option-item {
     margin-bottom: 0;
 }
 
-body.theme-dark .runtime-foreground-card,
-body.theme-dark .runtime-quick-grid,
-body.theme-dark .runtime-metrics-strip,
 body.theme-dark #runtime-optimizer-panel .runtime-switch-card,
 body.theme-dark .runtime-advanced {
     background: color-mix(in srgb, var(--glass-surface) 88%, transparent);
+}
+
+.thread-runtime-overview .runtime-overview-header {
+    margin-bottom: 4px;
+}
+
+.runtime-summary-list,
+.runtime-details,
+.runtime-decision-section {
+    border-top: 1px solid var(--glass-border);
+}
+
+.runtime-summary-row {
+    display: grid;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+}
+
+.runtime-summary-primary {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.runtime-summary-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-top: 1px solid var(--glass-border);
+}
+
+.runtime-summary-row > span {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.runtime-summary-row small,
+.runtime-details summary small {
+    overflow: hidden;
+    color: var(--text-sub);
+    font-size: 10px;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.runtime-summary-row strong {
+    overflow: hidden;
+    color: var(--text-main);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.runtime-summary-primary > span:first-child > strong {
+    font-size: 14px;
+}
+
+.runtime-summary-primary > span:last-child {
+    max-width: 112px;
+    text-align: right;
+}
+
+.runtime-summary-primary b {
+    color: var(--text-sub);
+    font-weight: 500;
+}
+
+.runtime-details {
+    margin: 0;
+}
+
+.runtime-details summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    cursor: pointer;
+    list-style: none;
+}
+
+.runtime-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.runtime-details summary > span:first-child {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.runtime-details summary strong {
+    color: var(--text-main);
+    font-size: 12px;
+}
+
+.runtime-details-arrow {
+    color: var(--text-sub);
+    font-size: 20px;
+    line-height: 1;
+    transition: transform 160ms ease;
+}
+
+.runtime-details[open] .runtime-details-arrow {
+    transform: rotate(90deg);
+}
+
+.runtime-detail-list {
+    border-top: 1px solid var(--glass-border);
+}
+
+.runtime-detail-row,
+.runtime-capability-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
+    padding: 9px 0;
+    border: 0;
+    border-bottom: 1px solid var(--glass-border);
+    border-radius: 0;
+    background: transparent;
+}
+
+.runtime-detail-row span,
+.runtime-capability-item span {
+    flex: 1;
+    min-width: 0;
+    color: var(--text-sub);
+    font-size: 10px;
+}
+
+.runtime-detail-row strong,
+.runtime-capability-item strong {
+    overflow: hidden;
+    max-width: 62%;
+    color: var(--text-main);
+    font-size: 10px;
+    font-weight: 600;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.runtime-capability-item[data-state="available"] strong {
+    color: #2f9d68;
+}
+
+.runtime-capability-item[data-state="unavailable"] strong,
+.runtime-capability-item[data-state="waiting"] strong {
+    color: var(--text-dim);
+}
+
+.runtime-capability-section {
+    margin: 0;
+    padding-top: 12px;
+}
+
+.runtime-capability-heading {
+    margin-bottom: 2px;
+}
+
+.runtime-capability-grid {
+    display: block;
+}
+
+.runtime-capability-item:last-child {
+    border-bottom: 0;
+}
+
+.runtime-decision-section {
+    margin: 0;
+    padding-top: 12px;
+}
+
+.runtime-decision-list {
+    display: block;
+    max-height: 168px;
+    overflow-y: auto;
+}
+
+.runtime-decision-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 10px;
+    padding: 9px 0;
+    border: 0;
+    border-bottom: 1px solid var(--glass-border);
+    border-radius: 0;
+    background: transparent;
+}
+
+.runtime-decision-item:last-child {
+    border-bottom: 0;
+}
+
+.runtime-decision-empty {
+    padding: 12px 0 2px;
+}
+
+.runtime-daemon-waiting {
+    padding: 12px 0;
+    border: 0;
+    border-top: 1px solid var(--glass-border);
+    border-radius: 0;
+    background: transparent;
+}
+
+.runtime-daemon-waiting-dot {
+    width: 7px;
+    height: 7px;
+    flex-basis: 7px;
+    box-shadow: none;
+}
+
+.thread-runtime-overview.runtime-stopped .runtime-summary-list,
+.thread-runtime-overview.runtime-stopped .runtime-details,
+.thread-runtime-overview.runtime-stopped .runtime-status-note {
+    display: none;
+}
+
+.thread-runtime-overview.runtime-stopped .runtime-decision-section {
+    margin-top: 0;
+}
+
+@media (max-width: 520px) {
+    .runtime-summary-metrics {
+        gap: 8px;
+    }
+
+    .runtime-summary-primary > span:last-child {
+        max-width: 96px;
+    }
 }
 
 @media (hover: hover) {
@@ -1345,15 +1250,10 @@ body.theme-dark .runtime-advanced {
 }
 
 @media (max-width: 420px) {
-    .runtime-dashboard,
     .runtime-switch-grid,
     .runtime-field-grid,
     .runtime-number-grid {
         grid-template-columns: 1fr;
-    }
-
-    .runtime-metrics-strip {
-        grid-column: auto;
     }
 
     .runtime-section-header {

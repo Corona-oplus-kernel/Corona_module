@@ -1763,51 +1763,47 @@
                         <span class="runtime-daemon-waiting-dot"></span>
                         <span><strong data-i18n="runtimeWaitingTitle"></strong><small data-i18n="runtimeWaitingDesc"></small></span>
                     </div>
-                    <div class="runtime-dashboard">
-                        <div class="runtime-foreground-card">
-                            <span class="runtime-dashboard-label" data-i18n="runtimeForeground"></span>
-                            <strong id="runtime-foreground">--</strong>
-                            <span class="runtime-dashboard-meta"><span data-i18n="runtimeDetection"></span> · <b id="runtime-detection">--</b></span>
+                    <div class="runtime-summary-list">
+                        <div class="runtime-summary-row runtime-summary-primary">
+                            <span><small data-i18n="runtimeForeground"></small><strong id="runtime-foreground">--</strong><small><span data-i18n="runtimeDetection"></span> · <b id="runtime-detection">--</b></small></span>
+                            <span><small data-i18n="runtimeMode"></small><strong id="runtime-mode">--</strong></span>
                         </div>
-                        <div class="runtime-quick-grid">
-                            <div class="runtime-quick-item"><span data-i18n="runtimeMode"></span><strong id="runtime-mode">--</strong></div>
-                            <div class="runtime-quick-item"><span data-i18n="runtimeTemperature"></span><strong id="runtime-temperature">--</strong></div>
-                            <div class="runtime-quick-item"><span data-i18n="runtimeEbpfState"></span><strong id="runtime-ebpf-state">--</strong></div>
-                            <div class="runtime-quick-item"><span data-i18n="runtimeKnownThreads"></span><strong id="runtime-known-threads">--</strong></div>
-                            <div class="runtime-quick-item"><span data-i18n="runtimeIrqPolicy"></span><strong id="runtime-irq-policy">--</strong></div>
-                            <div class="runtime-quick-item"><span data-i18n="runtimeUfsPolicy"></span><strong id="runtime-ufs-policy">--</strong></div>
-                            <div class="runtime-quick-item"><span data-i18n="runtimeGpuPolicy"></span><strong id="runtime-gpu-policy">--</strong></div>
-                            <div class="runtime-quick-item"><span data-i18n="runtimeIoPolicy"></span><strong id="runtime-io-policy">--</strong></div>
+                        <div class="runtime-summary-row runtime-summary-metrics">
+                            <span><small data-i18n="runtimeCpuPressure"></small><strong id="runtime-cpu-pressure">--</strong></span>
+                            <span><small data-i18n="runtimeIoPressure"></small><strong id="runtime-io-pressure">--</strong></span>
+                            <span><small data-i18n="runtimeTemperature"></small><strong id="runtime-temperature">--</strong></span>
                         </div>
                     </div>
-                    <div class="runtime-live-grid">
-                        <div class="runtime-live-item"><span data-i18n="runtimeCpuPressure"></span><strong id="runtime-cpu-pressure">--</strong></div>
-                        <div class="runtime-live-item"><span data-i18n="runtimeIoPressure"></span><strong id="runtime-io-pressure">--</strong></div>
-                        <div class="runtime-live-item runtime-live-wide"><span data-i18n="runtimeCpuGroups"></span><strong id="runtime-cpu-groups">--</strong></div>
-                        <div class="runtime-live-item"><span data-i18n="runtimeIrqTarget"></span><strong id="runtime-irq-target">--</strong></div>
-                        <div class="runtime-live-item"><span data-i18n="runtimeUfsWriteShape"></span><strong id="runtime-ufs-write-shape">--</strong></div>
-                        <div class="runtime-live-item"><span data-i18n="runtimeGpuFloor"></span><strong id="runtime-gpu-floor">--</strong></div>
-                        <div class="runtime-live-item"><span data-i18n="runtimeIoQueue"></span><strong id="runtime-io-queue">--</strong></div>
-                        <div class="runtime-live-item"><span data-i18n="runtimeAffinityStats"></span><strong id="runtime-affinity-stats">--</strong></div>
-                        <div class="runtime-live-item runtime-live-wide"><span data-i18n="runtimeStorageLearning"></span><strong id="runtime-storage-learning">--</strong></div>
-                    </div>
-                    <div class="runtime-capability-section">
-                        <div class="runtime-capability-heading">
-                            <strong data-i18n="runtimeCapabilities"></strong>
-                            <span data-i18n="runtimeCapabilitiesDesc"></span>
+                    <details class="runtime-details">
+                        <summary><span><strong data-i18n="runtimeDetails"></strong><small data-i18n="runtimeDetailsDesc"></small></span><span class="runtime-details-arrow">›</span></summary>
+                        <div class="runtime-detail-list">
+                            <div class="runtime-detail-row"><span data-i18n="runtimeEbpfState"></span><strong id="runtime-ebpf-state">--</strong></div>
+                            <div class="runtime-detail-row"><span data-i18n="runtimeKnownThreads"></span><strong id="runtime-known-threads">--</strong></div>
+                            <div class="runtime-detail-row"><span data-i18n="runtimeIrqPolicy"></span><strong id="runtime-irq-policy">--</strong></div>
+                            <div class="runtime-detail-row"><span data-i18n="runtimeUfsPolicy"></span><strong id="runtime-ufs-policy">--</strong></div>
+                            <div class="runtime-detail-row"><span data-i18n="runtimeGpuPolicy"></span><strong id="runtime-gpu-policy">--</strong></div>
+                            <div class="runtime-detail-row"><span data-i18n="runtimeIoPolicy"></span><strong id="runtime-io-policy">--</strong></div>
+                            <div class="runtime-detail-row"><span data-i18n="runtimeCpuGroups"></span><strong id="runtime-cpu-groups">--</strong></div>
+                            <div class="runtime-detail-row"><span data-i18n="runtimeStorageLearning"></span><strong id="runtime-storage-learning">--</strong></div>
                         </div>
-                        <div class="runtime-capability-grid">
-                            <div class="runtime-capability-item" data-capability="zram"><span>ZRAM</span><strong>--</strong></div>
-                            <div class="runtime-capability-item" data-capability="erm"><span>OPlus ERM</span><strong>--</strong></div>
-                            <div class="runtime-capability-item" data-capability="irq"><span>IRQ/RPS</span><strong>--</strong></div>
-                            <div class="runtime-capability-item" data-capability="ufs"><span>UFS WB</span><strong>--</strong></div>
-                            <div class="runtime-capability-item" data-capability="gpu"><span>KGSL</span><strong>--</strong></div>
-                            <div class="runtime-capability-item" data-capability="io"><span>Block I/O</span><strong>--</strong></div>
-                            <div class="runtime-capability-item" data-capability="cpu_psi"><span>CPU PSI</span><strong>--</strong></div>
-                            <div class="runtime-capability-item" data-capability="io_psi"><span>I/O PSI</span><strong>--</strong></div>
-                            <div class="runtime-capability-item" data-capability="memory_psi"><span>Memory PSI</span><strong>--</strong></div>
+                        <div class="runtime-capability-section">
+                            <div class="runtime-capability-heading">
+                                <strong data-i18n="runtimeCapabilities"></strong>
+                                <span data-i18n="runtimeCapabilitiesDesc"></span>
+                            </div>
+                            <div class="runtime-capability-grid">
+                                <div class="runtime-capability-item" data-capability="zram"><span>ZRAM</span><strong>--</strong></div>
+                                <div class="runtime-capability-item" data-capability="erm"><span>OPlus ERM</span><strong>--</strong></div>
+                                <div class="runtime-capability-item" data-capability="irq"><span>IRQ/RPS</span><strong>--</strong></div>
+                                <div class="runtime-capability-item" data-capability="ufs"><span>UFS WB</span><strong>--</strong></div>
+                                <div class="runtime-capability-item" data-capability="gpu"><span>KGSL</span><strong>--</strong></div>
+                                <div class="runtime-capability-item" data-capability="io"><span>Block I/O</span><strong>--</strong></div>
+                                <div class="runtime-capability-item" data-capability="cpu_psi"><span>CPU PSI</span><strong>--</strong></div>
+                                <div class="runtime-capability-item" data-capability="io_psi"><span>I/O PSI</span><strong>--</strong></div>
+                                <div class="runtime-capability-item" data-capability="memory_psi"><span>Memory PSI</span><strong>--</strong></div>
+                            </div>
                         </div>
-                    </div>
+                    </details>
                     <div class="runtime-decision-section">
                         <div class="runtime-capability-heading">
                             <strong data-i18n="runtimeDecisions"></strong>

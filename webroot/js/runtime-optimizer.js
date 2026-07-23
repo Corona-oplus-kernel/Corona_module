@@ -59,6 +59,9 @@
             this.runtimeOptimizerInitialized = true;
             this.mountRuntimeOptimizerPanel();
             document.getElementById('runtime-refresh-btn')?.addEventListener('click', () => this.refreshRuntimeOptimizer(true));
+            document.querySelector('.runtime-details')?.addEventListener('toggle', event => {
+                if (event.currentTarget.open) this.refreshRuntimeOptimizer();
+            });
             const settingsToggle = document.getElementById('runtime-settings-toggle');
             settingsToggle?.addEventListener('click', event => {
                 if (event.target.closest('#runtime-refresh-btn')) return;
@@ -213,23 +216,25 @@
                 input.setAttribute('aria-disabled', enabled ? 'false' : 'true');
             });
         },
-        updateRuntimeCapabilities(status, running) {
-            document.querySelectorAll('.runtime-capability-item').forEach(item => {
-                const name = item.dataset.capability;
-                if (!running) {
-                    item.dataset.state = 'waiting';
+        updateRuntimeCapabilities(status, running, renderDetails = true) {
+            if (renderDetails) {
+                document.querySelectorAll('.runtime-capability-item').forEach(item => {
+                    const name = item.dataset.capability;
+                    if (!running) {
+                        item.dataset.state = 'waiting';
+                        const value = item.querySelector('strong');
+                        const text = this.t('runtimeCapabilityWaiting');
+                        if (value && value.textContent !== text) value.textContent = text;
+                        return;
+                    }
+                    const supported = status[`capability_${name}`] === '1';
+                    const reason = status[`capability_${name}_reason`] || 'missing_node';
+                    item.dataset.state = supported ? 'available' : 'unavailable';
                     const value = item.querySelector('strong');
-                    const text = this.t('runtimeCapabilityWaiting');
+                    const text = this.t(CAPABILITY_REASON_KEYS[reason] || 'unsupported');
                     if (value && value.textContent !== text) value.textContent = text;
-                    return;
-                }
-                const supported = status[`capability_${name}`] === '1';
-                const reason = status[`capability_${name}_reason`] || 'missing_node';
-                item.dataset.state = supported ? 'available' : 'unavailable';
-                const value = item.querySelector('strong');
-                const text = this.t(CAPABILITY_REASON_KEYS[reason] || 'unsupported');
-                if (value && value.textContent !== text) value.textContent = text;
-            });
+                });
+            }
             HARDWARE_POLICIES.forEach(policy => {
                 const capability = policy.key.replace('_enabled', '');
                 const toggle = document.getElementById(policy.id);
@@ -489,8 +494,9 @@
             const binary = this.shellQuote(`${this.modDir}/bin/coronad`);
             const status = this.parseRuntimeKeyValues(await this.exec(`${binary} status 2>/dev/null`));
             const running = status.running === '1';
+            const renderDetails = document.querySelector('.runtime-details')?.open === true;
             this.updateRuntimeOverviewState(running);
-            this.updateRuntimeCapabilities(status, running);
+            this.updateRuntimeCapabilities(status, running, renderDetails);
             this.updateRuntimeDecisions(status);
             const badge = document.getElementById('runtime-status-badge');
             if (badge) {
@@ -498,9 +504,7 @@
                 badge.textContent = this.t(running ? 'runtimeRunning' : 'runtimeStopped');
             }
             if (!running) {
-                const waiting = this.t('runtimePolicyWaiting');
-                ['runtime-foreground', 'runtime-detection', 'runtime-mode', 'runtime-temperature', 'runtime-ebpf-state', 'runtime-known-threads', 'runtime-cpu-pressure', 'runtime-io-pressure', 'runtime-cpu-groups', 'runtime-irq-target', 'runtime-ufs-write-shape', 'runtime-gpu-floor', 'runtime-io-queue', 'runtime-storage-learning', 'runtime-affinity-stats', 'runtime-applied-failed', 'runtime-ebpf-events'].forEach(id => this.setRuntimeText(id, '--'));
-                ['runtime-irq-policy', 'runtime-ufs-policy', 'runtime-gpu-policy', 'runtime-io-policy'].forEach(id => this.setRuntimeText(id, waiting));
+                ['runtime-foreground', 'runtime-detection', 'runtime-mode', 'runtime-temperature', 'runtime-cpu-pressure', 'runtime-io-pressure'].forEach(id => this.setRuntimeText(id, '--'));
                 const error = document.getElementById('runtime-ebpf-error');
                 if (error) error.hidden = true;
                 return;
@@ -509,6 +513,20 @@
             this.setRuntimeText('runtime-detection', status.foreground_source);
             this.setRuntimeText('runtime-mode', status.runtime_mode || status.mode);
             this.setRuntimeText('runtime-temperature', status.max_temperature_c ? `${status.max_temperature_c} °C` : '--');
+            this.setRuntimeText('runtime-cpu-pressure', `${status.cpu_pressure_avg10 || '0'}% · ${this.runtimePressureText(status.cpu_pressure_level)}`);
+            this.setRuntimeText('runtime-io-pressure', `${status.io_pressure_avg10 || '0'}% · ${this.runtimePressureText(status.io_pressure_level)}`);
+            const error = document.getElementById('runtime-ebpf-error');
+            if (error) {
+                const hasError = Boolean(status.ebpf_error_stage) || Number(status.ebpf_error_errno || 0) !== 0;
+                error.hidden = !hasError;
+                error.textContent = hasError
+                    ? `${this.t('runtimeEbpfError')}: ${status.ebpf_error_stage || 'unknown'} (${status.ebpf_error_errno || 0})`
+                    : '';
+            }
+            if (!renderDetails) {
+                if (notify) this.showToast(this.t('runtimeRefreshed'));
+                return;
+            }
             const requested = status.ebpf_requested === '1';
             const active = status.ebpf_active === '1';
             this.setRuntimeText('runtime-ebpf-state', this.t(active ? 'runtimeEbpfActive' : requested ? 'runtimeEbpfFallback' : 'runtimeEbpfIdle'));
@@ -521,8 +539,6 @@
                 ? ` · ${status.io_read_ahead_kb}/${status.io_nr_requests || 0}`
                 : '';
             this.setRuntimeText('runtime-io-policy', `${this.runtimePolicyText('io', status.io_policy)}${ioValues}`);
-            this.setRuntimeText('runtime-cpu-pressure', `${status.cpu_pressure_avg10 || '0'}% · ${this.runtimePressureText(status.cpu_pressure_level)}`);
-            this.setRuntimeText('runtime-io-pressure', `${status.io_pressure_avg10 || '0'}% · ${this.runtimePressureText(status.io_pressure_level)}`);
             const cpuGroups = [
                 `E ${status.efficiency_cpus || '--'}`,
                 `B ${status.balanced_cpus || '--'}`,
@@ -530,25 +546,10 @@
                 `L ${status.latency_cpus || '--'}`
             ].join(' · ');
             this.setRuntimeText('runtime-cpu-groups', cpuGroups);
-            this.setRuntimeText('runtime-irq-target', `${status.irq_target_cpus || '--'} · ${status.irq_busy || 0}/${status.irq_managed || 0}`);
-            this.setRuntimeText('runtime-ufs-write-shape', `${status.ufs_write_ops || 0} ops · ${status.ufs_average_write_sectors || 0} ${this.t('runtimeSectorsPerOp')}`);
-            this.setRuntimeText('runtime-gpu-floor', `${status.gpu_min_freq || 0} · ${status.gpu_busy_percent || 0}%`);
-            this.setRuntimeText('runtime-io-queue', `${status.io_read_ahead_kb || 0} KB · ${status.io_nr_requests || 0}`);
             this.setRuntimeText(
                 'runtime-storage-learning',
                 `${status.storage_learning_progress || 0}% · ${status.storage_active_sectors || 0}/${status.storage_sequential_write_sectors || 0} sectors`
             );
-            this.setRuntimeText('runtime-affinity-stats', `${status.affinity_applied || 0}/${status.affinity_failed || 0} · ${status.manual_applied || 0}`);
-            this.setRuntimeText('runtime-applied-failed', `${status.affinity_applied || status.applied || 0} / ${status.affinity_failed || status.failed || 0}`);
-            this.setRuntimeText('runtime-ebpf-events', status.bpf_events || '0');
-            const error = document.getElementById('runtime-ebpf-error');
-            if (error) {
-                const hasError = Boolean(status.ebpf_error_stage) || Number(status.ebpf_error_errno || 0) !== 0;
-                error.hidden = !hasError;
-                error.textContent = hasError
-                    ? `${this.t('runtimeEbpfError')}: ${status.ebpf_error_stage || 'unknown'} (${status.ebpf_error_errno || 0})`
-                    : '';
-            }
             if (notify) this.showToast(this.t('runtimeRefreshed'));
             } finally {
                 this.runtimeRefreshPending = false;
