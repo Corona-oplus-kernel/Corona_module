@@ -762,6 +762,10 @@
     },
     closeHomeDetail(id) {
         this.hideOverlay(id);
+        if (window.history.state?.coronaOverlay === id) {
+            window.history.back();
+            return;
+        }
         this.switchPage('home')?.catch(error => console.error('home detail navigation failed', error));
     },
     bindSurfaceSwipe(surface, onDismiss) {
@@ -830,6 +834,9 @@
         requestAnimationFrame(() => {
             requestAnimationFrame(() => overlay.classList.add('show'));
         });
+        if (overlay.classList.contains('home-return-overlay') && window.history.state?.coronaOverlay !== id) {
+            window.history.pushState({ coronaPage: 'home', coronaOverlay: id }, '', `#home/${id}`);
+        }
         if (overlay.classList.contains('no-close-btn')) {
             const floatingHeader = document.getElementById('floating-header');
             if (floatingHeader) floatingHeader.classList.add('overlay-hidden');
