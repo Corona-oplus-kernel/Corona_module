@@ -185,17 +185,6 @@ get_active_zram_block() {
     echo "$dev"
 }
 
-get_active_zram_algorithm() {
-    block=$(get_active_zram_block) || return 1
-    raw=$(cat "/sys/block/$block/comp_algorithm" 2>/dev/null)
-    active=$(echo "$raw" | sed -n 's/.*\[\([^]]*\)\].*/\1/p')
-    [ -n "$active" ] && {
-        echo "$active"
-        return 0
-    }
-    echo "$raw" | awk '{print $1}'
-}
-
 get_oplus_vm_swappiness() {
     for node in /proc/oplus_mem/swappiness_para /proc/oplus_healthinfo/swappiness_para; do
         [ -r "$node" ] || continue
@@ -639,7 +628,8 @@ get_swap_priority() {
 }
 
 get_active_zram_algorithm() {
-    zram_block="$1"
+    zram_block="${1:-$(get_active_zram_block)}"
+    [ -n "$zram_block" ] || return 1
     alg_raw=$(cat "/sys/block/$zram_block/comp_algorithm" 2>/dev/null)
     active=$(echo "$alg_raw" | sed -n 's/.*\[\([^]]*\)\].*/\1/p')
     [ -n "$active" ] && { echo "$active"; return; }
