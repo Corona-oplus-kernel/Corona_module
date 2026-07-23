@@ -128,18 +128,50 @@
         },
         bindRuntimeDetails() {
             document.querySelectorAll('.runtime-details, .runtime-capabilities, .runtime-history').forEach(details => {
+                const summary = details.firstElementChild;
+                summary?.addEventListener('click', event => {
+                    if (!details.open) return;
+                    if (details._runtimeClosing) {
+                        event.preventDefault();
+                        return;
+                    }
+                    const content = [...details.children].find(child => child.tagName !== 'SUMMARY');
+                    if (!content?.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                    event.preventDefault();
+                    details._runtimeClosing = true;
+                    this.animateRuntimeDetails(content, false, () => {
+                        details.open = false;
+                        details._runtimeClosing = false;
+                    });
+                });
                 details.addEventListener('toggle', () => {
                     if (!details.open) return;
                     this.refreshRuntimeOptimizer();
                     const content = [...details.children].find(child => child.tagName !== 'SUMMARY');
                     if (!content?.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-                    content._runtimeExpandAnimation?.cancel();
-                    content._runtimeExpandAnimation = content.animate([
-                        { opacity: 0, transform: 'translateY(-7px)', clipPath: 'inset(0 0 100% 0)' },
-                        { opacity: 1, transform: 'translateY(0)', clipPath: 'inset(0)' }
-                    ], { duration: 190, easing: 'cubic-bezier(.22, 1, .36, 1)' });
+                    this.animateRuntimeDetails(content, true);
                 });
             });
+        },
+        animateRuntimeDetails(content, opening, onFinish = null) {
+            content._runtimeDetailsAnimation?.cancel();
+            const visible = { opacity: 1, transform: 'translateY(0)', clipPath: 'inset(0)' };
+            const hidden = { opacity: 0, transform: 'translateY(-7px)', clipPath: 'inset(0 0 100% 0)' };
+            const duration = opening ? 190 : 150;
+            const animation = content.animate(opening ? [hidden, visible] : [visible, hidden], {
+                duration,
+                easing: 'cubic-bezier(.22, 1, .36, 1)'
+            });
+            content._runtimeDetailsAnimation = animation;
+            let finished = false;
+            const finish = () => {
+                if (finished || content._runtimeDetailsAnimation !== animation) return;
+                finished = true;
+                content._runtimeDetailsAnimation = null;
+                if (onFinish) onFinish();
+            };
+            animation.onfinish = finish;
+            window.setTimeout(finish, duration + 50);
         },
         toggleRuntimePanel(prefix, options = {}) {
             const toggle = document.getElementById(`${prefix}-toggle`);
