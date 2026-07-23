@@ -148,7 +148,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072311` : '';
+        return map[name] ? `${map[name]}?v=2026072312` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -494,27 +494,22 @@ class CoronaAddon {
             .map(([key, value]) => `${key}=${value}`);
         return lines.length ? `${lines.join('\n')}\n` : '';
     }
-    async buildMergedConfigContent(filename, updates, order = []) {
-        const current = await this.readConfig(filename);
-        const map = new Map(this.parseSimpleConfig(current));
+    mergeSimpleConfigContent(content, updates, order = []) {
+        const map = new Map(this.parseSimpleConfig(content));
         Object.entries(updates || {}).forEach(([key, value]) => {
             if (value === undefined || value === null || value === '') map.delete(key);
             else map.set(key, String(value));
         });
         const keys = [...new Set([...order, ...map.keys()])].filter(key => map.has(key));
-        return this.compactConfigContent(filename, this.buildSimpleConfig(keys.map(key => [key, map.get(key)])));
+        return this.buildSimpleConfig(keys.map(key => [key, map.get(key)]));
+    }
+    async buildMergedConfigContent(filename, updates, order = []) {
+        return this.compactConfigContent(filename, this.mergeSimpleConfigContent(await this.readConfig(filename), updates, order));
     }
     mergeConfigFile(filename, updates, order = []) {
         const normalized = this.normalizeConfigFilename(filename);
         return this.withLock(`config-file:${normalized}`, async () => {
-            const current = await this.readConfig(normalized);
-            const map = new Map(this.parseSimpleConfig(current));
-            Object.entries(updates || {}).forEach(([key, value]) => {
-                if (value === undefined || value === null || value === '') map.delete(key);
-                else map.set(key, String(value));
-            });
-            const keys = [...new Set([...order, ...map.keys()])].filter(key => map.has(key));
-            const content = this.buildSimpleConfig(keys.map(key => [key, map.get(key)]));
+            const content = this.mergeSimpleConfigContent(await this.readConfig(normalized), updates, order);
             return this.writeConfigUnlocked(normalized, content);
         });
     }

@@ -129,28 +129,6 @@
             if (this._loopRefreshPromise === refresh) this._loopRefreshPromise = null;
         }
     },
-    initZramRecompFold() {
-        if (typeof this.initAdvancedFold === 'function') {
-            this.initAdvancedFold('zram-recomp-toggle', 'zram-recomp-body', { defaultOpen: false });
-            return;
-        }
-        // fallback no-anim
-        const header = document.getElementById('zram-recomp-toggle');
-        const body = document.getElementById('zram-recomp-body');
-        if (!header || !body || header.dataset.bound) return;
-        header.dataset.bound = '1';
-        header.addEventListener('click', () => {
-            const open = body.dataset.open === '1';
-            body.dataset.open = open ? '0' : '1';
-            body.style.display = open ? 'none' : 'block';
-            header.classList.toggle('expanded', !open);
-        });
-    },
-    initZramAdvancedFold() {
-        if (typeof this.initAdvancedFold === 'function') {
-            this.initAdvancedFold('zram-advanced-toggle', 'zram-advanced-body', { defaultOpen: false });
-        }
-    },
     renderRecompAlgorithmOptions() {
         const section = document.getElementById('zram-recomp-section');
         if (!section) return;
