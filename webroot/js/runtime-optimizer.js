@@ -112,10 +112,9 @@
             });
             this.loadRuntimeOptimizerConfig();
             this.refreshRuntimeOptimizer();
-            this.runtimeStatusTimer = window.setInterval(() => {
-                if (document.hidden || !document.getElementById('page-settings')?.classList.contains('active')) return;
-                this.refreshRuntimeOptimizer();
-            }, 2000);
+            this.startRefreshTask('runtime-status', () => this.refreshRuntimeOptimizer(), 2000, {
+                when: () => document.getElementById('page-settings')?.classList.contains('active') === true
+            });
         },
         mountRuntimeOptimizerPanel() {
             const target = document.getElementById('app-policy-content');

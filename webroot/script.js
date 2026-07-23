@@ -94,8 +94,7 @@ class CoronaAddon {
         this.maxHistoryPoints = 36;
         this.le9ecSupported = false;
         this.realtimeIntervalMs = 6000;
-        this.realtimeTimer = null;
-        this.zramMetricsTimer = null;
+        this.refreshTasks = new Map();
         this.zramStatusBusy = false;
         this.realtimeBusy = false;
         this.realtimeTick = 0;
@@ -148,7 +147,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072324` : '';
+        return map[name] ? `${map[name]}?v=2026072325` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -683,6 +682,59 @@ class CoronaAddon {
         }
         overlay._hideTimer = setTimeout(finalize, duration);
     }
+    scheduleRefreshTask(task, delay = task.interval) {
+        if (!task?.active || document.hidden || task.timer) return;
+        task.timer = setTimeout(() => {
+            task.timer = null;
+            this.runRefreshTask(task);
+        }, Math.max(0, delay));
+    }
+    async runRefreshTask(task) {
+        if (!task?.active || document.hidden) return;
+        if (task.running || (task.when && !task.when())) {
+            this.scheduleRefreshTask(task);
+            return;
+        }
+        task.running = true;
+        try {
+            await task.callback();
+        } catch (error) {
+            console.error(`refresh task failed: ${task.name}`, error);
+        } finally {
+            task.running = false;
+            this.scheduleRefreshTask(task);
+        }
+    }
+    startRefreshTask(name, callback, interval, options = {}) {
+        this.stopRefreshTask(name);
+        const task = {
+            name,
+            callback,
+            interval: Math.max(250, Number(interval) || 1000),
+            when: options.when,
+            resumeImmediate: options.resumeImmediate !== false,
+            active: true,
+            running: false,
+            timer: null
+        };
+        this.refreshTasks.set(name, task);
+        this.scheduleRefreshTask(task, options.initialDelay ?? task.interval);
+        return task;
+    }
+    stopRefreshTask(name) {
+        const task = this.refreshTasks?.get(name);
+        if (!task) return;
+        task.active = false;
+        if (task.timer) clearTimeout(task.timer);
+        this.refreshTasks.delete(name);
+    }
+    handleRefreshVisibility(hidden = document.hidden) {
+        this.refreshTasks?.forEach(task => {
+            if (task.timer) clearTimeout(task.timer);
+            task.timer = null;
+            if (!hidden) this.scheduleRefreshTask(task, task.resumeImmediate ? 0 : task.interval);
+        });
+    }
     showConfirm(message, title = '确认', options = {}) {
         return new Promise((resolve) => {
             const overlay = document.getElementById('confirm-dialog-overlay');
@@ -1034,4 +1086,5 @@ function endExpand() {}
 document.addEventListener('DOMContentLoaded', () => { window.corona = new CoronaAddon(); });
 document.addEventListener('visibilitychange', () => {
     document.body.classList.toggle('app-hidden', document.hidden);
+    window.corona?.handleRefreshVisibility(document.hidden);
 });

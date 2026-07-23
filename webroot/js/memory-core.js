@@ -411,32 +411,12 @@
     formatClusterInfo() { const parts = []; if (this.cpuClusterInfo.little > 0) parts.push(this.cpuClusterInfo.little); if (this.cpuClusterInfo.mid > 0) parts.push(this.cpuClusterInfo.mid); if (this.cpuClusterInfo.big > 0) parts.push(this.cpuClusterInfo.big); if (this.cpuClusterInfo.prime > 0) parts.push(this.cpuClusterInfo.prime); return parts.length === 0 ? '' : parts.join('+'); },
     getTotalCoreCount() { return this.cpuClusterInfo.little + this.cpuClusterInfo.mid + this.cpuClusterInfo.big + this.cpuClusterInfo.prime; },
     startRealtimeMonitor() {
-        this.stopRealtimeMonitor();
-        const schedule = (delay = this.realtimeIntervalMs) => {
-            if (document.hidden || this.realtimeTimer) return;
-            this.realtimeTimer = setTimeout(async () => {
-                this.realtimeTimer = null;
-                await this.updateRealtimeData(false);
-                schedule();
-            }, delay);
-        };
-        this._scheduleRealtimeUpdate = schedule;
-        schedule();
-        if (!this.realtimeVisibilityBound) {
-            this.realtimeVisibilityBound = true;
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) {
-                    this.stopRealtimeMonitor();
-                    return;
-                }
-                this.updateRealtimeData(false).finally(() => this._scheduleRealtimeUpdate?.());
-            });
-        }
+        this.startRefreshTask('realtime', () => this.updateRealtimeData(false), this.realtimeIntervalMs, {
+            initialDelay: this.realtimeIntervalMs
+        });
     },
     stopRealtimeMonitor() {
-        if (!this.realtimeTimer) return;
-        clearTimeout(this.realtimeTimer);
-        this.realtimeTimer = null;
+        this.stopRefreshTask('realtime');
     },
     async awaitInitialRealtimeReady() {
         await this.updateRealtimeData(true);
@@ -1246,40 +1226,13 @@
         this.updateZramModeHint(this.state.zramEnabled ? 'module' : (isActive ? 'system' : 'off'), runtimeInfo);
     },
     startZramMetricsRefresh(intervalMs = 8000) {
-        this.stopZramMetricsRefresh();
-        if (!this.zramMetricsVisibilityBound) {
-            this.zramMetricsVisibilityBound = true;
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) return;
-                const content = document.getElementById('zram-content');
-                if (content && content.classList.contains('expanded') && typeof this.loadZramStatus === 'function') {
-                    this.loadZramStatus().finally(() => this._scheduleZramMetrics?.());
-                }
-            });
-        }
-        // let expand animation start before shell reads
-        setTimeout(() => {
-            if (typeof this.loadZramStatus === 'function') this.loadZramStatus();
-        }, 60);
-        const schedule = () => {
-            if (this.zramMetricsTimer || document.hidden) return;
-            this.zramMetricsTimer = setTimeout(async () => {
-                this.zramMetricsTimer = null;
-                const content = document.getElementById('zram-content');
-                if (!content || !content.classList.contains('expanded')) return;
-                if (document.hidden) return;
-                await this.loadZramStatus();
-                schedule();
-            }, intervalMs);
-        };
-        this._scheduleZramMetrics = schedule;
-        schedule();
+        this.startRefreshTask('zram-metrics', () => this.loadZramStatus(), intervalMs, {
+            initialDelay: 60,
+            when: () => document.getElementById('zram-content')?.classList.contains('expanded') === true
+        });
     },
     stopZramMetricsRefresh() {
-        if (this.zramMetricsTimer) {
-            clearTimeout(this.zramMetricsTimer);
-            this.zramMetricsTimer = null;
-        }
+        this.stopRefreshTask('zram-metrics');
     },
     async detectZramFeatures() {
         if (!this.zramFeatures) this.zramFeatures = { multiComp: false, zstdLevel: false, writebackControl: false, writebackMode: 'none' };
