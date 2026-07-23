@@ -551,15 +551,11 @@
                 this.settingsUiInitialized = true;
             }
             if (!this.settingsDataLoaded) {
-                const configTasks = [
-                    ['loadAllConfigs', () => this.loadAllConfigs()],
-                    ['loadDualCellConfig', () => this.loadDualCellConfig()],
-                    ['detectKernelFeatures', () => this.detectKernelFeatures()]
-                ];
-                const configResults = await Promise.allSettled(configTasks.map(([, task]) => task()));
-                configResults.forEach((result, index) => {
-                    if (result.status === 'rejected') console.error(`${configTasks[index][0]} failed`, result.reason);
-                });
+                await Promise.all([
+                    this.loadAllConfigs(),
+                    this.loadDualCellConfig(),
+                    this.detectKernelFeatures()
+                ]);
                 this.initKernelFeatures();
                 this.settingsDataLoaded = true;
             }

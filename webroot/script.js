@@ -869,6 +869,24 @@ class CoronaAddon {
             });
         });
     }
+    async prepareSettingsNavigation() {
+        if (this.settingsReadyState === 'ready' && this.allSettingsSectionsPromise) return true;
+        const loadingText = document.getElementById('loading')?.querySelector('.loading-text');
+        const previousText = loadingText?.textContent || '';
+        if (loadingText) loadingText.textContent = this.t('initSettings');
+        this.showLoading(true);
+        try {
+            await this.ensureAllSettingsSectionsReady();
+            return true;
+        } catch (error) {
+            console.error('settings initialization failed', error);
+            this.showToast(this.t('settingsInitFailed'), 'error');
+            return false;
+        } finally {
+            this.showLoading(false);
+            if (loadingText) loadingText.textContent = previousText || this.t('processing');
+        }
+    }
     async switchPage(pageName, options = {}) {
         const updateHistory = options.updateHistory !== false;
         const pages = document.querySelectorAll('.page');
@@ -877,6 +895,7 @@ class CoronaAddon {
         const currentActive = document.querySelector('.page.active');
         const targetPage = document.getElementById(`page-${pageName}`);
         if (!targetPage || currentActive === targetPage) return;
+        if (pageName === 'settings' && !await this.prepareSettingsNavigation()) return false;
         if (updateHistory && pageName === 'home' && window.history.state?.coronaPage === 'settings') {
             window.history.back();
             return;
@@ -913,9 +932,6 @@ class CoronaAddon {
             const floatingHeader = document.getElementById('floating-header');
             if (floatingHeader) floatingHeader.classList.remove('visible', 'overlay-hidden');
         });
-        if (pageName === 'settings') {
-            this.ensureAllSettingsSectionsReady().catch(e => console.error('ensureAllSettingsSectionsReady failed', e));
-        }
         if (pageName === 'home' && this.pendingChartDraw) {
             requestAnimationFrame(() => this.drawChart());
             this.pendingChartDraw = false;

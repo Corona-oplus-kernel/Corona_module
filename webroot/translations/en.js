@@ -47,6 +47,7 @@
       "initPrepare": "Preparing configuration...",
       "initDevice": "Loading device information...",
       "initSettings": "Loading settings...",
+      "settingsInitFailed": "Failed to initialize settings. Please try again.",
       "initRealtime": "Loading live status...",
       "initApps": "Loading application list...",
       "processing": "Processing...",
