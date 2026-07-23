@@ -128,49 +128,74 @@
         bindRuntimeDetails() {
             document.querySelectorAll('.runtime-details, .runtime-capabilities, .runtime-history').forEach(details => {
                 const summary = details.firstElementChild;
-                summary?.addEventListener('click', event => {
-                    if (!details.open) return;
-                    if (details._runtimeClosing) {
-                        event.preventDefault();
-                        return;
-                    }
-                    const content = [...details.children].find(child => child.tagName !== 'SUMMARY');
-                    if (!content?.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+                if (!summary || details.dataset.runtimeDetailsBound) return;
+                details.dataset.runtimeDetailsBound = '1';
+                details.classList.toggle('runtime-details-expanded', details.open);
+                summary.addEventListener('click', event => {
                     event.preventDefault();
-                    details._runtimeClosing = true;
-                    this.animateRuntimeDetails(content, false, () => {
-                        details.open = false;
-                        details._runtimeClosing = false;
-                    });
-                });
-                details.addEventListener('toggle', () => {
-                    if (!details.open) return;
-                    this.refreshRuntimeOptimizer();
-                    const content = [...details.children].find(child => child.tagName !== 'SUMMARY');
-                    if (!content?.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-                    this.animateRuntimeDetails(content, true);
+                    const targetOpen = details._runtimeTargetOpen ?? details.open;
+                    this.setRuntimeDetailsOpen(details, !targetOpen);
                 });
             });
         },
-        animateRuntimeDetails(content, opening, onFinish = null) {
-            content._runtimeDetailsAnimation?.cancel();
-            const visible = { opacity: 1, transform: 'translate3d(0, 0, 0)' };
-            const hidden = { opacity: 0, transform: 'translate3d(0, -6px, 0)' };
-            const duration = opening ? 180 : 140;
-            const animation = content.animate(opening ? [hidden, visible] : [visible, hidden], {
-                duration,
-                easing: 'cubic-bezier(.22, 1, .36, 1)'
-            });
-            content._runtimeDetailsAnimation = animation;
-            let finished = false;
-            const finish = () => {
-                if (finished || content._runtimeDetailsAnimation !== animation) return;
-                finished = true;
+        setRuntimeDetailsOpen(details, opening) {
+            const content = [...details.children].find(child => child.tagName !== 'SUMMARY');
+            if (!content) return;
+            const currentHeight = details.open ? content.getBoundingClientRect().height : 0;
+            const currentStyle = details.open ? getComputedStyle(content) : null;
+            const currentOpacity = currentStyle ? Number.parseFloat(currentStyle.opacity) || 1 : 0;
+            const currentTransform = currentStyle?.transform && currentStyle.transform !== 'none'
+                ? currentStyle.transform
+                : 'translate3d(0, 0, 0)';
+            if (details._runtimeDetailsTimer) clearTimeout(details._runtimeDetailsTimer);
+            if (content._runtimeDetailsAnimation) {
+                content._runtimeDetailsAnimation.onfinish = null;
+                content._runtimeDetailsAnimation.cancel();
                 content._runtimeDetailsAnimation = null;
-                if (onFinish) onFinish();
+            }
+            details._runtimeTargetOpen = opening;
+            details.classList.toggle('runtime-details-expanded', opening);
+            if (opening) details.open = true;
+            const reduceMotion = !content.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reduceMotion) {
+                details.classList.remove('runtime-details-animating');
+                details.open = opening;
+                details._runtimeTargetOpen = null;
+                if (opening) this.refreshRuntimeOptimizer();
+                return;
+            }
+            const targetHeight = opening ? content.scrollHeight : 0;
+            const distance = Math.abs(targetHeight - currentHeight);
+            const duration = Math.round(Math.min(260, Math.max(160, 150 + distance * 0.22)) * (opening ? 1 : 0.82));
+            const animation = content.animate([{
+                height: `${currentHeight}px`,
+                opacity: currentOpacity,
+                transform: currentTransform
+            }, {
+                height: `${targetHeight}px`,
+                opacity: opening ? 1 : 0,
+                transform: opening ? 'translate3d(0, 0, 0)' : 'translate3d(0, -3px, 0)'
+            }], {
+                duration,
+                easing: opening ? 'cubic-bezier(.2, .8, .2, 1)' : 'cubic-bezier(.4, 0, 1, 1)',
+                fill: 'forwards'
+            });
+            details.classList.add('runtime-details-animating');
+            content._runtimeDetailsAnimation = animation;
+            const finish = () => {
+                if (content._runtimeDetailsAnimation !== animation) return;
+                clearTimeout(details._runtimeDetailsTimer);
+                details._runtimeDetailsTimer = null;
+                content._runtimeDetailsAnimation = null;
+                details.classList.remove('runtime-details-animating');
+                if (!opening) details.open = false;
+                animation.onfinish = null;
+                animation.cancel();
+                details._runtimeTargetOpen = null;
+                if (opening) this.refreshRuntimeOptimizer();
             };
             animation.onfinish = finish;
-            window.setTimeout(finish, duration + 50);
+            details._runtimeDetailsTimer = window.setTimeout(finish, duration + 60);
         },
         toggleRuntimePanel(prefix, options = {}) {
             const toggle = document.getElementById(`${prefix}-toggle`);

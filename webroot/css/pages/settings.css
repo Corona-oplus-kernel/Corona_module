@@ -1097,13 +1097,22 @@ body.theme-dark .runtime-advanced {
     color: var(--text-sub);
     font-size: 20px;
     line-height: 1;
-    transition: transform 160ms ease;
+    transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.runtime-details[open] .runtime-details-arrow,
-.runtime-capabilities[open] .runtime-details-arrow,
-.runtime-history[open] .runtime-details-arrow {
+.runtime-details-expanded .runtime-details-arrow {
     transform: rotate(90deg);
+}
+
+.runtime-details > :not(summary),
+.runtime-capabilities > :not(summary),
+.runtime-history > :not(summary) {
+    transform-origin: top center;
+}
+
+.runtime-details-animating > :not(summary) {
+    overflow: hidden;
+    will-change: height, opacity, transform;
 }
 
 .runtime-detail-list,
