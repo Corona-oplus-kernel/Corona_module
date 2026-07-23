@@ -62,6 +62,9 @@
             document.querySelector('.runtime-details')?.addEventListener('toggle', event => {
                 if (event.currentTarget.open) this.refreshRuntimeOptimizer();
             });
+            document.querySelector('.runtime-capabilities')?.addEventListener('toggle', event => {
+                if (event.currentTarget.open) this.refreshRuntimeOptimizer();
+            });
             document.querySelector('.runtime-history')?.addEventListener('toggle', event => {
                 if (event.currentTarget.open) this.refreshRuntimeOptimizer();
             });
@@ -219,8 +222,8 @@
                 input.setAttribute('aria-disabled', enabled ? 'false' : 'true');
             });
         },
-        updateRuntimeCapabilities(status, running, renderDetails = true) {
-            if (renderDetails) {
+        updateRuntimeCapabilities(status, running, renderCapabilities = true) {
+            if (renderCapabilities) {
                 document.querySelectorAll('.runtime-capability-item').forEach(item => {
                     const name = item.dataset.capability;
                     if (!running) {
@@ -516,8 +519,9 @@
             const status = this.parseRuntimeKeyValues(await this.exec(`${binary} status 2>/dev/null`));
             const running = status.running === '1';
             const renderDetails = document.querySelector('.runtime-details')?.open === true;
+            const renderCapabilities = document.querySelector('.runtime-capabilities')?.open === true;
             this.updateRuntimeOverviewState(running);
-            this.updateRuntimeCapabilities(status, running, renderDetails);
+            this.updateRuntimeCapabilities(status, running, renderCapabilities);
             this.updateRuntimeDecisions(status);
             const badge = document.getElementById('runtime-status-badge');
             if (badge) {

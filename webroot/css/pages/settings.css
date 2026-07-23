@@ -989,6 +989,7 @@ body.theme-dark .runtime-advanced {
 
 .runtime-summary-list,
 .runtime-details,
+.runtime-capabilities,
 .runtime-history {
     border-top: 1px solid var(--glass-border);
 }
@@ -1036,6 +1037,7 @@ body.theme-dark .runtime-advanced {
 
 .runtime-summary-primary small,
 .runtime-details summary small,
+.runtime-capabilities summary small,
 .runtime-history summary small {
     overflow: hidden;
     color: var(--text-sub);
@@ -1051,11 +1053,13 @@ body.theme-dark .runtime-advanced {
 }
 
 .runtime-details,
+.runtime-capabilities,
 .runtime-history {
     margin: 0;
 }
 
 .runtime-details summary,
+.runtime-capabilities summary,
 .runtime-history summary {
     display: flex;
     align-items: center;
@@ -1067,11 +1071,13 @@ body.theme-dark .runtime-advanced {
 }
 
 .runtime-details summary::-webkit-details-marker,
+.runtime-capabilities summary::-webkit-details-marker,
 .runtime-history summary::-webkit-details-marker {
     display: none;
 }
 
 .runtime-details summary > span:first-child,
+.runtime-capabilities summary > span:first-child,
 .runtime-history summary > span:first-child {
     display: flex;
     min-width: 0;
@@ -1080,6 +1086,7 @@ body.theme-dark .runtime-advanced {
 }
 
 .runtime-details summary strong,
+.runtime-capabilities summary strong,
 .runtime-history summary strong {
     color: var(--text-main);
     font-size: 12px;
@@ -1094,11 +1101,13 @@ body.theme-dark .runtime-advanced {
 }
 
 .runtime-details[open] .runtime-details-arrow,
+.runtime-capabilities[open] .runtime-details-arrow,
 .runtime-history[open] .runtime-details-arrow {
     transform: rotate(90deg);
 }
 
 .runtime-detail-list,
+.runtime-capability-grid,
 .runtime-decision-list {
     border-top: 1px solid var(--glass-border);
 }
@@ -1148,7 +1157,7 @@ body.theme-dark .runtime-advanced {
 
 .runtime-capability-section {
     margin: 0;
-    padding-top: 12px;
+    padding: 0;
 }
 
 .runtime-capability-heading {
@@ -1192,17 +1201,73 @@ body.theme-dark .runtime-advanced {
     animation: runtime-history-update 180ms ease-out;
 }
 
+.runtime-history summary {
+    align-items: flex-start;
+}
+
+.runtime-history summary > span:first-child {
+    flex: 1;
+    max-width: calc(100% - 32px);
+}
+
+.runtime-history summary small {
+    display: -webkit-box;
+    overflow: hidden;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
 @keyframes runtime-history-update {
     from { opacity: 0.35; transform: translateY(-2px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
 .runtime-daemon-waiting {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    min-width: 0;
     padding: 12px 0;
     border: 0;
     border-top: 1px solid var(--glass-border);
     border-radius: 0;
     background: transparent;
+}
+
+.runtime-daemon-waiting[hidden] {
+    display: none;
+}
+
+.runtime-daemon-waiting > span:last-child {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.runtime-daemon-waiting strong,
+.runtime-daemon-waiting small {
+    display: block;
+    overflow: visible;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+}
+
+.runtime-daemon-waiting strong {
+    color: var(--text-main);
+    font-size: 12px;
+}
+
+.runtime-daemon-waiting small {
+    color: var(--text-sub);
+    font-size: 10px;
 }
 
 .runtime-daemon-waiting-dot {
@@ -1214,6 +1279,7 @@ body.theme-dark .runtime-advanced {
 
 .thread-runtime-overview.runtime-stopped .runtime-summary-list,
 .thread-runtime-overview.runtime-stopped .runtime-details,
+.thread-runtime-overview.runtime-stopped .runtime-capabilities,
 .thread-runtime-overview.runtime-stopped .runtime-status-note {
     display: none;
 }
