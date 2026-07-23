@@ -3797,6 +3797,13 @@ fn main() {
 mod tests {
     use super::*;
 
+    fn test_directory(name: &str) -> PathBuf {
+        let root = env::temp_dir().join(format!("coronad-{name}-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        root
+    }
+
     #[test]
     fn parses_foreground_package() {
         let input = "topResumedActivity=ActivityRecord{123 u0 com.example.game/.MainActivity t1}";
@@ -3964,8 +3971,7 @@ mod tests {
 
     #[test]
     fn manages_node_ownership_and_restore() {
-        let root = PathBuf::from(format!("/root/tmp/coronad-node-test-{}", process::id()));
-        fs::create_dir_all(&root).unwrap();
+        let root = test_directory("node-test");
         let first = root.join("first");
         let missing = root.join("missing");
         write_text(&first, "1").unwrap();
@@ -3988,7 +3994,7 @@ mod tests {
 
     #[test]
     fn migrates_legacy_v5_config_keys() {
-        let root = PathBuf::from(format!("/root/tmp/coronad-migration-test-{}", process::id()));
+        let root = test_directory("migration-test");
         let config = root.join("config");
         fs::create_dir_all(&config).unwrap();
         write_text(
