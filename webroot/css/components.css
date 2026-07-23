@@ -374,12 +374,15 @@
     max-height: 85vh;
     overflow-y: auto;
     box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.08);
-    transition: transform 300ms var(--motion-ease), var(--glass-motion);
-    transform: translateY(100%) translateZ(0);
+    transition: transform 260ms cubic-bezier(.22, 1, .36, 1), opacity 180ms ease-out;
+    transform: translate3d(0, 100%, 0);
+    opacity: 0.98;
+    backface-visibility: hidden;
 }
 
 .detail-overlay.show .detail-card {
-    transform: translateY(0) translateZ(0);
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {

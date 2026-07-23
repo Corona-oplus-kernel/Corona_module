@@ -38,11 +38,14 @@
 }
 
 .detail-overlay {
-    transition: visibility 0s linear 0.32s;
+    opacity: 0;
+    transition: opacity 180ms ease-out, visibility 0s linear 260ms;
+    contain: layout paint style;
 }
 
 .detail-overlay.show {
-    transition: visibility 0s linear 0s;
+    opacity: 1;
+    transition: opacity 180ms ease-out, visibility 0s linear 0s;
 }
 
 #confirm-dialog-overlay,
@@ -51,24 +54,37 @@
 }
 
 .detail-card {
-    transition: transform var(--motion-base) var(--motion-ease);
-    will-change: transform;
+    transition: transform 260ms cubic-bezier(.22, 1, .36, 1), opacity 180ms ease-out;
+    will-change: auto;
 }
 
-.detail-overlay.show .detail-card {
-    transition: transform var(--motion-slow) var(--motion-ease);
+.detail-overlay:not(.hidden) .detail-card {
+    will-change: transform, opacity;
+}
+
+.detail-overlay.home-return-overlay,
+.detail-overlay.home-return-overlay.show,
+.detail-overlay.home-return-overlay.no-close-btn.show {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.home-return-overlay .detail-card {
+    background: color-mix(in srgb, var(--bg-color) 94%, var(--glass-dialog-bg));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
     .detail-overlay {
-        transition: visibility 0s linear 0.2s;
+        transition: opacity 120ms linear, visibility 0s linear 120ms;
     }
     .detail-overlay.show {
-        transition: visibility 0s linear 0s;
+        transition: opacity 120ms linear, visibility 0s linear 0s;
     }
     .detail-card,
     .detail-overlay.show .detail-card {
-        transition: transform 0.2s ease;
+        transition: transform 120ms linear, opacity 120ms linear;
     }
 }
 

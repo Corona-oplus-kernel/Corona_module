@@ -155,9 +155,9 @@
         },
         animateRuntimeDetails(content, opening, onFinish = null) {
             content._runtimeDetailsAnimation?.cancel();
-            const visible = { opacity: 1, transform: 'translateY(0)', clipPath: 'inset(0)' };
-            const hidden = { opacity: 0, transform: 'translateY(-7px)', clipPath: 'inset(0 0 100% 0)' };
-            const duration = opening ? 190 : 150;
+            const visible = { opacity: 1, transform: 'translate3d(0, 0, 0)' };
+            const hidden = { opacity: 0, transform: 'translate3d(0, -6px, 0)' };
+            const duration = opening ? 180 : 140;
             const animation = content.animate(opening ? [hidden, visible] : [visible, hidden], {
                 duration,
                 easing: 'cubic-bezier(.22, 1, .36, 1)'

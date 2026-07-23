@@ -773,25 +773,26 @@
         surface.dataset.swipeBound = '1';
         let gesture = null;
         const reset = () => {
-            ['transition', 'transform', 'opacity'].forEach(name => surface.style.removeProperty(name));
+            ['transition', 'transform', 'opacity', 'will-change'].forEach(name => surface.style.removeProperty(name));
         };
         const finish = (event, cancelled = false) => {
             if (!gesture || event.pointerId !== gesture.id) return;
             const { offset, started, dragging } = gesture;
+            if (gesture.frame) cancelAnimationFrame(gesture.frame);
             gesture = null;
             if (!dragging) return;
             const dismiss = !cancelled && (offset < -72 || offset / Math.max(1, performance.now() - started) < -0.55);
-            surface.style.transition = 'transform 180ms cubic-bezier(.22, 1, .36, 1), opacity 160ms ease';
-            surface.style.transform = dismiss ? 'translateX(-105vw)' : 'translateX(0)';
+            surface.style.transition = 'transform 200ms cubic-bezier(.22, 1, .36, 1), opacity 160ms ease-out';
+            surface.style.transform = dismiss ? 'translate3d(-105vw, 0, 0)' : 'translate3d(0, 0, 0)';
             surface.style.opacity = dismiss ? '0' : '1';
             window.setTimeout(() => {
                 if (dismiss) onDismiss();
-                window.setTimeout(reset, dismiss ? 340 : 0);
-            }, dismiss ? 170 : 190);
+                window.setTimeout(reset, dismiss ? 280 : 0);
+            }, 200);
         };
         surface.addEventListener('pointerdown', event => {
             if (!event.isPrimary || event.button > 0 || event.target.closest('button, input, select, textarea, [role="button"]')) return;
-            gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, started: performance.now(), offset: 0, dragging: false };
+            gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, width: Math.max(surface.clientWidth, 1), started: performance.now(), offset: 0, dragging: false, frame: 0 };
             surface.setPointerCapture?.(event.pointerId);
         });
         surface.addEventListener('pointermove', event => {
@@ -803,11 +804,16 @@
                 if (deltaX > -8) return;
                 gesture.dragging = true;
                 surface.style.transition = 'none';
+                surface.style.willChange = 'transform, opacity';
             }
             event.preventDefault();
             gesture.offset = deltaX;
-            surface.style.transform = `translateX(${deltaX}px)`;
-            surface.style.opacity = String(Math.max(0.48, 1 + deltaX / Math.max(surface.clientWidth, 1)));
+            if (!gesture.frame) gesture.frame = requestAnimationFrame(() => {
+                if (!gesture) return;
+                gesture.frame = 0;
+                surface.style.transform = `translate3d(${gesture.offset}px, 0, 0)`;
+                surface.style.opacity = String(Math.max(0.48, 1 + gesture.offset / gesture.width));
+            });
         }, { passive: false });
         surface.addEventListener('pointerup', event => finish(event));
         surface.addEventListener('pointercancel', event => finish(event, true));
@@ -826,14 +832,10 @@
         overlay.classList.remove('hidden', 'closing');
         overlay.querySelectorAll('.detail-card, .priority-process-card, .script-edit-card').forEach(card => {
             card.scrollTop = 0;
-            card.style.height = '';
-            card.style.maxHeight = '';
-            card.style.transform = '';
+            ['height', 'max-height', 'transform', 'opacity', 'transition', 'will-change'].forEach(name => card.style.removeProperty(name));
         });
         overlay.querySelectorAll('textarea').forEach(t => { t.scrollTop = 0; });
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => overlay.classList.add('show'));
-        });
+        requestAnimationFrame(() => overlay.classList.add('show'));
         if (overlay.classList.contains('home-return-overlay') && window.history.state?.coronaOverlay !== id) {
             window.history.pushState({ coronaPage: 'home', coronaOverlay: id }, '', `#home/${id}`);
         }
@@ -886,7 +888,7 @@
         };
         overlay._hideTransitionEnd = onTransitionEnd;
         overlay.addEventListener('transitionend', onTransitionEnd);
-        overlay._hideTimer = setTimeout(finalize, 360);
+        overlay._hideTimer = setTimeout(finalize, 300);
     },
     async showBatteryDetail() {
         this.showOverlay('battery-detail-overlay');

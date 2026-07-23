@@ -148,7 +148,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072310` : '';
+        return map[name] ? `${map[name]}?v=2026072311` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -908,16 +908,15 @@ class CoronaAddon {
             if (pageName === 'settings') { currentActive.classList.add('left'); slider.classList.add('right'); }
             else { currentActive.classList.add('right'); slider.classList.remove('right'); }
             currentActive.classList.remove('active');
+            window.setTimeout(() => {
+                if (!currentActive.classList.contains('active')) currentActive.classList.remove('left', 'right');
+            }, 300);
         }
         targetPage.classList.add('active');
         tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.page === pageName));
         requestAnimationFrame(() => {
             const scroller = document.querySelector('.container');
             if (scroller) scroller.scrollTo({ top: 0, behavior: 'auto' });
-            requestAnimationFrame(() => {
-                const activeScroller = document.querySelector('.container');
-                if (activeScroller) activeScroller.scrollTo({ top: 0, behavior: 'auto' });
-            });
             const activeTitle = pageName === 'settings' ? document.getElementById('corona-title-settings') : document.getElementById('corona-title');
             if (activeTitle) {
                 activeTitle.style.opacity = '1';

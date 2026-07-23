@@ -647,37 +647,41 @@ body.monet-decoration .bg-decoration::before {
     top: 0;
     left: 0;
     right: 0;
-    transform: translateX(26px) translateY(0) translateZ(0);
+    transform: translate3d(18px, 0, 0);
     opacity: 0;
-    transition: transform 0.34s var(--motion-ease), opacity 0.26s ease;
+    transition: transform 280ms cubic-bezier(.22, 1, .36, 1), opacity 200ms ease-out;
     pointer-events: none;
-    will-change: transform, opacity;
+    will-change: auto;
+    backface-visibility: hidden;
 }
 
 .page.active {
     display: flex;
     position: relative;
-    transform: translateX(0) translateY(0) translateZ(0);
+    transform: translate3d(0, 0, 0);
     opacity: 1;
     pointer-events: auto;
     z-index: 2;
     overscroll-behavior-y: contain;
+    will-change: transform, opacity;
 }
 
 .page.left {
     display: flex;
     position: fixed;
-    transform: translateX(-26px) translateY(0) translateZ(0);
+    transform: translate3d(-18px, 0, 0);
     opacity: 0;
     z-index: 1;
+    will-change: transform, opacity;
 }
 
 .page.right {
     display: flex;
     position: fixed;
-    transform: translateX(26px) translateY(0) translateZ(0);
+    transform: translate3d(18px, 0, 0);
     opacity: 0;
     z-index: 1;
+    will-change: transform, opacity;
 }
 
 .home-return-overlay .detail-card,
@@ -1385,14 +1389,15 @@ body.theme-dark .cpu-core .cpu-core-load.has-usage {
     border: 1px solid var(--glass-selection-border);
     border-radius: 16px;
     box-shadow: var(--glass-selection-shadow);
-    transition: transform var(--motion-slow) var(--motion-ease), box-shadow var(--motion-fast) ease;
+    transition: transform 280ms cubic-bezier(.22, 1, .36, 1), box-shadow 180ms ease-out;
+    will-change: transform;
     z-index: 1;
 }
 
 
 
 .tab-slider.right {
-    transform: translateX(calc(100% + 8px));
+    transform: translate3d(calc(100% + 8px), 0, 0);
 }
 
 .toast {
