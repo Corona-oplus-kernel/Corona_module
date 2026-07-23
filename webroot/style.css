@@ -16,9 +16,6 @@
     --glass-selection-border: rgba(255, 255, 255, 0.35);
     --glass-selection-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.45);
     --glass-control-bg: rgba(0, 0, 0, 0.05);
-    --dialog-solid-bg: var(--glass-surface);
-    --control-solid-bg: var(--glass-surface-strong);
-    --solid-border: var(--glass-border);
     --glass-blur-floating: 10px;
     --glass-blur-card: 14px;
     --glass-blur-dialog: 16px;
@@ -169,7 +166,7 @@ body.theme-switch-in .detail-overlay.show .detail-card {
 
 
 
-/* Color picker entry + dialog (solid, Zram-like) */
+/* Color picker entry + dialog */
 .theme-color-section {
     margin: 8px 0 12px;
 }
@@ -250,10 +247,10 @@ body.theme-dark .color-pref-swatch {
 .color-picker-dialog {
     width: min(92vw, 400px);
     border-radius: 18px;
-    background: var(--dialog-solid-bg);
+    background: var(--glass-surface);
     backdrop-filter: blur(var(--glass-blur-card));
     -webkit-backdrop-filter: blur(var(--glass-blur-card));
-    border: 1px solid var(--solid-border);
+    border: 1px solid var(--glass-border);
     color: var(--text-main);
     box-shadow: var(--glass-shadow-lg);
     transition: var(--glass-motion);
@@ -5184,8 +5181,8 @@ body.theme-dark #zram-settings .option-item {
     max-height: none;
     padding: 0;
     border-radius: 28px;
-    border: 1px solid var(--solid-border);
-    background: var(--dialog-solid-bg);
+    border: 1px solid var(--glass-border);
+    background: var(--glass-surface);
     backdrop-filter: blur(var(--glass-blur-card));
     -webkit-backdrop-filter: blur(var(--glass-blur-card));
     box-shadow: 0 24px 70px rgba(17, 24, 39, 0.22), 0 2px 12px rgba(17, 24, 39, 0.08);
@@ -5215,7 +5212,7 @@ body.theme-dark #zram-settings .option-item {
     position: relative;
     z-index: 2;
     padding: 4px 16px 12px;
-    background: linear-gradient(to bottom, var(--dialog-solid-bg) 76%, transparent);
+    background: linear-gradient(to bottom, var(--glass-surface) 76%, transparent);
 }
 
 #app-policy-overlay .priority-search {
@@ -5245,8 +5242,8 @@ body.theme-dark #zram-settings .option-item {
     border-radius: 18px;
     content-visibility: auto;
     contain-intrinsic-size: auto 70px;
-    border-color: var(--solid-border);
-    background: var(--control-solid-bg);
+    border-color: var(--glass-border);
+    background: var(--glass-surface-strong);
     box-shadow: 0 1px 4px rgba(17, 24, 39, 0.035);
     transition: transform 160ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
     animation: app-policy-row-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -5474,7 +5471,11 @@ body.theme-dark .color-live-bar { background: rgba(255,255,255,0.08); }
     gap: 12px;
     padding: 18px;
     border-bottom: 1px solid var(--glass-border);
-    background: var(--dialog-solid-bg);
+}
+
+.color-picker-header,
+.color-picker-dialog .dialog-buttons {
+    background: var(--glass-surface);
 }
 
 .color-picker-header-swatch {
@@ -5522,8 +5523,13 @@ body.theme-dark .color-live-bar { background: rgba(255,255,255,0.08); }
     margin-bottom: 16px;
     border: 1px solid var(--glass-border);
     border-radius: 16px;
-    background: var(--control-solid-bg);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.color-global-preview,
+.color-preview-card,
+.color-picker-dialog .preset-color {
+    background: var(--glass-surface-strong);
 }
 
 .color-preview-topbar,
@@ -5591,7 +5597,6 @@ body.theme-dark .color-live-bar { background: rgba(255,255,255,0.08); }
     padding: 10px;
     border: 1px solid var(--glass-border);
     border-radius: 12px;
-    background: var(--control-solid-bg);
 }
 
 .color-preview-card small {
@@ -5632,7 +5637,6 @@ body.theme-dark .color-live-bar { background: rgba(255,255,255,0.08); }
     padding: 5px 8px;
     border: 1px solid var(--glass-border);
     border-radius: 11px;
-    background: var(--control-solid-bg);
     box-shadow: none;
     color: var(--text-sub);
 }
@@ -5675,7 +5679,6 @@ body.theme-dark .color-live-bar { background: rgba(255,255,255,0.08); }
 
 .color-picker-dialog .dialog-buttons {
     padding: 12px 18px max(16px, env(safe-area-inset-bottom));
-    background: var(--dialog-solid-bg);
 }
 
 .color-picker-dialog .dialog-button.filled {
