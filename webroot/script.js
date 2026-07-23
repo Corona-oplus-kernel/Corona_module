@@ -140,6 +140,7 @@ class CoronaAddon {
             'memory-opt': 'js/memory-opt.js',
             'le9ec': 'js/le9ec.js',
             'memory-core': 'js/memory-core.js',
+            'memory-extras': 'js/memory-extras.js',
             'settings-memory-page': 'js/settings-memory-page.js',
             'settings-ui': 'js/settings-ui.js',
             'home-ui': 'js/home-ui.js',
@@ -147,7 +148,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072326` : '';
+        return map[name] ? `${map[name]}?v=2026072327` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
