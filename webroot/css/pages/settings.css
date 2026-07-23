@@ -1174,15 +1174,16 @@ body.theme-dark .runtime-advanced {
 
 .runtime-decision-list {
     display: block;
-    max-height: 190px;
+    max-height: 280px;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
 }
 
 .runtime-decision-item {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 3px 10px;
-    padding: 9px 0;
+    display: block;
+    min-width: 0;
+    padding: 12px 0;
     border: 0;
     border-bottom: 1px solid var(--glass-border);
     border-radius: 0;
@@ -1197,12 +1198,62 @@ body.theme-dark .runtime-advanced {
     padding: 12px 0 2px;
 }
 
+.runtime-decision-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    gap: 12px;
+}
+
+.runtime-decision-area {
+    min-width: 0;
+    color: var(--primary);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.runtime-decision-sequence {
+    flex: none;
+    color: var(--text-dim);
+    font-size: 9px;
+    line-height: 1.35;
+}
+
+.runtime-decision-action {
+    display: block;
+    min-width: 0;
+    margin-top: 5px;
+    color: var(--text-main);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.runtime-decision-reason {
+    display: -webkit-box;
+    min-width: 0;
+    margin-top: 4px;
+    overflow: hidden;
+    color: var(--text-sub);
+    font-size: 10px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+}
+
 .runtime-history.runtime-history-updated summary small {
     animation: runtime-history-update 180ms ease-out;
 }
 
 .runtime-history summary {
-    align-items: flex-start;
+    align-items: center;
 }
 
 .runtime-history summary > span:first-child {
@@ -1211,14 +1262,11 @@ body.theme-dark .runtime-advanced {
 }
 
 .runtime-history summary small {
-    display: -webkit-box;
+    display: block;
     overflow: hidden;
     line-height: 1.4;
-    overflow-wrap: anywhere;
-    text-overflow: clip;
-    white-space: normal;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 @keyframes runtime-history-update {

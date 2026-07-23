@@ -869,6 +869,7 @@
       "runtimeDecisionsDesc": "最多保留 24 条，守护重启后继续保留，设备开机时清空",
       "runtimeDecisionForeground": "前台切换",
       "runtimeDecisionZram": "ZRAM 与 ERM",
+      "runtimeDecisionCount": "已记录 {count} 条，展开查看",
       "runtimeDecisionEmpty": "暂无动作",
       "runtimePressureNormal": "正常",
       "runtimePressureModerate": "中等",

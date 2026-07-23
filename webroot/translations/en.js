@@ -869,6 +869,7 @@
       "runtimeDecisionsDesc": "Keeps up to 24 entries across daemon restarts and clears them on device boot",
       "runtimeDecisionForeground": "Foreground change",
       "runtimeDecisionZram": "ZRAM and ERM",
+      "runtimeDecisionCount": "{count} recorded. Expand to view.",
       "runtimeDecisionEmpty": "No decisions yet",
       "runtimePressureNormal": "Normal",
       "runtimePressureModerate": "Moderate",

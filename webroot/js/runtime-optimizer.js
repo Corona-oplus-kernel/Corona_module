@@ -257,8 +257,8 @@
         },
         updateRuntimeDecisions(status) {
             const list = document.getElementById('runtime-decision-list');
-            const latest = document.getElementById('runtime-latest-decision');
-            if (!list || !latest) return;
+            const summary = document.getElementById('runtime-decision-summary');
+            if (!list || !summary) return;
             const entries = Object.entries(status)
                 .filter(([key]) => /^decision_\d+$/.test(key))
                 .sort(([left], [right]) => Number.parseInt(left.slice(9), 10) - Number.parseInt(right.slice(9), 10))
@@ -266,10 +266,10 @@
             const signature = entries.map(parts => parts.join('|')).join('\n');
             const changed = this.runtimeDecisionSignature !== signature;
             this.runtimeDecisionSignature = signature;
-            const latestText = entries.length
-                ? `${this.t(DECISION_AREA_KEYS[entries[0][1]] || 'runtimeUnknown')} · ${entries[0][2] || '--'}`
+            const summaryText = entries.length
+                ? this.t('runtimeDecisionCount').replace('{count}', String(entries.length))
                 : this.t('runtimeDecisionEmpty');
-            if (latest.textContent !== latestText) latest.textContent = latestText;
+            if (summary.textContent !== summaryText) summary.textContent = summaryText;
             if (changed && this.runtimeDecisionsInitialized) {
                 const history = document.querySelector('.runtime-history');
                 history?.classList.remove('runtime-history-updated');
@@ -305,13 +305,22 @@
                     item = document.createElement('div');
                     item.className = 'runtime-decision-item';
                     item.dataset.key = key;
-                    const title = document.createElement('strong');
-                    title.textContent = `${this.t(DECISION_AREA_KEYS[area] || 'runtimeUnknown')} · ${action || '--'}`;
-                    const detail = document.createElement('span');
-                    detail.textContent = reason || '--';
+                    const header = document.createElement('div');
+                    header.className = 'runtime-decision-head';
+                    const areaLabel = document.createElement('span');
+                    areaLabel.className = 'runtime-decision-area';
+                    areaLabel.textContent = this.t(DECISION_AREA_KEYS[area] || 'runtimeUnknown');
                     const sequence = document.createElement('small');
+                    sequence.className = 'runtime-decision-sequence';
                     sequence.textContent = `#${tick || 0}`;
-                    item.append(title, detail, sequence);
+                    header.append(areaLabel, sequence);
+                    const actionLabel = document.createElement('strong');
+                    actionLabel.className = 'runtime-decision-action';
+                    actionLabel.textContent = action || '--';
+                    const detail = document.createElement('span');
+                    detail.className = 'runtime-decision-reason';
+                    detail.textContent = reason || '--';
+                    item.append(header, actionLabel, detail);
                     if (changed && this.runtimeDecisionsInitialized) {
                         item.classList.add('runtime-decision-new');
                         item.addEventListener('animationend', () => item.classList.remove('runtime-decision-new'), { once: true });
