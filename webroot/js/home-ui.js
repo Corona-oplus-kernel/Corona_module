@@ -735,21 +735,103 @@
             });
         });
         document.getElementById('battery-card').addEventListener('click', () => this.showBatteryDetail());
-        document.getElementById('mem-card').addEventListener('click', () => this.showUFSDetail());
+        document.getElementById('mem-card').addEventListener('click', () => this.showMemoryDetail());
         document.getElementById('storage-card').addEventListener('click', () => this.showStorageDetail());
     },
     initDetailOverlays() {
-        const overlays = ['battery-detail-overlay', 'ufs-detail-overlay', 'storage-detail-overlay'];
+        const overlays = ['battery-detail-overlay', 'memory-detail-overlay', 'storage-detail-overlay'];
         overlays.forEach(id => {
             const overlay = document.getElementById(id);
             const closeBtn = document.getElementById(id.replace('-overlay', '-close'));
             if (closeBtn) closeBtn.addEventListener('click', () => this.hideOverlay(id));
             if (overlay) overlay.addEventListener('click', (e) => { if (e.target === overlay) this.hideOverlay(id); });
         });
+        this.initSurfaceSwipeNavigation();
         document.getElementById('xinran-overlay').addEventListener('click', (e) => { this.hideOverlay('xinran-overlay'); });
         document.getElementById('gc-btn').addEventListener('click', async () => await this.runGC());
         document.querySelectorAll('.memclean-option').forEach(opt => { opt.addEventListener('click', async () => { if (this.memCleanRunning) return; await this.runMemClean(opt.dataset.mode); }); });
         this.initResetAllBtn();
+    },
+    initSurfaceSwipeNavigation() {
+        document.querySelectorAll('.home-return-overlay').forEach(overlay => {
+            const card = overlay.querySelector('.detail-card');
+            this.bindSurfaceSwipe(card, () => this.hideOverlay(overlay.id));
+        });
+        const settingsPage = document.getElementById('page-settings');
+        this.bindSurfaceSwipe(settingsPage, () => this.switchPage('home'));
+    },
+    bindSurfaceSwipe(surface, onDismiss) {
+        if (!surface || surface.dataset.swipeBound === '1') return;
+        surface.dataset.swipeBound = '1';
+        let pointerId = null;
+        let startX = 0;
+        let startY = 0;
+        let startTime = 0;
+        let offsetX = 0;
+        let dragging = false;
+        const reset = () => {
+            surface.style.removeProperty('transition');
+            surface.style.removeProperty('transform');
+            surface.style.removeProperty('opacity');
+        };
+        const finish = event => {
+            if (pointerId === null || (event.pointerId !== undefined && event.pointerId !== pointerId)) return;
+            const elapsed = Math.max(1, performance.now() - startTime);
+            const dismiss = dragging && (offsetX < -72 || offsetX / elapsed < -0.55);
+            pointerId = null;
+            if (!dragging) return;
+            dragging = false;
+            surface.style.transition = 'transform 180ms cubic-bezier(.22, 1, .36, 1), opacity 160ms ease';
+            if (dismiss) {
+                surface.style.transform = 'translateX(-105vw)';
+                surface.style.opacity = '0';
+                window.setTimeout(() => {
+                    onDismiss();
+                    window.setTimeout(reset, 340);
+                }, 170);
+            } else {
+                surface.style.transform = 'translateX(0)';
+                surface.style.opacity = '1';
+                window.setTimeout(reset, 190);
+            }
+        };
+        const cancel = event => {
+            if (pointerId === null || (event.pointerId !== undefined && event.pointerId !== pointerId)) return;
+            pointerId = null;
+            if (!dragging) return;
+            dragging = false;
+            surface.style.transition = 'transform 180ms cubic-bezier(.22, 1, .36, 1), opacity 160ms ease';
+            surface.style.transform = 'translateX(0)';
+            surface.style.opacity = '1';
+            window.setTimeout(reset, 190);
+        };
+        surface.addEventListener('pointerdown', event => {
+            if (!event.isPrimary || event.button > 0 || event.target.closest('button, input, select, textarea, [role="button"]')) return;
+            pointerId = event.pointerId;
+            startX = event.clientX;
+            startY = event.clientY;
+            startTime = performance.now();
+            offsetX = 0;
+            dragging = false;
+            surface.setPointerCapture?.(pointerId);
+        });
+        surface.addEventListener('pointermove', event => {
+            if (pointerId === null || event.pointerId !== pointerId) return;
+            const deltaX = Math.min(0, event.clientX - startX);
+            const deltaY = event.clientY - startY;
+            if (!dragging) {
+                if (Math.abs(deltaY) > Math.abs(deltaX)) return;
+                if (deltaX > -8) return;
+                dragging = true;
+                surface.style.transition = 'none';
+            }
+            event.preventDefault();
+            offsetX = deltaX;
+            surface.style.transform = `translateX(${deltaX}px)`;
+            surface.style.opacity = String(Math.max(0.48, 1 + deltaX / Math.max(surface.clientWidth, 1)));
+        }, { passive: false });
+        surface.addEventListener('pointerup', finish);
+        surface.addEventListener('pointercancel', cancel);
     },
     showOverlay(id) {
         const overlay = document.getElementById(id);
@@ -851,17 +933,45 @@
         content.innerHTML = `<div class="info-item"><span class="info-label">充电状态</span><span class="info-value">${statusMap[status] || status || '--'}</span></div><div class="info-item"><span class="info-label">健康状态</span><span class="info-value">${healthMap[health] || health || '--'}</span></div><div class="info-item"><span class="info-label">电池电量</span><span class="info-value">${finalCapacity || '--'}%</span></div><div class="info-item"><span class="info-label">电池电压</span><span class="info-value">${voltageV} V</span></div><div class="info-item"><span class="info-label">温度</span><span class="info-value">${tempC} °C</span></div><div class="info-item"><span class="info-label">充电类型</span><span class="info-value">${chargeType || '--'}</span></div><div class="info-item"><span class="info-label">电池技术</span><span class="info-value">${technology || '--'}</span></div><div class="info-item"><span class="info-label">循环次数</span><span class="info-value">${cycleCount || '--'}</span></div><div class="info-item"><span class="info-label">电池健康度</span><span class="info-value">${healthPercent}%</span></div>`;
     },
     async loadDualCellConfig() { const result = await this.readConfig('dual_cell.conf'); if (result) this.state.dualCell = result.includes('dualCell=1'); },
-    async showUFSDetail() {
-        this.showOverlay('ufs-detail-overlay');
-        const content = document.getElementById('ufs-detail-content');
-        content.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-sub)">加载中...</div>';
-        const [lifeA, lifeB] = await Promise.all([
-            this.exec('cat /sys/devices/platform/soc/*/health_descriptor/life_time_estimation_a 2>/dev/null || cat /sys/block/sda/device/life_time_estimation_a 2>/dev/null'),
-            this.exec('cat /sys/devices/platform/soc/*/health_descriptor/life_time_estimation_b 2>/dev/null || cat /sys/block/sda/device/life_time_estimation_b 2>/dev/null')
-        ]);
-        const lifeMap = { '0x00': '未使用', '0x01': '0-10%', '0x02': '10-20%', '0x03': '20-30%', '0x04': '30-40%', '0x05': '40-50%', '0x06': '50-60%', '0x07': '60-70%', '0x08': '70-80%', '0x09': '80-90%', '0x0A': '90-100%', '0x0B': '超过寿命' };
-        const formatLife = (val) => lifeMap[val] || val || '--';
-        content.innerHTML = `<div class="info-item"><span class="info-label">寿命估计 A</span><span class="info-value">${formatLife(lifeA)}</span></div><div class="info-item"><span class="info-label">寿命估计 B</span><span class="info-value">${formatLife(lifeB)}</span></div>`;
+    async showMemoryDetail() {
+        this.showOverlay('memory-detail-overlay');
+        const content = document.getElementById('memory-detail-content');
+        content.innerHTML = `<div class="detail-loading">${this.t('loading')}</div>`;
+        const values = {};
+        const meminfo = await this.exec('cat /proc/meminfo 2>/dev/null');
+        String(meminfo).split('\n').forEach(line => {
+            const match = line.match(/^(MemTotal|MemAvailable|MemFree|Buffers|Cached|SReclaimable|Shmem|SwapTotal|SwapFree):\s+(\d+)/);
+            if (match) values[match[1]] = Number.parseInt(match[2], 10) || 0;
+        });
+        const total = values.MemTotal || 0;
+        const available = values.MemAvailable || values.MemFree || 0;
+        const used = Math.max(0, total - available);
+        const cache = Math.max(0, (values.Cached || 0) + (values.SReclaimable || 0) - (values.Shmem || 0));
+        const swapTotal = values.SwapTotal || 0;
+        const swapUsed = Math.max(0, swapTotal - (values.SwapFree || 0));
+        const usage = total ? `${((used / total) * 100).toFixed(1)}%` : '--';
+        const formatKb = value => this.formatBytes(value * 1024);
+        const rows = [
+            [this.t('memoryUsage'), usage],
+            [this.t('memoryTotal'), formatKb(total)],
+            [this.t('memoryUsed'), formatKb(used)],
+            [this.t('memoryAvailable'), formatKb(available)],
+            [this.t('memoryCache'), formatKb(cache)],
+            [this.t('memoryFree'), formatKb(values.MemFree || 0)],
+            [this.t('memorySwap'), `${formatKb(swapUsed)} / ${formatKb(swapTotal)}`]
+        ];
+        content.replaceChildren(...rows.map(([label, value]) => {
+            const row = document.createElement('div');
+            row.className = 'info-item';
+            const labelElement = document.createElement('span');
+            labelElement.className = 'info-label';
+            labelElement.textContent = label;
+            const valueElement = document.createElement('span');
+            valueElement.className = 'info-value';
+            valueElement.textContent = value;
+            row.append(labelElement, valueElement);
+            return row;
+        }));
     },
     showStorageDetail() { this.showOverlay('storage-detail-overlay'); },
     async runGC() { this.showLoading(true); await this.exec('sync && echo 1 > /sys/fs/f2fs/*/gc_urgent'); await this.sleep(2000); await this.exec('echo 0 > /sys/fs/f2fs/*/gc_urgent'); this.showLoading(false); this.showToast('GC 执行完成'); },

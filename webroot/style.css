@@ -680,6 +680,30 @@ body.monet-decoration .bg-decoration::before {
     z-index: 1;
 }
 
+#page-settings.settings-surface.active {
+    margin-top: 6px;
+    border: 1px solid var(--glass-border);
+    border-radius: 28px 28px 0 0;
+    background: color-mix(in srgb, var(--bg-color) 86%, var(--glass-dialog-bg));
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.08);
+}
+
+body.theme-dark #page-settings.settings-surface.active {
+    box-shadow: 0 -10px 36px rgba(0, 0, 0, 0.32);
+}
+
+.home-return-overlay .detail-card,
+#page-settings.settings-surface {
+    touch-action: pan-y;
+}
+
+.detail-loading {
+    padding: 24px 12px;
+    color: var(--text-sub);
+    font-size: 13px;
+    text-align: center;
+}
+
 .page-header {
     margin-bottom: 16px;
     padding: 12px 4px;
