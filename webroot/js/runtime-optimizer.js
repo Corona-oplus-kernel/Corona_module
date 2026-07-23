@@ -384,7 +384,7 @@
                     actionLabel.textContent = action || '--';
                     const detail = document.createElement('span');
                     detail.className = 'runtime-decision-reason';
-                    detail.textContent = reason || '--';
+                    detail.textContent = reason === 'activity' ? this.t('runtimeDetectionActivity') : reason || '--';
                     item.append(header, actionLabel, detail);
                     if (addedKeys.has(key) && this.runtimeDecisionsInitialized) {
                         item.classList.add('runtime-decision-new');

@@ -55,6 +55,7 @@ struct Paths {
     state: PathBuf,
     reload: PathBuf,
     stop: PathBuf,
+    foreground_event: PathBuf,
     pressure_baseline: PathBuf,
     affinity_state: PathBuf,
     zram_policy_state: PathBuf,
@@ -94,6 +95,7 @@ impl Paths {
             state: config.join(".coronad_state"),
             reload: config.join(".coronad.reload"),
             stop: config.join(".coronad.stop"),
+            foreground_event: config.join(".coronad_foreground_event"),
             pressure_baseline: config.join(".memory_pressure.baseline"),
             affinity_state: config.join(".auto_affinity_state"),
             zram_policy_state: config.join(".zram_policy_state"),
@@ -813,6 +815,8 @@ struct Daemon {
     zram_policy_child: Option<Child>,
     last_affinity_state: String,
     resource_usage: ResourceUsage,
+    foreground: ForegroundInfo,
+    foreground_verify_elapsed_ms: u64,
 }
 
 fn read_text(path: impl AsRef<Path>) -> String {
@@ -1010,14 +1014,20 @@ fn package_from_dumpsys(text: &str) -> Option<String> {
     None
 }
 
-fn package_from_pid(pid: u32) -> Option<String> {
-    process_base_from_pid(pid)
-}
-
 fn process_base_from_pid(pid: u32) -> Option<String> {
     let cmdline = fs::read(proc_root().join(pid.to_string()).join("cmdline")).ok()?;
     let process_name = String::from_utf8_lossy(cmdline.split(|byte| *byte == 0).next()?);
     package_from_process_name(&process_name)
+}
+
+fn package_pids(package: &str) -> Vec<u32> {
+    if package.is_empty() {
+        return Vec::new();
+    }
+    command_output("/system/bin/pidof", &[package])
+        .split_ascii_whitespace()
+        .filter_map(|value| value.parse::<u32>().ok())
+        .collect()
 }
 
 #[derive(Clone, Default)]
@@ -1025,44 +1035,6 @@ struct ForegroundInfo {
     package: String,
     source: &'static str,
     pids: Vec<u32>,
-}
-
-fn top_app_info() -> Option<ForegroundInfo> {
-    static TOP_APP_FILES: OnceLock<Vec<PathBuf>> = OnceLock::new();
-    let files = TOP_APP_FILES.get_or_init(|| {
-        env::var_os("CORONA_TOP_APP_FILES").map_or_else(|| {
-        vec![
-            PathBuf::from("/dev/cpuset/top-app/cgroup.procs"),
-            PathBuf::from("/dev/cpuset/top-app/tasks"),
-            PathBuf::from("/sys/fs/cgroup/top-app/cgroup.procs"),
-        ]
-        }, |value| {
-            value.to_string_lossy().split(':').map(PathBuf::from).collect()
-        })
-    });
-    for file in files {
-        let pids = read_text(file)
-            .split_ascii_whitespace()
-            .filter_map(|value| value.parse::<u32>().ok())
-            .collect::<Vec<_>>();
-        let package = pids
-            .iter()
-            .rev()
-            .find_map(|pid| package_from_pid(*pid));
-        let Some(package) = package else {
-            continue;
-        };
-        let matching_pids = pids
-            .into_iter()
-            .filter(|pid| package_from_pid(*pid).as_deref() == Some(package.as_str()))
-            .collect();
-        return Some(ForegroundInfo {
-            package,
-            source: "top-app",
-            pids: matching_pids,
-        });
-    }
-    None
 }
 
 fn web_foreground_info() -> ForegroundInfo {
@@ -1075,16 +1047,26 @@ fn web_foreground_info() -> ForegroundInfo {
     ));
     if let Some(package) = package {
         return ForegroundInfo {
+            pids: package_pids(&package),
             package,
             source: "activity",
-            pids: Vec::new(),
         };
     }
-    top_app_info().unwrap_or_default()
+    ForegroundInfo::default()
 }
 
-fn foreground_info() -> ForegroundInfo {
-    top_app_info().unwrap_or_else(web_foreground_info)
+fn take_foreground_event(paths: &Paths) -> Option<ForegroundInfo> {
+    let package = read_text(&paths.foreground_event).trim().to_string();
+    let _ = fs::remove_file(&paths.foreground_event);
+    (!package.is_empty()).then_some(ForegroundInfo {
+        pids: package_pids(&package),
+        package,
+        source: "activity",
+    })
+}
+
+fn write_foreground_event(paths: &Paths, package: &str) {
+    let _ = write_text_atomic(&paths.foreground_event, package);
 }
 
 fn csv_contains(csv: &str, item: &str) -> bool {
@@ -2728,7 +2710,9 @@ impl Daemon {
         } else {
             "base".to_string()
         };
+        let foreground = web_foreground_info();
         let _ = fs::remove_file(paths.config.join(".coronad_decisions"));
+        let _ = fs::remove_file(&paths.foreground_event);
         let mut daemon = Self {
             rules: load_rules(&paths),
             pressure: load_pressure(&paths),
@@ -2781,6 +2765,8 @@ impl Daemon {
             zram_policy_child: None,
             last_affinity_state: String::new(),
             resource_usage: ResourceUsage::new(),
+            foreground,
+            foreground_verify_elapsed_ms: 0,
             paths,
         };
         daemon.update_environment();
@@ -2790,6 +2776,27 @@ impl Daemon {
         daemon.stop_legacy_zram_policy();
         daemon.resource_usage.sample();
         daemon
+    }
+
+    fn current_foreground(&mut self, interval_ms: u64) -> ForegroundInfo {
+        self.foreground_verify_elapsed_ms = self
+            .foreground_verify_elapsed_ms
+            .saturating_add(interval_ms);
+        if let Some(foreground) = take_foreground_event(&self.paths) {
+            self.foreground = foreground;
+            self.foreground_verify_elapsed_ms = 0;
+            return self.foreground.clone();
+        }
+        let verify_interval = if self.screen_on { 5_000 } else { 15_000 };
+        if self.foreground_verify_elapsed_ms >= verify_interval || self.foreground.package.is_empty() {
+            let verified = web_foreground_info();
+            self.stats.dumpsys_fallbacks += 1;
+            self.foreground_verify_elapsed_ms = 0;
+            if !verified.package.is_empty() {
+                self.foreground = verified;
+            }
+        }
+        self.foreground.clone()
     }
 
     fn zram_policy_script(&self) -> PathBuf {
@@ -3525,12 +3532,7 @@ impl Daemon {
             self.system_pressure_elapsed_ms = 0;
         }
         self.update_zram_policy();
-        let foreground = foreground_info();
-        if foreground.source == "top-app" {
-            self.stats.top_app_hits += 1;
-        } else {
-            self.stats.dumpsys_fallbacks += 1;
-        }
+        let foreground = self.current_foreground(interval_ms);
         let profile_changed = self.apply_profile(&foreground.package);
         let foreground_changed = foreground.package != self.last_foreground;
         if foreground_changed {
@@ -3644,6 +3646,7 @@ impl Daemon {
             &self.paths.state,
             &self.paths.reload,
             &self.paths.stop,
+            &self.paths.foreground_event,
             &self.paths.pressure_baseline,
         ] {
             let _ = fs::remove_file(path);
@@ -3701,6 +3704,7 @@ fn print_status(paths: &Paths, web: bool) -> i32 {
             }
             let foreground = web_foreground_info();
             if !foreground.package.is_empty() {
+                write_foreground_event(paths, &foreground.package);
                 println!("foreground={}", foreground.package);
                 println!("foreground_source={}", foreground.source);
             }
