@@ -148,7 +148,7 @@ class CoronaAddon {
             'custom-scripts': 'js/custom-scripts.js',
             'corona-kernel': 'js/corona-kernel.js'
         };
-        return map[name] ? `${map[name]}?v=2026072327` : '';
+        return map[name] ? `${map[name]}?v=2026072329` : '';
     }
     async ensureFeatureScript(name) {
         window.CoronaFeatureScripts = window.CoronaFeatureScripts || {};
@@ -696,7 +696,7 @@ class CoronaAddon {
             overlay._hideEndTarget = endTarget;
             overlay._hideEndHandler = endHandler;
             overlay._hideEndEvent = endEvent;
-            endTarget.addEventListener(endEvent, endHandler, { once: true });
+            endTarget.addEventListener(endEvent, endHandler);
         }
         overlay._hideTimer = setTimeout(finalize, duration);
     }

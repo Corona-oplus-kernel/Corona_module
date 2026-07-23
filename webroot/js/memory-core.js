@@ -505,7 +505,7 @@
         [document.querySelector('.banner-image'), document.getElementById('author-card')].forEach(element => {
             element?.addEventListener('pointerdown', loadExtras, { once: true, passive: true });
         });
-        if ('requestIdleCallback' in window) window.requestIdleCallback(loadExtras, { timeout: 800 });
+        if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(loadExtras, { timeout: 800 });
         else setTimeout(loadExtras, 120);
     },
     async loadHomeExtras() {
