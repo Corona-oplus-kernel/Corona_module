@@ -16,9 +16,9 @@
     --glass-selection-border: rgba(255, 255, 255, 0.35);
     --glass-selection-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.45);
     --glass-control-bg: rgba(0, 0, 0, 0.05);
-    --dialog-solid-bg: rgba(255, 255, 255, 0.74);
-    --control-solid-bg: rgba(255, 255, 255, 0.52);
-    --solid-border: rgba(17, 24, 39, 0.08);
+    --dialog-solid-bg: var(--glass-surface);
+    --control-solid-bg: var(--glass-surface-strong);
+    --solid-border: var(--glass-border);
     --glass-blur-floating: 10px;
     --glass-blur-card: 14px;
     --glass-blur-dialog: 16px;
@@ -88,9 +88,6 @@ body.theme-dark {
     --glass-selection-border: rgba(255, 255, 255, 0.14);
     --glass-selection-shadow: 0 2px 10px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
     --glass-control-bg: rgba(255, 255, 255, 0.07);
-    --dialog-solid-bg: rgba(20, 23, 31, 0.76);
-    --control-solid-bg: rgba(255, 255, 255, 0.06);
-    --solid-border: rgba(255, 255, 255, 0.1);
     --primary: hsl(var(--hue), 78%, 62%);
     --primary-dim: hsla(var(--hue), 78%, 62%, 0.18);
     --primary-light: hsla(var(--hue), 78%, 62%, 0.12);
@@ -237,9 +234,9 @@ body.theme-dark .color-pref-swatch {
 .color-picker-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(15, 18, 26, 0.24);
-    backdrop-filter: blur(16px) saturate(1.06);
-    -webkit-backdrop-filter: blur(16px) saturate(1.06);
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -254,6 +251,8 @@ body.theme-dark .color-pref-swatch {
     width: min(92vw, 400px);
     border-radius: 18px;
     background: var(--dialog-solid-bg);
+    backdrop-filter: blur(var(--glass-blur-card));
+    -webkit-backdrop-filter: blur(var(--glass-blur-card));
     border: 1px solid var(--solid-border);
     color: var(--text-main);
     box-shadow: var(--glass-shadow-lg);
@@ -263,6 +262,9 @@ body.theme-dark .color-pref-swatch {
 }
 body.theme-dark .color-picker-dialog {
     color: #f2f2f2;
+}
+body.theme-dark .color-picker-overlay {
+    background: rgba(0, 0, 0, 0.2);
 }
 .color-picker-dialog.closing {
     animation: coronaDialogOut 0.2s var(--motion-collapse) forwards;
@@ -5171,9 +5173,9 @@ body.theme-dark #zram-settings .option-item {
 
 #app-policy-overlay {
     padding: max(18px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom));
-    background: rgba(15, 18, 26, 0.22);
-    backdrop-filter: blur(18px) saturate(1.08);
-    -webkit-backdrop-filter: blur(18px) saturate(1.08);
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 #app-policy-overlay .app-policy-detail-card {
@@ -5184,6 +5186,8 @@ body.theme-dark #zram-settings .option-item {
     border-radius: 28px;
     border: 1px solid var(--solid-border);
     background: var(--dialog-solid-bg);
+    backdrop-filter: blur(var(--glass-blur-card));
+    -webkit-backdrop-filter: blur(var(--glass-blur-card));
     box-shadow: 0 24px 70px rgba(17, 24, 39, 0.22), 0 2px 12px rgba(17, 24, 39, 0.08);
 }
 
@@ -5277,6 +5281,10 @@ body.theme-dark #zram-settings .option-item {
 
 body.theme-dark #app-policy-overlay .app-policy-detail-card {
     box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+}
+
+body.theme-dark #app-policy-overlay {
+    background: rgba(0, 0, 0, 0.2);
 }
 
 @media (prefers-reduced-motion: reduce) {
