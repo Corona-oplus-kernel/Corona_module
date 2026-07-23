@@ -16,8 +16,8 @@
     --glass-selection-border: rgba(255, 255, 255, 0.35);
     --glass-selection-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.45);
     --glass-control-bg: rgba(0, 0, 0, 0.05);
-    --dialog-solid-bg: #fff;
-    --control-solid-bg: #fff;
+    --dialog-solid-bg: rgba(255, 255, 255, 0.92);
+    --control-solid-bg: rgba(255, 255, 255, 0.82);
     --solid-border: rgba(17, 24, 39, 0.08);
     --glass-blur-floating: 10px;
     --glass-blur-card: 14px;
@@ -88,8 +88,8 @@ body.theme-dark {
     --glass-selection-border: rgba(255, 255, 255, 0.14);
     --glass-selection-shadow: 0 2px 10px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.12);
     --glass-control-bg: rgba(255, 255, 255, 0.07);
-    --dialog-solid-bg: rgba(20, 23, 31, 0.94);
-    --control-solid-bg: rgba(255, 255, 255, 0.05);
+    --dialog-solid-bg: rgba(20, 23, 31, 0.9);
+    --control-solid-bg: rgba(255, 255, 255, 0.08);
     --solid-border: rgba(255, 255, 255, 0.1);
     --primary: hsl(var(--hue), 78%, 62%);
     --primary-dim: hsla(var(--hue), 78%, 62%, 0.18);
