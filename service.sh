@@ -709,6 +709,13 @@ apply_zram_recomp_algorithms() {
     done
 }
 
+apply_zram_runtime_values() {
+    [ -z "$swappiness$direct_swappiness" ] || write_zram_swappiness "$swappiness" "$direct_swappiness"
+    [ -n "$zram_used_limit_mb" ] && [ -w /dev/memcg/memory.zram_used_limit_mb ] && echo "$zram_used_limit_mb" > /dev/memcg/memory.zram_used_limit_mb 2>/dev/null
+    [ -n "$hybridswap_zram_increase" ] && [ -w "/sys/block/$zram_block/hybridswap_zram_increase" ] && echo "$hybridswap_zram_increase" > "/sys/block/$zram_block/hybridswap_zram_increase" 2>/dev/null
+    [ -n "$hybridswap_quota_day" ] && [ -w "/sys/block/$zram_block/hybridswap_quota_day" ] && echo "$hybridswap_quota_day" > "/sys/block/$zram_block/hybridswap_quota_day" 2>/dev/null
+}
+
 apply_zram_config() {
     [ ! -f "$CONFIG_DIR/zram.conf" ] && return
     enabled=$(get_conf_value "$CONFIG_DIR/zram.conf" enabled)
@@ -732,12 +739,7 @@ apply_zram_config() {
             swapoff "$zram_path" 2>/dev/null || return
             swapon "$zram_path" -p "$zram_priority" 2>/dev/null || return
         fi
-        if [ -n "$swappiness" ] || [ -n "$direct_swappiness" ]; then
-            write_zram_swappiness "$swappiness" "$direct_swappiness"
-        fi
-        [ -n "$zram_used_limit_mb" ] && [ -w /dev/memcg/memory.zram_used_limit_mb ] && echo "$zram_used_limit_mb" > /dev/memcg/memory.zram_used_limit_mb 2>/dev/null
-        [ -n "$hybridswap_zram_increase" ] && [ -w "/sys/block/$zram_block/hybridswap_zram_increase" ] && echo "$hybridswap_zram_increase" > "/sys/block/$zram_block/hybridswap_zram_increase" 2>/dev/null
-        [ -n "$hybridswap_quota_day" ] && [ -w "/sys/block/$zram_block/hybridswap_quota_day" ] && echo "$hybridswap_quota_day" > "/sys/block/$zram_block/hybridswap_quota_day" 2>/dev/null
+        apply_zram_runtime_values
         return
     fi
     swapoff "$zram_path" 2>/dev/null || return
@@ -758,12 +760,7 @@ apply_zram_config() {
         /system/bin/sh "$WRITEBACK_HELPER" apply "$zram_block" "$zram_writeback" "$writeback_size_mb" 2>/dev/null || return
     fi
     [ "$(get_swap_priority "$zram_path")" = "$zram_priority" ] || return
-    if [ -n "$swappiness" ] || [ -n "$direct_swappiness" ]; then
-        write_zram_swappiness "$swappiness" "$direct_swappiness"
-    fi
-    [ -n "$zram_used_limit_mb" ] && [ -w /dev/memcg/memory.zram_used_limit_mb ] && echo "$zram_used_limit_mb" > /dev/memcg/memory.zram_used_limit_mb 2>/dev/null
-    [ -n "$hybridswap_zram_increase" ] && [ -w "/sys/block/$zram_block/hybridswap_zram_increase" ] && echo "$hybridswap_zram_increase" > "/sys/block/$zram_block/hybridswap_zram_increase" 2>/dev/null
-    [ -n "$hybridswap_quota_day" ] && [ -w "/sys/block/$zram_block/hybridswap_quota_day" ] && echo "$hybridswap_quota_day" > "/sys/block/$zram_block/hybridswap_quota_day" 2>/dev/null
+    apply_zram_runtime_values
 }
 
 apply_swap_config() {

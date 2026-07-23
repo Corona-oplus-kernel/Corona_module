@@ -8,32 +8,16 @@ normalize_foreground_package() {
     printf '%s\n' "$pkg"
 }
 
+parse_foreground_component() {
+    awk '/topResumedActivity=|mResumedActivity:|mCurrentFocus=|mFocusedApp=/ { for (i = 1; i <= NF; i++) if ($i ~ /^[A-Za-z0-9_.-]+\//) { split($i, component, "/"); print component[1]; exit } }'
+}
+
 get_foreground_package() {
-    pkg=$(dumpsys activity activities 2>/dev/null | awk '
-        /topResumedActivity=|mResumedActivity:/ {
-            for (i = 1; i <= NF; i++) {
-                if ($i ~ /^[A-Za-z0-9_.-]+\//) {
-                    split($i, component, "/")
-                    print component[1]
-                    exit
-                }
-            }
-        }
-    ')
+    pkg=$(dumpsys activity activities 2>/dev/null | parse_foreground_component)
     [ -n "$pkg" ] && {
         normalize_foreground_package "$pkg" && return 0
     }
-    dumpsys window windows 2>/dev/null | awk '
-        /mCurrentFocus=|mFocusedApp=/ {
-            for (i = 1; i <= NF; i++) {
-                if ($i ~ /^[A-Za-z0-9_.-]+\//) {
-                    split($i, component, "/")
-                    print component[1]
-                    exit
-                }
-            }
-        }
-    ' | while IFS= read -r candidate; do normalize_foreground_package "$candidate"; done
+    dumpsys window windows 2>/dev/null | parse_foreground_component | while IFS= read -r candidate; do normalize_foreground_package "$candidate"; done
 }
 
 runtime_package_pids() {

@@ -812,11 +812,7 @@ perform_hybridswapd_reclaim() {
         LAST_ACTION=reclaim
         ACTION_THIS_RUN=reclaim
         LAST_REASON=background_anon_reclaim
-        read_mm_stat "$ZRAM_BLOCK"
-        USAGE_PERCENT=$(zram_usage_percent "$ZRAM_BLOCK")
-        COMPRESSED_MB=$(bytes_to_mb "$MM_COMPR")
-        MEMORY_USED_MB=$(bytes_to_mb "$MM_USED")
-        OVERHEAD_MB=$(positive_difference_mb "$MM_USED" "$MM_COMPR")
+        refresh_zram_metrics
     elif [ "$attempt_count" -gt 0 ]; then
         RECLAIM_FAIL_STREAK=$((RECLAIM_FAIL_STREAK + 1))
         if [ "$RECLAIM_FAIL_STREAK" -ge 3 ]; then
@@ -962,6 +958,15 @@ zram_usage_percent() {
     awk -v block="$block" 'NR > 1 { dev=$1; sub(/^.*\//, "", dev); if (dev == block) { print ($3 > 0 ? int($4 * 100 / $3) : 0); exit } }' /proc/swaps 2>/dev/null
 }
 
+refresh_zram_metrics() {
+    read_mm_stat "$ZRAM_BLOCK"
+    USAGE_PERCENT=$(zram_usage_percent "$ZRAM_BLOCK")
+    COMPRESSED_MB=$(bytes_to_mb "$MM_COMPR")
+    MEMORY_USED_MB=$(bytes_to_mb "$MM_USED")
+    OVERHEAD_MB=$(positive_difference_mb "$MM_USED" "$MM_COMPR")
+    COMPRESSION_RATIO_PERCENT=$(compression_ratio_percent "$MM_ORIG" "$MM_COMPR")
+}
+
 write_state() {
     tmp="$STATE_FILE.tmp.$$"
     {
@@ -1092,12 +1097,7 @@ run_once() {
     HYBRID_USED_MB=$(kb_to_mb "$(hybridswap_meminfo_kb "$ZRAM_BLOCK" ESU_C)")
     HYBRID_CAPACITY_MB=$(kb_to_mb "$(hybridswap_meminfo_kb "$ZRAM_BLOCK" EST)")
     ESWAP_AVAILABLE=$(check_eswap_usable "$ZRAM_BLOCK")
-    read_mm_stat "$ZRAM_BLOCK"
-    USAGE_PERCENT=$(zram_usage_percent "$ZRAM_BLOCK")
-    COMPRESSED_MB=$(bytes_to_mb "$MM_COMPR")
-    MEMORY_USED_MB=$(bytes_to_mb "$MM_USED")
-    OVERHEAD_MB=$(positive_difference_mb "$MM_USED" "$MM_COMPR")
-    COMPRESSION_RATIO_PERCENT=$(compression_ratio_percent "$MM_ORIG" "$MM_COMPR")
+    refresh_zram_metrics
 
     apply_memory_profile "$ZRAM_BLOCK"
 

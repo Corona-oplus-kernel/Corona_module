@@ -171,11 +171,7 @@ apply_zram_recomp_algorithms() {
 }
 
 configure_zram_device() {
-  local zram_path="$1"
-  local size="$2"
-  local comp_algorithm="$3"
-  local zram_writeback="$4"
-  local magic="$5"
+  local zram_path="$1" size="$2" comp_algorithm="$3" zram_writeback="$4" magic="$5"
   local zram_block=$(get_zram_block "$zram_path") || return 1
 
   /system/bin/swapoff "$zram_path" 2>/dev/null
@@ -199,11 +195,7 @@ configure_zram_device() {
 }
 
 zram_matches_config() {
-  local zram_path="$1"
-  local size="$2"
-  local comp_algorithm="$3"
-  local zram_writeback="$4"
-  local magic="$5"
+  local zram_path="$1" size="$2" comp_algorithm="$3" zram_writeback="$4" magic="$5"
   local zram_block=$(get_zram_block "$zram_path") || return 1
   [ "$(/system/bin/cat "/sys/block/$zram_block/disksize" 2>/dev/null | tr -d ' \n')" = "$size" ] || return 1
   [ "$(get_zram_priority "$zram_path")" = "$magic" ] || return 1
