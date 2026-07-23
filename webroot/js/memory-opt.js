@@ -9,28 +9,24 @@
     background: Object.freeze({
       key: 'background_enabled',
       switchId: 'lmk-switch',
-      legacyFiles: ['lmk.conf', 'device.conf'],
       titleKey: 'systemOptBackground',
       actionKeys: ['systemOptActionLmk', 'systemOptActionBackgroundLimits']
     }),
     reclaim: Object.freeze({
       key: 'reclaim_enabled',
       switchId: 'reclaim-switch',
-      legacyFiles: ['reclaim.conf', 'kswapd.conf'],
       titleKey: 'systemOptReclaim',
       actionKeys: ['systemOptActionReclaim', 'systemOptActionKswapd']
     }),
     protect: Object.freeze({
       key: 'protect_enabled',
       switchId: 'protect-switch',
-      legacyFiles: ['protect.conf'],
       titleKey: 'systemOptProtect',
       actionKeys: ['systemOptActionProtect']
     }),
     fstrim: Object.freeze({
       key: 'fstrim_enabled',
       switchId: 'fstrim-switch',
-      legacyFiles: ['fstrim.conf'],
       titleKey: 'systemOptFstrim',
       actionKeys: ['systemOptActionFstrim']
     })
@@ -47,22 +43,8 @@
       await this.loadSystemOptConfig();
     },
     async readSystemOptConfig() {
-      let content = await this.readConfig(CONFIG_FILE);
-      const values = new Map(this.parseSimpleConfig(content));
-      const updates = {};
-      const legacyFiles = [...new Set(Object.values(POLICIES).flatMap(policy => policy.legacyFiles))];
-      const legacyContents = new Map(await Promise.all(legacyFiles.map(async filename => [filename, await this.readConfig(filename)])));
-      Object.values(POLICIES).forEach(policy => {
-        if (values.has(policy.key)) return;
-        if (policy.legacyFiles.some(filename => legacyContents.get(filename)?.includes('enabled=1'))) {
-          updates[policy.key] = '1';
-        }
-      });
-      if (Object.keys(updates).length) content = await this.mergeConfigFile(CONFIG_FILE, updates, CONFIG_ORDER);
-      if (legacyFiles.some(filename => legacyContents.get(filename))) {
-        await this.exec(`rm -f ${legacyFiles.map(filename => this.shellQuote(this.getConfigPath(filename))).join(' ')}`);
-      }
-      return new Map(this.parseSimpleConfig(content));
+      await this.runSystemOptService('--migrate-system-opt');
+      return new Map(this.parseSimpleConfig(await this.readConfig(CONFIG_FILE)));
     },
     async loadSystemOptConfig() {
       const values = await this.readSystemOptConfig();
@@ -111,10 +93,13 @@
     },
     async applySystemOptNow(name) {
       if (!POLICIES[name]) return false;
-      const command = `CORONA_CONFIG_DIR=${this.shellQuote(this.configDir)} /system/bin/sh ${this.shellQuote(`${this.modDir}/service.sh`)} --apply-system-opt ${this.shellQuote(name)}`;
-      const result = await this.execResult(command);
-      if (result.code !== 0) throw new Error(result.stderr || `Failed to apply ${name}`);
+      await this.runSystemOptService('--apply-system-opt', name);
       return true;
+    },
+    async runSystemOptService(action, argument = '') {
+      const command = `CORONA_CONFIG_DIR=${this.shellQuote(this.configDir)} /system/bin/sh ${this.shellQuote(`${this.modDir}/service.sh`)} ${action}${argument ? ` ${this.shellQuote(argument)}` : ''}`;
+      const result = await this.execResult(command);
+      if (result.code !== 0) throw new Error(result.stderr || `Failed to run ${action}`);
     }
   });
 

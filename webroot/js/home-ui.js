@@ -742,11 +742,9 @@
         const overlays = ['battery-detail-overlay', 'memory-detail-overlay', 'storage-detail-overlay'];
         overlays.forEach(id => {
             const overlay = document.getElementById(id);
-            const closeBtn = document.getElementById(id.replace('-overlay', '-close'));
-            if (closeBtn) closeBtn.addEventListener('click', () => this.closeHomeDetail(id));
-            if (overlay) overlay.addEventListener('click', event => {
-                if (event.target === overlay) this.closeHomeDetail(id);
-            });
+            const close = () => this.closeHomeDetail(id);
+            document.getElementById(id.replace('-overlay', '-close'))?.addEventListener('click', close);
+            overlay?.addEventListener('click', event => { if (event.target === overlay) close(); });
         });
         this.initSurfaceSwipeNavigation();
         document.getElementById('xinran-overlay').addEventListener('click', (e) => { this.hideOverlay('xinran-overlay'); });
@@ -764,82 +762,51 @@
     },
     closeHomeDetail(id) {
         this.hideOverlay(id);
-        Promise.resolve(this.switchPage('home')).catch(error => {
-            console.error('home detail navigation failed', error);
-        });
+        this.switchPage('home')?.catch(error => console.error('home detail navigation failed', error));
     },
     bindSurfaceSwipe(surface, onDismiss) {
         if (!surface || surface.dataset.swipeBound === '1') return;
         surface.dataset.swipeBound = '1';
-        let pointerId = null;
-        let startX = 0;
-        let startY = 0;
-        let startTime = 0;
-        let offsetX = 0;
-        let dragging = false;
+        let gesture = null;
         const reset = () => {
-            surface.style.removeProperty('transition');
-            surface.style.removeProperty('transform');
-            surface.style.removeProperty('opacity');
+            ['transition', 'transform', 'opacity'].forEach(name => surface.style.removeProperty(name));
         };
-        const finish = event => {
-            if (pointerId === null || (event.pointerId !== undefined && event.pointerId !== pointerId)) return;
-            const elapsed = Math.max(1, performance.now() - startTime);
-            const dismiss = dragging && (offsetX < -72 || offsetX / elapsed < -0.55);
-            pointerId = null;
+        const finish = (event, cancelled = false) => {
+            if (!gesture || event.pointerId !== gesture.id) return;
+            const { offset, started, dragging } = gesture;
+            gesture = null;
             if (!dragging) return;
-            dragging = false;
+            const dismiss = !cancelled && (offset < -72 || offset / Math.max(1, performance.now() - started) < -0.55);
             surface.style.transition = 'transform 180ms cubic-bezier(.22, 1, .36, 1), opacity 160ms ease';
-            if (dismiss) {
-                surface.style.transform = 'translateX(-105vw)';
-                surface.style.opacity = '0';
-                window.setTimeout(() => {
-                    onDismiss();
-                    window.setTimeout(reset, 340);
-                }, 170);
-            } else {
-                surface.style.transform = 'translateX(0)';
-                surface.style.opacity = '1';
-                window.setTimeout(reset, 190);
-            }
-        };
-        const cancel = event => {
-            if (pointerId === null || (event.pointerId !== undefined && event.pointerId !== pointerId)) return;
-            pointerId = null;
-            if (!dragging) return;
-            dragging = false;
-            surface.style.transition = 'transform 180ms cubic-bezier(.22, 1, .36, 1), opacity 160ms ease';
-            surface.style.transform = 'translateX(0)';
-            surface.style.opacity = '1';
-            window.setTimeout(reset, 190);
+            surface.style.transform = dismiss ? 'translateX(-105vw)' : 'translateX(0)';
+            surface.style.opacity = dismiss ? '0' : '1';
+            window.setTimeout(() => {
+                if (dismiss) onDismiss();
+                window.setTimeout(reset, dismiss ? 340 : 0);
+            }, dismiss ? 170 : 190);
         };
         surface.addEventListener('pointerdown', event => {
             if (!event.isPrimary || event.button > 0 || event.target.closest('button, input, select, textarea, [role="button"]')) return;
-            pointerId = event.pointerId;
-            startX = event.clientX;
-            startY = event.clientY;
-            startTime = performance.now();
-            offsetX = 0;
-            dragging = false;
-            surface.setPointerCapture?.(pointerId);
+            gesture = { id: event.pointerId, x: event.clientX, y: event.clientY, started: performance.now(), offset: 0, dragging: false };
+            surface.setPointerCapture?.(event.pointerId);
         });
         surface.addEventListener('pointermove', event => {
-            if (pointerId === null || event.pointerId !== pointerId) return;
-            const deltaX = Math.min(0, event.clientX - startX);
-            const deltaY = event.clientY - startY;
-            if (!dragging) {
+            if (!gesture || event.pointerId !== gesture.id) return;
+            const deltaX = Math.min(0, event.clientX - gesture.x);
+            const deltaY = event.clientY - gesture.y;
+            if (!gesture.dragging) {
                 if (Math.abs(deltaY) > Math.abs(deltaX)) return;
                 if (deltaX > -8) return;
-                dragging = true;
+                gesture.dragging = true;
                 surface.style.transition = 'none';
             }
             event.preventDefault();
-            offsetX = deltaX;
+            gesture.offset = deltaX;
             surface.style.transform = `translateX(${deltaX}px)`;
             surface.style.opacity = String(Math.max(0.48, 1 + deltaX / Math.max(surface.clientWidth, 1)));
         }, { passive: false });
-        surface.addEventListener('pointerup', finish);
-        surface.addEventListener('pointercancel', cancel);
+        surface.addEventListener('pointerup', event => finish(event));
+        surface.addEventListener('pointercancel', event => finish(event, true));
     },
     showOverlay(id) {
         const overlay = document.getElementById(id);

@@ -1199,6 +1199,8 @@ if [ "$1" = "--apply-system-opt" ]; then
     exit 0
 fi
 
+[ "$1" = "--migrate-system-opt" ] && exit 0
+
 if [ "$1" = "--apply-writeback-block" ]; then
     apply_writeback_block_config
     exit $?
