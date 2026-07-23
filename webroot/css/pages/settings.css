@@ -667,6 +667,58 @@ body.theme-dark .option-item {
     margin: 10px 0 0;
 }
 
+.runtime-daemon-waiting {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 13px 14px;
+    border: 1px solid color-mix(in srgb, var(--text-sub) 13%, transparent);
+    border-radius: var(--radius-ctl);
+    background: color-mix(in srgb, var(--text-main) 4%, transparent);
+}
+
+.runtime-daemon-waiting[hidden] {
+    display: none;
+}
+
+.runtime-daemon-waiting-dot {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 9px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--text-dim) 10%, transparent);
+}
+
+.runtime-daemon-waiting > span:last-child {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.runtime-daemon-waiting strong {
+    color: var(--text-main);
+    font-size: 13px;
+}
+
+.runtime-daemon-waiting small {
+    color: var(--text-sub);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.thread-runtime-overview.runtime-stopped .runtime-dashboard,
+.thread-runtime-overview.runtime-stopped .runtime-live-grid,
+.thread-runtime-overview.runtime-stopped .runtime-capability-section,
+.thread-runtime-overview.runtime-stopped .runtime-status-note {
+    display: none;
+}
+
+.thread-runtime-overview.runtime-stopped .runtime-decision-section {
+    margin-top: 12px;
+}
+
 .runtime-optimizer-section {
     margin-bottom: 14px;
     overflow: hidden;

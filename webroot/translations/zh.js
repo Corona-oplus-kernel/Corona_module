@@ -837,6 +837,8 @@
       "runtimeUnknown": "未知",
       "runtimeRunning": "运行中",
       "runtimeStopped": "已停止",
+      "runtimeWaitingTitle": "运行状态暂不可用",
+      "runtimeWaitingDesc": "在模块设置中开启守护进程后显示策略与硬件能力",
       "runtimeForeground": "前台应用",
       "runtimeDetection": "检测来源",
       "runtimeMode": "运行模式",

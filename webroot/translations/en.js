@@ -837,6 +837,8 @@
       "runtimeUnknown": "Unknown",
       "runtimeRunning": "Running",
       "runtimeStopped": "Stopped",
+      "runtimeWaitingTitle": "Runtime status unavailable",
+      "runtimeWaitingDesc": "Enable the daemon in Module Settings to view policies and hardware capabilities",
       "runtimeForeground": "Foreground app",
       "runtimeDetection": "Detection source",
       "runtimeMode": "Runtime mode",

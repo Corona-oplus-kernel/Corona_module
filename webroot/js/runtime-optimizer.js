@@ -186,11 +186,19 @@
             return true;
         },
         rejectDaemonDependentToggle(toggle) {
-            if (!toggle?.checked || !this.rejectDaemonDependentAction()) return false;
+            if (!toggle || !this.rejectDaemonDependentAction()) return false;
+            const previousChecked = !toggle.checked;
             setTimeout(() => {
-                toggle.checked = false;
+                toggle.checked = previousChecked;
             }, 180);
             return true;
+        },
+        updateRuntimeOverviewState(running) {
+            const overview = document.querySelector('.thread-runtime-overview');
+            if (!overview) return;
+            overview.classList.toggle('runtime-stopped', !running);
+            const waiting = document.getElementById('runtime-daemon-waiting');
+            if (waiting) waiting.hidden = running;
         },
         updateRuntimeDaemonControlState(enabled) {
             document.querySelector('.runtime-class-section')?.classList.toggle('runtime-daemon-locked', !enabled);
@@ -481,6 +489,7 @@
             const binary = this.shellQuote(`${this.modDir}/bin/coronad`);
             const status = this.parseRuntimeKeyValues(await this.exec(`${binary} status 2>/dev/null`));
             const running = status.running === '1';
+            this.updateRuntimeOverviewState(running);
             this.updateRuntimeCapabilities(status, running);
             this.updateRuntimeDecisions(status);
             const badge = document.getElementById('runtime-status-badge');
