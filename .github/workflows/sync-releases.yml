@@ -1,0 +1,167 @@
+name: Sync Releases
+
+on:
+  schedule:
+    - cron: '27 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-releases
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_REPO: Corona-oplus-kernel/Corona_module_source
+      TARGET_REPO: ${{ github.repository }}
+      SOURCE_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
+      TARGET_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
+    steps:
+      - name: Checkout private source
+        uses: actions/checkout@v5
+        with:
+          repository: Corona-oplus-kernel/Corona_module_source
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          path: source
+          fetch-depth: 1
+
+      - name: Checkout update repository
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          path: target
+          fetch-depth: 1
+
+      - name: Mirror published releases
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/corona-sync"
+          mkdir -p "$root"
+
+          GH_TOKEN="$SOURCE_TOKEN" gh api \
+            "repos/$SOURCE_REPO/releases?per_page=100" |
+            jq -c '[.[] | select(.draft == false)][:3][]' > "$root/source.jsonl"
+          jq -r '.tag_name' "$root/source.jsonl" > "$root/source-tags.txt"
+
+          GH_TOKEN="$TARGET_TOKEN" gh api \
+            "repos/$TARGET_REPO/releases?per_page=100" --paginate |
+            jq -c '.[]' > "$root/target.jsonl"
+          jq -r '.tag_name' "$root/target.jsonl" | while IFS= read -r tag; do
+              if ! grep -Fxq "$tag" "$root/source-tags.txt"; then
+                GH_TOKEN="$TARGET_TOKEN" gh release delete "$tag" \
+                  --repo "$TARGET_REPO" --yes --cleanup-tag
+              fi
+            done
+
+          main_sha=$(GH_TOKEN="$TARGET_TOKEN" gh api \
+            "repos/$TARGET_REPO/git/ref/heads/main" --jq '.object.sha')
+
+          while IFS= read -r release; do
+            tag=$(jq -r '.tag_name' <<<"$release")
+            name=$(jq -r '.name // .tag_name' <<<"$release")
+            prerelease=$(jq -r '.prerelease' <<<"$release")
+            signature_filter='{name:(.name//.tag_name),body:((.body//"")|sub("(\\r?\\n)+$";"")),draft:(.draft//false),prerelease:(.prerelease//false),assets:([(.assets//[])[]|{name,size}]|sort_by(.name))}'
+            source_json="$root/$tag-source.json"
+            target_json="$root/$tag-target.json"
+            printf '%s\n' "$release" > "$source_json"
+            jq -S "$signature_filter" "$source_json" > "$source_json.signature"
+            target_release=$(jq -c --arg tag "$tag" \
+              'select(.tag_name == $tag)' "$root/target.jsonl")
+            if [[ -n "$target_release" ]]; then
+              printf '%s\n' "$target_release" > "$target_json"
+              jq -S "$signature_filter" "$target_json" > "$target_json.signature"
+            fi
+
+            if [[ -f "$target_json.signature" ]] && \
+              cmp -s "$source_json.signature" "$target_json.signature"; then
+              echo "$tag: unchanged"
+              continue
+            fi
+
+            directory="$root/releases/$tag"
+            mkdir -p "$directory/assets"
+            jq -r '.body // ""' <<<"$release" > "$directory/notes.md"
+            GH_TOKEN="$SOURCE_TOKEN" gh release download "$tag" \
+              --repo "$SOURCE_REPO" --dir "$directory/assets" --clobber
+            expected_assets=$(jq '.assets | length' <<<"$release")
+            downloaded_assets=$(find "$directory/assets" -maxdepth 1 -type f | wc -l)
+            test "$downloaded_assets" -eq "$expected_assets"
+
+            GH_TOKEN="$TARGET_TOKEN" gh release delete "$tag" \
+              --repo "$TARGET_REPO" --yes 2>/dev/null || true
+            GH_TOKEN="$TARGET_TOKEN" gh api \
+              "repos/$TARGET_REPO/git/refs" -X POST \
+              -f ref="refs/tags/$tag" -f sha="$main_sha" >/dev/null 2>&1 || true
+
+            args=(release create "$tag" --repo "$TARGET_REPO" \
+              --title "$name" --notes-file "$directory/notes.md" --verify-tag)
+            test "$prerelease" = true && args+=(--prerelease)
+            while IFS= read -r -d '' asset; do
+              args+=("$asset")
+            done < <(find "$directory/assets" -maxdepth 1 -type f -print0 | sort -z)
+            GH_TOKEN="$TARGET_TOKEN" gh "${args[@]}"
+            echo "$tag: synchronized"
+          done < "$root/source.jsonl"
+
+      - name: Publish update metadata and documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/corona-sync"
+          publish="$root/public-root"
+          current="$root/current-root"
+          mkdir -p "$publish/.github/workflows" "$current"
+
+          cp target/.github/workflows/sync-releases.yml \
+            "$publish/.github/workflows/sync-releases.yml"
+          cp source/README.md source/LICENSE "$publish/"
+          cp -a source/docs "$publish/docs"
+
+          latest=$(jq -sc 'map(select(.prerelease == false)) | first' \
+            "$root/source.jsonl")
+          tag=$(jq -r '.tag_name' <<<"$latest")
+          body=$(jq -r '.body // ""' <<<"$latest")
+          zip_name=$(jq -r \
+            '[.assets[] | select(.name | endswith(".zip"))][0].name // empty' \
+            <<<"$latest")
+          test -n "$zip_name"
+
+          GH_TOKEN="$SOURCE_TOKEN" gh api \
+            "repos/$SOURCE_REPO/contents/module.prop?ref=$tag" --jq '.content' |
+            base64 -d > "$root/module.prop"
+          version=$(sed -n 's/^version=//p' "$root/module.prop" | head -1)
+          version_code=$(sed -n 's/^versionCode=//p' "$root/module.prop" | head -1)
+          test -n "$version"
+          [[ "$version_code" =~ ^[0-9]+$ ]]
+
+          printf '# Corona %s\n\n%s\n' "$version" "$body" > "$publish/changelog.md"
+          printf '{\n  "version": "%s",\n  "versionCode": %s,\n  "zipUrl": "https://github.com/%s/releases/download/%s/%s",\n  "changelog": "https://raw.githubusercontent.com/%s/main/changelog.md"\n}\n' \
+            "$version" "$version_code" "$TARGET_REPO" "$tag" "$zip_name" \
+            "$TARGET_REPO" > "$publish/update.json"
+
+          (cd target && tar --exclude=.git -cf - .) | (cd "$current" && tar -xf -)
+          if diff -qr "$current" "$publish" >/dev/null; then
+            new_sha=$(git -C target rev-parse HEAD)
+            echo "Documentation and update metadata unchanged"
+          else
+            git -C "$publish" init -b main
+            git -C "$publish" config user.name wswzgdg
+            git -C "$publish" config user.email wswzgdg@gmail.com
+            git -C "$publish" add .
+            git -C "$publish" commit -m '同步 Release 与文档'
+            git -C "$publish" remote add origin \
+              "https://x-access-token:${TARGET_TOKEN}@github.com/${TARGET_REPO}.git"
+            git -C "$publish" push --force origin main
+            new_sha=$(git -C "$publish" rev-parse HEAD)
+          fi
+
+          while IFS= read -r tag; do
+            printf '{"sha":"%s","force":true}' "$new_sha" |
+              GH_TOKEN="$TARGET_TOKEN" gh api \
+                "repos/$TARGET_REPO/git/refs/tags/$tag" -X PATCH --input - >/dev/null
+          done < "$root/source-tags.txt"
