@@ -108,19 +108,11 @@ jobs:
             echo "$tag: synchronized"
           done < "$root/source.jsonl"
 
-      - name: Publish update metadata and documentation
+      - name: Publish update metadata
         shell: bash
         run: |
           set -euo pipefail
           root="$RUNNER_TEMP/corona-sync"
-          publish="$root/public-root"
-          current="$root/current-root"
-          mkdir -p "$publish/.github/workflows" "$current"
-
-          cp target/.github/workflows/sync-releases.yml \
-            "$publish/.github/workflows/sync-releases.yml"
-          cp source/README.md source/LICENSE "$publish/"
-          cp -a source/docs "$publish/docs"
 
           latest=$(jq -sc 'map(select(.prerelease == false)) | first' \
             "$root/source.jsonl")
@@ -140,32 +132,26 @@ jobs:
           [[ "$version_code" =~ ^[0-9]+$ ]]
 
           if [[ "$body" == "# Corona "* ]]; then
-            printf '%s\n' "$body" > "$publish/changelog.md"
+            printf '%s\n' "$body" > target/changelog.md
           else
-            printf '# Corona %s\n\n%s\n' "$version" "$body" > "$publish/changelog.md"
+            printf '# Corona %s\n\n%s\n' "$version" "$body" > target/changelog.md
           fi
           printf '{\n  "version": "%s",\n  "versionCode": %s,\n  "zipUrl": "https://github.com/%s/releases/download/%s/%s",\n  "changelog": "https://raw.githubusercontent.com/%s/main/changelog.md"\n}\n' \
             "$version" "$version_code" "$TARGET_REPO" "$tag" "$zip_name" \
-            "$TARGET_REPO" > "$publish/update.json"
+            "$TARGET_REPO" > target/update.json
 
-          (cd target && tar --exclude=.git -cf - .) | (cd "$current" && tar -xf -)
-          if diff -qr "$current" "$publish" >/dev/null; then
-            new_sha=$(git -C target rev-parse HEAD)
-            echo "Documentation and update metadata unchanged"
-          else
-            git -C "$publish" init -b main
-            git -C "$publish" config user.name wswzgdg
-            git -C "$publish" config user.email wswzgdg@gmail.com
-            git -C "$publish" add .
-            git -C "$publish" commit -m '同步 Release 与文档'
-            git -C "$publish" remote add origin \
-              "https://x-access-token:${TARGET_TOKEN}@github.com/${TARGET_REPO}.git"
-            git -C "$publish" push --force origin main
-            new_sha=$(git -C "$publish" rev-parse HEAD)
+          cd target
+          git config user.name wswzgdg
+          git config user.email wswzgdg@gmail.com
+          git add update.json changelog.md
+          if ! git diff --cached --quiet; then
+            git commit -m "update: $version"
+            git push
           fi
 
-          while IFS= read -r tag; do
+          new_sha=$(git rev-parse HEAD)
+          while IFS= read -r t; do
             printf '{"sha":"%s","force":true}' "$new_sha" |
               GH_TOKEN="$TARGET_TOKEN" gh api \
-                "repos/$TARGET_REPO/git/refs/tags/$tag" -X PATCH --input - >/dev/null
+                "repos/$TARGET_REPO/git/refs/tags/$t" -X PATCH --input - >/dev/null
           done < "$root/source-tags.txt"
