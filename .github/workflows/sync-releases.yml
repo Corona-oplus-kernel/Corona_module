@@ -101,6 +101,7 @@ jobs:
             args=(release create "$tag" --repo "$TARGET_REPO" \
               --title "$name" --notes-file "$directory/notes.md" --verify-tag)
             test "$prerelease" = true && args+=(--prerelease)
+            [ "$tag" = "$(head -1 "$root/source-tags.txt")" ] && args+=(--latest)
             while IFS= read -r -d '' asset; do
               args+=("$asset")
             done < <(find "$directory/assets" -maxdepth 1 -type f -print0 | sort -z)
