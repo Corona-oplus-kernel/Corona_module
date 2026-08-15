@@ -1,30 +1,7 @@
-# Corona v5.2.0
+# Corona v5.2.2
 
-- fix: 开关绑核不再弹回
-- 安装时显示 CPU 拓扑与功能检测信息
-- 默认启用守护进程
-- fix: 守护进程迁移到 system cgroup 避免被前台杀进程波及
-- ci: release 标记 latest
-- Update changelog for v5.2.0 release
-
-- fix: 开关绑核不再弹回
-- 安装时显示 CPU 拓扑与功能检测信息
-- 默认启用守护进程
-- fix: 守护进程迁移到 system cgroup 避免被前台杀进程波及
-- ci: release 标记 latest
-- Update changelog for v5.2.0 release
-
-- 安装时显示 CPU 拓扑与功能检测信息
-- 默认启用守护进程
-- fix: 守护进程迁移到 system cgroup 避免被前台杀进程波及
-- ci: release 标记 latest
-- Update changelog for v5.2.0 release
-
-- 默认启用守护进程
-- fix: 守护进程迁移到 system cgroup 避免被前台杀进程波及
-- ci: release 标记 latest
-- Update changelog for v5.2.0 release
-
-- 加入前台线程绑核
-- refactor: 提取面板动画公共逻辑，减少重复代码
-- 和对象在一起一周年OVO
+- 优化 `coronad` 常驻资源占用，减少前台探测、`/proc` 扫描与状态落盘频率
+- 自动线程亲和性接入 eBPF fork、rename、exit 事件，降低新线程处理延迟
+- 自动规则跳过易变 Binder/线程池名称，并处理 cpuset 限制导致的绑核失败
+- 自动分配页面新增 eBPF 与 cgroup boost 状态展示
+- 加入纯色设置解决web的部分性能问题
