@@ -1,3 +1,4 @@
-# Corona v5.2.6
+# Corona v5.2.7
 
-- 抽取公共函数到 `scripts/common.sh`, 消除跨脚本重复定义
+- 修复 coronad reload 后状态快照延迟, 消除 WebUI 首次点应用判定失效
+- 修复 solid 主题彩蛋弹窗文字
