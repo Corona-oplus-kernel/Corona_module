@@ -1,4 +1,6 @@
-# Corona v5.2.7
+# Corona v5.2.8
 
-- 修复 coronad reload 后状态快照延迟, 消除 WebUI 首次点应用判定失效
-- 修复 solid 主题彩蛋弹窗文字
+- 新增“仅启动 Boost”模式，默认关闭持续后台干预
+- 增加一键重置全部功能
+- 纯色主题默认关闭，并修复相关弹窗文字显示
+- 修复 `coronad reload` 后 WebUI 状态刷新延迟问题
