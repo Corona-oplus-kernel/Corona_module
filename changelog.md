@@ -1,11 +1,5 @@
-# Corona v5.4.6
+# Corona v5.5.0
 
-- chore: bump version to v5.4.6
-- feat: add boot notification, borderless runtime panels and optimize animations
-- Preload settings and merge startup probes
-- Load daemon subsystems on demand
-- fix: remove footer tint behind end labels
-- fix: persist blur settings and restore memory card styling
-- fix: 修复内存压缩卡片背景模糊
-- fix: 完成 WebUI 背景与性能优化
-- fix: detect OPlus memcg nodes dynamically
+引导状态相关属性与 bootconfig 处理
+service.sh 的常驻循环改用 setsid
+补全老配置里缺失的键
